@@ -52,7 +52,7 @@ venue. If all suitable courses in that city are booked, the event moves to anoth
 ## How difficult each layout is
 
 Every layout is rated by simulation: the average score of a tour pro (75), an amateur event winner (40),
-an amateur (25) and a high schooler (10). Roughly, for tour pros: elite +2 to +3 over par (Georgia
+an amateur (25) and a high schooler (10). Roughly, for tour pros: elite about +3 over par (every elite course gets a championship set-up: at least 7,250 yards, tighter fairways, heavier rough, faster greens; Georgia
 National +3.5), championship +1, standard −1.5 (Club −4, Forward −6), municipal −6.5. Amateurs are
 punished far more on hard courses: an amateur (25) is about +19 on an elite course and +6 on a
 municipal one. See the report for full ranges by class and layout.

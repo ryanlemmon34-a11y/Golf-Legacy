@@ -371,6 +371,19 @@ def make_holes(style, d, par, rng):
     return tuple(holes)
 
 
+ELITE_MIN_YARDS = 7250
+
+
+def championship_setup(holes):
+    """The world's best courses are set up as major-championship tests: long, tight, firm and fast."""
+    total = sum(h.yards for h in holes)
+    k = max(1.0, ELITE_MIN_YARDS / total)
+    return tuple(replace(h, yards=int(round(h.yards * k)),
+                         fairway_width=round(max(22.0, h.fairway_width - 3), 1),
+                         rough_severity=round(min(1.0, h.rough_severity + 0.10), 2),
+                         green_speed=round(min(14.5, h.green_speed + 0.4), 1)) for h in holes)
+
+
 LAYOUT_SETUPS = {
     # name: (yardage factor, green speed change, rough change, firmness change)
     'Championship': (1.0, 0.0, 0.0, 0.0),
@@ -410,6 +423,8 @@ def generate_site(course_id, city, cls, rng, taken_names, style=None):
     if style == 'Links' and par == 72 and rng.random() < .4:
         par = 71
     holes = make_holes(style, d, par, rng)
+    if cls == 'elite':
+        holes = championship_setup(holes)
     name = course_name(city, cls, style, rng, taken_names)
     architect, opened = pick_architect(style, rng, cls)
     country = CITY_BY_NAME[city].country

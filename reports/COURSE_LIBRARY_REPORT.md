@@ -1,6 +1,6 @@
 # Golf Legacy — World Course Library
 
-**380 fictional courses** in 258 real cities across 57 countries, with **797 layouts**. Every layout rated by simulation (100 rounds per level, 86 s to build and rate). Venue checks over 10 seasons: **all passed**.
+**380 fictional courses** in 258 real cities across 57 countries, with **797 layouts**. Every layout rated by simulation (100 rounds per level, 84 s to build and rate). Venue checks over 10 seasons: **all passed**.
 
 Courses are generated from the calendar: ten seasons are replayed and every event (and every site of a multi-site qualifier) needs a free course of the right standard in its host city that week. That sets the minimum; the rest of the 380 are extra clubs where golf is busiest.
 
@@ -21,7 +21,7 @@ Average score to par for uniform golfers at each level (calm weather). Ranges sh
 
 | Class | Layout | Layouts | Yards (avg) | Tour pro (75) | Amateur winner (40) | Amateur (25) | High schooler (10) |
 |---|---|---|---|---|---|---|---|
-| Elite | Championship | 34 | 7,283 | +2.3 (E to +4.7) | +11.7 (+7.7 to +15.0) | +18.9 (+13.5 to +22.4) | +34.7 (+27.0 to +39.5) |
+| Elite | Championship | 34 | 7,331 | +3.1 (+0.1 to +5.3) | +13.0 (+8.5 to +17.5) | +20.4 (+15.0 to +24.9) | +37.2 (+29.5 to +42.7) |
 | Championship | Championship | 124 | 7,040 | +0.8 (-2.2 to +3.4) | +10.1 (+4.5 to +14.0) | +16.7 (+10.6 to +22.9) | +31.4 (+25.2 to +38.0) |
 | Championship | Club | 124 | 6,547 | -1.7 (-4.8 to +0.7) | +7.0 (+2.9 to +10.6) | +13.3 (+7.4 to +17.2) | +26.6 (+18.8 to +32.7) |
 | Standard | Championship | 200 | 6,673 | -1.5 (-5.2 to +2.0) | +7.1 (+3.1 to +12.1) | +13.3 (+8.7 to +18.2) | +26.8 (+20.4 to +32.5) |
@@ -111,55 +111,55 @@ Average score to par for uniform golfers at each level (calm weather). Ranges sh
 
 | Course | City | Style | Architect | Opened | Par | Yards | Tour avg | Major rota |
 |---|---|---|---|---|---|---|---|---|
+| Briar Creek Club | Monterey, California | Coastal | Ian McCrae | 1935 | 70 | 7,251 | 75.3 (+5.3) | USA Open |
+| Holly Landing Club | Philadelphia, Pennsylvania | Woodland | Lars Eklund | 1990 | 70 | 7,252 | 75.2 (+5.2) | USA Open |
+| Ravensworth Ridge National | Charlotte, North Carolina | Woodland | Samuel Kittredge | 1919 | 72 | 7,497 | 77.1 (+5.1) | Premier Tour Championship |
 | Stonebridge Hollow Golf Club | Pittsburgh, Pennsylvania | Woodland | Samuel Kittredge | 1930 | 71 | 7,310 | 75.7 (+4.7) | USA Open |
-| Marten Hollow Golf Club | Boston, Massachusetts | Mountain | Hans Brenner | 1974 | 71 | 7,212 | 75.0 (+4.0) | USA Open |
-| Ravensworth Ridge National | Charlotte, North Carolina | Woodland | Samuel Kittredge | 1919 | 72 | 7,497 | 76.0 (+4.0) | Premier Tour Championship |
-| Holly Landing Club | Philadelphia, Pennsylvania | Woodland | Lars Eklund | 1990 | 70 | 7,156 | 74.0 (+4.0) | USA Open |
-| Northcote Park National | Kohler, Wisconsin | Parkland | Mei Lin Zhao | 2005 | 71 | 7,422 | 74.7 (+3.7) | Premier Tour Championship |
-| Royal Willowwood Club | Canberra | Parkland | Lars Eklund | 1976 | 72 | 7,412 | 75.5 (+3.5) |  |
+| Royal Willowwood Club | Canberra | Parkland | Lars Eklund | 1976 | 72 | 7,412 | 76.7 (+4.7) |  |
+| Bluestone Vale Golf Club | Seattle, Washington | Coastal | Ian McCrae | 1931 | 70 | 7,248 | 74.6 (+4.6) | USA Open |
+| Sable Fields Golf Club | Kiawah Island, South Carolina | Parkland | Jack Nevin | 1974 | 70 | 7,249 | 74.4 (+4.4) | Premier Tour Championship |
+| Marten Hollow Golf Club | Boston, Massachusetts | Mountain | Hans Brenner | 1974 | 71 | 7,250 | 75.3 (+4.3) | USA Open |
+| Briar Bay National | Los Angeles, California | Coastal | Samuel Kittredge | 1938 | 72 | 7,323 | 76.3 (+4.3) | USA Open |
+| Langford Dunes Club | San Francisco, California | Coastal | Ian McCrae | 1961 | 71 | 7,248 | 75.0 (+4.0) | Premier Tour Championship |
+| Mapleton Landing National | Melbourne | Coastal | Samuel Kittredge | 1938 | 72 | 7,367 | 76.0 (+4.0) |  |
+| Northcote Park National | Kohler, Wisconsin | Parkland | Mei Lin Zhao | 2005 | 71 | 7,422 | 74.9 (+3.9) | Premier Tour Championship |
+| Dunmore Wood Golf Club | Columbus, Ohio | Parkland | Harold Penrose | 1908 | 71 | 7,378 | 74.8 (+3.9) |  |
+| Birchwood National | Bethesda, Maryland | Parkland | William Ashdown | 1931 | 72 | 7,382 | 75.7 (+3.6) | Premier Tour Championship |
+| Ironwood Springs Club | Louisville, Kentucky | Woodland | Kenji Morita | 1978 | 72 | 7,329 | 75.6 (+3.6) | Premier Tour Championship |
+| Ravensworth Hollow Golf Club | Rochester, New York | Parkland | Jack Nevin | 1961 | 70 | 7,251 | 73.5 (+3.5) | Premier Tour Championship |
+| Copper Cove Club | Southampton, New York | Parkland | William Ashdown | 1911 | 72 | 7,482 | 75.5 (+3.5) | USA Open |
+| Bramble Park Golf Club | Bandon, Oregon | Coastal | Samuel Kittredge | 1926 | 72 | 7,303 | 75.5 (+3.5) | USA Open |
 | Georgia National Golf Club | Athens, Georgia | Woodland | Samuel Kittredge | 1931 | 72 | 7,635 | 75.5 (+3.5) | Tour Masters (every year) |
-| Ironwood Springs Club | Louisville, Kentucky | Woodland | Kenji Morita | 1978 | 72 | 7,329 | 75.4 (+3.4) | Premier Tour Championship |
-| Bluestone Vale Golf Club | Seattle, Washington | Coastal | Ian McCrae | 1931 | 70 | 7,120 | 73.2 (+3.2) | USA Open |
-| Royal Carrick Fields Golf Club | Carnoustie | Links | Arthur Bellamy | 1943 | 71 | 7,430 | 74.1 (+3.1) | Britannia Open |
-| Briar Bay National | Los Angeles, California | Coastal | Samuel Kittredge | 1938 | 72 | 7,323 | 75.0 (+3.0) | USA Open |
-| Mapleton Landing National | Melbourne | Coastal | Samuel Kittredge | 1938 | 72 | 7,367 | 74.9 (+2.9) |  |
-| Langford Dunes Club | San Francisco, California | Coastal | Ian McCrae | 1961 | 71 | 7,228 | 73.9 (+2.9) | Premier Tour Championship |
-| Briar Creek Club | Monterey, California | Coastal | Ian McCrae | 1935 | 70 | 6,905 | 72.7 (+2.7) | USA Open |
-| Bramble Park Golf Club | Bandon, Oregon | Coastal | Samuel Kittredge | 1926 | 72 | 7,303 | 74.7 (+2.7) | USA Open |
-| Sable Fields Golf Club | Kiawah Island, South Carolina | Parkland | Jack Nevin | 1974 | 70 | 7,067 | 72.7 (+2.6) | Premier Tour Championship |
-| Dunmore Wood Golf Club | Columbus, Ohio | Parkland | Harold Penrose | 1908 | 71 | 7,378 | 73.6 (+2.6) |  |
-| Whitfield Meadows National | Jacksonville, Florida | Woodland | Thomas Whitcombe | 1928 | 72 | 7,209 | 74.6 (+2.6) |  |
-| Copper Cove Club | Southampton, New York | Parkland | William Ashdown | 1911 | 72 | 7,482 | 74.2 (+2.2) | USA Open |
-| Birchwood National | Bethesda, Maryland | Parkland | William Ashdown | 1931 | 72 | 7,382 | 74.2 (+2.2) | Premier Tour Championship |
-| Hawk Bend Golf Club | Pinehurst, North Carolina | Parkland | Pierre Lavallée | 1972 | 71 | 7,302 | 73.0 (+2.0) | USA Open |
-| Royal Amber Wood Golf Club | Glasgow | Parkland | Harold Penrose | 1909 | 71 | 7,187 | 72.8 (+1.8) |  |
-| Dunmore Brook Links | Sandwich | Links | Alistair Grieve | 1890 | 72 | 7,424 | 73.7 (+1.7) | Britannia Open |
-| Royal Heatherbrook Club | Virginia Water | Parkland | Kenji Morita | 1992 | 71 | 7,105 | 72.7 (+1.6) |  |
-| Ravensworth Hollow Golf Club | Rochester, New York | Parkland | Jack Nevin | 1961 | 70 | 7,049 | 71.6 (+1.6) | Premier Tour Championship |
-| Quarry Brook Links | Edinburgh | Links | Arthur Bellamy | 1939 | 71 | 7,190 | 72.2 (+1.2) |  |
-| Marten Bay Links | North Berwick | Links | Arthur Bellamy | 1938 | 72 | 7,479 | 73.0 (+1.0) | Britannia Open |
-| Thornbury Valley Golf Club | Tulsa, Oklahoma | Parkland | Kenji Morita | 1993 | 72 | 7,325 | 72.9 (+0.9) | Premier Tour Championship |
-| Marten Woods Golf Links | Southport | Links | Arthur Bellamy | 1950 | 71 | 7,313 | 71.7 (+0.7) | Britannia Open |
-| Hollins Dunes Golf Club | St Andrews | Links | Duncan Fairlie | 1923 | 72 | 7,371 | 72.5 (+0.5) | Britannia Open |
-| Ardnacross Golf Links | Inverness | Links | Arthur Bellamy | 1950 | 72 | 7,274 | 72.4 (+0.4) |  |
-| Royal Kilcarra Golf Club | Portrush | Links | Ian McCrae | 1932 | 72 | 7,202 | 72.3 (+0.3) | Britannia Open |
-| Elder Crest Golf Links | Troon | Links | Arthur Bellamy | 1935 | 71 | 6,986 | 71.2 (+0.2) | Britannia Open |
-| Royal Larchton Links | Hoylake | Links | Arthur Bellamy | 1930 | 72 | 7,234 | 72.0 (-0.1) | Britannia Open |
+| Royal Carrick Fields Golf Club | Carnoustie | Links | Arthur Bellamy | 1943 | 71 | 7,430 | 74.2 (+3.1) | Britannia Open |
+| Hawk Bend Golf Club | Pinehurst, North Carolina | Parkland | Pierre Lavallée | 1972 | 71 | 7,302 | 74.1 (+3.1) | USA Open |
+| Whitfield Meadows National | Jacksonville, Florida | Woodland | Thomas Whitcombe | 1928 | 72 | 7,249 | 75.1 (+3.1) |  |
+| Royal Amber Wood Golf Club | Glasgow | Parkland | Harold Penrose | 1909 | 71 | 7,251 | 73.5 (+2.5) |  |
+| Dunmore Brook Links | Sandwich | Links | Alistair Grieve | 1890 | 72 | 7,424 | 74.2 (+2.2) | Britannia Open |
+| Royal Heatherbrook Club | Virginia Water | Parkland | Kenji Morita | 1992 | 71 | 7,249 | 73.2 (+2.2) |  |
+| Marten Bay Links | North Berwick | Links | Arthur Bellamy | 1938 | 72 | 7,479 | 73.9 (+1.9) | Britannia Open |
+| Quarry Brook Links | Edinburgh | Links | Arthur Bellamy | 1939 | 71 | 7,249 | 72.8 (+1.8) |  |
+| Marten Woods Golf Links | Southport | Links | Arthur Bellamy | 1950 | 71 | 7,313 | 72.6 (+1.6) | Britannia Open |
+| Elder Crest Golf Links | Troon | Links | Arthur Bellamy | 1935 | 71 | 7,250 | 72.5 (+1.5) | Britannia Open |
+| Royal Kilcarra Golf Club | Portrush | Links | Ian McCrae | 1932 | 72 | 7,250 | 73.4 (+1.4) | Britannia Open |
+| Thornbury Valley Golf Club | Tulsa, Oklahoma | Parkland | Kenji Morita | 1993 | 72 | 7,325 | 73.1 (+1.1) | Premier Tour Championship |
+| Hollins Dunes Golf Club | St Andrews | Links | Duncan Fairlie | 1923 | 72 | 7,371 | 72.7 (+0.7) | Britannia Open |
+| Ardnacross Golf Links | Inverness | Links | Arthur Bellamy | 1950 | 72 | 7,274 | 72.5 (+0.5) |  |
+| Royal Larchton Links | Hoylake | Links | Arthur Bellamy | 1930 | 72 | 7,248 | 72.1 (+0.1) | Britannia Open |
 
 ## Hardest and easiest layouts for tour pros
 
 | | Course | Layout | City | Par | Yards | Tour avg | Amateur (25) |
 |---|---|---|---|---|---|---|---|
-| Hardest | Stonebridge Hollow Golf Club | Championship | Pittsburgh, Pennsylvania | 71 | 7,310 | 75.7 (+4.7) | 92.7 |
-| Hardest | Marten Hollow Golf Club | Championship | Boston, Massachusetts | 71 | 7,212 | 75.0 (+4.0) | 92.0 |
-| Hardest | Ravensworth Ridge National | Championship | Charlotte, North Carolina | 72 | 7,497 | 76.0 (+4.0) | 94.4 |
-| Hardest | Holly Landing Club | Championship | Philadelphia, Pennsylvania | 70 | 7,156 | 74.0 (+4.0) | 91.5 |
-| Hardest | Northcote Park National | Championship | Kohler, Wisconsin | 71 | 7,422 | 74.7 (+3.7) | 91.5 |
-| Hardest | Royal Willowwood Club | Championship | Canberra | 72 | 7,412 | 75.5 (+3.5) | 92.3 |
-| Hardest | Georgia National Golf Club | Championship | Athens, Georgia | 72 | 7,635 | 75.5 (+3.5) | 93.1 |
-| Hardest | Golf Club Le Colline | Championship | Turin | 72 | 7,418 | 75.4 (+3.4) | 92.9 |
-| Hardest | Ironwood Springs Club | Championship | Louisville, Kentucky | 72 | 7,329 | 75.4 (+3.4) | 92.0 |
-| Hardest | Bluestone Vale Golf Club | Championship | Seattle, Washington | 70 | 7,120 | 73.2 (+3.2) | 89.4 |
+| Hardest | Briar Creek Club | Championship | Monterey, California | 70 | 7,251 | 75.3 (+5.3) | 94.9 |
+| Hardest | Holly Landing Club | Championship | Philadelphia, Pennsylvania | 70 | 7,252 | 75.2 (+5.2) | 92.8 |
+| Hardest | Ravensworth Ridge National | Championship | Charlotte, North Carolina | 72 | 7,497 | 77.1 (+5.1) | 95.6 |
+| Hardest | Stonebridge Hollow Golf Club | Championship | Pittsburgh, Pennsylvania | 71 | 7,310 | 75.7 (+4.7) | 95.0 |
+| Hardest | Royal Willowwood Club | Championship | Canberra | 72 | 7,412 | 76.7 (+4.7) | 95.4 |
+| Hardest | Bluestone Vale Golf Club | Championship | Seattle, Washington | 70 | 7,248 | 74.6 (+4.6) | 91.9 |
+| Hardest | Sable Fields Golf Club | Championship | Kiawah Island, South Carolina | 70 | 7,249 | 74.4 (+4.4) | 90.1 |
+| Hardest | Marten Hollow Golf Club | Championship | Boston, Massachusetts | 71 | 7,250 | 75.3 (+4.3) | 94.5 |
+| Hardest | Briar Bay National | Championship | Los Angeles, California | 72 | 7,323 | 76.3 (+4.3) | 95.3 |
+| Hardest | Langford Dunes Club | Championship | San Francisco, California | 71 | 7,248 | 75.0 (+4.0) | 93.0 |
 | Easiest | Cork Ridge Municipal Golf Course | Regular | Cork | 72 | 5,963 | 62.7 (-9.3) | 74.0 |
 | Easiest | Lark Pines Golf Course | Forward | Monterey, California | 70 | 5,180 | 60.6 (-9.4) | 69.2 |
 | Easiest | Dunlarig Municipal Golf Course | Forward | Carnoustie | 72 | 5,395 | 62.3 (-9.7) | 70.1 |

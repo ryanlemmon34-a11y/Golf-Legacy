@@ -352,14 +352,14 @@
 "yards": 6451
 },
 "ardnacross-golf-links:Championship": {
-"amateur": 87.01,
-"amateur_winner": 79.71,
-"difficulty": 0.41,
-"fingerprint": "44684e73fd6f",
-"high_school": 100.38,
+"amateur": 87.07,
+"amateur_winner": 80.51,
+"difficulty": 0.49,
+"fingerprint": "8d2b3aa7ef9b",
+"high_school": 102.12,
 "par": 72,
-"spread": 14.6,
-"tour": 72.41,
+"spread": 14.58,
+"tour": 72.49,
 "yards": 7274
 },
 "ashcombe-harbor-golf-club:Championship": {
@@ -814,14 +814,14 @@
 "yards": 6651
 },
 "birchwood-national:Championship": {
-"amateur": 90.43,
-"amateur_winner": 83.6,
-"difficulty": 2.21,
-"fingerprint": "1a18911c50dd",
-"high_school": 106.37,
+"amateur": 91.93,
+"amateur_winner": 84.94,
+"difficulty": 3.65,
+"fingerprint": "c0f2b9c1eac4",
+"high_school": 109.39,
 "par": 72,
-"spread": 16.22,
-"tour": 74.21,
+"spread": 16.28,
+"tour": 75.65,
 "yards": 7382
 },
 "bjorkudden-golf:Championship": {
@@ -935,15 +935,15 @@
 "yards": 6617
 },
 "bluestone-vale-golf-club:Championship": {
-"amateur": 89.41,
-"amateur_winner": 82.93,
-"difficulty": 3.22,
-"fingerprint": "1a3634c70ec0",
-"high_school": 108.86,
+"amateur": 91.94,
+"amateur_winner": 84.34,
+"difficulty": 4.59,
+"fingerprint": "bb42e0e857e8",
+"high_school": 108.14,
 "par": 70,
-"spread": 16.19,
-"tour": 73.22,
-"yards": 7120
+"spread": 17.35,
+"tour": 74.59,
+"yards": 7248
 },
 "bluestone-wood-club:Championship": {
 "amateur": 85.42,
@@ -990,14 +990,14 @@
 "yards": 6034
 },
 "bramble-park-golf-club:Championship": {
-"amateur": 92.42,
-"amateur_winner": 85.05,
-"difficulty": 2.67,
-"fingerprint": "0859518e8bda",
-"high_school": 107.92,
+"amateur": 93.55,
+"amateur_winner": 86.28,
+"difficulty": 3.47,
+"fingerprint": "7754afe98d7e",
+"high_school": 110.54,
 "par": 72,
-"spread": 17.75,
-"tour": 74.67,
+"spread": 18.08,
+"tour": 75.47,
 "yards": 7303
 },
 "brambleton-golf-club:Championship": {
@@ -1023,26 +1023,26 @@
 "yards": 5901
 },
 "briar-bay-national:Championship": {
-"amateur": 92.76,
-"amateur_winner": 85.21,
-"difficulty": 2.98,
-"fingerprint": "1e3eeb98220c",
-"high_school": 108.9,
+"amateur": 95.26,
+"amateur_winner": 86.54,
+"difficulty": 4.31,
+"fingerprint": "160c2d665d79",
+"high_school": 110.48,
 "par": 72,
-"spread": 17.78,
-"tour": 74.98,
+"spread": 18.95,
+"tour": 76.31,
 "yards": 7323
 },
 "briar-creek-club:Championship": {
-"amateur": 91.1,
-"amateur_winner": 83.51,
-"difficulty": 2.69,
-"fingerprint": "6b791e509279",
-"high_school": 106.28,
+"amateur": 94.94,
+"amateur_winner": 87.48,
+"difficulty": 5.29,
+"fingerprint": "64551ee6294c",
+"high_school": 112.65,
 "par": 70,
-"spread": 18.41,
-"tour": 72.69,
-"yards": 6905
+"spread": 19.65,
+"tour": 75.29,
+"yards": 7251
 },
 "briar-park-club:Championship": {
 "amateur": 82.43,
@@ -1881,14 +1881,14 @@
 "yards": 6246
 },
 "copper-cove-club:Championship": {
-"amateur": 92.61,
-"amateur_winner": 84.22,
-"difficulty": 2.25,
-"fingerprint": "4b9816a3107b",
-"high_school": 107.46,
+"amateur": 91.6,
+"amateur_winner": 85.22,
+"difficulty": 3.47,
+"fingerprint": "78c360f40307",
+"high_school": 109.9,
 "par": 72,
-"spread": 18.36,
-"tour": 74.25,
+"spread": 16.13,
+"tour": 75.47,
 "yards": 7482
 },
 "cork-ridge-municipal-golf-course:Regular": {
@@ -2013,14 +2013,14 @@
 "yards": 6274
 },
 "dunmore-brook-links:Championship": {
-"amateur": 88.97,
-"amateur_winner": 82.5,
-"difficulty": 1.68,
-"fingerprint": "5f377ec91998",
-"high_school": 105.1,
+"amateur": 90.63,
+"amateur_winner": 82.77,
+"difficulty": 2.22,
+"fingerprint": "21ccdee65ca1",
+"high_school": 109.14,
 "par": 72,
-"spread": 15.29,
-"tour": 73.68,
+"spread": 16.41,
+"tour": 74.22,
 "yards": 7424
 },
 "dunmore-lakes-country-club:Championship": {
@@ -2079,26 +2079,26 @@
 "yards": 6425
 },
 "dunmore-wood-golf-club:Championship": {
-"amateur": 91.17,
-"amateur_winner": 83.42,
-"difficulty": 2.61,
-"fingerprint": "aff252aa7942",
-"high_school": 108.22,
+"amateur": 90.82,
+"amateur_winner": 84.74,
+"difficulty": 3.85,
+"fingerprint": "41be2d14ce4f",
+"high_school": 109.06,
 "par": 71,
-"spread": 17.56,
-"tour": 73.61,
+"spread": 15.97,
+"tour": 74.85,
 "yards": 7378
 },
 "elder-crest-golf-links:Championship": {
-"amateur": 86.25,
-"amateur_winner": 79.39,
-"difficulty": 0.23,
-"fingerprint": "1eb59ae71ff1",
-"high_school": 98.67,
+"amateur": 89.08,
+"amateur_winner": 81.14,
+"difficulty": 1.52,
+"fingerprint": "9dd97621bada",
+"high_school": 106.19,
 "par": 71,
-"spread": 15.02,
-"tour": 71.23,
-"yards": 6986
+"spread": 16.56,
+"tour": 72.52,
+"yards": 7250
 },
 "elder-rock-golf-club:Championship": {
 "amateur": 88.63,
@@ -4103,14 +4103,14 @@
 "yards": 6620
 },
 "hawk-bend-golf-club:Championship": {
-"amateur": 89.39,
-"amateur_winner": 82.95,
-"difficulty": 1.98,
-"fingerprint": "0899d88e2c5f",
-"high_school": 104.46,
+"amateur": 91.38,
+"amateur_winner": 83.68,
+"difficulty": 3.11,
+"fingerprint": "bc41ccbeac3f",
+"high_school": 105.97,
 "par": 71,
-"spread": 16.41,
-"tour": 72.98,
+"spread": 17.27,
+"tour": 74.11,
 "yards": 7302
 },
 "hawk-farm-golf-club:Championship": {
@@ -4389,14 +4389,14 @@
 "yards": 6424
 },
 "hollins-dunes-golf-club:Championship": {
-"amateur": 88.69,
-"amateur_winner": 80.49,
-"difficulty": 0.5,
-"fingerprint": "644886a42e72",
-"high_school": 103.53,
+"amateur": 88.25,
+"amateur_winner": 82.64,
+"difficulty": 0.74,
+"fingerprint": "eb4af4769ca1",
+"high_school": 107.23,
 "par": 72,
-"spread": 16.19,
-"tour": 72.5,
+"spread": 15.51,
+"tour": 72.74,
 "yards": 7371
 },
 "hollins-ridge-golf-resort:Championship": {
@@ -4488,15 +4488,15 @@
 "yards": 6530
 },
 "holly-landing-club:Championship": {
-"amateur": 91.55,
-"amateur_winner": 83.77,
-"difficulty": 3.98,
-"fingerprint": "cc6da2bd47b4",
-"high_school": 107.87,
+"amateur": 92.8,
+"amateur_winner": 85.84,
+"difficulty": 5.16,
+"fingerprint": "5aca3fd27f15",
+"high_school": 110.16,
 "par": 70,
-"spread": 17.57,
-"tour": 73.98,
-"yards": 7156
+"spread": 17.64,
+"tour": 75.16,
+"yards": 7252
 },
 "holly-park-golf-club:Championship": {
 "amateur": 85.67,
@@ -4697,14 +4697,14 @@
 "yards": 6417
 },
 "ironwood-springs-club:Championship": {
-"amateur": 92.02,
-"amateur_winner": 85.14,
-"difficulty": 3.38,
-"fingerprint": "5c964b559086",
-"high_school": 111.33,
+"amateur": 94.51,
+"amateur_winner": 86.25,
+"difficulty": 3.6,
+"fingerprint": "134a94c2774b",
+"high_school": 114.21,
 "par": 72,
-"spread": 16.64,
-"tour": 75.38,
+"spread": 18.91,
+"tour": 75.6,
 "yards": 7329
 },
 "isoharu-golf-links:Championship": {
@@ -5269,15 +5269,15 @@
 "yards": 6655
 },
 "langford-dunes-club:Championship": {
-"amateur": 90.86,
-"amateur_winner": 83.73,
-"difficulty": 2.87,
-"fingerprint": "a4f5ec59b52e",
-"high_school": 105.76,
+"amateur": 93.0,
+"amateur_winner": 85.13,
+"difficulty": 4.0,
+"fingerprint": "824ca98cb66d",
+"high_school": 108.53,
 "par": 71,
-"spread": 16.99,
-"tour": 73.87,
-"yards": 7228
+"spread": 18.0,
+"tour": 75.0,
+"yards": 7248
 },
 "langford-oaks-golf-club:Championship": {
 "amateur": 86.44,
@@ -5797,14 +5797,14 @@
 "yards": 6244
 },
 "mapleton-landing-national:Championship": {
-"amateur": 92.27,
-"amateur_winner": 85.47,
-"difficulty": 2.87,
-"fingerprint": "c12c5848767d",
-"high_school": 110.68,
+"amateur": 94.61,
+"amateur_winner": 86.28,
+"difficulty": 3.96,
+"fingerprint": "cf4bf81f664e",
+"high_school": 113.2,
 "par": 72,
-"spread": 17.4,
-"tour": 74.87,
+"spread": 18.65,
+"tour": 75.96,
 "yards": 7367
 },
 "mapleton-springs-golf-club:Championship": {
@@ -5830,14 +5830,14 @@
 "yards": 6455
 },
 "marten-bay-links:Championship": {
-"amateur": 89.52,
-"amateur_winner": 82.65,
-"difficulty": 1.01,
-"fingerprint": "613deed9e8a1",
-"high_school": 105.1,
+"amateur": 89.06,
+"amateur_winner": 83.31,
+"difficulty": 1.86,
+"fingerprint": "d08101241ae1",
+"high_school": 106.83,
 "par": 72,
-"spread": 16.51,
-"tour": 73.01,
+"spread": 15.2,
+"tour": 73.86,
 "yards": 7479
 },
 "marten-brook-club:Championship": {
@@ -5885,15 +5885,15 @@
 "yards": 6393
 },
 "marten-hollow-golf-club:Championship": {
-"amateur": 92.01,
-"amateur_winner": 85.07,
-"difficulty": 4.05,
-"fingerprint": "4be035eb1377",
-"high_school": 110.0,
+"amateur": 94.45,
+"amateur_winner": 85.62,
+"difficulty": 4.35,
+"fingerprint": "95c9f10e1bb5",
+"high_school": 110.96,
 "par": 71,
-"spread": 16.96,
-"tour": 75.05,
-"yards": 7212
+"spread": 19.1,
+"tour": 75.35,
+"yards": 7250
 },
 "marten-knoll-country-club:Championship": {
 "amateur": 87.38,
@@ -5918,14 +5918,14 @@
 "yards": 6367
 },
 "marten-woods-golf-links:Championship": {
-"amateur": 88.92,
-"amateur_winner": 80.56,
-"difficulty": 0.66,
-"fingerprint": "0435c874dfc0",
-"high_school": 103.0,
+"amateur": 91.06,
+"amateur_winner": 82.3,
+"difficulty": 1.57,
+"fingerprint": "f48c3c8ad969",
+"high_school": 106.3,
 "par": 71,
-"spread": 17.26,
-"tour": 71.66,
+"spread": 18.49,
+"tour": 72.57,
 "yards": 7313
 },
 "martenfield-golf-club:Championship": {
@@ -6380,14 +6380,14 @@
 "yards": 5581
 },
 "northcote-park-national:Championship": {
-"amateur": 91.5,
-"amateur_winner": 83.09,
-"difficulty": 3.71,
-"fingerprint": "1af81abe4b9e",
-"high_school": 107.94,
+"amateur": 93.56,
+"amateur_winner": 85.51,
+"difficulty": 3.9,
+"fingerprint": "6ec3594afca9",
+"high_school": 108.27,
 "par": 71,
-"spread": 16.79,
-"tour": 74.71,
+"spread": 18.66,
+"tour": 74.9,
 "yards": 7422
 },
 "oakley-country-club:Championship": {
@@ -6732,15 +6732,15 @@
 "yards": 6319
 },
 "quarry-brook-links:Championship": {
-"amateur": 88.42,
-"amateur_winner": 80.52,
-"difficulty": 1.22,
-"fingerprint": "7f74982800b1",
-"high_school": 105.2,
+"amateur": 90.4,
+"amateur_winner": 81.86,
+"difficulty": 1.76,
+"fingerprint": "bc194c726f07",
+"high_school": 110.3,
 "par": 71,
-"spread": 16.2,
-"tour": 72.22,
-"yards": 7190
+"spread": 17.64,
+"tour": 72.76,
+"yards": 7249
 },
 "quarry-dunes-golf-club:Championship": {
 "amateur": 82.56,
@@ -6963,15 +6963,15 @@
 "yards": 6583
 },
 "ravensworth-hollow-golf-club:Championship": {
-"amateur": 86.63,
-"amateur_winner": 80.57,
-"difficulty": 1.62,
-"fingerprint": "064820a2da91",
-"high_school": 100.51,
+"amateur": 89.44,
+"amateur_winner": 82.53,
+"difficulty": 3.55,
+"fingerprint": "d77a962e2706",
+"high_school": 106.28,
 "par": 70,
-"spread": 15.01,
-"tour": 71.62,
-"yards": 7049
+"spread": 15.89,
+"tour": 73.55,
+"yards": 7251
 },
 "ravensworth-lakes-golf-club:Championship": {
 "amateur": 82.97,
@@ -6996,14 +6996,14 @@
 "yards": 6027
 },
 "ravensworth-ridge-national:Championship": {
-"amateur": 94.37,
-"amateur_winner": 86.95,
-"difficulty": 4.01,
-"fingerprint": "7bd2c4644759",
-"high_school": 108.3,
+"amateur": 95.58,
+"amateur_winner": 88.39,
+"difficulty": 5.09,
+"fingerprint": "9d74ad5d7a13",
+"high_school": 111.77,
 "par": 72,
-"spread": 18.36,
-"tour": 76.01,
+"spread": 18.49,
+"tour": 77.09,
 "yards": 7497
 },
 "ravensworth-run-golf-club:Championship": {
@@ -7150,81 +7150,81 @@
 "yards": 5589
 },
 "royal-amber-wood-golf-club:Championship": {
-"amateur": 90.18,
-"amateur_winner": 82.61,
-"difficulty": 1.77,
-"fingerprint": "34853ea9f70f",
-"high_school": 104.59,
+"amateur": 90.64,
+"amateur_winner": 82.83,
+"difficulty": 2.53,
+"fingerprint": "3a81c3b1301f",
+"high_school": 107.64,
 "par": 71,
-"spread": 17.41,
-"tour": 72.77,
-"yards": 7187
+"spread": 17.11,
+"tour": 73.53,
+"yards": 7251
 },
 "royal-carrick-fields-golf-club:Championship": {
-"amateur": 90.48,
-"amateur_winner": 82.43,
-"difficulty": 3.13,
-"fingerprint": "f9fc5896e7c3",
-"high_school": 107.45,
+"amateur": 90.97,
+"amateur_winner": 85.34,
+"difficulty": 3.15,
+"fingerprint": "caca587f64b1",
+"high_school": 110.14,
 "par": 71,
-"spread": 16.35,
-"tour": 74.13,
+"spread": 16.82,
+"tour": 74.15,
 "yards": 7430
 },
 "royal-heatherbrook-club:Championship": {
-"amateur": 88.52,
-"amateur_winner": 82.52,
-"difficulty": 1.65,
-"fingerprint": "26ce97fe45e5",
-"high_school": 102.03,
+"amateur": 88.76,
+"amateur_winner": 84.47,
+"difficulty": 2.16,
+"fingerprint": "f552b720c8f3",
+"high_school": 105.22,
 "par": 71,
-"spread": 15.87,
-"tour": 72.65,
-"yards": 7105
+"spread": 15.6,
+"tour": 73.16,
+"yards": 7249
 },
 "royal-kilcarra-golf-club:Championship": {
-"amateur": 87.04,
-"amateur_winner": 81.35,
-"difficulty": 0.27,
-"fingerprint": "65275f8865d5",
-"high_school": 102.3,
+"amateur": 89.58,
+"amateur_winner": 82.13,
+"difficulty": 1.4,
+"fingerprint": "f6934a3bb8f1",
+"high_school": 103.99,
 "par": 72,
-"spread": 14.77,
-"tour": 72.27,
-"yards": 7202
+"spread": 16.18,
+"tour": 73.4,
+"yards": 7250
 },
 "royal-larchton-links:Championship": {
-"amateur": 85.47,
-"amateur_winner": 80.08,
-"difficulty": -0.05,
-"fingerprint": "a89fbcce7965",
-"high_school": 99.03,
+"amateur": 87.03,
+"amateur_winner": 80.95,
+"difficulty": 0.1,
+"fingerprint": "99316117399c",
+"high_school": 101.54,
 "par": 72,
-"spread": 13.52,
-"tour": 71.95,
-"yards": 7234
+"spread": 14.93,
+"tour": 72.1,
+"yards": 7248
 },
 "royal-willowwood-club:Championship": {
-"amateur": 92.34,
-"amateur_winner": 85.35,
-"difficulty": 3.5,
-"fingerprint": "702afdd73600",
-"high_school": 110.09,
+"amateur": 95.4,
+"amateur_winner": 86.72,
+"difficulty": 4.69,
+"fingerprint": "5b69c89529da",
+"high_school": 110.65,
 "par": 72,
-"spread": 16.84,
-"tour": 75.5,
+"spread": 18.71,
+"tour": 76.69,
 "yards": 7412
 },
 "sable-fields-golf-club:Championship": {
-"amateur": 88.23,
-"amateur_winner": 82.03,
-"difficulty": 2.65,
-"fingerprint": "811613870b4b",
-"high_school": 105.43,
+"amateur": 90.13,
+"amateur_winner": 83.06,
+"difficulty": 4.41,
+"fingerprint": "b8a5f9c9dae2",
+"high_school": 106.29,
 "par": 70,
-"spread": 15.58,
-"tour": 72.65,
-"yards": 7067
+"spread": 15.72,
+"tour": 74.41,
+"yards": 7249
 },
 "sacramento-ridge-golf-course:Forward": {
 "amateur": 72.09,
@@ -7755,14 +7755,14 @@
 "yards": 5701
 },
 "stonebridge-hollow-golf-club:Championship": {
-"amateur": 92.7,
-"amateur_winner": 85.75,
-"difficulty": 4.72,
-"fingerprint": "c9239d02c4a0",
-"high_school": 110.48,
+"amateur": 95.02,
+"amateur_winner": 86.19,
+"difficulty": 4.73,
+"fingerprint": "4654a7606611",
+"high_school": 111.97,
 "par": 71,
-"spread": 16.98,
-"tour": 75.72,
+"spread": 19.29,
+"tour": 75.73,
 "yards": 7310
 },
 "stonebridge-woods-golf-club:Championship": {
@@ -8118,14 +8118,14 @@
 "yards": 5539
 },
 "thornbury-valley-golf-club:Championship": {
-"amateur": 89.06,
-"amateur_winner": 81.74,
-"difficulty": 0.92,
-"fingerprint": "7c6f008609d1",
-"high_school": 104.36,
+"amateur": 91.45,
+"amateur_winner": 83.39,
+"difficulty": 1.07,
+"fingerprint": "d173236637eb",
+"high_school": 105.42,
 "par": 72,
-"spread": 16.14,
-"tour": 72.92,
+"spread": 18.38,
+"tour": 73.07,
 "yards": 7325
 },
 "thornfield-club:Championship": {
@@ -8371,15 +8371,15 @@
 "yards": 6346
 },
 "whitfield-meadows-national:Championship": {
-"amateur": 93.33,
-"amateur_winner": 84.04,
-"difficulty": 2.59,
-"fingerprint": "ce6038a2b7b9",
-"high_school": 109.27,
+"amateur": 93.18,
+"amateur_winner": 85.74,
+"difficulty": 3.1,
+"fingerprint": "db9e51cde260",
+"high_school": 110.79,
 "par": 72,
-"spread": 18.74,
-"tour": 74.59,
-"yards": 7209
+"spread": 18.08,
+"tour": 75.1,
+"yards": 7249
 },
 "willow-crest-club:Championship": {
 "amateur": 86.31,
