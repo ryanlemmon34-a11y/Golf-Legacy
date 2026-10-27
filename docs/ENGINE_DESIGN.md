@@ -201,3 +201,7 @@ woodland across Europe, North America and Japan.
 - Hiring a top coach depends on both money and the golfer's prestige.
 - Prestige is built by winning, weighted by the prestige of the event won.
 - The expanded attribute list gives more distinct things to train.
+- Players prioritise the biggest events they are eligible for (season system).
+- Majors are fixed: Tour Masters week 18, Premier Tour Championship week 24, USA Open week 25, Britannia
+  Open week 30, with no other competitive golf anywhere in those weeks. Qualifying paths mirror real life.
+- High-school golf comes later; the calendar starts at amateur and college level.

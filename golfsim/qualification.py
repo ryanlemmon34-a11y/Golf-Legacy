@@ -124,6 +124,7 @@ class Route:
     max_age: int = 0
     spots: int = 0                 # qualifying routes: places on offer (0 = all who qualify)
     site_spots: tuple = ()         # qualifying stages: places per site
+    alternates: bool = False       # next finishers become first alternates for the field
 
 
 def winners_of(series_ids, years_back, include_current=True):
@@ -297,8 +298,9 @@ RULES = {
               winners_of(('PT_PREMIER_PLAYERS_CHAMPIONSHIP',), 3)),
         Route('P4', 'Top 15 and ties, last Premier Tour Championship', 'Top 15 and ties, previous PGA',
               top_finishers('PREMIER_TOUR_CHAMPIONSHIP', 15)),
-        Route('P5', 'Top 20, Club Professional Championship', 'Top 20, PGA Professional Championship',
-              top_finishers('CLUB_PRO_CHAMPIONSHIP', 20, 0), status='club_pro'),
+        Route('P5', 'Top 20, Club Professional Championship', 'Top 20, PGA Professional Championship (ties for the '
+              'last places settled by playoff)', qualifier_finishers(('CLUB_PRO_CHAMPIONSHIP',)), kind='qualifying',
+              status='club_pro', spots=20),
         Route('P6', 'Top 70, Premier Tour Americas points list', 'Top 70, PGA Tour points list',
               points_list('PT_AMERICAS', 22, 0, 70)),
         Route('P7', 'Premier Tour winners since the last Premier Tour Championship', 'PGA Tour winners since previous PGA',
@@ -325,7 +327,8 @@ RULES = {
         Route('U9', 'World top 60, first cut-off', 'OWGR top 60, mid-May ranking', ranking_top(60, 21)),
         Route('U10', 'World top 60, final cut-off', 'OWGR top 60, ranking the week before', ranking_top(60, 23)),
         Route('UQ', 'Final Qualifying', 'US Open Final Qualifying (36 holes, one day)',
-              stage_sites(('USA_OPEN_FINAL_INTL', 'USA_OPEN_FINAL')), kind='qualifying', site_spots=(6, 4, 8, 7, 6, 6, 8, 6, 7, 5)),
+              stage_sites(('USA_OPEN_FINAL_INTL', 'USA_OPEN_FINAL')), kind='qualifying', site_spots=(6, 4, 8, 7, 6, 6, 8, 6, 7, 5),
+              alternates=True),
         Route('UF', 'Alternates', 'Alternates from final qualifying, then the world ranking', ranking_fill(23), kind='fill'),
     ),
     'BRITANNIA_OPEN': (
@@ -369,7 +372,7 @@ RULES = {
               ('PT_GREAT_LAKES_OPEN', 'Great Lakes Open', 'John Deere Classic', 0, 1),
               ('PT_SCOTLAND_OPEN', 'Scotland Open', 'Genesis Scottish Open', 0, 3))],
         Route('BQ', 'Final Qualifying', 'Open Final Qualifying (36 holes, four venues)',
-              stage_sites(('BRITANNIA_FINAL',)), kind='qualifying', site_spots=(4, 4, 4, 4)),
+              stage_sites(('BRITANNIA_FINAL',)), kind='qualifying', site_spots=(4, 4, 4, 4), alternates=True),
         Route('BF', 'Reserves from the world ranking', 'Reserve list (OWGR)', ranking_fill(26), kind='fill'),
     ),
 }
@@ -456,7 +459,7 @@ def build_field(major, year, ctx):
                 taken = 0
                 for gid in group:
                     if taken >= spots:
-                        if gid not in in_field and _eligible(ctx, gid, route, year):
+                        if route.alternates and gid not in in_field and _eligible(ctx, gid, route, year):
                             alternates.append(gid)
                         continue
                     if gid in in_field or not _eligible(ctx, gid, route, year):

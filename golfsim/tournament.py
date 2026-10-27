@@ -72,3 +72,64 @@ def play_event(field, course, rng, cut_top=65, prestige=1.0, cond_by_round=None,
     board.remove(winner)
     board.insert(0, winner)
     return [(g, totals[id(g)], rounds[id(g)]) for g in board], playoff_holes
+
+
+def play_match(a, b, course, rng, holes=18, pressure=0.5, caddies=None):
+    """Hole-by-hole match play, every shot simulated. Returns (winner, loser, result text)."""
+    caddies = caddies or {}
+    pls = {id(g): Player(g, course, Conditions(), caddies.get(id(g)), rng, 1, WeekForm.draw(rng, g)) for g in (a, b)}
+    states = {id(g): HoleState() for g in (a, b)}
+    up, played = 0, 0          # up > 0 means `a` leads
+    while True:
+        idx = played % 18
+        hole = course.holes[idx]
+        remaining = holes - played
+        late = pressure * (1.4 if remaining <= 4 else 1.0)
+        sa = play_hole(pls[id(a)], hole, idx, rng, RoundStats(), late, states[id(a)])
+        sb = play_hole(pls[id(b)], hole, idx, rng, RoundStats(), late, states[id(b)])
+        played += 1
+        up += (sa < sb) - (sb < sa)
+        remaining = holes - played
+        if played < holes and abs(up) > remaining:
+            text = f'{abs(up)}&{remaining}'
+            break
+        if played >= holes and up != 0:
+            text = f'{abs(up)} up' if played == holes else f'{played} holes'
+            break
+    return (a, b, text) if up > 0 else (b, a, text)
+
+
+def play_stroke_and_match(field, course, rng, stroke_holes=36, bracket=64, final_holes=36):
+    """Amateur-championship format: stroke-play qualifying, then a seeded knockout.
+
+    Returns finishers [(golfer, position)]: 1 champion, 2 runner-up, 3 semi-finalists, 5 quarter-
+    finalists, 9 / 17 / 33 earlier rounds, then non-qualifiers by stroke-play position.
+    """
+    totals = {}
+    for g in field:
+        form = WeekForm.draw(rng, g)
+        totals[id(g)] = sum(play_round(g, course, rng, Conditions(), None, rd, form).score
+                            for rd in range(1, stroke_holes // 18 + 1))
+    order = sorted(field, key=lambda g: (totals[id(g)], rng.random()))
+    seeds, rest = order[:bracket], order[bracket:]
+    # Standard seeding: 1 v 64, 32 v 33 ... arranged so the top seeds meet last.
+    def bracket_order(n):
+        slots = [1]
+        while len(slots) < n:
+            m = len(slots) * 2 + 1
+            slots = [x for s in slots for x in (s, m - s)]
+        return slots
+    alive = [seeds[s - 1] for s in bracket_order(len(seeds))]
+    places, size = [], len(alive)
+    while len(alive) > 1:
+        winners, losers = [], []
+        for i in range(0, len(alive), 2):
+            w, l, _ = play_match(alive[i], alive[i + 1], course, rng, final_holes if len(alive) == 2 else 18)
+            winners.append(w)
+            losers.append(l)
+        pos = len(alive) // 2 + 1
+        places = [(g, pos) for g in losers] + places
+        alive = winners
+    places = [(alive[0], 1)] + places
+    start = size + 1
+    return places + [(g, start + i) for i, g in enumerate(rest)]

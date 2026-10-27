@@ -12,11 +12,15 @@ majors, and a full season must still run quickly. See `docs/ENGINE_DESIGN.md`, s
 
 | Path | What it is |
 |---|---|
-| `golfsim/` | The engine: ratings, golfers, courses, shot-by-shot hole simulation, stats, tournament harness |
+| `golfsim/` | The engine: ratings, golfers, courses, shot-by-shot hole simulation, stats, tournaments (stroke and match play), world calendar, geography, major qualification |
 | `tools/balance_test.py` | Runs the balance study and writes `reports/BALANCE_REPORT.md` |
 | `tools/calibrate.py` | Quick rating-ladder check against target scores |
+| `tools/calendar_report.py` | Writes the full world calendar to `reports/CALENDAR_REPORT.md` |
+| `tools/qualifying_demo.py` | Plays two seasons at the top of the calendar and builds the major fields by the qualifying rules |
+| `tools/major_test.py`, `tools/high_school_test.py` | Realism tests at Georgia National and Cedar Creek |
 | `tests/` | Automated correctness and balance tests |
 | `docs/ENGINE_DESIGN.md` | Plain-language explanation of how the engine works |
+| `docs/CALENDAR_AND_QUALIFYING.md` | The world calendar and how players get into the majors |
 | `reports/` | Latest balance report |
 | `legacy/` | The original v0.13 package, untouched |
 
