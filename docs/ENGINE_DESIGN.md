@@ -88,6 +88,18 @@ score alike on a balanced course.
 
 All randomness comes from one seeded random generator, so a seed reproduces every shot.
 
+Three rules hold everywhere:
+
+- **Shared hole locations.** Each round has one pin sheet (a hole position on every green), drawn once
+  and played by every golfer in that round — stroke play, playoffs and both players in a match. Harder
+  set-ups tuck the pins nearer the edges, for everyone.
+- **Every hole is played out.** There is no pick-up, no maximum score and no invented finishing putt: a
+  hole ends when the ball is holed, however many shots that takes. (A safety check stops the program
+  with an error if a hole ever reached 60 strokes, which would mean a bug; it never makes up a score.)
+- **Hazards apply to every shot.** Out of bounds, water and trees along a hole catch any shot that
+  leaves the corridor — including a long drive that reaches the green's distance and a wild approach
+  that misses far left or right of the green.
+
 1. **The day's form.** Each round draws a ball-striking form and a putting form; each tournament week
    draws a smaller week form shared by all four rounds. Consistency attributes control the spread.
    This is how a 71 can have the week of his life.
@@ -96,7 +108,8 @@ All randomness comes from one seeded random generator, so a seed reproduces ever
    angular spread come from Power and Driving Accuracy, widened by wind (minus Ball-Flight Control),
    pressure, lingering bad holes and fatigue. The ball finishes in the fairway, rough, a fairway bunker,
    the trees, water (penalty, drop) or out of bounds (stroke and distance). Doglegs punish drives that
-   run through the corner unless the golfer shapes it. Drivable par 4s can finish on the green.
+   run through the corner unless the golfer shapes it. Drivable par 4s can finish on the green, but only
+   if the drive stays inside the hole's corridor; a long drive far offline is in the hazards.
 3. **Approach.** Proximity depends on distance measured in the golfer's own clubs (a short hitter hits a
    longer club from the same yardage), the lie (rough is worse, less so with good Recovery Play), the
    matching iron/wedge skill, firm greens, wind and form. The ball lands in two dimensions around the aim

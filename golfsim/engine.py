@@ -39,7 +39,7 @@ from .baseline import expected as baseline
 from .golfer import neutral_caddie
 
 TOUR_DRIVE = 298.0          # tour-average driver distance, the club-selection reference
-MAX_HOLE_STROKES = 12       # pick-up rule for the rare runaway hole
+RUNAWAY_GUARD = 60          # a hole this long means a bug: raise, never invent a score
 _LIE_BASELINE = {'tee': 'tee', 'fairway': 'fairway', 'rough': 'rough', 'around': 'rough',
                  'fringe': 'fringe', 'sand': 'sand', 'fairway_bunker': 'fairway_bunker',
                  'trees': 'trees'}
@@ -55,6 +55,21 @@ class Conditions:
     wind_mph: float = 6.0
     rain: bool = False
     pin_difficulty: float = 0.45     # 0 centre pins .. 1 tucked tournament pins
+
+
+def pin_sheet(course, cond, rng):
+    """One hole location per green for a round, shared by everyone playing that round.
+
+    Positions are (x, y) yards from the centre of the green: x along the line of play (+ = back),
+    y across it (+ = right). Harder set-ups tuck pins nearer the edges.
+    """
+    depth = 0.32 + 0.5 * cond.pin_difficulty
+    pins = []
+    for h in course.holes:
+        r = h.green_radius * depth * (0.7 + 0.3 * rng.random())
+        a = rng.random() * 6.2832
+        pins.append((r * math.cos(a), r * math.sin(a)))
+    return tuple(pins)
 
 
 @dataclass
@@ -174,7 +189,6 @@ class Player:
         self.day_disp = math.exp(rng.gauss(0, ip(R.STRIKE_FORM_SD, a['striking_consistency'])) + wf.strike)
         self.day_putt = rng.gauss(0, ip(R.PUTT_FORM_SD, a['putting_consistency'])) + wf.putt
         self.wind = cond.wind_mph / 20.0
-        self.pin_depth = 0.32 + 0.5 * cond.pin_difficulty
         self.reach_fw = self.drive * 0.90       # 3-wood from a fairway
         self.plans = {}
 
@@ -277,6 +291,23 @@ def _tee_plan(pl, hole, rng):
     return best
 
 
+def _side_hazard(hole, lat, beyond, rng):
+    """Where a ball that left the playing corridor ends up.
+
+    lat: signed lateral position (- left, + right); beyond: yards past the corridor edge.
+    Returns (lie, penalty, out_of_bounds). Out of bounds means stroke and distance.
+    """
+    side = hole.left if lat < 0 else hole.right
+    if side == 'ob':
+        return None, 1, True
+    if side == 'water':
+        return 'rough', 1, False
+    if side == 'trees':
+        # Deep into the woods: lost ball or unplayable lie (penalty, drop in the trees).
+        return 'trees', 1 if beyond > 12 and rng.random() < 0.3 else 0, False
+    return 'rough', 0, False
+
+
 def _attack_pin(pl, hole, mean_ft, rng):
     ratio = mean_ft / (hole.green_radius * 3.0)
     value = (0.85 - ratio) * 2.2 - (1.1 if hole.green_water else 0) - (0.4 if hole.greenside_bunkers > 0.7 else 0)
@@ -287,8 +318,12 @@ def _attack_pin(pl, hole, mean_ft, rng):
 # ---------------------------------------------------------------------------
 # The hole
 # ---------------------------------------------------------------------------
-def play_hole(pl, hole, hidx, rng, st, pressure=0.0, state=None):
-    """Play one hole shot by shot. Returns strokes and updates RoundStats `st`."""
+def play_hole(pl, hole, hidx, rng, st, pressure=0.0, state=None, pin=None):
+    """Play one hole shot by shot until the ball is holed. Returns strokes; updates RoundStats `st`.
+
+    `pin` is the round's shared hole location (see `pin_sheet`). Competitions must pass it so every
+    golfer plays the same pin; it is only drawn here for a one-off hole with no round context.
+    """
     state = state or HoleState()
     par = hole.par
     state.tilt *= pl.tilt_decay
@@ -302,9 +337,10 @@ def play_hole(pl, hole, hidx, rng, st, pressure=0.0, state=None):
     dist_sd = 0.035 + 0.025 * pl.wind * hole.wind_exposure
 
     G = hole.green_radius
-    pin_r = G * pl.pin_depth * (0.7 + 0.3 * rng.random())
-    pin_a = rng.random() * 6.2832
-    pin_x, pin_y = pin_r * math.cos(pin_a), pin_r * math.sin(pin_a)
+    if pin is None:
+        r, a = G * 0.55 * (0.7 + 0.3 * rng.random()), rng.random() * 6.2832
+        pin = (r * math.cos(a), r * math.sin(a))
+    pin_x, pin_y = pin
 
     strokes = 0
     lie = 'tee'
@@ -327,9 +363,8 @@ def play_hole(pl, hole, hidx, rng, st, pressure=0.0, state=None):
             st.sg_putt += val
 
     while True:
-        if strokes >= 10:           # hard stop: pick up after 10 (rare, keeps loops bounded)
-            strokes += 1
-            break
+        if strokes >= RUNAWAY_GUARD:
+            raise RuntimeError(f'Runaway hole: {strokes} strokes on hole {hole.number} (engine bug)')
         if lie == 'green':
             if strokes <= par - 2 and not gir:
                 gir = True
@@ -346,9 +381,8 @@ def play_hole(pl, hole, hidx, rng, st, pressure=0.0, state=None):
                     break
                 ft = pl.leave(ft, hole, state, rng)
                 sg_add('putt', before, baseline('green', ft))
-                if n >= 6:
-                    n += 1
-                    break
+                if strokes + n >= RUNAWAY_GUARD:
+                    raise RuntimeError(f'Runaway putting on hole {hole.number} (engine bug)')
             strokes += n
             putts += n
             break
@@ -385,7 +419,9 @@ def play_hole(pl, hole, hidx, rng, st, pressure=0.0, state=None):
             rem = hole.plays - total
             half = hole.fairway_width / 2
             a = abs(lat)
-            if abs(rem) <= 30:     # drove it to the green complex
+            corridor = half + hole.rough_width
+            # Hazards first: a drive that leaves the corridor is in trouble however far it went.
+            if a <= corridor and abs(rem) <= 30:     # drove it to the green complex
                 if abs(rem) <= G and a <= G:
                     lie, dist = 'green', 3 * math.hypot(rem, lat)
                 elif rng.random() < hole.greenside_bunkers * 0.55:
@@ -394,7 +430,7 @@ def play_hole(pl, hole, hidx, rng, st, pressure=0.0, state=None):
                     lie, dist = 'around', max(3.0, math.hypot(rem, lat))
                 sg_add('ott', before, baseline(_LIE_BASELINE[lie] if lie != 'green' else 'green', dist))
                 continue
-            dist = abs(rem)
+            dist = abs(rem) if abs(rem) > 60 else max(3.0, math.hypot(rem, a))
             if a <= half and not forced_rough:
                 lie = 'fairway_bunker' if rng.random() < hole.fairway_bunkers * 0.06 else 'fairway'
             elif a <= half + hole.rough_width:
@@ -403,19 +439,8 @@ def play_hole(pl, hole, hidx, rng, st, pressure=0.0, state=None):
                 else:
                     lie = 'rough'
             else:
-                side = hole.left if lat < 0 else hole.right
-                if side == 'trees':
-                    lie = 'trees'
-                    # Deep into the woods: lost ball or unplayable lie (penalty, drop in the trees).
-                    if a > half + hole.rough_width + 12 and rng.random() < 0.3:
-                        penalty = 1
-                elif side == 'open':
-                    lie = 'rough'
-                elif side == 'water':
-                    penalty = 1
-                    lie = 'rough'
-                else:                   # out of bounds: stroke and distance
-                    penalty = 1
+                lie, penalty, ob = _side_hazard(hole, lat, a - corridor, rng)
+                if ob:                  # out of bounds: stroke and distance
                     st.penalties += 1
                     strokes += 1
                     sg_add('ott', before, baseline('tee', hole.plays), 1)
@@ -529,6 +554,7 @@ def play_hole(pl, hole, hidx, rng, st, pressure=0.0, state=None):
             ev_go -= 0.15 * pl.aggr
             lay_up = ev_go + rng.gauss(0, pl.noise) > ev_lay
         if lay_up:
+            prev_lie = lie
             if dist - reach <= 70 and par == 4:
                 # Just out of reach: hit the longest club available and finish short of the green.
                 target = reach
@@ -545,16 +571,12 @@ def play_hole(pl, hole, hidx, rng, st, pressure=0.0, state=None):
             elif a <= half + hole.rough_width:
                 lie = 'fairway_bunker' if (a <= half + 6 and rng.random() < hole.fairway_bunkers * 0.35) else 'rough'
             else:
-                side = hole.left if lat < 0 else hole.right
-                if side in ('water', 'ob'):
-                    penalty = 1
+                lie, penalty, ob = _side_hazard(hole, lat, a - half - hole.rough_width, rng)
+                if ob:                  # stroke and distance: replay from where it was hit
+                    dist, lie = dist + go, prev_lie
+                if penalty:
                     st.penalties += 1
                     strokes += 1
-                    if side == 'ob':
-                        dist = dist + go
-                    lie = 'rough'
-                else:
-                    lie = 'trees' if side == 'trees' else 'rough'
             sg_add('app', before, baseline(_LIE_BASELINE[lie], dist), penalty)
             continue
 
@@ -603,6 +625,19 @@ def play_hole(pl, hole, hidx, rng, st, pressure=0.0, state=None):
             continue
         missed_green_once = True
         off = max(0.5, from_centre - G * 0.88)
+        # A wild miss beside the green is in the hole's side hazards, just like a wild drive.
+        lateral_limit = max(G + 6, hole.fairway_width / 2 + hole.rough_width)
+        if abs(by) > lateral_limit:
+            side_lie, penalty, ob = _side_hazard(hole, by, abs(by) - lateral_limit, rng)
+            if penalty:
+                st.penalties += 1
+                strokes += 1
+            if ob:                      # stroke and distance: replay from the same spot
+                sg_add('app', before, before, penalty)
+                continue
+            lie, dist = side_lie, max(10.0, to_pin)
+            sg_add('app', before, baseline(_LIE_BASELINE[lie], dist), penalty)
+            continue
         if hole.green_water and off > 1.5:
             side = ('front' if bx < -abs(by) else 'back' if bx > abs(by) else 'left' if by < 0 else 'right')
             if side == hole.green_water and rng.random() < (0.85 if off > 3 else 0.5):
@@ -624,7 +659,6 @@ def play_hole(pl, hole, hidx, rng, st, pressure=0.0, state=None):
         sg_add('app', before, baseline(_LIE_BASELINE[lie], dist))
 
     # ----------------------------------------------------------- bookkeeping
-    strokes = min(strokes, MAX_HOLE_STROKES)   # pick-up rule: a true disaster is recorded as 12
     rel = strokes - par
     st.holes.append(strokes)
     st.score += strokes
@@ -659,16 +693,22 @@ def play_hole(pl, hole, hidx, rng, st, pressure=0.0, state=None):
 
 
 def play_round(golfer, course, rng, cond=None, caddie=None, round_no=1, week_form=None,
-               pressure_fn=None):
-    """Play 18 holes. pressure_fn(hole_index, strokes_to_par_so_far) -> 0..1."""
+               pressure_fn=None, pins=None):
+    """Play 18 holes. pressure_fn(hole_index, strokes_to_par_so_far) -> 0..1.
+
+    `pins`: the round's shared pin sheet. Pass the same sheet to every golfer in a competition round;
+    if omitted (a stand-alone round) a sheet is drawn for this round.
+    """
     cond = cond or Conditions()
+    if pins is None:
+        pins = pin_sheet(course, cond, rng)
     pl = Player(golfer, course, cond, caddie, rng, round_no, week_form)
     st = RoundStats()
     state = HoleState()
     par_so_far = 0
     for i, hole in enumerate(course.holes):
         pressure = pressure_fn(i, st.score - par_so_far) if pressure_fn else 0.0
-        play_hole(pl, hole, i, rng, st, pressure, state)
+        play_hole(pl, hole, i, rng, st, pressure, state, pins[i])
         par_so_far += hole.par
     st.to_par = st.score - course.par
     return st

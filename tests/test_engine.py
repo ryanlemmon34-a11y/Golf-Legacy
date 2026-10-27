@@ -14,7 +14,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from golfsim import ratings as R                                       # noqa: E402
 from golfsim.course import (ashford_ridge, easy_course, georgia_national, hard_course,  # noqa: E402
                             tight_classic, windy_links)
-from golfsim.engine import Conditions, Player, play_round              # noqa: E402
+from golfsim import tournament as T                                     # noqa: E402
+from golfsim.course import Course, Hole                                 # noqa: E402
+from golfsim.engine import (Conditions, HoleState, Player, RoundStats,  # noqa: E402
+                            pin_sheet, play_hole, play_round)
 from golfsim.golfer import (ARCHETYPES, CADDIE_SKILLS, OVERALL_WEIGHTS, Caddie,  # noqa: E402
                             archetype_golfer, neutral_caddie, uniform_golfer)
 from golfsim.tournament import play_event                              # noqa: E402
@@ -47,12 +50,19 @@ class ScoringIntegrityTests(unittest.TestCase):
                 st = play_round(uniform_golfer(rating), MID, rng)
                 self.assertEqual(len(st.holes), 18)
                 self.assertEqual(sum(st.holes), st.score)
-                self.assertTrue(all(1 <= s <= 12 for s in st.holes))
+                self.assertTrue(all(s >= 1 for s in st.holes))
                 self.assertEqual(st.to_par, st.score - 72)
                 self.assertEqual(sum(v[1] for v in st.par_scores.values()), 18)
                 self.assertEqual(st.eagles + st.birdies + st.pars + st.bogeys + st.doubles + st.worse, 18)
                 self.assertLessEqual(st.gir, 18)
                 self.assertGreaterEqual(st.putts, 0)
+
+    def test_disaster_holes_play_out_with_no_cap(self):
+        """Every stroke is a simulated shot: no pick-up, no invented finishing putt, no maximum score."""
+        rng = random.Random(8)
+        holes = [h for _ in range(800) for h in play_round(uniform_golfer(0), hard_course(), rng).holes]
+        self.assertGreater(max(holes), 12)
+        self.assertGreater(sum(h > 12 for h in holes), 50)
 
     def test_same_seed_same_round(self):
         g = archetype_golfer('Power Hitter', 80)
@@ -60,6 +70,49 @@ class ScoringIntegrityTests(unittest.TestCase):
         b = play_round(g, MID, random.Random(42))
         self.assertEqual(a.holes, b.holes)
         self.assertEqual(a.drives, b.drives)
+
+
+class SharedConditionsTests(unittest.TestCase):
+    def test_pin_sheet_is_shared_by_the_whole_field(self):
+        calls = []
+        real = T.pin_sheet
+        def counting(*a, **k):
+            calls.append(1)
+            return real(*a, **k)
+        T.pin_sheet = counting
+        try:
+            field = [uniform_golfer(70 + i % 10, name=f'P{i}') for i in range(40)]
+            T.play_event(field, MID, random.Random(3), cut_top=20)
+        finally:
+            T.pin_sheet = real
+        self.assertEqual(len(calls), 4 + 1)          # one sheet per round (+ one for any playoff)
+        pins = pin_sheet(MID, Conditions(pin_difficulty=0.45), random.Random(1))
+        self.assertEqual(len(pins), 18)
+        for (x, y), h in zip(pins, MID.holes):
+            self.assertLessEqual((x * x + y * y) ** .5, h.green_radius)
+
+    def test_same_pins_same_golfer_same_seed_identical(self):
+        pins = pin_sheet(MID, Conditions(), random.Random(5))
+        g = uniform_golfer(75)
+        a = play_round(g, MID, random.Random(9), pins=pins)
+        b = play_round(g, MID, random.Random(9), pins=pins)
+        self.assertEqual(a.holes, b.holes)
+
+
+class HazardTests(unittest.TestCase):
+    def test_long_drives_cannot_bypass_trouble(self):
+        """A drivable par 4 lined by out of bounds: reaching the green's distance does not skip the OB."""
+        hole = Hole(1, 4, 300, fairway_width=26, rough_width=6, left='ob', right='ob', greenside_bunkers=.3)
+        course = Course('Probe', 'USA', 'Test', tuple(replace(hole, number=i + 1) for i in range(18)))
+        g = replace(uniform_golfer(75), attrs={**uniform_golfer(75).attrs, 'power': 99, 'driving_accuracy': 10})
+        rng = random.Random(1)
+        pens = scores = 0
+        for _ in range(1500):
+            st = RoundStats()
+            scores += play_hole(Player(g, course, Conditions(), None, rng), hole, 0, rng, st)
+            pens += st.penalties
+        self.assertGreater(pens / 1500, 0.5)
+        self.assertGreater(scores / 1500, 5.0)
 
 
 class AttributeWiringTests(unittest.TestCase):

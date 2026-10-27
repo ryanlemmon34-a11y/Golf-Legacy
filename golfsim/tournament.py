@@ -7,7 +7,7 @@ world simulation will reuse the chronological tee-time model from v0.13.
 """
 from __future__ import annotations
 
-from .engine import Conditions, WeekForm, play_round, play_hole, Player, RoundStats, HoleState
+from .engine import Conditions, WeekForm, play_round, play_hole, pin_sheet, Player, RoundStats, HoleState
 
 
 def _pressure_fn(level_front, level_back):
@@ -29,6 +29,7 @@ def play_event(field, course, rng, cut_top=65, prestige=1.0, cond_by_round=None,
     alive = list(field)
     for rd in range(1, rounds_n + 1):
         cond = (cond_by_round or {}).get(rd) or Conditions()
+        pins = pin_sheet(course, cond, rng)          # one hole location per green, shared by the field
         board = sorted(totals[id(g)] for g in alive)
         leader = board[0] if board else 0
         cut_est = board[min(cut_top, len(board)) - 1] if board else 0
@@ -48,7 +49,7 @@ def play_event(field, course, rng, cut_top=65, prestige=1.0, cond_by_round=None,
                     pf = _pressure_fn(0.5 * prestige, 0.95 * prestige)
                 elif gap <= 6:
                     pf = _pressure_fn(0.2 * prestige, 0.4 * prestige)
-            st = play_round(g, course, rng, cond, caddies.get(id(g)), rd, forms[id(g)], pf)
+            st = play_round(g, course, rng, cond, caddies.get(id(g)), rd, forms[id(g)], pf, pins)
             totals[id(g)] += st.score
             rounds[id(g)].append(st.score)
         if cut_after and rd == cut_after and rd < rounds_n:
@@ -59,12 +60,14 @@ def play_event(field, course, rng, cut_top=65, prestige=1.0, cond_by_round=None,
     best = totals[id(board[0])]
     tied = [g for g in board if totals[id(g)] == best]
     playoff_holes = 0
+    playoff_pins = pin_sheet(course, Conditions(), rng)
     while len(tied) > 1:
-        hole = course.holes[17 if playoff_holes % 2 == 0 else 16]
+        idx = 17 if playoff_holes % 2 == 0 else 16
+        hole = course.holes[idx]
         scores = {}
         for g in tied:
             pl = Player(g, course, Conditions(), caddies.get(id(g)), rng, rounds_n, forms[id(g)])
-            scores[id(g)] = play_hole(pl, hole, 17, rng, RoundStats(), 1.0 * prestige, HoleState())
+            scores[id(g)] = play_hole(pl, hole, 17, rng, RoundStats(), 1.0 * prestige, HoleState(), playoff_pins[idx])
         low = min(scores.values())
         tied = [g for g in tied if scores[id(g)] == low]
         playoff_holes += 1
@@ -80,13 +83,16 @@ def play_match(a, b, course, rng, holes=18, pressure=0.5, caddies=None):
     pls = {id(g): Player(g, course, Conditions(), caddies.get(id(g)), rng, 1, WeekForm.draw(rng, g)) for g in (a, b)}
     states = {id(g): HoleState() for g in (a, b)}
     up, played = 0, 0          # up > 0 means `a` leads
+    pins = None
     while True:
         idx = played % 18
+        if idx == 0:
+            pins = pin_sheet(course, Conditions(), rng)   # both players play the same hole locations
         hole = course.holes[idx]
         remaining = holes - played
         late = pressure * (1.4 if remaining <= 4 else 1.0)
-        sa = play_hole(pls[id(a)], hole, idx, rng, RoundStats(), late, states[id(a)])
-        sb = play_hole(pls[id(b)], hole, idx, rng, RoundStats(), late, states[id(b)])
+        sa = play_hole(pls[id(a)], hole, idx, rng, RoundStats(), late, states[id(a)], pins[idx])
+        sb = play_hole(pls[id(b)], hole, idx, rng, RoundStats(), late, states[id(b)], pins[idx])
         played += 1
         up += (sa < sb) - (sb < sa)
         remaining = holes - played
@@ -105,11 +111,12 @@ def play_stroke_and_match(field, course, rng, stroke_holes=36, bracket=64, final
     Returns finishers [(golfer, position)]: 1 champion, 2 runner-up, 3 semi-finalists, 5 quarter-
     finalists, 9 / 17 / 33 earlier rounds, then non-qualifiers by stroke-play position.
     """
-    totals = {}
-    for g in field:
-        form = WeekForm.draw(rng, g)
-        totals[id(g)] = sum(play_round(g, course, rng, Conditions(), None, rd, form).score
-                            for rd in range(1, stroke_holes // 18 + 1))
+    totals = {id(g): 0 for g in field}
+    forms = {id(g): WeekForm.draw(rng, g) for g in field}
+    for rd in range(1, stroke_holes // 18 + 1):
+        pins = pin_sheet(course, Conditions(), rng)       # shared by the whole stroke-play field
+        for g in field:
+            totals[id(g)] += play_round(g, course, rng, Conditions(), None, rd, forms[id(g)], None, pins).score
     order = sorted(field, key=lambda g: (totals[id(g)], rng.random()))
     seeds, rest = order[:bracket], order[bracket:]
     # Standard seeding: 1 v 64, 32 v 33 ... arranged so the top seeds meet last.
