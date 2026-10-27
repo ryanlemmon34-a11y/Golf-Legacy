@@ -84,8 +84,13 @@ class DevelopmentTests(unittest.TestCase):
         g = golfer(28, 5)
         p = g.attrs['power']
         self.assertEqual(D.serious_injury(g, 4, random.Random(1)), {})
-        self.assertTrue(D.serious_injury(g, 20, random.Random(1)))
-        self.assertLess(g.attrs['power'], p)
+        marked = [bool(D.serious_injury(copy.deepcopy(g), w, random.Random(i))) for w in (12, 30) for i in range(200)]
+        self.assertLess(sum(marked[:200]), sum(marked[200:]))               # longer: likelier to leave a mark
+        self.assertTrue(0 < sum(marked[:200]) < 200)
+        i, hurt = 0, copy.deepcopy(g)
+        while not D.serious_injury(hurt, 20, random.Random(i)):
+            i, hurt = i + 1, copy.deepcopy(g)
+        self.assertLess(hurt.attrs['power'], p)
 
     def test_choose_category_reads_the_game(self):
         g = golfer(22, 0, coachability=95)

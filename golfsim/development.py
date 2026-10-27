@@ -76,7 +76,16 @@ def init_ceilings(g, age, rng):
     g.ceilings = {k: round(v, 2) for k, v in ceil.items()}
 
 
-def develop_week(g, activity, age, category=None, rounds=0.0, coach=0.5, scale=1.0):
+def coach_multiplier(quality):
+    """How much a week of training counts for, by coaching quality (0-1; teaching yourself = 0.3).
+    Golfers who teach themselves keep the 1.0 the world's development rates were calibrated on (the
+    calibration predates coaches, so it describes a typical golfer's own practice); a coach adds to
+    it: an ordinary coach about +10%, a strong specialist in their speciality or a youth specialist
+    with a teenager about +30%. A weak coach is no worse than none."""
+    return 1.0 + 0.5 * max(0.0, quality - 0.3)
+
+
+def develop_week(g, activity, age, category=None, rounds=0.0, coach=0.3, scale=1.0):
     """Apply one week of development. activity: 'train', 'play' or 'rest' (a paid work week counts as
     rest). `scale` shrinks training for golfers with a full-time job. Returns overall gained."""
     before = g.overall
@@ -90,7 +99,7 @@ def develop_week(g, activity, age, category=None, rounds=0.0, coach=0.5, scale=1
         return g.overall - before
     lr = learning_rate(age) * (0.5 + g.personality['work_ethic'] / 100) * scale
     if activity == 'train' and category:
-        k_train = BASE_TRAIN * lr * (0.6 + 0.8 * g.personality['coachability'] / 100) * (0.7 + 0.6 * coach)
+        k_train = BASE_TRAIN * lr * (0.6 + 0.8 * g.personality['coachability'] / 100) * coach_multiplier(coach)
         if category == 'mental':
             k_train *= MENTAL_TRAIN
         for k in CATEGORIES[category]:
@@ -127,14 +136,14 @@ def perceived_gap(g, k, insight=0.0):
     return max(0.0, g.ceilings[k] - g.attrs[k] + sd * z)
 
 
-def development_value(g, activity, age, category=None, insight=0.0, coach=0.5):
+def development_value(g, activity, age, category=None, insight=0.0, coach=0.3):
     """Overall a golfer expects to gain this week from an activity, from their own (imperfect) view of
     their game (used by the planner)."""
     lr = learning_rate(age) * (0.5 + g.personality['work_ethic'] / 100)
     gain = 0.0
     total_w = sum(OVERALL_WEIGHTS.values())
     if activity == 'train' and category:
-        k_train = BASE_TRAIN * lr * (0.6 + 0.8 * g.personality['coachability'] / 100) * (0.7 + 0.6 * coach)
+        k_train = BASE_TRAIN * lr * (0.6 + 0.8 * g.personality['coachability'] / 100) * coach_multiplier(coach)
         if category == 'mental':
             k_train *= MENTAL_TRAIN
         for k in CATEGORIES[category]:
@@ -187,8 +196,9 @@ def age_year(g, age, rng):
 
 
 def serious_injury(g, weeks, rng):
-    """A long injury (10+ weeks) can cost some strength, stamina and resilience to injury for good."""
-    if weeks < 10:
+    """A long injury (10+ weeks) can cost some strength, stamina and resilience to injury for good: the
+    longer it is, the likelier (about 15% at 10 weeks, 60% at 20, 85% at 30)."""
+    if weeks < 10 or rng.random() > 1 - math.exp(-(weeks - 8) / 12):
         return {}
     lost = {}
     for k in ('power', 'stamina', 'injury_resistance'):

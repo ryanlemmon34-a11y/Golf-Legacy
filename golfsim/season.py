@@ -179,6 +179,14 @@ class Season:
         self.juniors_added = {}                              # year -> number of new golfers
         self.entry_routes = {}                               # (year, series) -> {gid: route code}
         self.staff = ST.initial_staff(world, seed)           # coaches and caddies
+        self.staff_receipts = defaultdict(Counter)            # year -> ('coach'|'caddie', id) -> $ received
+        self.overall_start = {}                              # year -> gid -> overall on 1 January
+        self.transitions = {}                                # year -> [career decisions with their reasons]
+        self.activity_counts = defaultdict(lambda: defaultdict(Counter))  # year -> gid -> weeks per activity
+        self.assignments = {}                                # year -> staff assignments at the season's start
+        self.staff_year = {}                                 # year -> staff id -> that season's work
+        self.stuck_blocks = Counter()                        # gid -> consecutive months unable to afford a trip
+        self.block_flags = defaultdict(lambda: defaultdict(Counter))  # year -> gid -> monthly money state
         self.year = self.first_year
         from .cards import tour_target
         for k, t in TOUR_BY_KEY.items():
@@ -394,7 +402,7 @@ class Season:
         if champs and champs[-1][1] == g.id:
             v += 5                                           # defending champion
         cost = self.trip_cost(g, s, self.lib.venues(ed.year)[ed.event_id][0].city)
-        v -= (cost - self.expected_prize(g, s)) / FIN.money_unit(self.funds(g, ed.year))
+        v -= (cost - self.expected_kept(g, s)) / FIN.money_unit(self.funds(g, ed.year))
         return v + rng.gauss(0, 3)
 
     # ---- the week ------------------------------------------------------------------------------
@@ -873,8 +881,19 @@ class Season:
                 rec.add_hole(idx, strokes, pars[idx], self.g[gid].name, ed.event_id, year, stage)
                 self.holes_played[year] += 1
             rounds = Counter(gid for gid, *_ in o['rounds'])
+            fk = course.familiarity_key
             for gid, n in Counter(gid for gid, *_ in o['holes']).items():
                 rounds[gid] += n / 18
+                # match-play and playoff holes teach the course too (in rounds' worth)
+                g_ = self.g[gid]
+                g_.familiarity[fk] = g_.familiarity.get(fk, 0) + n / 18
+                k = self.staff.caddie(gid)
+                if k is not None:
+                    k.familiarity[fk] = k.familiarity.get(fk, 0) + n / 18
+            for gid, n in rounds.items():
+                k = self.staff.caddie(gid)
+                if k is not None:
+                    k.rounds_worked += n
             host_region = COUNTRIES[CITY_BY_NAME[v.city].country].region
             for gid, n in rounds.items():
                 self._week_load[gid] += self.load(self.g[gid], n, region_of(self.g[gid]) != host_region, year)
@@ -884,8 +903,8 @@ class Season:
                 self.spend(self.g[gid], year, 'events', FIN.event_cost(self.g[gid], s, v.city))
                 k = self.staff.caddie(gid)
                 if k is not None:
-                    self.spend(self.g[gid], year, 'caddie', k.weekly_fee)
-                    k.earnings += k.weekly_fee
+                    self.pay_staff(self.g[gid], year, 'caddie', k, k.weekly_fee)
+                    k.weeks_worked += 1
             if s.kind != 'qualifying' and finish and finish[0][1] == 1:
                 w = finish[0][0]
                 tp = '' if finish[0][2] is None else f' at {finish[0][2] - course.par * s.rounds:+d}'
@@ -987,16 +1006,19 @@ class Season:
         """Pay the purse to professionals who made the cut, by the payout table (ties share the
         positions' money). Amateurs take nothing; the professionals behind them move up the table.
 
-        The table is sized by the event's paid places (the cut, or every starter in a no-cut event),
-        not by however many professionals happen to be paid: when amateurs or a small cut leave
-        places without a professional to fill them, the money for those places is not paid out
-        (it is recorded in `unpaid`) rather than inflating everyone else's share.
+        The table is sized by the event's intended paid places (the cut within the intended field, or
+        every starter in a no-cut event), not by however many professionals happen to be paid: when
+        amateurs, a small cut or an undersized field leave places without a professional to fill them,
+        the money for those places is not paid out (it is recorded in `unpaid`) rather than inflating
+        everyone else's share.
         Returns {gid: prize}."""
         won = {}
         if not s.purse:
             return won
         paid = [(gid, pos) for gid, pos, _ in finish if pos is not None and self.g[gid].status != 'amateur']
-        places = min(s.cut_top, len(finish)) if s.cut_top else len(finish)
+        # cut events pay their intended places (the cut, within the intended field size) even when fewer
+        # start; a no-cut event pays every starter
+        places = min(s.cut_top, s.field) if s.cut_top else len(finish)
         shares = PR.payout_shares(max(places, len(paid)))
         i = 0
         while i < len(paid):
@@ -1012,11 +1034,9 @@ class Season:
                 self.earn(g, year, 'prize', each)
                 k = self.staff.caddie(gid)
                 if k is not None:
-                    self.spend(g, year, 'caddie', FIN.CADDIE_SHARE * each)
-                    k.earnings += FIN.CADDIE_SHARE * each
+                    self.pay_staff(g, year, 'caddie_share', k, FIN.CADDIE_SHARE * each)
                 if self.staff.deal.get(gid) == 'share':      # the coach who approached them
-                    self.spend(g, year, 'coaching', ST.SCOUT_SHARE * each)
-                    self.staff.coach(gid).earnings += ST.SCOUT_SHARE * each
+                    self.pay_staff(g, year, 'coach_share', self.staff.coach(gid), ST.SCOUT_SHARE * each)
                 keys = [s.tour] if s.tour in TOUR_BY_KEY else []
                 if s.kind == 'major':
                     keys = list(PREMIER_TOURS)
@@ -1080,7 +1100,10 @@ class Season:
         self.rank_start[year] = dict(self.wr_pos)
         self.am_start[year] = dict(self.am_pos)
         self.cash_start[year] = {g.id: g.cash for g in self.world.golfers}
+        self.overall_start[year] = {g.id: g.overall for g in self.world.golfers if g.lifestyle != 'retired'}
         ST.start_of_season(self, year)                       # coaches scout, golfers hire coaches and caddies
+        self.assignments[year] = {'coach_of': dict(self.staff.coach_of), 'deal': dict(self.staff.deal),
+                                  'caddie_of': dict(self.staff.caddie_of)}
 
     def standing_key(self, money, gid):
         """Order on a money list: more money first; ties broken by world ranking, then by id, so the
@@ -1101,7 +1124,8 @@ class Season:
             led = self.ledgers[year].get(g.id)
             snap[g.id] = {'tour': g.tour, 'tier': TOUR_BY_KEY[g.tour].tier if g.tour in TOUR_BY_KEY else 9,
                           'status': g.status, 'lifestyle': g.lifestyle, 'events': len(self.played[year][g.id]),
-                          'wins': 0, 'top3': 0, 'top10': 0, 'cuts': 0,
+                          'wins': 0, 'top3': 0, 'top10': 0, 'cuts': 0, 'wins_by_tier': {}, 'majors': 0,
+                          'secured': [],
                           'prize': led.prize if led else 0.0, 'net': led.net if led else 0.0,
                           'wr_start': self.rank_start.get(year, {}).get(g.id), 'wr_end': self.wr_pos.get(g.id),
                           'am_start': self.am_start.get(year, {}).get(g.id), 'am_end': self.am_pos.get(g.id),
@@ -1116,11 +1140,24 @@ class Season:
                         continue
                     row['cuts'] += 1
                     row['wins'] += pos == 1
+                    if pos == 1:
+                        ser = self.cal.by_id[r.series_id]
+                        row['wins_by_tier'][ser.tier] = row['wins_by_tier'].get(ser.tier, 0) + 1
+                        row['majors'] += ser.kind == 'major'
                     row['top3'] += pos <= 3
                     row['top10'] += pos <= 10
         for week, gid, kind, weeks, _ in self.injuries[year]:
             if gid in snap:
                 snap[gid]['injury_weeks'] += weeks
+        for gid, row in snap.items():                        # places already secured for next season
+            if row['majors']:
+                row['secured'].append('major champion (5-year exemptions)')
+            if row['wins_by_tier'].get(1, 0) and row['status'] == 'pro':
+                row['secured'].append('Premier Tour winner (Masters and other invitations)')
+            if row['wr_end'] and row['wr_end'] <= 50:
+                row['secured'].append('world top 50 (Tour Masters invitation)')
+        for gid, row in snap.items():
+            row['zero_start_reason'] = self.zero_start_reason(gid, year, row) if row['events'] == 0 else ''
         by_tour = defaultdict(list)
         for gid, row in snap.items():
             if row['status'] == 'pro' and row['tier'] <= 4:
@@ -1140,6 +1177,20 @@ class Season:
                     snap[gid]['money_rank_pct'] = avg / len(ids)
                 i = j
         return snap
+
+    def zero_start_reason(self, gid, year, row):
+        """Why a golfer played no event all season, from what was recorded in their monthly plans."""
+        f = self.block_flags[year].get(gid, Counter())
+        months = sum(f.values()) or 1
+        if row['injury_weeks'] >= 40:
+            return 'injured'
+        if f['stuck'] >= months / 2:
+            return 'could not afford any trip'
+        if f['no event'] >= months / 2:
+            return 'no event they were eligible for'
+        if self.g[gid].lifestyle == 'part_time':
+            return 'part-timer: chose not to play'
+        return 'chose not to play (training, rest or work)'
 
     # ---- development and the monthly plan ------------------------------------------------------
     def plan_block(self, year, week0):
@@ -1166,18 +1217,24 @@ class Season:
                 continue
             key = (g.tour, g.country, g.status, g.lifestyle, self.wr_pos.get(g.id, 9999) <= 500,
                    self.am_pos.get(g.id, 9999) <= 25, self.am_pos.get(g.id, 9999) <= 300)
-            if key not in cache:
-                row = []
-                for w in weeks:
-                    best = None
-                    for e in by_week[w]:
-                        if self.eligible(g, e.series, w):
-                            v = self.base_value(g, e, CITY_BY_NAME[city[e.event_id]].country)
-                            if best is None or v > best[0]:
-                                best = (v, e)
-                    row.append(best)
-                cache[key] = row
-            base = cache[key]
+            if key not in cache:                             # every eligible event, best first
+                cache[key] = [sorted(((self.base_value(g, e, CITY_BY_NAME[city[e.event_id]].country), e.event_id, e)
+                                      for e in by_week[w] if self.eligible(g, e.series, w)), reverse=True)
+                              for w in weeks]
+            options = cache[key]
+            money0 = self.spendable(g, year)
+            # each week: the most valuable event they can actually pay for (a cheaper local event is
+            # still an option when the one they would prefer is out of reach)
+            base, costs = [], []
+            for opts in options:
+                pick = self.best_affordable(g, opts, city, money0)
+                base.append(pick[0] if pick else None)
+                costs.append(pick[1] if pick else 0.0)
+            eligible_any = any(options)
+            stuck = money0 < 0 or (eligible_any and not any(base))
+            self.stuck_blocks[g.id] = self.stuck_blocks[g.id] + 1 if stuck else 0
+            self.block_flags[year][g.id]['stuck' if stuck else 'no event' if not eligible_any else 'ok'] += 1
+            self.staff_midseason(g, year, week0, money0)
             age = g.age(year)
             insight = self.staff.insight(g)
             cat = D.choose_category(g, rng, insight)
@@ -1193,16 +1250,13 @@ class Season:
             load4 = 4 * FATIGUE_PER_ROUND * (1.4 - 0.8 * stam) * (1 + 0.02 * max(0, age - 30))
             rest_rec = 0.40 + 0.30 * (1 - g.attrs['recovery_rate'] / 100)
             top100 = self.wr_pos.get(g.id, 9999) <= 100
-            money0 = self.spendable(g, year)
             unit = FIN.money_unit(self.funds(g, year))
-            costs = [self.trip_cost(g, b[1].series, city[b[1].event_id]) if b else 0.0 for b in base]
-            prizes = [self.expected_prize(g, b[1].series) if b else 0.0 for b in base]
+            prizes = [self.expected_kept(g, b[1].series) if b else 0.0 for b in base]
             # Paid work only makes sense when money is genuinely short: funds would not last three
             # months and their own results are not paying for their golf.
             burn = FIN.weekly_living(g)[1] + (sum(costs) / max(1, sum(1 for b in base if b)))
-            # ... and they must earn if they cannot cover the next weeks' living, or cannot afford any
-            # trip this month (otherwise a golfer just short of a trip would wait for ever).
-            stuck = money0 < 0 or (any(base) and all(c > money0 for b, c in zip(base, costs) if b))
+            # ... and they must earn if they cannot cover the next weeks' committed costs, or cannot
+            # afford any trip this month (otherwise a golfer just short of a trip would wait for ever).
             can_work = (g.status == 'pro' and g.lifestyle == 'full_time'
                         and (stuck or money0 < 13 * burn and sum(prizes) <= sum(costs)))
             work_v = min(20.0, FIN.WORK_WAGE / unit) if can_work else -1.0
@@ -1251,6 +1305,31 @@ class Season:
                              for _ in weeks]
             self.plans[g.id] = {w: (a, cat) for w, a in zip(weeks, best_acts)}
 
+    def best_affordable(self, g, opts, city, money):
+        """The most valuable of a week's eligible events (`opts`, best first) whose trip the golfer can
+        pay for: ((value, edition), trip cost), or None."""
+        for v, _, e in opts:
+            c = self.trip_cost(g, e.series, city[e.event_id])
+            if c <= money:
+                return (v, e), c
+        return None
+
+    def staff_midseason(self, g, year, week, money0):
+        """Monthly: a golfer who can no longer cover their committed costs stops paying their coach
+        (the fee stops from this week); a caddie whose player has been unable to afford a single trip
+        for two months in a row looks for another bag."""
+        st = self.staff
+        c = st.coach(g.id)
+        if c is not None and st.deal.get(g.id) == 'fee' and money0 < 0:
+            del st.coach_of[g.id], st.deal[g.id]
+            c.history.append((year, f'Stopped coaching {g.name} (could no longer pay)'))
+            self.log(g.id, year, week, f'Could no longer pay coach {c.name}; carried on alone')
+        k = st.caddie(g.id)
+        if k is not None and self.stuck_blocks[g.id] >= 2:
+            del st.caddie_of[g.id]
+            k.history.append((year, f'Left the bag of {g.name} (no events to work)'))
+            self.log(g.id, year, week, f'Caddie {k.name} left: no events they could afford')
+
     # ---- money --------------------------------------------------------------------------------
     def earn(self, g, year, field, amount):
         """Income: recorded in the ledger and added to cash in the same step (exact accounting)."""
@@ -1263,21 +1342,58 @@ class Season:
         setattr(led, field, getattr(led, field) + amount)
         g.cash -= amount
 
+    def pay_staff(self, g, year, field, person, amount):
+        """A payment from a golfer to their coach or caddie: out of the golfer's ledger and into the
+        person's receipts in the same step, so the two always reconcile."""
+        self.spend(g, year, field, amount)
+        person.earnings += amount
+        key = ('coach' if field.startswith('coach') else 'caddie', person.id)
+        self.staff_receipts[year][key] += amount
+
     def funds(self, g, year):
         """What a golfer could draw on right now: savings, backers, and a limited line of credit."""
         last = self.ledgers.get(year - 1, {}).get(g.id)
         earned = last.income - last.support if last else 0.0    # lenders look at earnings, not handouts
         return g.cash + g.backing + FIN.credit_limit(earned)
 
-    def spendable(self, g, year):
-        """Funds left for golf after setting aside the next few weeks of living costs."""
+    # The money definitions every decision shares (hiring, the monthly plan, entries, settlement and
+    # career runway):
+    #   committed     what goes out every week whatever they do: living costs net of salary, and a
+    #                 contracted coach's fee
+    #   spendable     funds after setting aside RESERVE_WEEKS of committed costs: the money for travel
+    #   trip cost     travel and fees, plus a caddie's weekly fee (paid only in weeks they play)
+    #   prize kept    expected prize money net of the caddie's share and a scouting coach's share;
+    #                 it informs decisions but is never spent before it is won
+    def committed_weekly(self, g):
         salary, living = FIN.weekly_living(g)
-        return self.funds(g, year) - FIN.RESERVE_WEEKS * max(0.0, living - salary)
+        c = self.staff.coach(g.id)
+        coach = c.fee / 52 if c is not None and self.staff.deal.get(g.id) == 'fee' else 0.0
+        return max(0.0, living - salary) + coach
+
+    def spendable(self, g, year):
+        """Funds left for golf after setting aside the next few weeks of committed costs."""
+        return self.funds(g, year) - FIN.RESERVE_WEEKS * self.committed_weekly(g)
 
     def trip_cost(self, g, series, city):
         """What playing an event costs a golfer: travel and fees, plus their caddie's weekly fee."""
         k = self.staff.caddie(g.id)
         return FIN.event_cost(g, series, city) + (k.weekly_fee if k is not None else 0.0)
+
+    def prize_kept(self, g):
+        """Share of prize money a golfer keeps after their caddie's and a scouting coach's shares."""
+        return (1.0 - (FIN.CADDIE_SHARE if self.staff.caddie(g.id) is not None else 0.0)
+                - (ST.SCOUT_SHARE if self.staff.deal.get(g.id) == 'share' else 0.0))
+
+    def earned_income(self, g, year):
+        """Income earned in a year (prize money kept, sponsors, salary, work): not family support."""
+        led = self.ledgers.get(year, {}).get(g.id)
+        if led is None:
+            return 0.0
+        return led.prize - led.caddie_share - led.coach_share + led.sponsors + led.salary + led.work
+
+    def means(self, g, year):
+        """What a golfer can commit to staff from: spendable funds plus most of last year's earnings."""
+        return max(0.0, self.spendable(g, year)) + 0.8 * self.earned_income(g, year - 1)
 
     def expected_prize(self, g, series):
         """The prize a golfer expects from an event, from the share of purses they have actually won
@@ -1287,6 +1403,9 @@ class Season:
         own = TOUR_BY_KEY[g.tour].tier if g.tour in TOUR_BY_KEY else 4
         stronger = max(0, own - series.tier)                 # a field above their usual level
         return self.prize_share.get(g.id, FIN.PRIOR_PRIZE_SHARE) * series.purse * 0.5 ** stronger
+
+    def expected_kept(self, g, series):
+        return self.expected_prize(g, series) * self.prize_kept(g)
 
     def weekly_finances(self, year, week):
         """Salaries, living costs, sponsor contracts and paid work for the week; backers cover shortfalls."""
@@ -1305,8 +1424,7 @@ class Season:
                 self.earn(g, year, 'work', FIN.WORK_WAGE)
             if self.staff.deal.get(g.id) == 'fee':
                 c = self.staff.coach(g.id)
-                self.spend(g, year, 'coaching', c.fee / 52)
-                c.earnings += c.fee / 52
+                self.pay_staff(g, year, 'coaching', c, c.fee / 52)
             if g.cash < 0 and g.backing > 0:
                 draw = min(g.backing, -g.cash)
                 g.backing -= draw
@@ -1328,6 +1446,7 @@ class Season:
             else:
                 act = 'train' if action in ('play', 'train') and self.development else 'rest'
             self.week_activity[g.id] = act
+            self.activity_counts[year][g.id][act] += 1
             if self.development and g.ceilings:
                 scale = 0.3 if g.lifestyle == 'part_time' and act == 'train' else 1.0
                 D.develop_week(g, 'rest' if act == 'work' else act, g.age(year), cat, rounds,

@@ -2,3 +2,5 @@ __pycache__/
 *.pyc
 dist/
 reports/cohort_data/
+reports/long_world*/*.json.gz
+reports/long_world*/*.tmp

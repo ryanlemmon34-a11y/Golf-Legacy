@@ -14,6 +14,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from golfsim import development as D                                  # noqa: E402
+from golfsim import finance as FIN                                     # noqa: E402
 from golfsim import staff as ST                                       # noqa: E402
 from golfsim.calendar import TOUR_BY_KEY                              # noqa: E402
 from golfsim.population import generate_world                         # noqa: E402
@@ -60,17 +61,22 @@ class MarketTests(unittest.TestCase):
         self.assertEqual(hired(-5000.0), 0)
         self.assertGreater(hired(500000.0), 50)
 
-    def test_coaches_approach_young_raw_players_they_believe_in(self):
-        """Same world, same young players: alternate ones get high hidden potential. Coaches see only
-        through their scouting noise, yet approach the high-potential half far more often."""
-        s = fresh(23)
-        young = [g for g in s.world.golfers if g.age(2027) <= 20 and g.status == 'amateur'][:600]
-        for i, g in enumerate(young):
-            g.cash, g.backing = 0.0, 0.0                             # cannot pay anyone
-            g.potential = min(99.0, g.overall + (30.0 if i % 2 else 2.0))
-        s.start_finances(2027)
-        got = Counter(i % 2 for i, g in enumerate(young) if s.staff.deal.get(g.id) == 'share')
-        self.assertGreater(got[1], 4 * max(1, got[0]))
+    def test_scouts_judge_what_they_can_see_not_hidden_potential(self):
+        """Coaches do not read hidden potential: changing it changes nothing. They do notice a young
+        player who improved a lot over the last year."""
+        def approaches(potential_shift, improved):
+            s = fresh(23)
+            young = [g for g in s.world.golfers if g.age(2027) <= 20 and g.status == 'amateur'][:600]
+            s.overall_start[2026] = {}
+            for i, g in enumerate(young):
+                g.cash, g.backing = 0.0, 0.0                             # cannot pay anyone
+                g.potential = min(99.0, g.potential + potential_shift)
+                s.overall_start[2026][g.id] = g.overall - (6.0 if improved and i % 2 else 1.0)
+            s.start_finances(2027)
+            return Counter(i % 2 for i, g in enumerate(young) if s.staff.deal.get(g.id) == 'share')
+        self.assertEqual(approaches(0.0, False), approaches(25.0, False))     # hidden potential is invisible
+        got = approaches(0.0, True)
+        self.assertGreater(got[1], 2 * max(1, got[0]))                       # fast improvers stand out
 
 
 class EffectTests(unittest.TestCase):
@@ -126,6 +132,104 @@ class EffectTests(unittest.TestCase):
             self.assertAlmostEqual(g.cash, s.cash_start[2027][g.id] + (led.net if led else 0.0), places=6)
         paid = [g for g in s.world.golfers if s.staff.deal.get(g.id) == 'fee']
         self.assertTrue(all(s.ledgers[2027][g.id].coaching > 0 for g in paid))
+
+
+class MoneyTests(unittest.TestCase):
+    def test_player_payments_equal_staff_receipts(self):
+        s = fresh(26)
+        s.start_finances(2027)
+        eds = s.cal.editions(2027)
+        for w in (1, 2, 3):
+            s.run_week(2027, w, [e for e in eds if e.week == w])
+        led = s.ledgers[2027].values()
+        rec = s.staff_receipts[2027]
+        caddie_paid = sum(l.caddie + l.caddie_share for l in led)
+        coach_paid = sum(l.coaching + l.coach_share for l in led)
+        self.assertGreater(caddie_paid, 0)
+        self.assertAlmostEqual(caddie_paid, sum(v for (kind, _), v in rec.items() if kind == 'caddie'), places=4)
+        self.assertAlmostEqual(coach_paid, sum(v for (kind, _), v in rec.items() if kind == 'coach'), places=4)
+        for g in s.world.golfers:                                            # and every golfer still reconciles
+            l = s.ledgers[2027].get(g.id)
+            self.assertAlmostEqual(g.cash, s.cash_start[2027][g.id] + (l.net if l else 0.0), places=6)
+
+    def test_contracted_coaching_is_reserved_before_travel(self):
+        s = fresh(27)
+        s.start_finances(2027)
+        gid = next(g for g, d in s.staff.deal.items() if d == 'fee')
+        g = s.g[gid]
+        with_coach = s.spendable(g, 2027)
+        c = s.staff.coach(gid)
+        self.assertAlmostEqual(s.committed_weekly(g) - c.fee / 52, max(0.0, FIN.weekly_living(g)[1] - FIN.weekly_living(g)[0]))
+        del s.staff.coach_of[gid], s.staff.deal[gid]
+        self.assertAlmostEqual(s.spendable(g, 2027) - with_coach, FIN.RESERVE_WEEKS * c.fee / 52)
+
+    def test_a_golfer_who_cannot_pay_loses_their_coach_midseason(self):
+        s = fresh(28)
+        s.start_finances(2027)
+        payers = [gid for gid, d in s.staff.deal.items() if d == 'fee'][:20]
+        scouted = [gid for gid, d in s.staff.deal.items() if d == 'share'][:20]
+        for gid in payers + scouted:
+            s.g[gid].cash, s.g[gid].backing = -10 ** 6, 0.0
+        s.plan_block(2027, 5)
+        self.assertTrue(all(gid not in s.staff.coach_of for gid in payers))
+        self.assertTrue(all(gid in s.staff.coach_of for gid in scouted))   # a share deal costs nothing now
+        self.assertTrue(any('Could no longer pay coach' in t for gid in payers for _, _, t in s.history[gid]))
+
+
+class LifecycleTests(unittest.TestCase):
+    def test_caddie_experience_comes_from_work_and_keeps_high_skills(self):
+        s = fresh(29)
+        s.start_finances(2027)
+        busy, idle, expert = list(s.staff.caddies.values())[:3]
+        busy.rounds_worked, idle.rounds_worked, expert.rounds_worked = 60.0, 0.0, 60.0
+        busy.born = idle.born = expert.born = 1990
+        expert.skills['strategy'] = 97.0
+        before = dict(busy.skills), dict(idle.skills)
+        ST.end_of_season(s, 2027, s.season_snapshot(2027))
+        self.assertAlmostEqual(busy.skills['strategy'], min(95.0, before[0]['strategy'] + 0.3), places=2)
+        self.assertEqual(idle.skills['strategy'], before[1]['strategy'])    # no work, no experience
+        self.assertEqual(expert.skills['strategy'], 97.0)                    # never clamped down
+        self.assertEqual((busy.seasons, idle.seasons), (1, 0))
+
+    def test_staff_invariants_across_rollovers(self):
+        s = fresh(30)
+        for year in (2027, 2028, 2029):
+            s.refresh_people(year)
+            s.start_finances(year)
+            st = s.staff
+            load = Counter(st.coach_of.values())
+            self.assertTrue(all(n <= st.coaches[cid].capacity for cid, n in load.items()))
+            self.assertEqual(len(set(st.caddie_of.values())), len(st.caddie_of))      # one golfer per caddie
+            self.assertTrue(all(st.coaches[cid].status == 'active' for cid in st.coach_of.values()))
+            self.assertTrue(all(st.caddies[kid].status == 'active' for kid in st.caddie_of.values()))
+            self.assertTrue(all(s.g[gid].lifestyle != 'retired' for gid in list(st.coach_of) + list(st.caddie_of)))
+            self.assertEqual(set(st.deal), set(st.coach_of))
+            s.end_of_season(year)
+        former = [p for p in list(st.coaches.values()) + list(st.caddies.values()) if p.former_golfer]
+        self.assertTrue(former)
+        for p in former:                                                     # identity and history kept
+            g = s.g[p.former_golfer]
+            self.assertEqual(p.name, g.name)
+            self.assertEqual(g.lifestyle, 'retired')
+            self.assertTrue(any(t.startswith('Became a') for _, _, t in s.history[g.id]))
+            self.assertTrue(p.history and p.history[0][1].startswith('Became a'))
+        self.assertTrue(any(c.status == 'retired' for c in st.coaches.values()))
+        self.assertTrue(s.juniors_added)
+
+    def test_match_play_holes_teach_the_course(self):
+        s = fresh(31)
+        ed = next(e for e in s.cal.editions(2027) if e.series.series_id == 'USA_AMATEUR')
+        ams = [g.id for g in s.world.golfers if g.status == 'amateur'][:80]
+        k = next(iter(s.staff.caddies.values()))
+        s.staff.caddie_of[ams[0]] = k.id                                     # one of them brings a caddie
+        venues = s.lib.venues(2027)
+        s.play_week(2027, ed.week, [ed], {ed.event_id: [ams]}, venues)
+        key = s.lib.course(venues[ed.event_id][0]).familiarity_key
+        fam = [s.g[gid].familiarity.get(key, 0) for gid in ams]
+        self.assertTrue(all(f >= 2 for f in fam))                            # two stroke-play rounds each
+        self.assertTrue(any(f > 2 for f in fam))                             # plus match-play holes
+        self.assertAlmostEqual(k.familiarity.get(key, 0), s.g[ams[0]].familiarity[key])
+        self.assertAlmostEqual(k.rounds_worked, s.g[ams[0]].familiarity[key])
 
 
 class FormerGolferTests(unittest.TestCase):

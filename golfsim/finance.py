@@ -111,11 +111,12 @@ def money_unit(available):
 
 class Ledger:
     """One golfer's money for one year."""
-    __slots__ = ('prize', 'sponsors', 'salary', 'work', 'support', 'events', 'caddie', 'coaching', 'living')
+    __slots__ = ('prize', 'sponsors', 'salary', 'work', 'support', 'events', 'caddie', 'caddie_share', 'coaching',
+                 'coach_share', 'living')
 
     def __init__(self):
         self.prize = self.sponsors = self.salary = self.work = self.support = 0.0
-        self.events = self.caddie = self.coaching = self.living = 0.0
+        self.events = self.caddie = self.caddie_share = self.coaching = self.coach_share = self.living = 0.0
 
     @property
     def income(self):
@@ -123,7 +124,7 @@ class Ledger:
 
     @property
     def costs(self):
-        return self.events + self.caddie + self.coaching + self.living
+        return self.events + self.caddie + self.caddie_share + self.coaching + self.coach_share + self.living
 
     @property
     def net(self):

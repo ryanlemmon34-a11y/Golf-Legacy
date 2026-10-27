@@ -87,10 +87,11 @@ def runway_years(season, g, year, tour, events, last_prize=None):
     income = season.prize_share.get(g.id, FIN.PRIOR_PRIZE_SHARE) * purse * events
     if last_prize is not None:
         income = 0.5 * income + 0.5 * last_prize
+    income *= season.prize_kept(g)                 # net of the caddie's and a scouting coach's shares
     income += PR.endorsements(season.player_prestige(g.id))
-    costs = events * cost + FIN.LIVING
-    k, c = season.staff.caddie(g.id), season.staff.coach(g.id)
-    costs += events * (k.weekly_fee if k else 0.0) + (c.fee if c and season.staff.deal.get(g.id) == 'fee' else 0.0)
+    # the same costs the season charges: trips (with a caddie's weekly fee) and committed weekly costs
+    k = season.staff.caddie(g.id)
+    costs = events * (cost + (k.weekly_fee if k else 0.0)) + 52 * season.committed_weekly(g)
     shortfall = costs - income
     if shortfall <= 0:
         return 10.0
@@ -124,18 +125,28 @@ def lasting_damage(season, gid, year, years=3):
     return sum(1 for y, _, t in season.history.get(gid, ()) if y > year - years and 'lasting damage' in t)
 
 
-def p_stop_chasing(season, g, row, year):
-    """Chance a full-time professional gives up the chase this winter (every tier)."""
-    age = g.age(year)
+def desire_to_continue(season, g, row, year):
+    """How much a golfer *wants* another season, from reasons they can see (logit units): progress
+    they have made, the card they have earned for next season, a significant event they have already
+    secured a place in, their health, their own willingness, and the pull of an ordinary life.
+    This is a reason to accept another losing season; it creates no money — what they can actually
+    afford to enter is still decided week by week from their funds."""
     tier = TOUR_BY_KEY[g.tour].tier if g.tour in TOUR_BY_KEY else 4
+    will = (g.personality['work_ethic'] + g.personality['big_stage']) / 200
+    return (1.2 * progress_signal(row) + 1.5 * OPPORTUNITY.get(tier, 0.15) + 0.8 * min(1, len(row.get('secured', ())))
+            + 1.5 * (will - 0.5) - life_stage(g.age(year))
+            - 0.05 * row.get('injury_weeks', 0) - 0.6 * lasting_damage(season, g.id, year))
+
+
+def p_stop_chasing(season, g, row, year):
+    """Chance a full-time professional gives up the chase this winter (every tier): money pressure
+    (1 / (1 + runway)) against their desire to continue."""
     runway = runway_years(season, g, year, g.tour, season.target_events(g), row.get('prize', 0.0))
     pressure = 1 / (1 + runway)                    # 1 = broke and losing money, ~0 = self-funding
-    funded = min(1.0, runway)                      # progress only counts if next year can be paid for
-    will = (g.personality['work_ethic'] + g.personality['big_stage']) / 200
-    x = (-4.5 + 4.5 * pressure + life_stage(age)
-         - 1.4 * progress_signal(row) * funded - 1.5 * OPPORTUNITY.get(tier, 0.15)
-         - 1.5 * (will - 0.5) + 0.05 * row.get('injury_weeks', 0) + 0.6 * lasting_damage(season, g.id, year))
-    return _sig(x), {'runway': runway, 'progress': progress_signal(row)}
+    desire = desire_to_continue(season, g, row, year)
+    x = -4.5 + 4.0 * pressure - desire
+    return _sig(x), {'runway': runway, 'progress': progress_signal(row), 'desire': desire,
+                     'secured': list(row.get('secured', ()))}
 
 
 def p_retire(season, g, row, year):
@@ -183,7 +194,8 @@ def p_comeback(season, g, row, year):
               + 0.6 * max(0.0, progress_signal(row)))
     funded = min(1.0, (max(0.0, g.cash) + g.backing) / (FIN.LIVING + 15 * 900))   # a year on tour paid for?
     will = (g.personality['work_ethic'] + g.personality['big_stage']) / 200
-    x = (-7.0 + (1.3 * signal + 0.6) * funded - 0.10 * (age - 30) - 0.05 * row.get('injury_weeks', 0)
+    # results give the desire, money the means: separate terms (desire alone does not pay for a season)
+    x = (-7.0 + 1.1 * signal + 0.9 * funded - 0.10 * (age - 30) - 0.05 * row.get('injury_weeks', 0)
          + 1.5 * (will - 0.5))
     return _sig(x)
 
@@ -195,8 +207,12 @@ def decide(season, year, snap):
     log = season.log
     counts = {}
 
-    def note(kind):
+    trans = season.transitions.setdefault(year, [])
+
+    def note(kind, g, **why):
+        """Count the decision and record it with its reasons (for reports and checks)."""
         counts[kind] = counts.get(kind, 0) + 1
+        trans.append({'gid': g.id, 'kind': kind, 'age': g.age(year), **why})
 
     for g in sorted(season.world.golfers, key=lambda x: x.id):     # order never matters
         if g.lifestyle == 'retired':
@@ -205,65 +221,73 @@ def decide(season, year, snap):
         age = g.age(year)
         college = g.tour.startswith('CO_')
         # ---- retirement ---------------------------------------------------------------------
-        if not college and rng.random() < p_retire(season, g, row, year):
+        p_ret = p_retire(season, g, row, year) if not college else 0.0
+        if not college and rng.random() < p_ret:
             role = ST.former_golfer_role(season, g, year, rng, level_name(row)) if g.status != 'amateur' or age >= 23 \
                 else None
             if role is None:
                 log(g.id, year, 53, f'Retired from competitive golf at {age}')
             g.lifestyle, g.tour = 'retired', ''
-            note(f'became {role}' if role else 'retired')
+            note(f'became {role}' if role else 'retired', g, p=round(p_ret, 4), via='retirement',
+                 injury_weeks=row.get('injury_weeks', 0), events=row.get('events', 0))
             continue
         # ---- amateurs: graduation (an eligibility rule) and turning professional ---------------
         if g.status == 'amateur':
             graduating = college and age >= 22                     # college eligibility ends
             if graduating or not college:
-                if rng.random() < p_turn_pro(season, g, row, year, graduating):
+                p_pro = p_turn_pro(season, g, row, year, graduating)
+                if rng.random() < p_pro:
                     turn_pro(season, g, year, row.get('am_end') or 99999,
                              'after college' if graduating else
                              'late, after years as an amateur' if g.lifestyle == 'part_time' and age >= 27
                              else 'from the amateur ranks')
-                    note('turned pro' if not (g.lifestyle == 'part_time' and age >= 27) else 'comeback')
+                    note('turned pro' if not (g.lifestyle == 'part_time' and age >= 27) else 'comeback', g,
+                         p=round(p_pro, 4), am_rank=row.get('am_end'), graduating=graduating)
                 elif graduating:
                     g.tour, g.lifestyle = amateur_series(g), 'part_time'
                     log(g.id, year, 53, 'College eligibility ended; kept playing as an amateur alongside a job')
-                    note('college to amateur')
+                    note('college to amateur', g, p=round(1 - p_pro, 4), am_rank=row.get('am_end'))
             continue
         if g.status != 'pro':
             continue
         # ---- part-timers: a comeback? --------------------------------------------------------
         if g.lifestyle == 'part_time':
-            if rng.random() < p_comeback(season, g, row, year):
+            p_cb = p_comeback(season, g, row, year)
+            if rng.random() < p_cb:
                 g.lifestyle = 'full_time'
                 g.tour = home_mini(g)
                 log(g.id, year, 53, f'Quit their job to make another run at it, aged {age}')
-                note('comeback')
+                note('comeback', g, p=round(p_cb, 4), wins=row.get('wins', 0), top3=row.get('top3', 0))
             continue
         # ---- full-time professionals (every tier): keep chasing, or stop? ------------------------
         p, why = p_stop_chasing(season, g, row, year)
         if rng.random() < p:
+            why = dict(p=round(p, 4), runway=round(why['runway'], 2), progress=round(why['progress'], 2),
+                       desire=round(why['desire'], 2), secured=why['secured'], tier=row.get('tier'),
+                       net=round(row.get('net', 0.0)), events=row.get('events', 0))
             role = ST.former_golfer_role(season, g, year, rng, level_name(row))
             if role is not None:                                    # off to coach or caddie
                 g.lifestyle, g.tour = 'retired', ''
-                note(f'became {role}')
+                note(f'became {role}', g, via='stopped chasing', **why)
                 continue
             mind = (g.attrs['management'] + g.attrs['composure']) / 200
             earned = sum(e.get(g.id, 0.0) for e in season.earnings.values())
             r = rng.random()
-            reason = f'runway {why["runway"]:.1f} yrs, progress {why["progress"]:+.1f}'
+            reason = f'runway {why["runway"]:.1f} yrs, progress {why["progress"]:+.1f}, desire {why["desire"]:+.1f}'
             p_club = 0.25 * mind * min(1.0, max(0.0, age - 22) / 8)
             p_am = 0.45 * math.exp(-earned / 250000)        # reinstatement suits those who never earned much
             if r < p_club:
                 g.status, g.lifestyle, g.tour = 'club_pro', 'part_time', ''
                 log(g.id, year, 53, f'Stopped chasing the tour at {age} and became a club professional ({reason})')
-                note('became club pro')
+                note('became club pro', g, **why)
             elif r < p_club + p_am:
                 g.status, g.lifestyle, g.tour = 'amateur', 'part_time', amateur_series(g)
                 log(g.id, year, 53, f'Stopped chasing the tour at {age}, took a job and regained amateur status ({reason})')
-                note('back to amateur')
+                note('back to amateur', g, **why)
             else:
                 g.lifestyle, g.tour = 'part_time', home_mini(g)
                 log(g.id, year, 53, f'Stopped chasing the tour at {age}; took a job and plays a few local events ({reason})')
-                note('part-time pro')
+                note('part-time pro', g, **why)
     return counts
 
 

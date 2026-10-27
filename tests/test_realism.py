@@ -107,6 +107,38 @@ class FundingTests(unittest.TestCase):
         del s.prize_share[g.id]
         self.assertLess(idle, played)
 
+    def test_a_cheaper_event_is_still_an_option(self):
+        """If the event a golfer would prefer is out of reach, an affordable eligible event that week
+        is still considered (the week is not written off)."""
+        s = SEASON
+        g = full_timers(s, 4)[0]
+        venues = s.lib.venues(2027)
+        eds = [e for e in s.cal.editions(2027) if e.series.tier == 4][:2]
+        city = {e.event_id: venues[e.event_id][0].city for e in eds}
+        costs = {e.event_id: s.trip_cost(g, e.series, city[e.event_id]) for e in eds}
+        dear, cheap = sorted(eds, key=lambda e: -costs[e.event_id])
+        opts = [(10.0, dear.event_id, dear), (5.0, cheap.event_id, cheap)]  # the dear one preferred
+        if costs[dear.event_id] == costs[cheap.event_id]:
+            self.skipTest('no price difference between these events')
+        money = (costs[dear.event_id] + costs[cheap.event_id]) / 2
+        self.assertIs(s.best_affordable(g, opts, city, money)[0][1], cheap)
+        self.assertIs(s.best_affordable(g, opts, city, costs[dear.event_id])[0][1], dear)
+        self.assertIsNone(s.best_affordable(g, opts, city, costs[cheap.event_id] - 1))
+
+    def test_same_world_whatever_the_number_of_workers(self):
+        def run(workers):
+            s = Season(generate_world(seed=17), seed=17, development=True, workers=workers)
+            s.refresh_people(2027)
+            s.start_finances(2027)
+            eds = s.cal.editions(2027)
+            for w in (1, 2, 3):
+                s.run_week(2027, w, [e for e in eds if e.week == w])
+            s.close()
+            return ({k: r.finish for k, r in s.results.items()},
+                    {g.id: (round(g.cash, 6), round(g.overall, 9)) for g in s.world.golfers},
+                    dict(s.staff.coach_of), dict(s.staff.caddie_of))
+        self.assertEqual(run(1), run(2))
+
     def test_a_challenger_card_is_no_financial_immunity(self):
         s = SEASON
         g = min(full_timers(s, 2, 400), key=lambda x: (s.player_prestige(x.id), x.id))   # no sponsor to lean on
@@ -150,15 +182,34 @@ class CareerOddsTests(unittest.TestCase):
             self.assertGreaterEqual(p1, p0 - 1e-12)
             self.assertLess(p1 - p0, 0.06)
 
-    def test_progress_buys_time_only_when_funded(self):
-        good = dict(self.row, promoted=True, wins=1, top10=4, wr_start=900, wr_end=300)
-        broke = copy.deepcopy(self.g)
-        broke.cash = -10 ** 6
-        funded = copy.deepcopy(self.g)
-        funded.cash = 10 ** 6
-        p = lambda g, row: C.p_stop_chasing(self.s, at_age(g, 27), row, 2027)[0]
-        self.assertAlmostEqual(p(broke, good), p(broke, self.row), places=12)   # hope pays no bills
-        self.assertLess(p(funded, good), 0.6 * p(funded, self.row))
+    def test_contrasting_career_arcs(self):
+        """The same 27-year-old in four situations. Finances matter, but a golfer who is improving, has
+        earned a better card or secured a big event may accept another losing season; nothing about
+        that desire creates money."""
+        s = self.s
+        stagnant = dict(self.row)
+        improving = dict(self.row, promoted=True, wins=2, top10=5, wr_start=900, wr_end=300)
+        secured = dict(self.row, secured=['world top 50 (Tour Masters invitation)'])
+        challenger = full_timers(s, 2)[0].tour
+        def golfer(cash, tour=None):
+            g = at_age(self.g, 27)
+            g.cash = cash
+            if tour:
+                g.tour = tour                                                # the card earned for next season
+            return g
+        p = lambda g, row: C.p_stop_chasing(s, g, row, 2027)[0]
+        broke, funded = -10 ** 6, 10 ** 6
+        b = golfer(broke)
+        before = s.funds(b, 2027)
+        p_improving = p(golfer(broke, challenger), improving)
+        self.assertEqual(s.funds(b, 2027), before)                           # desire creates no money
+        self.assertLess(p_improving, 0.6 * p(b, stagnant))                   # willing to accept a losing season
+        self.assertGreater(p_improving, p(golfer(funded, challenger), improving))   # money still matters
+        self.assertGreater(p_improving, 0.01)                                # and nothing is guaranteed
+        self.assertLess(p(golfer(broke), secured), p(b, stagnant))           # a secured major counts
+        self.assertLess(p(golfer(funded), stagnant), p(b, stagnant))
+        hurt = dict(stagnant, injury_weeks=30)
+        self.assertGreater(p(b, hurt), p(b, stagnant))                       # health counts
 
     def test_retirement_and_comebacks_have_no_age_or_cash_switches(self):
         s = self.s
@@ -283,6 +334,27 @@ class QualificationTests(unittest.TestCase):
         new = set(again) - set(ids)
         self.assertTrue(all(s.entry_routes[(2027, 'USA_OPEN')][gid] == 'ALT' for gid in new))
 
+    def test_premier_tour_championship_withdrawals_are_replaced_in_order(self):
+        s = SEASON
+        sid = 'PREMIER_TOUR_CHAMPIONSHIP'
+        f = Q.build_field(sid, 2027, s.ctx)
+        self.assertEqual(len(f.entries), 156)
+        self.assertGreaterEqual(len(f.alternates), 10)                       # ordered reserves kept
+        out = [e.golfer_id for e in f.entries[:3]] + [e.golfer_id for e in f.entries if e.primary == 'PF'][:3]
+        out += f.alternates[:1]                                              # a reserve who is hurt too
+        for gid in out:
+            s.injured[gid] = (10 ** 6, 'test', 1)
+        try:
+            ids = s.major_field(sid, 2027, Q.MAJOR_WEEK[sid])
+        finally:
+            for gid in out:
+                del s.injured[gid]
+        self.assertEqual(len(ids), 156)                                      # the field is full again
+        routes = s.entry_routes[(2027, sid)]
+        alts = [gid for gid in ids if routes[gid] == 'ALT']
+        self.assertEqual(alts, f.alternates[1:7])                            # the next six, in order
+        self.assertTrue(not set(out) & set(ids))
+
     def test_club_pro_championship_comes_from_sectional_results(self):
         s = SEASON
         ed = next(e for e in s.cal.editions(2027) if e.series.series_id == 'CLUB_PRO_CHAMPIONSHIP')
@@ -374,6 +446,22 @@ class PayoutTests(unittest.TestCase):
         won, unpaid, purse = self.pay(finish, cut_top=65)
         self.assertAlmostEqual(won[self.pros[0]], PR.payout_shares(65)[0] * purse)
         self.assertGreater(unpaid, 0)
+
+    def test_undersized_cut_field_keeps_the_paid_place_schedule(self):
+        """Fewer starters than the cut: the intended schedule stands and unfilled places go unpaid,
+        with ties sharing their places' money and amateurs taking none."""
+        cut = 65
+        places = min(cut, self.series.field)
+        sh = PR.payout_shares(places)
+        finish = [(self.pros[0], 1, 0), (self.ams[0], 2, 0), (self.pros[1], 3, 0), (self.pros[2], 3, 0)]
+        finish += [(gid, i + 5, 0) for i, gid in enumerate(self.pros[3:30])]
+        won, unpaid, purse = self.pay(finish, cut_top=cut)
+        self.assertAlmostEqual(won[self.pros[0]], sh[0] * purse)
+        self.assertNotIn(self.ams[0], won)
+        self.assertAlmostEqual(won[self.pros[1]], won[self.pros[2]])
+        self.assertAlmostEqual(won[self.pros[1]], (sh[1] + sh[2]) / 2 * purse)   # pros move up past the amateur
+        self.assertAlmostEqual(unpaid, purse * sum(sh[30:]))                 # 30 pros paid, the rest unpaid
+        self.assertAlmostEqual(sum(won.values()) + unpaid, purse, places=6)
 
     def test_ties_share_the_places_money(self):
         finish = [(self.pros[0], 1, 0), (self.pros[1], 2, 0), (self.pros[2], 2, 0)] + \

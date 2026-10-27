@@ -104,7 +104,9 @@ class TourCaddie(Caddie):
     former_golfer: int = 0
     status: str = 'active'
     earnings: float = 0.0
-    seasons: int = 0                   # seasons worked on a tour
+    seasons: int = 0                   # seasons in which they actually worked
+    weeks_worked: int = 0              # event weeks worked this season (reset each winter)
+    rounds_worked: float = 0.0         # rounds on the bag this season (stroke play, match play, playoffs)
     history: list = field(default_factory=list)
 
     @property
@@ -282,25 +284,44 @@ def region(country):
 
 
 # ---- the yearly market -------------------------------------------------------------------------------
+COACH_OF_MEANS = 0.10                             # a coach's yearly fee must fit 10% of a golfer's means
+CADDIE_OF_MEANS = 0.25
+
+
 def coach_budget(season, g, year):
-    """What a golfer can put towards coaching this year."""
-    led = season.ledgers.get(year - 1, {}).get(g.id)
-    earned = (led.prize + led.sponsors + led.salary + led.work) if led else 0.0
-    return 0.10 * max(0.0, season.spendable(g, year)) + 0.08 * earned
+    """What a golfer can commit to a coach's yearly fee: a contracted cost paid every week, so it must
+    come out of money they have or have earned (Season.means), never out of hoped-for winnings."""
+    return COACH_OF_MEANS * season.means(g, year)
 
 
 def caddie_budget(season, g, year):
-    """What a golfer can put towards a caddie: a share of their funds and of the prize money their own
-    record says they will win on their tour this season."""
+    """What a golfer can commit to a caddie's fees over the season. A caddie is paid only in weeks the
+    golfer plays, and every trip must still be affordable when it is booked, so the prize money they
+    expect to keep (from their own record) may inform this choice — at half weight."""
     from .careers import _tour_economics
     purse, _ = _tour_economics(season, g.tour)
-    expected = season.prize_share.get(g.id, 0.004) * purse * season.target_events(g)
-    return 0.25 * (max(0.0, season.spendable(g, year)) + expected)
+    expected = season.prize_share.get(g.id, 0.004) * purse * season.target_events(g) * (1 - 0.08)
+    return CADDIE_OF_MEANS * (season.means(g, year) + 0.5 * expected)
 
 
 def wants_caddie(g):
     t = TOUR_BY_KEY.get(g.tour)
     return g.status == 'pro' and g.lifestyle == 'full_time' and t is not None and t.tier <= CADDIE_TIERS
+
+
+def scouting_estimate(season, g, year, rng, sd):
+    """A coach's judgement of where a young player is heading, from what can be watched: their
+    current level (seen with some error), the growth typical for their age, and how much they really
+    improved over the last year (a fast improver looks like more to come) — through the coach's own
+    scouting error. Never the player's hidden potential, so coaches back players who do not make it
+    and miss some who do."""
+    from .population import age_deficit
+    age = g.age(year)
+    seen = g.overall + rng.gauss(0, 2.0)
+    last = season.overall_start.get(year - 1, {}).get(g.id)
+    recent = (g.overall - last) if last is not None else 0.0
+    typical = age_deficit(age, 27.0) - age_deficit(age + 1, 27.0)     # a typical year's growth at this age
+    return seen + age_deficit(age, 27.0) + 1.5 * (recent - typical) + rng.gauss(0, sd)
 
 
 def start_of_season(season, year):
@@ -360,7 +381,7 @@ def start_of_season(season, year):
         bar = 50 + 0.35 * c.reputation                # top coaches only approach the best prospects
         picks = []
         for g in sorted(look, key=lambda x: x.id):
-            est = g.potential + crng.gauss(0, sd)     # what this coach believes the player can become
+            est = scouting_estimate(season, g, year, crng, sd)   # what this coach believes they can become
             raw = est - g.overall
             if est >= bar and raw >= 6:
                 picks.append((est + 0.3 * raw, g.id, g))
@@ -444,14 +465,27 @@ def end_of_season(season, year, snap):
         if rng.random() < _sig((c.age(year) - COACH_RETIRE_AGE) / 3) or (not pupils.get(c.id) and rng.random() < 0.15):
             c.status = 'retired'
             c.history.append((year, f'Retired from coaching at {c.age(year)}'))
+    record = season.staff_year.setdefault(year, {})   # this season's work, before the counters reset
+    for k in st.caddies.values():
+        if k.status == 'active':
+            record[('caddie', k.id)] = {'rounds': round(k.rounds_worked, 2), 'weeks': k.weeks_worked,
+                                        'reputation': k.reputation}
+    for gid, cid in st.coach_of.items():
+        r = record.setdefault(('coach', cid), {'students': 0, 'reputation': st.coaches[cid].reputation})
+        r['students'] += 1
+    for k in st.caddies.values():                     # experience comes from rounds actually worked
+        if k.status == 'active' and k.rounds_worked > 0:
+            k.seasons += 1
+            if k.age(year) < 50:
+                gain = 0.3 * min(1.0, k.rounds_worked / 60)
+                for s in ('strategy', 'green_reading', 'yardage', 'course_knowledge'):
+                    if k.skills[s] < 95.0:                # growth stops at 95; higher skills are kept
+                        k.skills[s] = round(min(95.0, k.skills[s] + gain), 2)
+        k.weeks_worked, k.rounds_worked = 0, 0.0
     for gid, kid in list(st.caddie_of.items()):
         k = st.caddies[kid]
         row = snap.get(gid, {})
-        k.seasons += 1
         k.reputation = round(_clip(0.8 * k.reputation + 0.2 * min(100.0, 20 * math.log10(1 + row.get('prize', 0) / 1000)), 1.0), 1)
-        for s in ('strategy', 'green_reading', 'yardage', 'course_knowledge'):
-            if k.age(year) < 50:
-                k.skills[s] = round(min(95.0, k.skills[s] + 0.3), 1)      # experience on the bag
         if progress_signal(row) < -0.3 and rng.random() < 0.3:          # a bad year: a new caddie
             st.caddie_of.pop(gid)
             k.history.append((year, f'Let go by {season.g[gid].name} after a difficult season'))

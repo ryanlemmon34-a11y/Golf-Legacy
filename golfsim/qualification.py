@@ -479,9 +479,10 @@ def build_field(major, year, ctx):
                 continue
             pool = [g for g in alternates if g not in in_field] + [g for g in route.select(ctx, year) if g not in in_field]
             for gid in pool:
-                if len(entries) >= target:
-                    break
                 if gid in in_field or not _eligible(ctx, gid, route, year):
+                    continue
+                if len(entries) >= target:
+                    alternates.append(gid)            # the rest of the list stays on as ordered reserves
                     continue
                 e = Entry(gid, route.code, [route.code])
                 in_field[gid] = e
