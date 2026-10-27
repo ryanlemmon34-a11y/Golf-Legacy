@@ -157,6 +157,21 @@ class SeasonTests(unittest.TestCase):
         top = SEASON.world.ranked(SEASON.world.pros())[:20]
         self.assertGreaterEqual(len({g.id for g in top} & {gid for gid, _, _ in r.finish[0]}), 18)
 
+    def test_every_major_entrant_has_a_recorded_route(self):
+        routes = SEASON.entry_routes[(2027, 'TOUR_MASTERS')]
+        r = SEASON.results['2027:TOUR_MASTERS']
+        self.assertEqual({gid for gid, _, _ in r.finish[0]}, set(routes))
+        self.assertTrue(all(v for v in routes.values()))
+
+    def test_club_pro_sectionals_are_played_and_decide_the_championship(self):
+        sect = SEASON.results['2027:CLUB_PRO_SECTIONALS']
+        self.assertGreater(len(sect.finish), 1)                              # several sites
+        finishers = {gid for site in sect.finish for gid, pos, _ in site if pos is not None}
+        champ = SEASON.results['2027:CLUB_PRO_CHAMPIONSHIP']
+        entrants = {gid for gid, _, _ in champ.finish[0]}
+        self.assertTrue(entrants and entrants <= finishers)
+        self.assertTrue(all(SEASON.g[gid].status == 'club_pro' for gid in finishers))
+
     def test_stars_skip_opportunity_events(self):
         s = SEASON
         top30 = {g.id for g in s.world.ranked(s.world.pros())[:30]}

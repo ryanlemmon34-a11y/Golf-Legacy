@@ -7,10 +7,15 @@ potential). Each week a golfer does one thing, and it moves their attributes tow
                        putting or mental); coachability makes training count for more
     play a tournament  every skill grows a little, the mental game most; the further a golfer is from
                        their potential (the more raw), the more a tournament teaches them
-    rest               no growth, but fatigue recovers fully
+    rest               no skill growth, but fatigue recovers fully
 
 Growth is proportional to the gap to the ceiling, times a learning rate that is highest in the
-teens and falls with age, times work ethic. Young golfers also mature physically on their own.
+teens and falls with age, times work ethic. Young golfers also mature physically on their own, every
+week, whatever they are doing (resting and working included): growing up does not need golf.
+
+Golfers do not know their ceilings. Their decisions (what to train, whether a tournament or a training
+week helps them more) use a *perceived* gap: the real gap seen through a persistent personal misreading
+that is larger for golfers with poor judgement of their own game (management and coachability).
 
 Once a year golfers age: strength and stamina fade first (from a few years after their prime), then
 technique; the mental game keeps maturing with experience into the late forties — which is why a
@@ -72,13 +77,18 @@ def init_ceilings(g, age, rng):
 
 
 def develop_week(g, activity, age, category=None, rounds=0.0, coach=0.5, scale=1.0):
-    """Apply one week of development. activity: 'train', 'play' or 'rest'. `scale` shrinks training
-    for golfers with a full-time job. Returns overall gained."""
-    if activity == 'rest':
-        return 0.0
+    """Apply one week of development. activity: 'train', 'play' or 'rest' (a paid work week counts as
+    rest). `scale` shrinks training for golfers with a full-time job. Returns overall gained."""
     before = g.overall
-    lr = learning_rate(age) * (0.5 + g.personality['work_ethic'] / 100) * scale
     a, c = g.attrs, g.ceilings
+    if age < 23:                                  # still growing into their body, whatever the week
+        for k in CATEGORIES['physical']:
+            gap = c[k] - a[k]
+            if gap > 0:
+                a[k] = min(99.0, a[k] + MATURING * gap)
+    if activity == 'rest':
+        return g.overall - before
+    lr = learning_rate(age) * (0.5 + g.personality['work_ethic'] / 100) * scale
     if activity == 'train' and category:
         k_train = BASE_TRAIN * lr * (0.6 + 0.8 * g.personality['coachability'] / 100) * (0.7 + 0.6 * coach)
         if category == 'mental':
@@ -95,16 +105,30 @@ def develop_week(g, activity, age, category=None, rounds=0.0, coach=0.5, scale=1
             gap = c[k] - a[k]
             if gap > 0:
                 a[k] = min(99.0, a[k] + k_play * gap * (MENTAL_PLAY if cat == 'mental' else 1.0))
-    if age < 23:                                  # still growing into their body
-        for k in CATEGORIES['physical']:
-            gap = c[k] - a[k]
-            if gap > 0:
-                a[k] = min(99.0, a[k] + MATURING * gap)
     return g.overall - before
 
 
+def judgement(g):
+    """How well a golfer reads their own game (0-1)."""
+    return (g.attrs['management'] + g.personality['coachability']) / 200
+
+
+_SELF_VIEW = {}
+
+
+def perceived_gap(g, k):
+    """The room a golfer *believes* attribute k has left: the true gap seen through a persistent personal
+    misreading (fixed per golfer and attribute; wider for poor judges of their own game)."""
+    z = _SELF_VIEW.get((g.id, k))
+    if z is None:
+        z = _SELF_VIEW[(g.id, k)] = random.Random(f'{g.id}:{k}:selfview').gauss(0, 1)
+    sd = 2.0 + 6.0 * (1 - judgement(g))
+    return max(0.0, g.ceilings[k] - g.attrs[k] + sd * z)
+
+
 def development_value(g, activity, age, category=None):
-    """Expected overall gained this week from an activity (used by the planner)."""
+    """Overall a golfer expects to gain this week from an activity, from their own (imperfect) view of
+    their game (used by the planner)."""
     lr = learning_rate(age) * (0.5 + g.personality['work_ethic'] / 100)
     gain = 0.0
     total_w = sum(OVERALL_WEIGHTS.values())
@@ -113,12 +137,12 @@ def development_value(g, activity, age, category=None):
         if category == 'mental':
             k_train *= MENTAL_TRAIN
         for k in CATEGORIES[category]:
-            gain += OVERALL_WEIGHTS[k] * k_train * max(0.0, g.ceilings[k] - g.attrs[k])
+            gain += OVERALL_WEIGHTS[k] * k_train * perceived_gap(g, k)
     elif activity == 'play':
         k_play = BASE_PLAY * lr
         for k, cat in CATEGORY_OF.items():
             if cat != 'physical':
-                gain += OVERALL_WEIGHTS[k] * k_play * max(0.0, g.ceilings[k] - g.attrs[k]) * (
+                gain += OVERALL_WEIGHTS[k] * k_play * perceived_gap(g, k) * (
                     MENTAL_PLAY if cat == 'mental' else 1.0)
     return gain / total_w
 
@@ -128,12 +152,11 @@ def choose_category(g, rng):
     Good course managers and coachable golfers read their game better; others guess more."""
     scores = {}
     for cat, ks in CATEGORIES.items():
-        gain = sum(OVERALL_WEIGHTS[k] * max(0.0, g.ceilings[k] - g.attrs[k]) for k in ks)
+        gain = sum(OVERALL_WEIGHTS[k] * perceived_gap(g, k) for k in ks)
         if cat == 'mental':
             gain *= MENTAL_TRAIN
         scores[cat] = gain
-    judgement = (g.attrs['management'] + g.personality['coachability']) / 200
-    noise = 0.25 + 0.75 * (1 - judgement)
+    noise = 0.25 + 0.75 * (1 - judgement(g))
     top = max(scores.values()) or 1.0
     return max(scores, key=lambda c: scores[c] / top + rng.gauss(0, noise))
 

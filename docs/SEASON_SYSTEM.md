@@ -16,7 +16,7 @@ Each week:
    everything that has happened, with no hindsight), the Premier Tour Finals (top 30 on the points
    list), college post-season (conference championships → regionals → national championship), elite
    and national amateur championships (by amateur ranking and region), the Club Professional
-   Championship, the Q-School stages, and the USA Open and Britannia Open qualifiers.
+   sectionals and Championship (from the sectional results), the Q-School stages, and the USA Open and Britannia Open qualifiers.
 2. **Everyone else chooses where to play** (see "How golfers choose" below).
 3. **All of the week's events are played in parallel.** Weather (wind, rain) is drawn per round around
    each course's typical wind, and hole locations get harder as event prestige rises.
@@ -25,7 +25,13 @@ Each week:
    including match-play and playoff holes), familiarity with the course, champions' history, and
    season statistics for every player (driving distance, fairways, greens, putts, strokes gained).
 
-At the end of the season, players move between tours (see "Tour cards").
+At the end of the season, the completed season's evidence is **snapshotted first** — for every golfer:
+the tour they played on, events, wins, top-10s, cuts, prize money, money and rank on their own tour
+(ties share the average rank; ordering never depends on how the population happens to be listed: ties
+break by world ranking, then id), world and amateur ranking at the start and end of the season, injury
+weeks and the year's net money. Only then do players move between tours (see "Tour cards"), and
+promotion or relegation is added to the snapshot as a separate fact. Career decisions read the snapshot,
+never the post-card tour.
 
 ## Event prestige (owner requirement)
 
@@ -98,7 +104,10 @@ Every golfer carries a **season fatigue** level (0 fresh, 1 exhausted):
 - **World ranking:** points per finish from event prestige (a major winner 100, a standard Premier winner
   ~60, a Challenger winner ~12), full value for 13 weeks then fading to zero over two years, divided by
   events played (40 to 52). The amateur ranking works the same way for amateurs.
-- **Prize money:** Premier Tour-style payout table (winner 18%), shared on ties; amateurs take no money.
+- **Prize money:** Premier Tour-style payout table (winner 18%), shared on ties; amateurs take no money
+  and the professionals behind them move up. The table is sized by the event's paid places (the cut, or
+  every starter without a cut); places no professional fills are not paid out and are recorded
+  (`Season.unpaid`), so a small paid list never inflates anyone's share.
 - **Points lists:** money lists per tour; majors count for all three Premier circuits; a combined
   Premier list decides cards. The majors' rules read these lists (e.g. "top 70 on the points list").
 

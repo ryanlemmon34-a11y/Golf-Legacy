@@ -33,7 +33,9 @@ def golfer(age=20, gap=10.0, **pers):
 
 class DevelopmentTests(unittest.TestCase):
     def test_learning_slows_with_age(self):
-        self.assertGreater(D.learning_rate(18), D.learning_rate(25) > D.learning_rate(35) > D.learning_rate(50))
+        rates = [D.learning_rate(a) for a in (18, 25, 35, 50)]
+        self.assertEqual(rates, sorted(rates, reverse=True))
+        self.assertEqual(len(set(rates)), len(rates))
 
     def test_ceilings_match_potential(self):
         g = golfer(20, 12)
@@ -115,20 +117,21 @@ class FinanceTests(unittest.TestCase):
 
 class CareerTests(unittest.TestCase):
     def test_money_age_and_hope_decide_who_keeps_chasing(self):
-        s = Season(generate_world(), seed=5, development=True, workers=1)
-        minis = [g for g in s.world.golfers if g.status == 'pro' and g.lifestyle == 'full_time'
-                 and TOUR_BY_KEY[g.tour].tier == 4][:400]
-        young, older = minis[:200], minis[200:]
-        for grp, age in ((young, 22), (older, 28)):
-            for g in grp:
+        # the same 400 mini-tour players, in debt with no results, at 22 and at 28 (a counterfactual)
+        def quits(age):
+            s = Season(generate_world(), seed=5, development=True, workers=1)
+            minis = [g for g in s.world.golfers if g.status == 'pro' and g.lifestyle == 'full_time'
+                     and TOUR_BY_KEY[g.tour].tier == 4][:400]
+            for g in minis:
                 g.born = 2027 - age
-                g.cash = -30000
-                s.ledger(2027, g.id).living = 40000
-        decide(s, 2027)
-        quit_young = sum(1 for g in young if g.lifestyle != 'full_time')
-        quit_older = sum(1 for g in older if g.lifestyle != 'full_time')
-        self.assertLess(quit_young, 20)
-        self.assertGreater(quit_older, 3 * max(1, quit_young))
+                g.cash, g.backing = -30000, 0.0
+                s.prize_share[g.id] = 0.0
+            decide(s, 2027, s.season_snapshot(2027))
+            return s, [g for g in minis if g.lifestyle != 'full_time']
+        _, young = quits(22)
+        s, older = quits(28)
+        self.assertGreater(len(young), 0)                        # nobody is immune
+        self.assertGreater(len(older), 1.5 * len(young))
         for g in older:
             if g.lifestyle == 'part_time':
                 self.assertTrue(any('Stopped chasing' in t for _, _, t in s.history[g.id]))
@@ -139,12 +142,13 @@ class CareerTests(unittest.TestCase):
         for i, g in enumerate(grads):
             g.born = 2027 - 22
             s.am_pos[g.id] = i + 1
-        decide(s, 2027)
-        self.assertGreater(sum(1 for g in grads if g.status == 'pro'), 40)
+        decide(s, 2027, s.season_snapshot(2027))
+        self.assertGreater(sum(1 for g in grads if g.status == 'pro'), 35)
+        self.assertTrue(all(not g.tour.startswith('CO_') for g in grads))
         from golfsim.careers import add_juniors
         n = add_juniors(s, 2028)
         new = s.world.golfers[-n:]
-        self.assertTrue(120 <= n <= 260)
+        self.assertTrue(150 <= n <= 400)
         self.assertTrue(all(g.age(2028) == 18 and g.ceilings and g.status == 'amateur' for g in new))
         self.assertEqual(len({g.name for g in s.world.golfers}), len(s.world.golfers))
 

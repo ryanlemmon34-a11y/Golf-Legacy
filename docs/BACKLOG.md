@@ -43,7 +43,9 @@ Owner requirements and planned work, in rough order. "Built" items link to where
 - **Finances drive careers.** A 22-year-old earning a few thousand a year keeps chasing the dream; by
   26-27, if they are still only making $10-20k, it stops making sense to travel the world for it.
   They take a full-time job but, still good enough, play a couple of events a year on a low tour near
-  home. *First version: see `docs/DEVELOPMENT_AND_CAREERS.md`.*
+  home. *Built: funds (savings, backing, limited credit) gate travel and entries before money is
+  spent; career odds come from runway, funded progress, opportunity, health, willingness and a smooth
+  life-stage curve — no age or debt cliffs (see `docs/DEVELOPMENT_AND_CAREERS.md`).*
 - **Rare comebacks:** a part-timer whose mental game has matured naturally may make another run at
   34 — qualify for a big event or win a tour card. Very rare, but possible and part of the history.
 - **Every individual has a history** — players, caddies and coaches: careers, results, moves, injuries,
@@ -56,6 +58,16 @@ Owner requirements and planned work, in rough order. "Built" items link to where
   rest week, and tournaments — a risk/reward balance of fatigue and injury against development and
   career. Playing tournaments develops raw golfers (far from their potential) the most.
   *First version built.*
+
+## Known limitations from the realism audit
+
+- Career odds are hand-set logistic weights, checked for shape (smooth, monotone, counterfactual) but
+  not fitted to real career data; the cohort study (`reports/COHORT_STUDY.md`) shows what they produce.
+- The world is a selected sample of competitive golfers; its rates are not population-wide rates.
+- No pre-history: the first season's rankings and standings are seeded from reputation, and the first
+  Tour Masters uses inaugural invitations (route `INIT`).
+- Finance is simple: one credit rule, one work wage, family backing as a single pot; no regional
+  costs of living, coaching fees or contract lengths.
 
 ## Next
 

@@ -169,11 +169,17 @@ def _age(rng):
             return int(a)
 
 
-def _keep_young(pot, prof, u):
-    """Whether a golfer aged 22 or under is part of the competitive world: judged on where they are
-    heading (their potential, by the adult rules), not on how raw they still are."""
-    projected = 'pro' if pot >= PRO_LINE + 3 else 'amateur'
-    return u < _keep_probability(projected, 27, pot)
+SCOUTING_SD = 4.0             # how far a young golfer's apparent trajectory can be from their own
+
+
+def _keep_young(cur, age, u, noise):
+    """Whether a golfer aged 22 or under is part of the competitive world. Judged as coaches and
+    scouts would: on their current level plus the growth a typical golfer makes from this age, with
+    the noise of judging teenagers — never on their hidden potential. Some golfers kept will never
+    become what they seemed; some late developers are missed and arrive later (if at all)."""
+    projected = cur + age_deficit(age, 27.0) + noise
+    status = 'pro' if projected >= PRO_LINE + 3 else 'amateur'
+    return u < _keep_probability(status, 27, projected)
 
 
 def _keep_probability(status, age, cur):
@@ -205,8 +211,8 @@ def candidates(year, seed, profiles, scale=1.0):
             cur = min(cur, 99.0)                     # the rating scale tops out at 99
             pot = max(min(pot, 99.0), cur)
             status = _status(age, cur, prof, crng.random(), crng)
-            keep = _keep_young(pot, prof, crng.random()) if age <= 22 and status == 'amateur' else \
-                crng.random() < _keep_probability(status, age, cur)
+            keep = _keep_young(cur, age, crng.random(), crng.gauss(0, SCOUTING_SD)) \
+                if age <= 22 and status == 'amateur' else crng.random() < _keep_probability(status, age, cur)
             if keep:
                 out.append((country, age, pot, peak, cur, status, aging))
     out.sort(key=lambda r: -r[4])
@@ -234,7 +240,7 @@ def _make_golfer(i, row, year, seed, profiles, taken):
 def generate_world(year=2027, seed=2027, nation_profiles=None, scale=1.0):
     """Generate every competitive golfer in the world. `scale` multiplies the number of candidates."""
     from .development import init_ceilings
-    from .finance import initial_cash
+    from .finance import initial_backing, initial_cash
     profiles = nation_profiles or starting_nations()
     taken = set()
     golfers = [_make_golfer(i, row, year, seed, profiles, taken)
@@ -246,6 +252,7 @@ def generate_world(year=2027, seed=2027, nation_profiles=None, scale=1.0):
         age = g.age(year)
         init_ceilings(g, age, rng)
         g.cash = initial_cash(g, age, rng.random())
+        g.backing = initial_backing(age, rng.random(), rng.random())
         t = TOUR_BY_KEY.get(g.tour)
         if g.status == 'club_pro' or (g.status == 'amateur' and age > 22 and not g.tour.startswith('CO_')):
             g.lifestyle = 'part_time'                 # they have a job
@@ -273,7 +280,7 @@ def junior_class(year, seed, profiles, start_id, taken):
                 continue
             cur = min(cur, 99.0)
             pot = max(min(pot, 99.0), cur)
-            if _keep_young(pot, prof, crng.random()):
+            if _keep_young(cur, 18, crng.random(), crng.gauss(0, SCOUTING_SD)):
                 rows.append((country, 18, pot, peak, cur, 'amateur', aging))
     rows.sort(key=lambda r: -r[4])
     golfers = [_make_golfer(start_id + i, row, year, f'{seed}:j{year}', profiles, taken) for i, row in enumerate(rows)]

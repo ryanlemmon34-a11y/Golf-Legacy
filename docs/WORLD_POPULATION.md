@@ -46,7 +46,7 @@ Every country has a starting **nation profile**:
 | Pool | How many serious golfers the country has (USA 100, Japan 40, England 22, Korea 18 ... Bahrain 0.2) |
 | Development | Coaching, facilities, junior programmes and competition, 0–100. Raises how much of their talent golfers realise. |
 | Pathway | Access to elite college golf and academies. Decides how many young players reach US college golf. |
-| Style | Playing tendencies: power (USA, Canada), links (UK and Ireland), precision (Japan, Korea, China, Taiwan), touch (Spain, Latin America, Italy), complete (Scandinavia, Germany, France...), striker (South Africa, Australia), touch_sea (Southeast Asia, India), raw (emerging golf nations) |
+| Style | The golf environment golfers grow up in. Only **links** golf (UK and Ireland: firm ground, wind, pot bunkers) tilts attributes (ball flight, bunker and recovery play). Nationality alone does not shape physique, touch or temperament, and every archetype is equally likely in every country; coaching and facilities act through Development. (Earlier versions tilted power, putting or short game by nationality; that was a stereotype and was removed.) |
 
 A nation's golfers draw their potential around a mean set by its development; its pool sets how many
 there are. So a big country with average coaching (Japan) produces many good players and a few great
@@ -58,6 +58,16 @@ averaged over many generated worlds. Any single world varies, like real generati
 These are starting values. The **nation-improvement model** (next phase) will move development, pool
 and pathway over time from each country's results: a nation whose golfers win big events gets more
 juniors, better coaching and better access to college golf a decade later.
+
+## Who is in the world (a selected sample)
+
+The world holds every good golfer and a *sample* of the many weaker competitive golfers, so its tours
+and events have realistic numbers. Adults are kept by their current level. Golfers aged 22 and under
+are kept as coaches and scouts would judge them: their current level plus the growth a typical golfer
+makes from that age, with the noise of judging teenagers (`SCOUTING_SD`) — **never by their hidden
+potential**. So the world includes juniors who look promising and never become what they seemed, and
+misses some late developers. Because weaker golfers are sampled, rates measured in this world (how
+many careers fail, for example) describe this selected sample, not everyone who ever played.
 
 ## Age
 

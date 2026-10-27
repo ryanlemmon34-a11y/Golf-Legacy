@@ -119,11 +119,14 @@ class PopulationTests(unittest.TestCase):
         self.assertGreater(rel(young, 'power'), rel(old, 'power') + 4)        # strength fades first
         self.assertGreater(rel(old, 'composure'), rel(young, 'composure') + 3)  # experience grows
 
-    def test_styles_shape_attributes(self):
+    def test_only_course_environment_shapes_style(self):
+        from golfsim.nations import STYLES
         rel = lambda country, k: S.mean(g.attrs[k] - g.overall for g in WORLD.golfers if g.country == country)
-        self.assertGreater(rel('USA', 'power'), rel('Japan', 'power') + 4)
-        self.assertGreater(rel('Scotland', 'ball_flight'), rel('USA', 'ball_flight') + 2)
-        self.assertGreater(rel('Spain', 'chipping'), rel('Germany', 'chipping') + 2)
+        self.assertGreater(rel('Scotland', 'ball_flight'), rel('USA', 'ball_flight') + 1.5)   # links golf
+        for style, (tilt, archetypes) in STYLES.items():                  # no nationality stereotypes
+            self.assertEqual(archetypes, {})
+            if style != 'links':
+                self.assertEqual(tilt, {})
 
     def test_overall_is_exact(self):
         for g in WORLD.golfers[::97]:

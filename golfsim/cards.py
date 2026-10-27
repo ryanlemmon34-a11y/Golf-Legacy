@@ -78,7 +78,7 @@ def apply_cards(season, year):
 
     def by_money(tour_key, members):
         m = money[(tour_key, year)]
-        return sorted(members, key=lambda g: -m.get(g.id, 0.0))
+        return sorted(members, key=lambda g: season.standing_key(m, g.id))
 
     pros = [g for g in golfers if g.status == 'pro' and g.lifestyle == 'full_time']   # part-timers stay local
     members = defaultdict(list)
@@ -176,7 +176,7 @@ def apply_cards(season, year):
                     return home_challenger(g) == tour
                 return REGIONAL_BY_COUNTRY.get(g.country) == tour or tour in REGIONAL_BY_REGION[COUNTRIES[g.country].region]
             pool = [g for g in pros if new.get(g.id, (9,))[0] > tier and fits(g)]
-            pool.sort(key=lambda g: -money[(g.tour, year)].get(g.id, 0.0))
+            pool.sort(key=lambda g: season.standing_key(money[(g.tour, year)], g.id))
             for g in pool[:short]:
                 assign(g, tour, f'called up to fill the {t.name}')
 

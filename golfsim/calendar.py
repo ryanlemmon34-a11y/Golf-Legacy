@@ -324,6 +324,9 @@ def _anchor_specs():
     yield ('AFRICA_AMATEUR', 'Africa Amateur Championship', 'AMATEUR', 6, 'amateur', 'elite_amateur', 72, 96, 9,
            'amateur', 'South Africa', ('Johannesburg', 'Cape Town', 'Nairobi', 'Rabat', 'Durban', 'Windhoek'),
            'rotating', 'Thu-Sun', False, 62, 1, 50)
+    # Club professionals qualify for their championship through 36-hole sectionals (a competition)
+    yield ('CLUB_PRO_SECTIONALS', 'Club Professional Championship Sectional Qualifying', 'QUALIFYING', 7, 'qualifying',
+           'qualifier', 36, 90, 12, 'club_pro', 'USA', None, 'rotating', 'Mon', False, 25, 4, 0)
     yield ('CLUB_PRO_CHAMPIONSHIP', 'Club Professional Championship', 'QUALIFYING', 7, 'qualifying', 'qualifier',
            72, 156, 16, 'club_pro', 'USA', ('Austin, Texas', 'Palm Springs, California', 'Myrtle Beach, South Carolina',
                                            'Tucson, Arizona', 'Fort Worth, Texas'), 'rotating', 'Thu-Sun', False, 50, 1, 70)

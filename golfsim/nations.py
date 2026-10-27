@@ -6,8 +6,9 @@ Each country has
                   their talent golfers realise. 60 = a strong golf nation.
     pathway       0-100: access to elite college golf and academies (the US college system, national
                   squads). Decides how many young players go to college, and where.
-    style         playing tendencies that tilt attributes and archetypes (links golfers flight the
-                  ball, Japanese golfers have precise short games, Americans hit it far...)
+    style         the golf environment a nation's golfers grow up in. Only links golf (UK and Ireland)
+                  tilts attributes (ball flight, bunker and recovery play); the other labels are kept
+                  as descriptions but have no effect: nationality is not a playing style
 
 These are the STARTING values for 2027. The nation-improvement model (planned) will move
 development, pool and pathway over time from the results of each country's golfers.
@@ -20,23 +21,13 @@ from .geography import COUNTRIES
 
 # Attribute tilts (points added before the overall is set) and archetype weight multipliers.
 STYLES = {
-    'power': ({'power': 3, 'driving_accuracy': -1, 'recovery_play': 1},
-              {'Power Hitter': 1.6, 'Effortless Power': 1.3}),
-    'links': ({'ball_flight': 4, 'bunker': 2, 'recovery_play': 2, 'composure': 1, 'power': -1, 'lag_putting': 1},
-              {'Strategic Technician': 1.4, 'Short-Game Artist': 1.2}),
-    'precision': ({'driving_accuracy': 3, 'wedges': 2, 'short_putting': 2, 'chipping': 2, 'power': -4,
-                   'striking_consistency': 1},
-                  {'Precision Ball-Striker': 1.5, 'Short-Game Artist': 1.4, 'Elite Putter': 1.4, 'Power Hitter': .5}),
-    'touch': ({'chipping': 4, 'recovery_play': 4, 'bunker': 2, 'management': -1, 'driving_accuracy': -1},
-              {'Short-Game Artist': 1.8, 'Aggressive Shotmaker': 1.4}),
-    'complete': ({'striking_consistency': 2, 'management': 2, 'driving_accuracy': 1, 'mid_irons': 1},
-                 {'All-Rounder': 1.6, 'Strategic Technician': 1.3}),
-    'striker': ({'long_irons': 2, 'mid_irons': 2, 'power': 1, 'chipping': -1},
-                {'Precision Ball-Striker': 1.5, 'All-Rounder': 1.2}),
-    'touch_sea': ({'chipping': 2, 'wedges': 2, 'short_putting': 1, 'power': -2},
-                  {'Short-Game Artist': 1.4, 'Elite Putter': 1.2}),
-    'raw': ({'management': -2, 'green_reading': -1, 'chipping': -1, 'power': 1},
-            {'Aggressive Shotmaker': 1.3, 'Power Hitter': 1.2}),
+    # Only the course environment a golfer grows up on: links golf (firm ground, wind, deep pot
+    # bunkers) teaches ball-flight control and bunker and recovery play. Nationality alone does not
+    # tilt physique, touch or temperament, and archetypes are equally likely everywhere; coaching and
+    # facilities act through `development` instead.
+    'links': ({'ball_flight': 3, 'bunker': 1, 'recovery_play': 1, 'power': -1}, {}),
+    'power': ({}, {}), 'touch': ({}, {}), 'complete': ({}, {}), 'striker': ({}, {}),
+    'precision': ({}, {}), 'touch_sea': ({}, {}), 'raw': ({}, {}),
 }
 
 

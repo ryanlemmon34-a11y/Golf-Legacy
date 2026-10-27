@@ -12,8 +12,20 @@ Costs
                         pays ordinary living costs from their salary (college golfers and teenagers
                         living at home pay none)
 
-A golfer's cash carries over from year to year and can go negative (debt). Money is one of the big
-reasons golfers give up the chase (see `careers.py`).
+Money moves when it is earned or spent (weekly), never in a lump at the end of the season, and every
+dollar passes through the golfer's ledger, so savings always reconcile exactly:
+    cash at the end of a year = cash at the start + ledger income - ledger costs.
+
+Funding decisions (before money is spent)
+    available funds  cash + remaining family/backer support + a limited line of credit
+                     (credit grows with a golfer's recent income, up to a cap; nobody can borrow
+                     without limit)
+    committed        the next few weeks of living costs are set aside before any trip is booked
+    expected prize   estimated from the golfer's own results so far (the share of purses they have
+                     actually won), not from their hidden ability; it is never spent before it is won
+A golfer can only enter an event they can pay for. How much a dollar matters scales with their funds,
+so a broke mini-tour player weighs a long trip heavily and a millionaire barely notices it. When
+funds run short, full-time players take paid work weeks instead of training.
 """
 from __future__ import annotations
 
@@ -60,16 +72,51 @@ def event_cost(g, series, city):
     return cost
 
 
+WORK_WAGE = 900                  # a week of paid work for a full-time player who needs money
+CREDIT_BASE, CREDIT_SHARE, CREDIT_CAP = 8000, 0.25, 60000
+RESERVE_WEEKS = 4                # living costs set aside before booking any trip
+PRIOR_PRIZE_SHARE = 0.004        # a professional's assumed share of a purse before they have results
+
+
+def credit_limit(last_income):
+    """How far into debt a lender (or family) will let a golfer go: grows with recent income, capped."""
+    return min(CREDIT_CAP, CREDIT_BASE + CREDIT_SHARE * max(0.0, last_income))
+
+
+def initial_backing(age, u1, u2):
+    """Family or private backers willing to fund a young golfer's career (a pot used as needed).
+    Many have none; a few have generous backing; it is mostly there for the young."""
+    if age > 30 or u1 < 0.4:
+        return 0.0
+    youth = min(1.0, (31 - age) / 10)
+    return round(min(150000.0, youth * 20000 * math.exp(2.0 * (u2 - 0.5))), -2)
+
+
+def weekly_living(g):
+    """(salary, living cost) per week for a golfer's lifestyle."""
+    if g.lifestyle == 'part_time':
+        return SALARY['club_pro' if g.status == 'club_pro' else 'part_time'] / 52, LIVING_WORKING / 52
+    if g.status == 'pro' and g.lifestyle == 'full_time':
+        return 0.0, LIVING / 52
+    return 0.0, 0.0                                  # college golfers and teenagers living at home
+
+
+def money_unit(available):
+    """Dollars per point of 'event value': how much money matters to someone with these funds."""
+    return max(100.0, available / 50.0)
+
+
 class Ledger:
     """One golfer's money for one year."""
-    __slots__ = ('prize', 'sponsors', 'salary', 'events', 'caddie', 'living')
+    __slots__ = ('prize', 'sponsors', 'salary', 'work', 'support', 'events', 'caddie', 'living')
 
     def __init__(self):
-        self.prize = self.sponsors = self.salary = self.events = self.caddie = self.living = 0.0
+        self.prize = self.sponsors = self.salary = self.work = self.support = 0.0
+        self.events = self.caddie = self.living = 0.0
 
     @property
     def income(self):
-        return self.prize + self.sponsors + self.salary
+        return self.prize + self.sponsors + self.salary + self.work + self.support
 
     @property
     def costs(self):

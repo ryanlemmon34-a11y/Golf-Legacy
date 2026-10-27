@@ -45,7 +45,8 @@ class Golfer:
     fatigue: float = 0.0             # season fatigue, 0 (fresh) .. 1 (exhausted); set by the season engine
     ceilings: dict = field(default_factory=dict)      # hidden: the most each attribute can reach
     lifestyle: str = 'full_time'     # 'full_time' (chasing it / college), 'part_time' (has a job), 'retired'
-    cash: float = 0.0                # savings in dollars (can go negative: debt)
+    cash: float = 0.0                # savings in dollars (can go negative: debt, within a credit limit)
+    backing: float = 0.0             # family / private backers' support still available (dollars)
 
     def __post_init__(self):
         missing = set(ATTRIBUTE_KEYS) - set(self.attrs)

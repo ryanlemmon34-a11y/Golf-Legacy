@@ -33,7 +33,7 @@ southern summer, the Middle East and Arizona in winter, Scotland in summer, the 
 | Mini | 16 circuits worldwide | Mini tours (incl. the Japan Challenge Circuit, the ABEMA Tour's place) | 36-72 holes |
 | College | US Division I, US Small College, International University | NCAA D1, D2/D3/NAIA, university golf | 36-54 holes; post-season to 72 |
 | Amateur | Elite championships, 50 national amateur championships, 6 regional amateur series | US Amateur, The Amateur, Asia-Pacific Amateur; state/county events | 18-72 holes; two use match play |
-| Qualifying | USA Open local/final, Britannia regional/final, Club Professional Championship, Q-Schools | The same stages in real life | 18-72 holes |
+| Qualifying | USA Open local/final, Britannia regional/final, Club Professional sectionals and Championship, Q-Schools | The same stages in real life | 18-72 holes |
 
 Opportunity Premier events (weaker fields, the Barbasol / John Deere kind) sit in the weeks straight
 after majors: weeks 19, 26 and 31, plus a few others. Because weeks 24 and 25 are back-to-back majors,
@@ -46,7 +46,14 @@ places go to the best finishers *not already exempt* — if an exempt player fin
 place, the spot passes to the next finisher. Fields are built "as of" the major's week: nothing that
 happens later can count. Amateur categories are lost on turning professional.
 
-**Tour Masters (Masters):** invitation only, about 90 players, never filled to a number. Past
+**Every entrant's route is recorded** (`Season.entry_routes`). An entrant who is injured or retired
+withdraws; their place goes to the next recorded alternate (route `ALT`), and an event without
+alternates plays with a smaller field. Nobody is added from the world ranking to make up numbers.
+
+**Tour Masters (Masters):** invitation only, about 90 players, never filled to a number. (The world's
+very first Tour Masters is the one explicit exception: with no past champions or results yet, the best
+of the seeded world ranking receive inaugural invitations, recorded as route `INIT`. This happens only
+in the world's first season.) Past
 champions (lifetime); other majors' champions (5 years); Premier Players Championship winners (3 years);
 USA Amateur champion and runner-up, Britannia Amateur, Asia-Pacific Amateur, Latin America Amateur and
 USA Mid-Amateur champions; top 12 at last year's Masters; top 4 at last year's other majors; winners of
@@ -55,7 +62,9 @@ Tour Finals qualifiers; world top 50 at year end and two weeks before; up to fou
 invitations.
 
 **Premier Tour Championship (PGA Championship):** 156 players. Past champions; recent major and Players
-champions; top 15 last year; **the top 20 from the Club Professional Championship (week 16)**; top 70 on
+champions; top 15 last year; **the top 20 from the Club Professional Championship (week 16)**, whose field itself comes from
+36-hole **sectional qualifying** (week 12, four sites, played shot by shot: each site's places in
+proportion to its entrants go to its best finishers); top 70 on
 the Premier Tour Americas points list; Premier Tour winners since last year; world top 100 invitations;
 filled from the points list.
 
