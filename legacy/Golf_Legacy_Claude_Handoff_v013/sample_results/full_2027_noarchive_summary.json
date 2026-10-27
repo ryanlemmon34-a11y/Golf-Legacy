@@ -1,0 +1,133 @@
+{
+  "seed": 1217,
+  "years": 1,
+  "start_year": 2027,
+  "end_year": 2027,
+  "initial_active_population": 1700,
+  "generated_golfers": 1708,
+  "active_final": 1700,
+  "total_tournaments": 358,
+  "majors": 4,
+  "courses": 240,
+  "courses_used": 194,
+  "major_champions_unique": 4,
+  "most_majors": 1,
+  "most_total_wins": 4,
+  "top_major_champions": [
+    {
+      "id": 357,
+      "name": "Nathan Taylor",
+      "country": "Japan",
+      "majors": 1,
+      "all_tour_wins": 2
+    },
+    {
+      "id": 795,
+      "name": "Ryan Kim",
+      "country": "Japan",
+      "majors": 1,
+      "all_tour_wins": 1
+    },
+    {
+      "id": 1426,
+      "name": "Mateo Evans",
+      "country": "Australia",
+      "majors": 1,
+      "all_tour_wins": 1
+    },
+    {
+      "id": 1146,
+      "name": "George Sato",
+      "country": "Australia",
+      "majors": 1,
+      "all_tour_wins": 2
+    }
+  ],
+  "most_years_world_no1": 1,
+  "top_world_no1": [
+    {
+      "id": 1107,
+      "name": "Ryan Singh",
+      "years": 1,
+      "majors": 0
+    }
+  ],
+  "major_winner_countries": 2,
+  "first_major_by_country": {
+    "Japan": 2027,
+    "Australia": 2027
+  },
+  "avg_major_winning_to_par": -9.25,
+  "range_major_winning_to_par": [
+    -11,
+    -6
+  ],
+  "mean_all_event_winning_to_par": -9.13,
+  "fixed_course_series": {
+    "Founders Masters": 0,
+    "Summit Invitational": 0
+  },
+  "rotating_series": {
+    "World Open": 0,
+    "Heritage Championship": 0
+  },
+  "stats": {
+    "holes_scored": 1352916,
+    "cuts_made": 28535,
+    "players_started": 32575,
+    "projected_cut_pressure_holes": 30328,
+    "lead_pressure_holes": 30124,
+    "playoff_events": 82,
+    "playoff_holes": 160,
+    "pairing_count": 28034,
+    "amateur_only_qualifier_deferred": 2,
+    "unfilled_major_exemption_slots": 241,
+    "relegations": 82,
+    "promotions": 178,
+    "injuries": 39,
+    "slumps": 47,
+    "retirements": 8,
+    "runtime_seconds": 28.916
+  },
+  "validation_errors": [],
+  "validation_error_count": 0,
+  "model_version": "0.13-calendar-integration-experimental",
+  "calibration": {
+    "elite_curve": 0.03,
+    "dispersion": 0.58,
+    "event_quality_sd": 2.0,
+    "round_quality_sd": 3.0,
+    "familiarity_fix": true,
+    "coherent_veteran_initialization": true,
+    "initial_bankroll_reserved_events": 4,
+    "initial_membership": "noisy skill-informed shares16/28/33/23 percent",
+    "upper_tail_threshold": 90,
+    "upper_tail_log_width": 3.0,
+    "regional_mini_circuits": true,
+    "major_earned_premier_access": true
+  },
+  "economics": {
+    "valid": true,
+    "errors": [],
+    "accounts": 1708,
+    "transactions": 118494,
+    "negative_balances": 0,
+    "statuses": {
+      "active": 1644,
+      "hiatus": 56,
+      "retired": 8
+    }
+  },
+  "purse_conservation_errors": 0,
+  "national_opens": {
+    "completed": 28,
+    "accepted_elite_visits": 53,
+    "countries_hosted": 28,
+    "home_wins": 8,
+    "invitation_decisions": 77
+  },
+  "calendar_fixtures": 360,
+  "ranking_awards": 9316,
+  "exemption_records": 261,
+  "history_audit": null
+}

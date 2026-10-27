@@ -1,0 +1,18 @@
+{
+  "path": "../demo_output/demo.sqlite",
+  "passed": true,
+  "errors": [],
+  "error_count": 0,
+  "counts": {
+    "entries": 7316,
+    "rounds": 19259,
+    "holes": 346662,
+    "events": 75,
+    "duplicate_golfer_weeks": 0,
+    "bad_exemption_sources": 0,
+    "course_record_changes": 314,
+    "hole_record_changes": 3026,
+    "weekly_rankings": 52,
+    "amateur_qualifiers_scored": 0
+  }
+}

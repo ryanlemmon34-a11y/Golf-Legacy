@@ -1,0 +1,351 @@
+{
+  "seed": 2601,
+  "years": 2,
+  "start_year": 2027,
+  "end_year": 2028,
+  "initial_active_population": 450,
+  "generated_golfers": 454,
+  "active_final": 450,
+  "total_tournaments": 243,
+  "majors": 8,
+  "courses": 240,
+  "courses_used": 150,
+  "major_champions_unique": 7,
+  "most_majors": 2,
+  "most_total_wins": 5,
+  "top_major_champions": [
+    {
+      "id": 450,
+      "name": "Hugo Diaz",
+      "country": "Sweden",
+      "majors": 2,
+      "all_tour_wins": 5
+    },
+    {
+      "id": 137,
+      "name": "Min Sato",
+      "country": "Canada",
+      "majors": 1,
+      "all_tour_wins": 1
+    },
+    {
+      "id": 352,
+      "name": "Marcus Reed",
+      "country": "Canada",
+      "majors": 1,
+      "all_tour_wins": 5
+    },
+    {
+      "id": 345,
+      "name": "Peter Fischer",
+      "country": "Japan",
+      "majors": 1,
+      "all_tour_wins": 3
+    },
+    {
+      "id": 266,
+      "name": "Victor Miller",
+      "country": "USA",
+      "majors": 1,
+      "all_tour_wins": 2
+    },
+    {
+      "id": 41,
+      "name": "Theo Singh",
+      "country": "Canada",
+      "majors": 1,
+      "all_tour_wins": 2
+    },
+    {
+      "id": 276,
+      "name": "Yuto Reed",
+      "country": "Turkey",
+      "majors": 1,
+      "all_tour_wins": 2
+    }
+  ],
+  "most_years_world_no1": 2,
+  "top_world_no1": [
+    {
+      "id": 450,
+      "name": "Hugo Diaz",
+      "years": 2,
+      "majors": 2
+    }
+  ],
+  "major_winner_countries": 5,
+  "first_major_by_country": {
+    "Canada": 2027,
+    "Japan": 2027,
+    "USA": 2027,
+    "Sweden": 2028,
+    "Turkey": 2028
+  },
+  "avg_major_winning_to_par": -13.88,
+  "range_major_winning_to_par": [
+    -17,
+    -10
+  ],
+  "mean_all_event_winning_to_par": -9.66,
+  "fixed_course_series": {
+    "Founders Masters": 0,
+    "Summit Invitational": 0
+  },
+  "rotating_series": {
+    "World Open": 0,
+    "Heritage Championship": 0
+  },
+  "stats": {
+    "holes_scored": 986832,
+    "cuts_made": 18226,
+    "players_started": 21851,
+    "projected_cut_pressure_holes": 28028,
+    "lead_pressure_holes": 16059,
+    "playoff_events": 55,
+    "playoff_holes": 116,
+    "pairing_count": 20699,
+    "amateur_only_qualifier_deferred": 4,
+    "unfilled_major_exemption_slots": 496,
+    "promotions": 85,
+    "relegations": 5,
+    "injuries": 18,
+    "retirements": 4,
+    "slumps": 21,
+    "financial_career_exits": 1,
+    "runtime_seconds": 16.922
+  },
+  "validation_errors": [
+    {
+      "year": 2027,
+      "event": "Americas Mini Circuit",
+      "issue": "too_few_entrants",
+      "count": 8
+    },
+    {
+      "year": 2027,
+      "event": "Africa Local Pro 2",
+      "issue": "too_few_entrants",
+      "count": 0
+    },
+    {
+      "year": 2027,
+      "event": "Africa Local Pro 2 Event 5",
+      "issue": "insufficient_field",
+      "field": 0
+    },
+    {
+      "year": 2027,
+      "event": "Americas Local Pro 2",
+      "issue": "too_few_entrants",
+      "count": 0
+    },
+    {
+      "year": 2027,
+      "event": "Americas Local Pro 2 Event 3",
+      "issue": "insufficient_field",
+      "field": 0
+    },
+    {
+      "year": 2027,
+      "event": "Asia Mini Circuit",
+      "issue": "too_few_entrants",
+      "count": 0
+    },
+    {
+      "year": 2027,
+      "event": "Asia Mini Circuit Event 6",
+      "issue": "insufficient_field",
+      "field": 0
+    },
+    {
+      "year": 2027,
+      "event": "Europe Mini Circuit",
+      "issue": "too_few_entrants",
+      "count": 0
+    },
+    {
+      "year": 2027,
+      "event": "Europe Mini Circuit Event 5",
+      "issue": "insufficient_field",
+      "field": 0
+    },
+    {
+      "year": 2027,
+      "event": "Americas Mini Circuit",
+      "issue": "too_few_entrants",
+      "count": 0
+    },
+    {
+      "year": 2027,
+      "event": "Americas Mini Circuit Event 7",
+      "issue": "insufficient_field",
+      "field": 0
+    },
+    {
+      "year": 2027,
+      "event": "Europe Mini Circuit",
+      "issue": "too_few_entrants",
+      "count": 3
+    },
+    {
+      "year": 2027,
+      "event": "Oceania Local Pro 1",
+      "issue": "too_few_entrants",
+      "count": 1
+    },
+    {
+      "year": 2027,
+      "event": "Oceania Local Pro 1 Event 9",
+      "issue": "insufficient_field",
+      "field": 0
+    },
+    {
+      "year": 2027,
+      "event": "Africa Local Pro 2",
+      "issue": "too_few_entrants",
+      "count": 14
+    },
+    {
+      "year": 2027,
+      "event": "Africa Mini Circuit",
+      "issue": "too_few_entrants",
+      "count": 0
+    },
+    {
+      "year": 2027,
+      "event": "Africa Mini Circuit Event 11",
+      "issue": "insufficient_field",
+      "field": 0
+    },
+    {
+      "year": 2028,
+      "event": "Oceania Mini Circuit",
+      "issue": "too_few_entrants",
+      "count": 9
+    },
+    {
+      "year": 2028,
+      "event": "Oceania Secondary Regional",
+      "issue": "too_few_entrants",
+      "count": 12
+    },
+    {
+      "year": 2028,
+      "event": "Asia Local Pro 1",
+      "issue": "too_few_entrants",
+      "count": 0
+    },
+    {
+      "year": 2028,
+      "event": "Asia Local Pro 1 Event 2",
+      "issue": "insufficient_field",
+      "field": 0
+    },
+    {
+      "year": 2028,
+      "event": "Asia Mini Circuit",
+      "issue": "too_few_entrants",
+      "count": 1
+    },
+    {
+      "year": 2028,
+      "event": "Asia Mini Circuit Event 6",
+      "issue": "insufficient_field",
+      "field": 0
+    },
+    {
+      "year": 2028,
+      "event": "Asia Mini Circuit",
+      "issue": "too_few_entrants",
+      "count": 5
+    },
+    {
+      "year": 2028,
+      "event": "Asia Challenger",
+      "issue": "too_few_entrants",
+      "count": 0
+    },
+    {
+      "year": 2028,
+      "event": "Asia Challenger Event 6",
+      "issue": "insufficient_field",
+      "field": 0
+    },
+    {
+      "year": 2028,
+      "event": "Oceania Regional",
+      "issue": "too_few_entrants",
+      "count": 5
+    },
+    {
+      "year": 2028,
+      "event": "Europe Mini Circuit",
+      "issue": "too_few_entrants",
+      "count": 2
+    },
+    {
+      "year": 2028,
+      "event": "Europe Mini Circuit Event 9",
+      "issue": "insufficient_field",
+      "field": 0
+    },
+    {
+      "year": 2028,
+      "event": "Americas Local Pro 1",
+      "issue": "too_few_entrants",
+      "count": 23
+    }
+  ],
+  "validation_error_count": 41,
+  "model_version": "0.13-calendar-integration-experimental",
+  "calibration": {
+    "elite_curve": 0.03,
+    "dispersion": 0.58,
+    "event_quality_sd": 2.0,
+    "round_quality_sd": 3.0,
+    "familiarity_fix": true,
+    "coherent_veteran_initialization": true,
+    "initial_bankroll_reserved_events": 4,
+    "initial_membership": "noisy skill-informed shares16/28/33/23 percent",
+    "upper_tail_threshold": 90,
+    "upper_tail_log_width": 3.0,
+    "regional_mini_circuits": true,
+    "major_earned_premier_access": true
+  },
+  "economics": {
+    "valid": true,
+    "errors": [],
+    "accounts": 454,
+    "transactions": 60820,
+    "negative_balances": 0,
+    "statuses": {
+      "active": 432,
+      "hiatus": 18,
+      "retired": 4
+    }
+  },
+  "purse_conservation_errors": 0,
+  "national_opens": {
+    "completed": 56,
+    "accepted_elite_visits": 80,
+    "countries_hosted": 28,
+    "home_wins": 7,
+    "invitation_decisions": 114
+  },
+  "calendar_fixtures": 131,
+  "ranking_awards": 8158,
+  "exemption_records": 482,
+  "history_audit": {
+    "events": 243,
+    "entries": 21851,
+    "rounds": 54824,
+    "holes": 986832,
+    "bad_round_lengths": 0,
+    "bad_round_sums": 0,
+    "duplicate_event_names_in_week": 0,
+    "rankings_snapshots": 104,
+    "exemptions": 482,
+    "hole_record_changes": 6796,
+    "seasons_on_disk": 2
+  }
+}

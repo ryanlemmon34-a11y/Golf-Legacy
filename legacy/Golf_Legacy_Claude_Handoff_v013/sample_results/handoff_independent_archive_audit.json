@@ -1,0 +1,18 @@
+{
+  "path": "../sample_results/two_season_final.sqlite",
+  "passed": true,
+  "errors": [],
+  "error_count": 0,
+  "counts": {
+    "entries": 21851,
+    "rounds": 54824,
+    "holes": 986832,
+    "events": 243,
+    "duplicate_golfer_weeks": 0,
+    "bad_exemption_sources": 0,
+    "course_record_changes": 743,
+    "hole_record_changes": 6796,
+    "weekly_rankings": 104,
+    "amateur_qualifiers_scored": 0
+  }
+}

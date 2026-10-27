@@ -1,0 +1,44 @@
+test_major_week_blackouts_and_invariant_series (test_v013.CalendarTests.test_major_week_blackouts_and_invariant_series) ... ok
+test_field_ties_and_ranking_event_eligibility (test_v013.RankingMathTests.test_field_ties_and_ranking_event_eligibility) ... ok
+test_rolling_weight (test_v013.RankingMathTests.test_rolling_weight) ... ok
+test_all_four_formats_and_archived_round_integrity (test_v013.TournamentEngineTests.test_all_four_formats_and_archived_round_integrity) ... ok
+test_amateur_only_qualifier_must_not_fabricate_pro_winner (test_v013.TournamentEngineTests.test_amateur_only_qualifier_must_not_fabricate_pro_winner) ... ok
+test_national_open_winner_is_invited_to_brittania_major (test_v013.TournamentEngineTests.test_national_open_winner_is_invited_to_brittania_major) ... ok
+test_qualifier_win_enters_next_week_major_with_source (test_v013.TournamentEngineTests.test_qualifier_win_enters_next_week_major_with_source) ... ok
+test_sqlite_reopen_and_compact_historical_scoring (test_v013.TournamentEngineTests.test_sqlite_reopen_and_compact_historical_scoring) ... ok
+
+----------------------------------------------------------------------
+Ran 8 tests in 3.017s
+
+OK
+{
+  "path": "../sample_results/two_season_final.sqlite",
+  "passed": true,
+  "errors": [],
+  "error_count": 0,
+  "counts": {
+    "entries": 21851,
+    "rounds": 54824,
+    "holes": 986832,
+    "events": 243,
+    "duplicate_golfer_weeks": 0,
+    "bad_exemption_sources": 0,
+    "course_record_changes": 743,
+    "hole_record_changes": 6796,
+    "weekly_rankings": 104,
+    "amateur_qualifiers_scored": 0
+  }
+}
+
+--- FRESH ONE-SEASON DEMO FROM COPIED SOURCE ---
+Command:
+  python engine_v013.py --seed 1217 --population 450 --years 1 --events-scale 0.08 --stop-week 52 --db ../demo_output/demo.sqlite --out ../demo_output/reports --quiet
+Then:
+  python audit_v013.py ../demo_output/demo.sqlite --output ../demo_output/audit.json
+Result:
+  Independent audit PASSED (0 integrity errors):
+  75 tournament editions, 7,316 entrants, 19,259 18-hole rounds,
+  346,662 recorded competitive holes, 52 weekly ranking snapshots,
+  314 dated course-record changes and 3,026 dated hole-record changes.
+NOTE: Small and artificially reduced fields; not a historical realism test.
+--- END ---

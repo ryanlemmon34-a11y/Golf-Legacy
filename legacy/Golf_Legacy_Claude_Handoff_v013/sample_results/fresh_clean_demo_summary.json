@@ -1,0 +1,139 @@
+{
+  "seed": 1217,
+  "years": 1,
+  "start_year": 2027,
+  "end_year": 2027,
+  "initial_active_population": 450,
+  "generated_golfers": 451,
+  "active_final": 450,
+  "total_tournaments": 75,
+  "majors": 4,
+  "courses": 240,
+  "courses_used": 68,
+  "major_champions_unique": 3,
+  "most_majors": 2,
+  "most_total_wins": 5,
+  "top_major_champions": [
+    {
+      "id": 205,
+      "name": "Ben Sato",
+      "country": "Japan",
+      "majors": 2,
+      "all_tour_wins": 5
+    },
+    {
+      "id": 310,
+      "name": "Alex Diaz",
+      "country": "USA",
+      "majors": 1,
+      "all_tour_wins": 1
+    },
+    {
+      "id": 39,
+      "name": "Min Hayes",
+      "country": "France",
+      "majors": 1,
+      "all_tour_wins": 2
+    }
+  ],
+  "most_years_world_no1": 1,
+  "top_world_no1": [
+    {
+      "id": 205,
+      "name": "Ben Sato",
+      "years": 1,
+      "majors": 2
+    }
+  ],
+  "major_winner_countries": 3,
+  "first_major_by_country": {
+    "USA": 2027,
+    "France": 2027,
+    "Japan": 2027
+  },
+  "avg_major_winning_to_par": -11.5,
+  "range_major_winning_to_par": [
+    -16,
+    -8
+  ],
+  "mean_all_event_winning_to_par": -11.15,
+  "fixed_course_series": {
+    "Founders Masters": 0,
+    "Summit Invitational": 0
+  },
+  "rotating_series": {
+    "World Open": 0,
+    "Heritage Championship": 0
+  },
+  "stats": {
+    "holes_scored": 346662,
+    "cuts_made": 5902,
+    "players_started": 7316,
+    "projected_cut_pressure_holes": 10882,
+    "lead_pressure_holes": 4488,
+    "playoff_events": 19,
+    "playoff_holes": 43,
+    "pairing_count": 7306,
+    "amateur_only_qualifier_deferred": 2,
+    "unfilled_major_exemption_slots": 255,
+    "relegations": 25,
+    "promotions": 50,
+    "injuries": 15,
+    "retirements": 1,
+    "slumps": 7,
+    "runtime_seconds": 8.861
+  },
+  "validation_errors": [],
+  "validation_error_count": 0,
+  "model_version": "0.13-calendar-integration-experimental",
+  "calibration": {
+    "elite_curve": 0.03,
+    "dispersion": 0.58,
+    "event_quality_sd": 2.0,
+    "round_quality_sd": 3.0,
+    "familiarity_fix": true,
+    "coherent_veteran_initialization": true,
+    "initial_bankroll_reserved_events": 4,
+    "initial_membership": "noisy skill-informed shares16/28/33/23 percent",
+    "upper_tail_threshold": 90,
+    "upper_tail_log_width": 3.0,
+    "regional_mini_circuits": true,
+    "major_earned_premier_access": true
+  },
+  "economics": {
+    "valid": true,
+    "errors": [],
+    "accounts": 451,
+    "transactions": 28575,
+    "negative_balances": 0,
+    "statuses": {
+      "active": 440,
+      "hiatus": 10,
+      "retired": 1
+    }
+  },
+  "purse_conservation_errors": 0,
+  "national_opens": {
+    "completed": 28,
+    "accepted_elite_visits": 36,
+    "countries_hosted": 28,
+    "home_wins": 3,
+    "invitation_decisions": 47
+  },
+  "calendar_fixtures": 77,
+  "ranking_awards": 2820,
+  "exemption_records": 228,
+  "history_audit": {
+    "events": 75,
+    "entries": 7316,
+    "rounds": 19259,
+    "holes": 346662,
+    "bad_round_lengths": 0,
+    "bad_round_sums": 0,
+    "duplicate_event_names_in_week": 0,
+    "rankings_snapshots": 52,
+    "exemptions": 228,
+    "hole_record_changes": 3026,
+    "seasons_on_disk": 1
+  }
+}
