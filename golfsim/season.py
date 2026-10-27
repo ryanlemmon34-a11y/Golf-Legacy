@@ -1181,11 +1181,14 @@ class Season:
             # Paid work only makes sense when money is genuinely short: funds would not last three
             # months and their own results are not paying for their golf.
             burn = FIN.weekly_living(g)[1] + (sum(costs) / max(1, sum(1 for b in base if b)))
+            # ... and they must earn if they cannot cover the next weeks' living, or cannot afford any
+            # trip this month (otherwise a golfer just short of a trip would wait for ever).
+            stuck = money0 < 0 or (any(base) and all(c > money0 for b, c in zip(base, costs) if b))
             can_work = (g.status == 'pro' and g.lifestyle == 'full_time'
-                        and (money0 < 0 or money0 < 13 * burn and sum(prizes) <= sum(costs)))
+                        and (stuck or money0 < 13 * burn and sum(prizes) <= sum(costs)))
             work_v = min(20.0, FIN.WORK_WAGE / unit) if can_work else -1.0
-            if can_work and money0 < 0:
-                work_v = 40.0                                # cannot cover the next weeks' living: must earn
+            if can_work and stuck:
+                work_v = 40.0
             playable = [i for i, w in enumerate(weeks) if base[i] is not None and now + w >= inj_until]
             best_val, best_acts = None, None
             for mask in range(1 << len(playable)):

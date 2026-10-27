@@ -75,6 +75,38 @@ class FundingTests(unittest.TestCase):
         self.assertTrue(all('work' in acts for acts in broke.values()))       # they work instead
         self.assertGreater(sum('play' in acts for acts in rich.values()), len(group) // 2)
 
+    def test_no_debt_trap_just_short_of_a_trip(self):
+        """A card holder whose funds sit just below the price of any trip works to get back on the
+        road, even if their past prize record looks good (regression: they used to train and wait)."""
+        s = SEASON
+        week0 = next(w for w in range(1, 49, 4)
+                     if any(e.week in range(w, w + 4) and e.series.tour.startswith('RG_') for e in s.cal.editions(2027)))
+        group = [g for g in full_timers(s, 3, 300)
+                 if any(e.week in range(week0, week0 + 4) and e.series.tour == g.tour for e in s.cal.editions(2027))][:40]
+        saved = {g.id: (g.cash, g.backing) for g in group}
+        for g in group:
+            g.backing = 0.0
+            s.prize_share[g.id] = 0.05                                       # a good record
+            g.cash = 0.0
+            g.cash = 300.0 - s.spendable(g, 2027)                            # $300 to spend: no trip costs that little
+        s.plan_block(2027, week0)
+        for g in group:
+            g.cash, g.backing = saved[g.id]
+            del s.prize_share[g.id]
+        self.assertTrue(all('work' in [a for a, _ in s.plans[g.id].values()] for g in group))
+
+    def test_a_season_without_events_counts_against_the_record(self):
+        s = SEASON
+        g = copy.deepcopy(full_timers(s, 3)[0])
+        g.cash, g.backing = 5000.0, 0.0
+        purse, cost = C._tour_economics(s, g.tour)
+        share = 1.2 * (20 * cost + FIN.LIVING) / (20 * purse)                # a record that pays its way
+        s.prize_share[g.id] = share
+        played = C.runway_years(s, g, 2027, g.tour, 20, last_prize=share * 20 * purse)
+        idle = C.runway_years(s, g, 2027, g.tour, 20, last_prize=0.0)
+        del s.prize_share[g.id]
+        self.assertLess(idle, played)
+
     def test_a_challenger_card_is_no_financial_immunity(self):
         s = SEASON
         g = min(full_timers(s, 2, 400), key=lambda x: (s.player_prestige(x.id), x.id))   # no sponsor to lean on

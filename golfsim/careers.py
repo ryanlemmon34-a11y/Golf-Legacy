@@ -76,12 +76,15 @@ def _tour_economics(season, tour):
     return cache[tour]
 
 
-def runway_years(season, g, year, tour, events):
+def runway_years(season, g, year, tour, events, last_prize=None):
     """Years a golfer's funds would last chasing golf on `tour`, judged from their own record:
-    expected prize money (the share of purses they have actually been winning), their sponsor
-    contract and living costs. 10 = self-funding."""
+    expected prize money (the share of purses they have been winning, weighed equally with what
+    they actually won in the season just played, so a season spent unable to afford events counts),
+    their sponsor contract and living costs. 10 = self-funding."""
     purse, cost = _tour_economics(season, tour)
     income = season.prize_share.get(g.id, FIN.PRIOR_PRIZE_SHARE) * purse * events
+    if last_prize is not None:
+        income = 0.5 * income + 0.5 * last_prize
     income += PR.endorsements(season.player_prestige(g.id))
     costs = events * cost + FIN.LIVING
     shortfall = costs - income
@@ -115,7 +118,7 @@ def p_stop_chasing(season, g, row, year):
     """Chance a full-time professional gives up the chase this winter (every tier)."""
     age = g.age(year)
     tier = TOUR_BY_KEY[g.tour].tier if g.tour in TOUR_BY_KEY else 4
-    runway = runway_years(season, g, year, g.tour, season.target_events(g))
+    runway = runway_years(season, g, year, g.tour, season.target_events(g), row.get('prize', 0.0))
     pressure = 1 / (1 + runway)                    # 1 = broke and losing money, ~0 = self-funding
     funded = min(1.0, runway)                      # progress only counts if next year can be paid for
     will = (g.personality['work_ethic'] + g.personality['big_stage']) / 200

@@ -212,6 +212,11 @@ def analyse(d, mature):
                         kept += bool(nxt and full_time(nxt) and nxt['tier'] <= t) if y < last else r['next_tier'] <= t
             ret[(t, label)] = kept / held if held else float('nan')
     out['retention'] = ret
+    idle = {}
+    for t in (1, 2, 3, 4):
+        seasons = [r for y in years for r in rows[y].values() if full_time(r) and r['tier'] == t]
+        idle[t] = sum(1 for r in seasons if r['events'] == 0) / len(seasons) if seasons else float('nan')
+    out['idle'] = idle
     # majors ------------------------------------------------------------------------------------------
     wins = Counter(d['majors'].values())
     out['majors'] = len(d['majors'])
@@ -238,7 +243,7 @@ def analyse(d, mature):
                           {'amateur': 'a', 'club_pro': 'c'}.get(tl[y]['status'], 'p')) for y in sorted(tl))
         e0 = episodes[gid][0][0]
         end = 'still chasing' if episodes[gid][-1][1] == last else f'stopped at {age(gid, episodes[gid][-1][1])}'
-        lines.append(f'{g["name"]} ({g["country"]}): turned pro at {age(gid, e0)}, best level {TIER_NAME[best_tier[gid]]}, '
+        lines.append(f'{g["name"]} ({g["country"]}): first full-time season at {age(gid, e0)}, best level {TIER_NAME[best_tier[gid]]}, '
                      f'{sum(tl[y]["wins"] for y in tl)} wins, net from golf ${net[gid]:,.0f}, lowest savings '
                      f'${min_cash[gid]:,.0f}, {end}. Seasons from {min(tl)}: `{track}`')
     out['sample'] = lines
@@ -313,6 +318,10 @@ def report(results, args):
     for t in (1, 2, 3):
         for label in ('early', 'later'):
             out.append(row(f'{TIER_NAME[t]} ({label})', lambda a, t=t, label=label: f'{100 * a["retention"][(t, label)]:.0f}%'))
+    out += ['', 'Full-time card holders who played no event all season (they could not afford to, or were injured):', '',
+            head, sep]
+    for t in (1, 2, 3, 4):
+        out.append(row(TIER_NAME[t], lambda a, t=t: f'{100 * a["idle"][t]:.1f}%'))
     out += ['', '## 5. Major championships', '', head, sep,
             row('Majors played', lambda a: f'{a["majors"]}'),
             row('Different winners', lambda a: f'{a["major_winners"]}'),
@@ -323,7 +332,7 @@ def report(results, args):
             row('Won by golfers already in the world at the start', lambda a: f'{a["major_from_start_world"]}'),
             '', 'By decade (majors, different winners, most by one golfer):', '']
     for r in results:
-        out.append(f'- seed {r["seed"]}: ' + '; '.join(f'years {10 * dd + 1}-{10 * dd + 10}: {n} majors, {w} winners, max {m}'
+        out.append(f'- seed {r["seed"]}: ' + '; '.join(f'years {10 * dd + 1}-{min(10 * dd + 10, args.years)}: {n} majors, {w} winners, max {m}'
                                                       for dd, n, w, m in r['a']['major_decades']))
     out += ['', 'Major fields by entry route (season 1 vs the last season; INIT = inaugural invitations, first '
             'Tour Masters only; ALT = alternates replacing withdrawals):', '']
