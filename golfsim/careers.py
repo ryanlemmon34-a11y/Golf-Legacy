@@ -132,6 +132,8 @@ def decide(season, year):
             p_quit *= 0.5                       # a regional tour card is a living for many, while it pays
         if climbing:
             p_quit *= 0.4
+        if g.cash < -50000 and age > 23:
+            p_quit = max(p_quit, 0.5)           # deep in debt: the dream can't be paid for any more
         if rng.random() < min(0.85, p_quit):
             mind = (g.attrs['management'] + g.attrs['composure']) / 2
             r = rng.random()
