@@ -12,10 +12,11 @@ majors, and a full season must still run quickly. See `docs/ENGINE_DESIGN.md`, s
 
 | Path | What it is |
 |---|---|
-| `golfsim/` | The engine: ratings, golfers, courses, shot-by-shot hole simulation, stats, tournaments (stroke and match play), world calendar, geography, major qualification, course library, course records, nations and the world population, season engine, prestige and tour cards |
+| `golfsim/` | The engine: ratings, golfers, courses, shot-by-shot hole simulation, stats, tournaments (stroke and match play), world calendar, geography, major qualification, course library, course records, nations and the world population, season engine, prestige and tour cards, development, finances and careers |
 | `tools/balance_test.py` | Runs the balance study and writes `reports/BALANCE_REPORT.md` |
 | `tools/calibrate.py` | Quick rating-ladder check against target scores |
 | `tools/calendar_report.py` | Writes the full world calendar to `reports/CALENDAR_REPORT.md` |
+| `tools/history_test.py` | Runs the world for decades with development on and writes `reports/WORLD_HISTORY_REPORT.md` |
 | `tools/season_test.py` | Plays several full seasons of the whole world and writes `reports/SEASON_TEST_REPORT.md` |
 | `tools/world_report.py` | Generates the starting world of golfers and writes `reports/WORLD_POPULATION_REPORT.md` |
 | `tools/build_course_library.py` | Rates every course layout and writes `data/` and `reports/COURSE_LIBRARY_REPORT.md` |
@@ -27,9 +28,10 @@ majors, and a full season must still run quickly. See `docs/ENGINE_DESIGN.md`, s
 | `docs/COURSE_LIBRARY.md` | The 380 courses, their layouts, venues and records |
 | `docs/WORLD_POPULATION.md` | Nations and how the world's golfers are generated |
 | `docs/SEASON_SYSTEM.md` | The season engine, event and player prestige, rankings, money and tour cards |
+| `docs/DEVELOPMENT_AND_CAREERS.md` | Development, the monthly plan, money and careers |
 | `docs/BACKLOG.md` | Owner requirements and planned work |
 | `data/` | Generated course library (`course_library.json`) and layout ratings |
-| `reports/` | Latest reports (balance, majors, high school, calendar, qualifying, course library, world population, multi-season test) |
+| `reports/` | Latest reports (balance, majors, high school, calendar, qualifying, course library, world population, multi-season test, world history) |
 | `legacy/` | The original v0.13 package, untouched |
 
 ## Running it (Windows)

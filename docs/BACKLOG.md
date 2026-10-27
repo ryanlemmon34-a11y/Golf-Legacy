@@ -9,6 +9,7 @@ Owner requirements and planned work, in rough order. "Built" items link to where
 - 380-course library with layouts and per-layout records (`docs/COURSE_LIBRARY.md`)
 - Nations and the world population (`docs/WORLD_POPULATION.md`)
 - Season system v1 with event and player prestige (`docs/SEASON_SYSTEM.md`)
+- Development, monthly planning, money and careers v1 (`docs/DEVELOPMENT_AND_CAREERS.md`)
 
 ## Prestige (owner, recorded for the backlog; first version built in the season system)
 
@@ -37,15 +38,33 @@ Owner requirements and planned work, in rough order. "Built" items link to where
 - Stamina matters across a season: tiredness affects mostly physical attributes and raises injury risk,
   especially with low injury resistance or older age.
 
+## Careers, money and the people of golf (owner)
+
+- **Finances drive careers.** A 22-year-old earning a few thousand a year keeps chasing the dream; by
+  26-27, if they are still only making $10-20k, it stops making sense to travel the world for it.
+  They take a full-time job but, still good enough, play a couple of events a year on a low tour near
+  home. *First version: see `docs/DEVELOPMENT_AND_CAREERS.md`.*
+- **Rare comebacks:** a part-timer whose mental game has matured naturally may make another run at
+  34 — qualify for a big event or win a tour card. Very rare, but possible and part of the history.
+- **Every individual has a history** — players, caddies and coaches: careers, results, moves, injuries,
+  money, milestones. *Players: first version built (career log).*
+- **Caddies and coaches as people (not built yet):** players who never make the Premier Tour but have
+  great mental attributes can become caddies or coaches; caddies and coaches have their own skills,
+  careers, reputations, employers and histories; the best players hire the best of them (money and
+  prestige).
+- **Monthly planning (owner):** each month a golfer juggles training a category of attributes, a full
+  rest week, and tournaments — a risk/reward balance of fatigue and injury against development and
+  career. Playing tournaments develops raw golfers (far from their potential) the most.
+  *First version built.*
+
 ## Next
 
-1. **Player development** (owner): aging year to year, AI training decisions, coach quality and
-   recommendations, potential, work ethic and coachability; new juniors entering the world each year;
-   college players graduating and turning pro; retirements. Include lasting effects of serious
-   injuries (lost power or stamina, re-injury risk) and training load as a source of fatigue.
-2. **Nation improvement** (owner): nations' pool, development and pathway move with their golfers'
+1. **Coaches and caddies as people**, with coach recommendations driving training choices and the
+   money/prestige market for the best of them. Re-injury risk after serious injuries.
+2. **Finance v2**: contracts and bonuses, family support for young players, cost of living by country,
+   appearance fees.
+3. **Nation improvement** (owner): nations' pool, development and pathway move with their golfers'
    results (a nation that wins majors grows more and better juniors a decade later).
-3. **Long-term test with development on**: realistic careers and stable long-run trends.
 4. **History generation**: simulate decades before the game starts so there are past champions,
    records and storylines from day one.
 5. **High-school golf** (owner: later) and junior events.

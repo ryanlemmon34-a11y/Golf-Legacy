@@ -169,6 +169,13 @@ def _age(rng):
             return int(a)
 
 
+def _keep_young(pot, prof, u):
+    """Whether a golfer aged 22 or under is part of the competitive world: judged on where they are
+    heading (their potential, by the adult rules), not on how raw they still are."""
+    projected = 'pro' if pot >= PRO_LINE + 3 else 'amateur'
+    return u < _keep_probability(projected, 27, pot)
+
+
 def _keep_probability(status, age, cur):
     """The world holds every good golfer and a sample of the many weaker competitive golfers.
 
@@ -198,35 +205,93 @@ def candidates(year, seed, profiles, scale=1.0):
             cur = min(cur, 99.0)                     # the rating scale tops out at 99
             pot = max(min(pot, 99.0), cur)
             status = _status(age, cur, prof, crng.random(), crng)
-            if crng.random() < _keep_probability(status, age, cur):
+            keep = _keep_young(pot, prof, crng.random()) if age <= 22 and status == 'amateur' else \
+                crng.random() < _keep_probability(status, age, cur)
+            if keep:
                 out.append((country, age, pot, peak, cur, status, aging))
     out.sort(key=lambda r: -r[4])
     return out
 
 
+def _make_golfer(i, row, year, seed, profiles, taken):
+    country, age, pot, peak, cur, status, aging = row
+    prof = profiles[country]
+    grng = random.Random(f'{seed}:golfer:{i}')
+    arch = _pick_archetype(prof.style, grng)
+    attrs = _build_attrs(cur, arch, prof.style, age, peak, grng)
+    pers = _personality(arch, cur, grng)
+    g = Golfer(make_name(country, grng, taken), attrs, pers, archetype=arch, id=i, country=country,
+               born=year - age, hometown=grng.choice(CITIES_BY_COUNTRY[country]).name, status=status,
+               height_cm=int(round(grng.gauss(180, 6.5) + 0.12 * (attrs['power'] - 60))),
+               hand='L' if grng.random() < 0.07 else 'R',
+               potential=math.ceil(max(pot, overall_rating(attrs)) * 10) / 10, peak_age=round(peak, 1),
+               aging_rate=round(aging, 2))
+    if status == 'pro':
+        g.turned_pro = year - max(0, age - grng.choice((21, 22, 22, 22, 23, 24)))
+    return g
+
+
 def generate_world(year=2027, seed=2027, nation_profiles=None, scale=1.0):
     """Generate every competitive golfer in the world. `scale` multiplies the number of candidates."""
+    from .development import init_ceilings
+    from .finance import initial_cash
     profiles = nation_profiles or starting_nations()
     taken = set()
-    golfers = []
-    for i, (country, age, pot, peak, cur, status, aging) in enumerate(candidates(year, seed, profiles, scale), 1):
-        prof = profiles[country]
-        grng = random.Random(f'{seed}:golfer:{i}')
-        arch = _pick_archetype(prof.style, grng)
-        attrs = _build_attrs(cur, arch, prof.style, age, peak, grng)
-        pers = _personality(arch, cur, grng)
-        g = Golfer(make_name(country, grng, taken), attrs, pers, archetype=arch, id=i, country=country,
-                   born=year - age, hometown=grng.choice(CITIES_BY_COUNTRY[country]).name, status=status,
-                   height_cm=int(round(grng.gauss(180, 6.5) + 0.12 * (attrs['power'] - 60))),
-                   hand='L' if grng.random() < 0.07 else 'R',
-                   potential=math.ceil(max(pot, overall_rating(attrs)) * 10) / 10, peak_age=round(peak, 1),
-                   aging_rate=round(aging, 2))
-        if status == 'pro':
-            g.turned_pro = year - max(0, age - grng.choice((21, 22, 22, 22, 23, 24)))
-        golfers.append(g)
+    golfers = [_make_golfer(i, row, year, seed, profiles, taken)
+               for i, row in enumerate(candidates(year, seed, profiles, scale), 1)]
     world = World(year, seed, profiles, golfers)
     _assign_memberships(world, random.Random(f'{seed}:tours'))
+    rng = random.Random(f'{seed}:careers')
+    for g in golfers:
+        age = g.age(year)
+        init_ceilings(g, age, rng)
+        g.cash = initial_cash(g, age, rng.random())
+        t = TOUR_BY_KEY.get(g.tour)
+        if g.status == 'club_pro' or (g.status == 'amateur' and age > 22 and not g.tour.startswith('CO_')):
+            g.lifestyle = 'part_time'                 # they have a job
+        elif g.status == 'pro' and t and t.tier == 4 and age >= 28 and g.overall < 52 and rng.random() < 0.5:
+            g.lifestyle = 'part_time'                 # already stopped chasing; plays a few local events
     return world
+
+
+JUNIOR_SHARE = 1 / 31.25          # share of a nation's candidates who are 18 in any one year (see _age)
+
+
+def junior_class(year, seed, profiles, start_id, taken):
+    """This year's 18-year-olds from every nation (amateurs: college or amateur golf)."""
+    rows = []
+    for country, prof in profiles.items():
+        n = max(0, round(prof.pool * CANDIDATES_PER_POOL * JUNIOR_SHARE))
+        mu = BASE_POTENTIAL + DEV_EFFECT * (prof.development - 60)
+        crng = random.Random(f'{seed}:juniors:{year}:{country}')
+        for _ in range(n):
+            pot = crng.gauss(mu, POTENTIAL_SD)
+            peak = crng.gauss(27.0, 2.0)
+            aging = math.exp(crng.gauss(0, 0.3))
+            cur = pot - age_deficit(18, peak, aging) + crng.gauss(0, CAREER_LUCK_SD)
+            if cur < KEEP_OVERALL:
+                continue
+            cur = min(cur, 99.0)
+            pot = max(min(pot, 99.0), cur)
+            if _keep_young(pot, prof, crng.random()):
+                rows.append((country, 18, pot, peak, cur, 'amateur', aging))
+    rows.sort(key=lambda r: -r[4])
+    golfers = [_make_golfer(start_id + i, row, year, f'{seed}:j{year}', profiles, taken) for i, row in enumerate(rows)]
+    rng = random.Random(f'{seed}:junior-tours:{year}')
+    am_series = {c: k for k, t in TOUR_BY_KEY.items() if t.tier == 6 for c, _ in t.countries}
+    for g in golfers:
+        g.tour = _college_or_series(g, profiles[g.country], rng, am_series)
+    return golfers
+
+
+def _college_or_series(g, prof, rng, am_series):
+    region = COUNTRIES[g.country].region
+    if g.overall >= 30:
+        if g.country == 'USA' or rng.random() < prof.pathway / 100 * 0.45:
+            return 'CO_US_D1' if g.overall >= 44 else 'CO_US_SMALL'
+        if rng.random() < 0.6:
+            return 'CO_INTL'
+    return am_series.get(g.country, AMATEUR_BY_REGION[region])
 
 
 def _status(age, cur, prof, u, rng):
@@ -281,13 +346,7 @@ def _assign_memberships(world, rng):
             age = g.age(world.year)
             prof = world.nations[g.country]
             if age <= 22 and g.overall >= 30:
-                us = g.country == 'USA' or rng.random() < prof.pathway / 100 * 0.45
-                if us:
-                    g.tour = 'CO_US_D1' if g.overall >= 44 else 'CO_US_SMALL'
-                elif g.overall >= 30 and rng.random() < 0.6:
-                    g.tour = 'CO_INTL'
-                else:
-                    g.tour = am_series.get(g.country, AMATEUR_BY_REGION[region(g)])
+                g.tour = _college_or_series(g, prof, rng, am_series)
             else:
                 g.tour = am_series.get(g.country, AMATEUR_BY_REGION[region(g)])
 

@@ -50,6 +50,19 @@ def home_lower(g):
     return REGIONAL_BY_COUNTRY.get(g.country) or home_mini(g)
 
 
+def tour_target(season, tour):
+    """How many members a Challenger or Regional tour carries: Challenger tours their full capacity,
+    Regional tours the size they started the world with."""
+    t = TOUR_BY_KEY[tour]
+    cap = round(t.field * MEMBERS_PER_FIELD)
+    if t.tier == 2:
+        return cap
+    sizes = season.__dict__.setdefault('tour_sizes', {})
+    if tour not in sizes:
+        sizes[tour] = min(cap, sum(1 for g in season.world.golfers if g.tour == tour))
+    return sizes[tour]
+
+
 def apply_cards(season, year):
     golfers = season.world.golfers
     gid = season.g
@@ -67,7 +80,7 @@ def apply_cards(season, year):
         m = money[(tour_key, year)]
         return sorted(members, key=lambda g: -m.get(g.id, 0.0))
 
-    pros = [g for g in golfers if g.status == 'pro']
+    pros = [g for g in golfers if g.status == 'pro' and g.lifestyle == 'full_time']   # part-timers stay local
     members = defaultdict(list)
     for g in pros:
         members[g.tour].append(g)
@@ -138,9 +151,7 @@ def apply_cards(season, year):
             if t.tier != tier:
                 continue
             order = [g for g in by_money(tour, members[tour]) if g.id not in new or new[g.id][0] >= tier]
-            target = round(t.field * MEMBERS_PER_FIELD)
-            if tier == 3:                        # regional tours hold their size rather than fill to capacity
-                target = min(target, len(members[tour]))
+            target = tour_target(season, tour)
             keep = max(round(len(order) * share), target - incoming(tour))
             for i, g in enumerate(order):
                 if i < keep:
@@ -151,6 +162,23 @@ def apply_cards(season, year):
         if t.tier == 4:
             for g in members[tour]:
                 assign(g, tour, 'mini tour')
+
+    # Tours below their size (players retired or gave up) call up the next best from the level below.
+    for tier in (2, 3):
+        for tour, t in TOUR_BY_KEY.items():
+            if t.tier != tier:
+                continue
+            short = tour_target(season, tour) - sum(1 for _, to, _ in new.values() if to == tour)
+            if short <= 0:
+                continue
+            def fits(g):
+                if tier == 2:
+                    return home_challenger(g) == tour
+                return REGIONAL_BY_COUNTRY.get(g.country) == tour or tour in REGIONAL_BY_REGION[COUNTRIES[g.country].region]
+            pool = [g for g in pros if new.get(g.id, (9,))[0] > tier and fits(g)]
+            pool.sort(key=lambda g: -money[(g.tour, year)].get(g.id, 0.0))
+            for g in pool[:short]:
+                assign(g, tour, f'called up to fill the {t.name}')
 
     # Premier members not placed above keep a lower card by default
     for g in pros:

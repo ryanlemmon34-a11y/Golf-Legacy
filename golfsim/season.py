@@ -29,6 +29,8 @@ from collections import Counter, defaultdict
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass, field
 
+from . import development as D
+from . import finance as FIN
 from . import prestige as PR
 from . import qualification as Q
 from .calendar import MAJOR_WEEKS, TOUR_BY_KEY, _in_window
@@ -160,13 +162,25 @@ class Season:
         self.holes_played = Counter()                        # year -> holes
         self.stats = defaultdict(Counter)
         self.pstats = defaultdict(lambda: defaultdict(Counter))  # year -> gid -> summed round stats
+        self.plans = {}                                      # gid -> {week: (action, training category)}
+        self.week_rounds = defaultdict(float)                # gid -> rounds played this week
+        self.week_activity = {}                              # gid -> 'play' / 'train' / 'rest' this week
+        self.ledgers = defaultdict(dict)                     # year -> gid -> finance.Ledger
+        self.history = defaultdict(list)                     # gid -> [(year, week, text)]: career log
+        self.career_counts = {}                              # year -> {decision: count}
+        self.juniors_added = {}                              # year -> number of new golfers
         self.year = self.first_year
+        from .cards import tour_target
+        for k, t in TOUR_BY_KEY.items():
+            if t.tier in (2, 3):
+                tour_target(self, k)                         # remember each tour's starting size
         self._seed_world()
 
     # ---- people and starting state --------------------------------------------------------------
     def refresh_people(self, year):
         for g in self.world.golfers:
-            self.ctx.people[g.id] = Q.Person(g.id, g.name, g.status, g.age(year), g.country, True)
+            self.ctx.people[g.id] = Q.Person(g.id, g.name, g.status, g.age(year), g.country,
+                                             g.lifestyle != 'retired')
 
     def abs_week(self, year, week):
         return (year - self.first_year) * 52 + week
@@ -299,7 +313,21 @@ class Season:
         return (cls, strength)
 
     # ---- the AI's choice of events --------------------------------------------------------------
+    def log(self, gid, year, week, text):
+        """Add a line to a golfer's career history."""
+        self.history[gid].append((year, week, text))
+
+    def ledger(self, year, gid):
+        led = self.ledgers[year].get(gid)
+        if led is None:
+            led = self.ledgers[year][gid] = FIN.Ledger()
+        return led
+
     def target_events(self, g):
+        if g.lifestyle == 'retired':
+            return 0
+        if g.lifestyle == 'part_time' and g.status in ('pro', 'amateur'):
+            return 4 if g.status == 'pro' else 6               # a job comes first
         if g.status == 'club_pro':
             return 4
         if g.tour.startswith('CO_'):
@@ -314,18 +342,27 @@ class Season:
         """The minimum event value worth playing for this golfer."""
         if g.status == 'club_pro':
             return 55.0
+        if g.lifestyle == 'part_time':
+            return 12.0
         home = self.home_level.get(g.tour, 20.0)
         return max(home - 20, 0.9 * self.player_prestige(g.id) + 3, 8.0)
 
-    def event_value(self, g, ed, week, rng, venue_country):
-        s = ed.series
-        v = self.event_prestige[s.series_id]
+    def base_value(self, g, ed, venue_country):
+        """An event's appeal before personal circumstances: prestige, home country, travel."""
+        v = self.event_prestige[ed.series.series_id]
         if venue_country == g.country:
             v += 6
         elif COUNTRIES[venue_country].region == region_of(g):
             v += 2
         else:
-            v -= 6 if s.tier >= 2 else 2
+            v -= 6 if ed.series.tier >= 2 else 2
+        if g.lifestyle == 'part_time':                       # they have a job: local events only
+            v += 8 if venue_country == g.country else -40
+        return v
+
+    def event_value(self, g, ed, week, rng, venue_country):
+        s = ed.series
+        v = self.base_value(g, ed, venue_country)
         weeks = self.played[ed.year][g.id]
         streak = 0
         w = week - 1
@@ -371,6 +408,8 @@ class Season:
                 for gid in ids:
                     busy[gid] |= ed.series.day_set
 
+        if self.development and (week - 1) % 4 == 0:
+            self.plan_block(year, week)
         special = [e for e in eds if self.is_special(e.series)]
         regular = [e for e in eds if not self.is_special(e.series)]
         for ed in sorted(special, key=lambda e: (e.series.tier, e.series.series_id)):
@@ -381,6 +420,7 @@ class Season:
         if regular:
             self.regular_entries(regular, year, week, rng, venues, busy, commit)
         self.play_week(year, week, [e for e in eds if e.event_id in fields], fields, venues)
+        self.develop_week(year, week)
         self.update_rankings(year, week)
         self.update_fame(year, week)
         self.snapshot_standings(year, week)
@@ -397,8 +437,10 @@ class Season:
         by_id = {ed.event_id: ed for ed in regular}
         prefs = {}
         for g in self.world.golfers:
-            if (not g.tour and g.status != 'club_pro') or g.id in self.injured:
+            if (not g.tour and g.status != 'club_pro') or g.id in self.injured or g.lifestyle == 'retired':
                 continue
+            if self.development and self.plans.get(g.id, {}).get(week, ('play',))[0] != 'play':
+                continue                                     # a training or rest week in their plan
             opts = []
             bar = self.bar(g)
             for ed in regular:
@@ -463,7 +505,7 @@ class Season:
 
     # ---- special fields --------------------------------------------------------------------------
     def available(self, gid, s, busy):
-        return not (busy[gid] & s.day_set) and gid not in self.injured
+        return not (busy[gid] & s.day_set) and gid not in self.injured and self.g[gid].lifestyle != 'retired'
 
     def ranked_amateurs(self, pred):
         ams = [g for g in self.world.golfers if g.status == 'amateur' and pred(g)]
@@ -475,12 +517,13 @@ class Season:
         free = lambda g: self.available(g.id, s, busy)
         if s.kind == 'major':
             f = Q.build_field(sid, year, self.ctx)
-            ids = [gid for gid in f.ids() if gid in self.g and gid not in self.injured]
+            ids = [gid for gid in f.ids() if gid in self.g and gid not in self.injured
+                   and self.g[gid].lifestyle != 'retired']
             target = s.field
             if len(ids) < (90 if sid == 'TOUR_MASTERS' else target):
                 # The world's first year has no qualifying history: fill from the world ranking.
                 fill = [gid for gid in self.ctx.ranking(year, week - 1) if gid not in ids and gid in self.g
-                        and gid not in self.injured]
+                        and gid not in self.injured and self.g[gid].lifestyle != 'retired']
                 ids += fill[:(90 if sid == 'TOUR_MASTERS' else target) - len(ids)]
             self.stage_log[(year, sid, 'field')] = f
             return [ids]
@@ -545,7 +588,7 @@ class Season:
 
     def _qs_pool(self, regions, exclude, year, free):
         pool = [g for g in self.world.golfers if g.status == 'pro' and free(g) and g.id not in exclude
-                and g.tour not in PREMIER_TOURS and region_of(g) in regions]
+                and g.tour not in PREMIER_TOURS and region_of(g) in regions and g.lifestyle == 'full_time']
         pool.sort(key=lambda g: self.wr_pos.get(g.id, 99999))
         return pool
 
@@ -619,11 +662,12 @@ class Season:
             tiers_ok = PREMIER_TOURS if major == 'USA_OPEN' else PREMIER_TOURS + tuple(
                 k for k, t in TOUR_BY_KEY.items() if t.tier == 2)
             direct = {g.id for g in self.world.golfers if g.id not in exempt and g.status != 'club_pro' and
-                      (self.wr_pos.get(g.id, 9999) <= limit or g.tour in tiers_ok)}
+                      g.lifestyle != 'retired' and (self.wr_pos.get(g.id, 9999) <= limit or g.tour in tiers_ok)}
             home = QS_AMERICAS if major == 'USA_OPEN' else QS_EUROPE
             pool = []
             for g in self.world.golfers:
-                if g.id in exempt or g.id in direct or g.status == 'club_pro' and major == 'BRITANNIA_OPEN':
+                if g.id in exempt or g.id in direct or g.status == 'club_pro' and major == 'BRITANNIA_OPEN' \
+                        or g.lifestyle == 'retired':
                     continue
                 good = g.status in ('pro', 'club_pro') or self.am_pos.get(g.id, 9999) <= 400
                 keen = 0.75 if region_of(g) in home else 0.08
@@ -742,6 +786,13 @@ class Season:
             for gid, n in rounds.items():
                 self._week_load[gid] += self.load(self.g[gid], n, region_of(self.g[gid]) != host_region, year)
                 self._week_event[gid] = ed.event_id
+                self.week_rounds[gid] += n
+            for gid, _, _ in finish:
+                self.ledger(year, gid).events += FIN.event_cost(self.g[gid], s, v.city)
+            if s.kind != 'qualifying' and finish and finish[0][1] == 1:
+                w = finish[0][0]
+                tp = '' if finish[0][2] is None else f' at {finish[0][2] - course.par * s.rounds:+d}'
+                self.log(w, year, week, f'Won the {s.name}{tp} ({self.lib.sites[v.course_id]["name"]})')
             if s.rounds and finish and finish[0][2] is not None and site == 0:
                 win_total = finish[0][2]
                 self.champions[sid].append((year, finish[0][0], win_total - course.par * s.rounds))
@@ -782,9 +833,9 @@ class Season:
         return (rounds * FATIGUE_PER_ROUND * (1.4 - 0.8 * stam) * (1.15 if travelled else 1.0)
                 * (1 + 0.02 * max(0, g.age(year) - 30)))
 
-    def injury_chance(self, g, rounds, year):
+    def injury_chance(self, g, rounds, year, f=None):
         """Chance of an injury from one event: tiredness, injury resistance, age and stamina."""
-        f = self.fatigue[g.id]
+        f = self.fatigue[g.id] if f is None else f
         return (INJURY_BASE * rounds / 4 * (1 + 6 * f * f) * (1.8 - 1.6 * g.attrs['injury_resistance'] / 100)
                 * (1 + 0.05 * max(0, g.age(year) - 30)) * (1 + 0.5 * (1 - g.attrs['stamina'] / 100)))
 
@@ -806,15 +857,24 @@ class Season:
                     kind = rng.choice(INJURIES)
                     self.injured[g.id] = (now + weeks + 1, kind, weeks)
                     self.injuries[year].append((week, g.id, kind, weeks, self._week_event.get(g.id)))
+                    text = f'Injured ({kind}), out for {weeks} week{"s" if weeks > 1 else ""}'
+                    if self.development:
+                        lost = D.serious_injury(g, weeks, rng)
+                        if lost:
+                            text += ' — lasting damage: ' + ', '.join(f'{k.replace("_", " ")} −{v}' for k, v in lost.items())
+                    self.log(g.id, year, week, text)
                     f = 0.0                                  # the time off rests them
                 else:
                     f = 1 - (1 - 0.9 * f) * (1 - min(0.9, load))
+            elif f and self.week_activity.get(g.id) == 'train':
+                f = 0.85 * f + 0.02 * (1.4 - 0.8 * g.attrs['stamina'] / 100)    # practice is lighter work
             elif f:
                 f *= 0.40 + 0.30 * (1 - g.attrs['recovery_rate'] / 100)
             self.fatigue[g.id] = f if f > 0.005 else 0.0
             g.fatigue = self.fatigue[g.id]
         self._week_load.clear()
         self._week_event.clear()
+        self.week_rounds.clear()
 
     def is_injured(self, gid):
         return gid in self.injured
@@ -835,6 +895,10 @@ class Season:
             each = sum(shares[i:j]) / (j - i) * s.purse
             for gid, _ in paid[i:j]:
                 self.earnings[year][gid] += each
+                led = self.ledger(year, gid)
+                led.prize += each
+                if s.tier <= 2:
+                    led.caddie += FIN.CADDIE_SHARE * each
                 keys = [s.tour] if s.tour in TOUR_BY_KEY else []
                 if s.kind == 'major':
                     keys = list(PREMIER_TOURS)
@@ -865,5 +929,162 @@ class Season:
                 self.ctx.standings[(t, year)] = []
         for gid in self.legacy:
             self.legacy[gid] *= PR.LEGACY_DECAY
+        self.settle_finances(year)
         from .cards import apply_cards
         apply_cards(self, year)
+        for gid, frm, to, why in self.card_log[year]:
+            self.log(gid, year, 53, f'{TOUR_BY_KEY[frm].name if frm in TOUR_BY_KEY else "—"} → {TOUR_BY_KEY[to].name} ({why})')
+        if self.development:
+            from . import careers
+            self.career_counts[year] = careers.decide(self, year)
+            rng = random.Random(_seed(self.seed, year, 'aging'))
+            for g in self.world.golfers:
+                if g.lifestyle != 'retired':
+                    D.age_year(g, g.age(year + 1), rng)
+            self.juniors_added[year + 1] = careers.add_juniors(self, year + 1)
+            for g in self.world.golfers:
+                self.fatigue[g.id] = g.fatigue = 0.0         # the off-season rests everyone
+
+    def settle_finances(self, year):
+        """Sponsors, salaries and living costs for the year; savings carry over."""
+        for g in self.world.golfers:
+            if g.lifestyle == 'retired' and g.id not in self.ledgers[year]:
+                continue
+            led = self.ledger(year, g.id)
+            if g.status == 'pro':
+                led.sponsors = PR.endorsements(self.player_prestige(g.id))
+            if g.lifestyle == 'part_time':
+                led.salary = FIN.SALARY['club_pro' if g.status == 'club_pro' else 'part_time']
+                led.living = FIN.LIVING_WORKING
+            elif g.status == 'pro' and g.lifestyle == 'full_time':
+                led.living = FIN.LIVING
+            g.cash += led.net
+
+    def season_results(self, year):
+        """Per golfer this season: wins, top-3 finishes, whether they moved up a level, money rank."""
+        out = defaultdict(dict)
+        for r in self.results.values():
+            if r.year != year or self.cal.by_id[r.series_id].kind == 'qualifying':
+                continue
+            for site in r.finish:
+                for gid, pos, _ in site:
+                    if pos == 1:
+                        out[gid]['wins'] = out[gid].get('wins', 0) + 1
+                    if pos is not None and pos <= 3:
+                        out[gid]['top3'] = out[gid].get('top3', 0) + 1
+        for gid, frm, to, _ in self.card_log[year]:
+            if frm in TOUR_BY_KEY and to in TOUR_BY_KEY and TOUR_BY_KEY[to].tier < TOUR_BY_KEY[frm].tier:
+                out[gid]['moved_up'] = True
+        by_tour = defaultdict(list)
+        for g in self.world.golfers:
+            if g.status == 'pro' and g.tour in TOUR_BY_KEY:
+                by_tour[g.tour].append(g.id)
+        for tour, ids in by_tour.items():
+            m = self.money[(tour, year)]
+            ids.sort(key=lambda gid: -m.get(gid, 0.0))
+            for i, gid in enumerate(ids):
+                out[gid]['money_rank_pct'] = (i + 1) / len(ids)
+        return out
+
+    # ---- development and the monthly plan ------------------------------------------------------
+    def plan_block(self, year, week0):
+        """Each golfer plans the next four weeks: which weeks to play, which to train, which to rest.
+
+        For every combination of weeks to play they weigh what the events are worth to their career
+        against what playing or training does for their game (raw golfers learn a lot from
+        tournaments), the cost of playing tired, and the risk of injury; a week not played is a
+        training week, or a full rest week when they are tired."""
+        weeks = [w for w in range(week0, week0 + 4) if w <= 52]
+        eds = [e for e in self.cal.editions(year) if e.week in weeks and not self.is_special(e.series)]
+        venues = self.lib.venues(year)
+        country = {e.event_id: CITY_BY_NAME[venues[e.event_id][0].city].country for e in eds}
+        by_week = {w: [e for e in eds if e.week == w] for w in weeks}
+        rng = random.Random(_seed(self.seed, year, week0, 'plan'))
+        cache = {}
+        now = self.abs_week(year, 0)
+        for g in self.world.golfers:
+            if g.lifestyle == 'retired':
+                continue
+            key = (g.tour, g.country, g.status, g.lifestyle, self.wr_pos.get(g.id, 9999) <= 500,
+                   self.am_pos.get(g.id, 9999) <= 25, self.am_pos.get(g.id, 9999) <= 300)
+            if key not in cache:
+                row = []
+                for w in weeks:
+                    best = None
+                    for e in by_week[w]:
+                        if self.eligible(g, e.series, w):
+                            v = self.base_value(g, e, country[e.event_id])
+                            best = v if best is None or v > best else best
+                    row.append(best)
+                cache[key] = row
+            base = cache[key]
+            age = g.age(year)
+            cat = D.choose_category(g, rng)
+            work = 0.3 if g.lifestyle == 'part_time' else 1.0
+            gamma = 60.0
+            dp = gamma * D.development_value(g, 'play', age)
+            dt = gamma * D.development_value(g, 'train', age, cat) * work
+            bar = self.bar(g)
+            target = self.target_events(g)
+            played0 = len(self.played[year][g.id])
+            inj_until = self.injured.get(g.id, (0,))[0]
+            stam = g.attrs['stamina'] / 100
+            load4 = 4 * FATIGUE_PER_ROUND * (1.4 - 0.8 * stam) * (1 + 0.02 * max(0, age - 30))
+            rest_rec = 0.40 + 0.30 * (1 - g.attrs['recovery_rate'] / 100)
+            top100 = self.wr_pos.get(g.id, 9999) <= 100
+            playable = [i for i, w in enumerate(weeks) if base[i] is not None and now + w >= inj_until]
+            best_val, best_mask = None, 0
+            for mask in range(1 << len(playable)):
+                f = self.fatigue[g.id]
+                val, n = 0.0, played0
+                for i, w in enumerate(weeks):
+                    if now + w < inj_until:
+                        f *= rest_rec
+                        continue
+                    j = playable.index(i) if i in playable else -1
+                    if j >= 0 and mask >> j & 1:
+                        pace = target * w / 52 - n
+                        v = base[i] + max(-25.0, min(6.0, 3.5 * pace)) - (6 if w + 1 in MAJOR_WEEKS and top100 else 0)
+                        eff = max(0.0, f - 0.2) * 1.25
+                        val += (v - bar) + dp - 12 * eff - 400 * self.injury_chance(g, 4, year, f)
+                        f = 1 - (1 - 0.9 * f) * (1 - load4)
+                        n += 1
+                    elif f > 0.25:
+                        f *= rest_rec
+                    else:
+                        val += dt
+                        f = 0.85 * f + 0.02
+                if best_val is None or val > best_val:
+                    best_val, best_mask = val, mask
+            plan = {}
+            f = self.fatigue[g.id]
+            for i, w in enumerate(weeks):
+                j = playable.index(i) if i in playable else -1
+                if j >= 0 and best_mask >> j & 1:
+                    plan[w] = ('play', cat)
+                    f = 1 - (1 - 0.9 * f) * (1 - load4)
+                elif f > 0.25 or now + w < inj_until:
+                    plan[w] = ('rest', cat)
+                    f *= rest_rec
+                else:
+                    plan[w] = ('train', cat)
+                    f = 0.85 * f + 0.02
+            self.plans[g.id] = plan
+
+    def develop_week(self, year, week):
+        """What each golfer did this week, and how it changed their game."""
+        for g in self.world.golfers:
+            if g.lifestyle == 'retired':
+                continue
+            rounds = self.week_rounds.get(g.id, 0.0)
+            action, cat = self.plans.get(g.id, {}).get(week, ('rest', None))
+            if rounds:
+                act = 'play'
+            elif g.id in self.injured:
+                act = 'rest'
+            else:
+                act = 'train' if action in ('play', 'train') and self.development else 'rest'
+            self.week_activity[g.id] = act
+            if self.development and g.ceilings:
+                scale = 0.3 if g.lifestyle == 'part_time' and act == 'train' else 1.0
+                D.develop_week(g, act, g.age(year), cat, rounds, scale=scale)

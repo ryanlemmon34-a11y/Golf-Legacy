@@ -43,6 +43,9 @@ class Golfer:
     peak_age: float = 0.0            # hidden: when their prime starts
     aging_rate: float = 1.0          # hidden: how fast they decline after their prime (1 = typical)
     fatigue: float = 0.0             # season fatigue, 0 (fresh) .. 1 (exhausted); set by the season engine
+    ceilings: dict = field(default_factory=dict)      # hidden: the most each attribute can reach
+    lifestyle: str = 'full_time'     # 'full_time' (chasing it / college), 'part_time' (has a job), 'retired'
+    cash: float = 0.0                # savings in dollars (can go negative: debt)
 
     def __post_init__(self):
         missing = set(ATTRIBUTE_KEYS) - set(self.attrs)
