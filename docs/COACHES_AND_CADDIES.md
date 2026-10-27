@@ -18,21 +18,27 @@ Tests: `tests/test_staff.py`.
 
 **One coach at a time.** Coaching quality for a week of training = teaching, +0.15 in their speciality,
 +0.15 for a young player if that is their gift (at most 1). Without a coach a golfer teaches themselves
-(0.3). The training multiplier is 0.7 + 0.6 × quality, so a strong specialist makes a week of training
-count for roughly a third more than teaching yourself. A coach also helps a golfer **read their own
+(0.3). The training multiplier is 1 + 0.5 × max(0, quality − 0.3): teaching yourself keeps the 1.0 the
+world's development rates were calibrated on, an ordinary coach adds about 10%, a strong specialist in
+their speciality (or a youth specialist with a teenager) about 30%; a weak coach is no worse than none.
+Because tournaments and maturation drive much of a young golfer's growth, a whole season's development
+differs by about 5-12% between no coach and a strong specialist (`reports/DEVELOPMENT_AUDIT.md`). (The
+first version used 0.7 + 0.6 × quality, which quietly slowed every uncoached golfer to 0.88; corrected.) A coach also helps a golfer **read their own
 game**: the golfer's misreading of where their room to improve lies narrows to the coach's teaching
 level, so they pick better things to work on.
 
 **Getting a coach** (every season, before it starts):
 
 1. **Scouting.** Each coach with room looks at up to 60 young players (23 and under) near them (their
-   country; well-known coaches their whole region). They estimate potential through the noise of their
-   own scouting skill and approach young, *raw* players they believe in (the better the coach, the
+   country; well-known coaches their whole region). They judge where a player is heading from what they
+   can watch — current level (seen with some error), the growth typical for the player's age, and how
+   much the player really improved over the last year — through the noise of their own scouting skill,
+   **never the player's hidden potential**; they approach young, *raw* players they believe in (the better the coach, the
    higher their bar). Players usually accept, and switch only to a clearly better-known coach. The coach
    works for free in return for **5% of future prize money**.
 2. **Hiring.** Golfers who want a coach (coachability, and almost every tour professional) hire the
-   best-looking coach they can afford: the fee must fit 10% of their spendable funds plus 8% of last
-   year's earned income. They see reputation, not teaching skill, and look for a speciality matching
+   best-looking coach they can afford: the fee must fit 10% of their **means** (spendable funds plus 80% of
+   last year's earned income — money they have, not winnings they hope for). They see reputation, not teaching skill, and look for a speciality matching
    what *they believe* is their weakest area. The best-known players choose first. Many college players
    and most amateurs therefore have no coach.
 3. **Leaving.** Golfers who can no longer afford the fee leave; a difficult season (falling ranking,
@@ -43,9 +49,10 @@ level, so they pick better things to work on.
 A caddie has the six skills the shot engine has always modelled: **strategy** and **yardage** (decision
 quality — course management), **mental support** (how much pressure costs and how long a bad hole
 lingers — composure), **green reading** (putting reads), **course knowledge**, and **communication**
-(how much of it reaches the player). A caddie builds **familiarity with every course they work**, round
-by round, exactly as players do; in the engine the player benefits from the caddie's familiarity on top
-of their own. Caddies gain a little skill with experience until about 50 and stop caddying smoothly
+(how much of it reaches the player). A caddie builds **familiarity with every course they work** — stroke-play rounds, match-play holes and
+playoff holes alike (in rounds' worth) — exactly as players do; in the engine the player benefits from the caddie's familiarity on top
+of their own. Caddies gain a little skill with experience — in proportion to the rounds they actually worked that
+season (none for an idle year), growing towards 95 and never pulling a higher skill down — until about 50 and stop caddying smoothly
 with age (around 60).
 
 Full-time professionals on the Premier and Challenger tours hire a caddie each season: the best-known
@@ -78,10 +85,27 @@ or coaching capacity running short), outside recruits are generated and labelled
 
 ## Money
 
-Coaching fees are paid weekly from the golfer's ledger (`coaching`), a scouting coach's share comes out
-of prize money, and a caddie's weekly fee is part of the cost of every trip — so planners and entry
-decisions see it before money is spent. Coaches and caddies record their earnings. Ledgers still
-reconcile exactly.
+One set of definitions serves hiring, the monthly plan, entries, weekly settlement and career runway:
+
+| Term | Definition |
+|---|---|
+| Committed (weekly) | Living costs net of salary, plus a contracted coach's fee / 52 |
+| Spendable | Funds (savings + backing + limited credit) − 4 weeks of committed costs: the money for travel |
+| Trip cost | Travel and fees + the caddie's weekly fee (a caddie is paid only in weeks the golfer plays) |
+| Prize kept | Expected prize × (1 − 8% caddie share − 5% scouting-coach share, where they apply); it informs decisions but is never spent before it is won |
+| Means | Spendable + 80% of last year's earned income: what a contracted coach must fit into |
+
+A caddie's commitment may also weigh expected winnings at half weight (a caddie is paid only for trips
+that are themselves affordable when booked); a coach's fee may not (it is owed every week).
+
+**When the money runs out mid-season:** a golfer who can no longer cover their committed costs stops
+paying their coach that month and carries on alone (logged); a scouting coach's share deal costs nothing
+up front and continues. A caddie whose player cannot afford a single trip for two months in a row leaves
+the bag.
+
+Every payment goes through one step that takes it out of the golfer's ledger (`coaching`,
+`coach_share`, `caddie`, `caddie_share`) and adds it to the person's receipts, so player payments
+equal staff receipts every season (checked in tests and in every long-world season).
 
 ## Not modelled yet
 

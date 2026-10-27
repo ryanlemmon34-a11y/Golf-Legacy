@@ -62,7 +62,8 @@ Owner requirements and planned work, in rough order. "Built" items link to where
 ## Known limitations from the realism audit
 
 - Career odds are hand-set logistic weights, checked for shape (smooth, monotone, counterfactual) but
-  not fitted to real career data; the cohort study (`reports/COHORT_STUDY.md`) shows what they produce.
+  not fitted to real career data; the long-world test (`tools/long_world.py`) shows what they produce. The
+earlier cohort report predated the debt-trap fix and coaches/caddies and was removed.
 - The world is a selected sample of competitive golfers; its rates are not population-wide rates.
 - No pre-history: the first season's rankings and standings are seeded from reputation, and the first
   Tour Masters uses inaugural invitations (route `INIT`).

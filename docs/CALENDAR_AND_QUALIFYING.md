@@ -66,7 +66,8 @@ champions; top 15 last year; **the top 20 from the Club Professional Championshi
 36-hole **sectional qualifying** (week 12, four sites, played shot by shot: each site's places in
 proportion to its entrants go to its best finishers); top 70 on
 the Premier Tour Americas points list; Premier Tour winners since last year; world top 100 invitations;
-filled from the points list.
+filled from the points list — and the rest of that list stays on, in order, as reserves for later
+withdrawals, so the field is back to 156 when anyone pulls out.
 
 **USA Open (U.S. Open):** 156 players, open to professionals and good amateurs. About half the field is
 exempt: champions (10 years), USA Amateur finalists, Mid-Amateur and Britannia Amateur champions, recent

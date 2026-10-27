@@ -11,9 +11,10 @@ Coaches
     Golfers get a coach in one of two ways:
       * they hire one they can afford (a yearly fee that grows with the coach's reputation) — so many
         college players and amateurs have none;
-      * a coach approaches them. Coaches scout young, raw players near them; they estimate potential
-        through the noise of their own scouting skill and approach those they believe in, coaching for
-        free in return for a share of future prize money.
+      * a coach approaches them. Coaches scout young, raw players near them; they judge where a player
+        is heading from what can be watched (current level, typical growth for their age, last year's
+        improvement) through the noise of their own scouting skill — not hidden potential — and approach
+        those they believe in, coaching for free in return for a share of future prize money.
 
 Caddies
     A caddie has the six caddie skills the shot engine uses (strategy and yardage help course management,

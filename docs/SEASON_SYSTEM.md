@@ -105,9 +105,10 @@ Every golfer carries a **season fatigue** level (0 fresh, 1 exhausted):
   ~60, a Challenger winner ~12), full value for 13 weeks then fading to zero over two years, divided by
   events played (40 to 52). The amateur ranking works the same way for amateurs.
 - **Prize money:** Premier Tour-style payout table (winner 18%), shared on ties; amateurs take no money
-  and the professionals behind them move up. The table is sized by the event's paid places (the cut, or
-  every starter without a cut); places no professional fills are not paid out and are recorded
-  (`Season.unpaid`), so a small paid list never inflates anyone's share.
+  and the professionals behind them move up. The table is sized by the event's intended paid places (the cut,
+  within the intended field size — even when fewer start; every starter in a no-cut event); places no
+  professional fills are not paid out and are recorded (`Season.unpaid`), so a small or undersized field
+  never inflates anyone's share.
 - **Points lists:** money lists per tour; majors count for all three Premier circuits; a combined
   Premier list decides cards. The majors' rules read these lists (e.g. "top 70 on the points list").
 

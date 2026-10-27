@@ -3,7 +3,8 @@
 Code: `golfsim/development.py`, `golfsim/finance.py`, `golfsim/careers.py`, and the planner and weekly
 development in `golfsim/season.py` (`Season(..., development=True)`).
 Tests: `python tools/history_test.py --years 20` → `reports/WORLD_HISTORY_REPORT.md` (one world's story);
-`python tools/cohort_study.py` → `reports/COHORT_STUDY.md` (career distributions across several worlds).
+`python tools/long_world.py` → a run directory with `REPORT.md` / `DEBUG.md` (whole worlds for decades,
+checked every season); `python tools/development_audit.py` → `reports/DEVELOPMENT_AUDIT.md`.
 
 The world now evolves: golfers improve toward their potential, age, get injured, earn and spend
 money, turn professional, give up the chase, sometimes come back, and retire; a new class of juniors
@@ -37,7 +38,8 @@ outcome always follows the true ceilings.
 **Aging (yearly):** strength, stamina and recovery fade from about 3 years after a golfer's prime
 (faster with a high aging rate), technique from about 8 years after; the **mental game keeps maturing
 with experience into the late forties** — which is how a journeyman can be a better competitor at 34
-than at 24. Long injuries (10+ weeks) can take some power, stamina and injury resistance away for good.
+than at 24. Long injuries (10+ weeks) can take some power, stamina and injury resistance away for good —
+the longer the injury, the likelier (about 15% at 10 weeks, 60% at 20, 85% at 30).
 
 The development rates are calibrated so a typical golfer follows the age curve the starting world was
 built on (improving fast to the mid-twenties, peaking around 27-33, declining from the mid-thirties).
@@ -88,16 +90,17 @@ completed season, snapshotted **before** tour cards change (see `docs/SEASON_SYS
 
 | Factor | What it is |
 |---|---|
-| **Runway** | Years their funds would last chasing golf on their tour: costs and living against what their own record says it earns, plus their sponsor contract. "Self-funding" if income covers costs. |
-| **Progress** | Promotion, a rising world ranking, wins and top-10s. Progress buys time **only in proportion to how well next season is funded** (runway up to a year): hope pays no bills. |
+| **Runway** | Years their funds would last chasing golf on their tour: trips (with a caddie's fees) and committed costs (living, a contracted coach) against the prize money their own record says they keep (net of staff shares) and their sponsor contract. "Self-funding" if income covers costs. |
+| **Progress** | Promotion, a rising world ranking, wins and top-10s. |
 | **Opportunity** | The card they hold for next season (a Premier card is worth more than a mini tour's). |
+| **Secured** | A significant event already secured for next season through a real route: a major title, a Premier Tour win, a world top-50 finish (Tour Masters invitation). |
 | **Health** | Weeks lost to injury and lasting damage from serious injuries. |
 | **Willingness** | Work ethic and appetite for the big stage. |
 | **Life stage** | A smooth pull towards an ordinary life that grows through the mid-twenties and keeps creeping up — a curve, not a cut-off. |
 
 | Decision | How it works |
 |---|---|
-| **Giving up the chase** (any tour) | The odds rise with money pressure (1 / (1 + runway)), life stage, poor health and a weak card, and fall with funded progress and willingness. The log records the runway and progress behind every decision. |
+| **Giving up the chase** (any tour) | Money pressure (1 / (1 + runway)) weighed against their **desire to continue** — progress, the card earned, a secured event, health, willingness and life stage. Desire is kept separate from funds: an improving golfer may willingly accept another losing season, but desire creates no money — what they can actually enter is still decided week by week by what they can afford, and their credit stays limited. Every decision is recorded with its reasons (probability, runway, progress, desire, what was secured). |
 | **After stopping** | Some become **coaches or caddies** (see `docs/COACHES_AND_CADDIES.md`; rarely anyone who made a fortune). The rest take a job and keep playing a few local events as part-time pros, regain amateur status (more likely for those who never earned much from golf), or (with a strong mental game, from their mid-twenties) become club professionals. |
 | **Comebacks** | A part-timer who wins or contends — often because their mental game has matured — may quit their job for another run. The odds come from those results, how much of a year on tour they could fund, age (smoothly) and willingness. No age limit and no savings threshold. |
 | **Turning pro** | College eligibility ends at 22 — a **rule**, so every graduate must choose; the choice weighs their amateur ranking (observed standing), wins, means and willingness. Other amateurs turn pro on the same evidence, less often the further they are from their early twenties. |
