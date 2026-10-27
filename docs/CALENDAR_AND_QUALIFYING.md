@@ -30,7 +30,7 @@ southern summer, the Middle East and Arizona in winter, Scotland in summer, the 
 | Premier (36 events: 8 flagship, 20 standard, 8 opportunity) | Premier Tour Americas, Europe, Asia-Pacific | PGA Tour, DP World Tour | 72 holes, cut |
 | Challenger | Americas, Europe, Asia, Latin America & Canada, Japan | Korn Ferry, Challenge Tour, Asian Tour, PGA Tour Americas, JGTO | 72 holes, cut |
 | Regional | Southern Africa, Australasia, Korea, India, China, Middle East & North Africa | Sunshine, Australasia, KPGA, PGTI, China Tour, MENA | 54-72 holes |
-| Mini | 15 circuits worldwide | Mini tours | 36-72 holes |
+| Mini | 16 circuits worldwide | Mini tours (incl. the Japan Challenge Circuit, the ABEMA Tour's place) | 36-72 holes |
 | College | US Division I, US Small College, International University | NCAA D1, D2/D3/NAIA, university golf | 36-54 holes; post-season to 72 |
 | Amateur | Elite championships, 50 national amateur championships, 6 regional amateur series | US Amateur, The Amateur, Asia-Pacific Amateur; state/county events | 18-72 holes; two use match play |
 | Qualifying | USA Open local/final, Britannia regional/final, Club Professional Championship, Q-Schools | The same stages in real life | 18-72 holes |

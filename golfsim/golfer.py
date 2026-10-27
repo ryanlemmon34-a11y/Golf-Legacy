@@ -29,6 +29,19 @@ class Golfer:
     personality: dict = field(default_factory=lambda: {k: 50.0 for k in PERSONALITY_KEYS})
     familiarity: dict = field(default_factory=dict)   # course id (or name) -> competitive rounds played
     archetype: str = ''
+    # Biography and career state (set for golfers in the generated world; defaults for test golfers)
+    id: int = 0
+    country: str = ''
+    born: int = 0                    # birth year
+    hometown: str = ''
+    status: str = 'pro'              # 'pro', 'amateur' (incl. college) or 'club_pro'
+    tour: str = ''                   # tour / college / amateur series membership key
+    turned_pro: int = 0
+    height_cm: int = 0
+    hand: str = 'R'
+    potential: float = 0.0           # hidden: the overall this golfer can reach at their peak
+    peak_age: float = 0.0            # hidden: when their prime starts
+    aging_rate: float = 1.0          # hidden: how fast they decline after their prime (1 = typical)
 
     def __post_init__(self):
         missing = set(ATTRIBUTE_KEYS) - set(self.attrs)
@@ -40,6 +53,9 @@ class Golfer:
     @property
     def overall(self):
         return overall_rating(self.attrs)
+
+    def age(self, year):
+        return year - self.born if self.born else 0
 
 
 @dataclass

@@ -1,6 +1,6 @@
 # Golf Legacy — World Calendar
 
-637 permanent event series; 2027 editions shown. Calendar checks: **all passed**.
+649 permanent event series; 2027 editions shown. Calendar checks: **all passed**.
 
 **The four majors own their weeks: no other competitive golf anywhere in the world in weeks 18, 24, 25 and 30.**
 
@@ -19,7 +19,7 @@
 | Premier | 36 | 0 / 0 / 0 / 36 | 5,108 | 500 | 10.2 |
 | Challenger | 90 | 0 / 0 / 0 / 90 | 13,224 | 900 | 14.7 |
 | Regional | 78 | 0 / 0 / 8 / 70 | 10,536 | 1400 | 7.5 |
-| Mini | 158 | 0 / 53 / 79 / 26 | 14,178 | 1200 | 11.8 |
+| Mini | 170 | 0 / 58 / 84 / 28 | 15,330 | 1200 | 12.8 |
 | College | 97 | 0 / 26 / 68 / 3 | 7,632 | 900 | 8.5 |
 | Amateur | 156 | 37 / 34 / 50 / 35 | 15,132 | 1100 | 13.8 |
 | Qualifying | 18 | 5 / 3 / 0 / 10 | 5,472 | — | — |
@@ -59,6 +59,7 @@
 | Australian State Pro Series | Mini | regional mini tour | 10 | 2–51 | 90 | 3×36, 5×54, 2×72 |
 | Southern Cone Pro Series | Mini | regional mini tour | 8 | 1–50 | 78 | 2×36, 4×54, 2×72 |
 | Mexico & Caribbean Pro Circuit | Mini | regional mini tour | 8 | 3–50 | 78 | 3×36, 3×54, 2×72 |
+| Japan Challenge Circuit | Mini | regional mini tour | 12 | 14–44 | 96 | 5×36, 5×54, 2×72 |
 | US College Division I | College | NCAA Division I | 61 | 6–46 | 84 | 12×36, 48×54, 1×72 |
 | US Small College Golf | College | NCAA D2/D3, NAIA | 25 | 7–45 | 72 | 8×36, 16×54, 1×72 |
 | International University Golf | College | University golf worldwide | 11 | 10–45 | 72 | 6×36, 4×54, 1×72 |
@@ -86,37 +87,37 @@
 | 11 |  | 1 | 2 | 4 | 2 | 4 | 4 |  | 17 | Premier Players Championship; Brazil Open |
 | 12 |  | 1 | 1 |  | 4 | 6 | 1 |  | 13 | India Open |
 | 13 |  | 2 | 1 | 2 | 5 | 4 | 2 |  | 16 |  |
-| 14 |  | 1 | 4 | 4 | 2 | 3 | 3 |  | 17 |  |
+| 14 |  | 1 | 4 | 4 | 3 | 3 | 3 |  | 18 |  |
 | 15 |  | 1 | 1 | 2 | 3 | 3 | 2 |  | 12 | Sweden Open |
-| 16 |  |  | 3 |  | 3 | 4 | 1 | 1 | 12 | Germany Open; Club Professional Championship |
+| 16 |  |  | 3 |  | 4 | 4 | 1 | 1 | 13 | Germany Open; Club Professional Championship |
 | 17 |  |  | 3 | 1 | 2 | 9 | 2 |  | 17 | Canada Open |
 | 18 | 1 |  |  |  |  |  |  |  | 1 | **Tour Masters** |
 | 19 |  | 1 | 2 | 2 | 4 |  | 2 | 1 | 12 | Indonesia Open; USA Open Local Qualifying (week 19) |
-| 20 |  | 1 | 4 |  | 3 | 6 |  | 1 | 15 | Austria Open; Small College National Championship; USA Open Local Qualifying (week 20) |
+| 20 |  | 1 | 4 |  | 4 | 6 |  | 1 | 16 | Austria Open; Small College National Championship; USA Open Local Qualifying (week 20) |
 | 21 |  |  | 3 | 1 | 4 | 1 | 3 | 1 | 13 | Chile Open; Thailand Open; College National Championship; USA Open Local Qualifying (week 21) |
-| 22 |  | 1 | 4 | 1 | 6 |  | 2 | 1 | 15 | Heartland Invitational; Taiwan Open; Wales Open; USA Open Final Qualifying (England & Japan) |
+| 22 |  | 1 | 4 | 1 | 7 |  | 2 | 1 | 16 | Heartland Invitational; Taiwan Open; Wales Open; USA Open Final Qualifying (England & Japan) |
 | 23 |  | 1 | 3 | 2 | 6 |  | 3 | 1 | 16 | Canada Open; Czechia Open; USA Open Final Qualifying |
 | 24 | 1 |  |  |  |  |  |  |  | 1 | **Premier Tour Championship** |
 | 25 | 1 |  |  |  |  |  |  |  | 1 | **USA Open** |
 | 26 |  | 2 | 2 | 1 | 7 |  | 8 | 1 | 21 | Britannia Open Regional Qualifying (week 26) |
-| 27 |  |  | 4 |  | 3 |  | 7 | 1 | 15 | Vietnam Open; Britannia Open Regional Qualifying (week 27) |
+| 27 |  |  | 4 |  | 4 |  | 7 | 1 | 16 | Vietnam Open; Britannia Open Regional Qualifying (week 27) |
 | 28 |  | 1 | 1 | 2 | 5 | 1 | 11 | 1 | 22 | Italy Open; Britannia Open Final Qualifying |
-| 29 |  | 1 | 4 |  | 5 |  | 7 |  | 17 | Scotland Open; Portugal Open |
+| 29 |  | 1 | 4 |  | 6 |  | 7 |  | 18 | Scotland Open; Portugal Open |
 | 30 | 1 |  |  |  |  |  |  |  | 1 | **Britannia Open** |
 | 31 |  | 2 | 2 | 1 | 5 |  | 10 |  | 20 | England Open |
 | 32 |  |  | 3 | 2 | 5 |  | 6 |  | 16 | Denmark Open |
-| 33 |  |  | 3 | 1 | 7 |  | 2 |  | 13 |  |
+| 33 |  |  | 3 | 1 | 8 |  | 2 |  | 14 |  |
 | 34 |  |  | 2 | 1 | 1 |  | 2 |  | 6 |  |
 | 35 |  |  |  | 1 | 8 |  | 3 |  | 12 |  |
-| 36 |  |  | 3 | 1 | 2 | 6 | 1 |  | 13 |  |
+| 36 |  |  | 3 | 1 | 3 | 6 | 1 |  | 14 |  |
 | 37 |  | 2 | 1 | 1 | 5 | 6 | 1 | 1 | 17 | Ireland Open |
-| 38 |  | 1 | 2 | 2 | 3 | 4 | 4 |  | 16 | European Championship |
+| 38 |  | 1 | 2 | 2 | 4 | 4 | 4 |  | 17 | European Championship |
 | 39 |  | 2 | 3 | 2 | 6 | 4 | 4 |  | 21 | France Open |
-| 40 |  | 1 | 3 | 1 | 2 | 3 | 4 | 1 | 15 | Spain Open |
+| 40 |  | 1 | 3 | 1 | 3 | 3 | 4 | 1 | 16 | Spain Open |
 | 41 |  | 2 | 2 | 3 | 1 | 4 | 2 |  | 14 |  |
-| 42 |  |  | 1 | 3 | 6 | 5 | 2 | 1 | 18 | Japan Open |
+| 42 |  |  | 1 | 3 | 7 | 5 | 2 | 1 | 19 | Japan Open |
 | 43 |  |  | 4 | 3 | 2 | 2 | 5 |  | 16 |  |
-| 44 |  | 1 | 1 | 2 | 2 | 2 | 2 | 1 | 11 |  |
+| 44 |  | 1 | 1 | 2 | 3 | 2 | 2 | 1 | 12 |  |
 | 45 |  | 1 | 2 | 1 | 2 | 4 | 2 |  | 12 | Premier Tour Finals |
 | 46 |  |  | 1 | 1 | 3 | 2 | 1 | 1 | 9 |  |
 | 47 |  | 1 |  | 2 |  |  | 1 |  | 4 | Desert Tour Championship |
@@ -133,7 +134,7 @@ Every event series has a host country and a pool of real host cities (rotating e
 | Country | Region | Event series | Host cities | Min. courses needed* |
 |---|---|---|---|---|
 | USA | North America | 212 | 70 | 105 |
-| Japan | Asia | 35 | 18 | 21 |
+| Japan | Asia | 47 | 18 | 24 |
 | Australia | Oceania | 32 | 9 | 14 |
 | Spain | Europe | 26 | 15 | 21 |
 | South Africa | Africa | 23 | 11 | 12 |
@@ -190,23 +191,23 @@ Every event series has a host country and a pool of real host cities (rotating e
 | Namibia | Africa | 1 | 1 | 1 |
 | Bahrain | Middle East | 1 | 1 | 1 |
 
-\*Minimum = the most events any city hosts in the same week (over 10 seasons of rotation), summed over cities: **380 courses** just to stage the calendar. A living world needs several times that — home clubs, practice venues and variety — which is the target for the course library.
+\*Minimum = the most events any city hosts in the same week (over 10 seasons of rotation), summed over cities: **383 courses** just to stage the calendar. A living world needs several times that — home clubs, practice venues and variety — which is the target for the course library.
 
 ## Every-shot workload per season
 
 | Level | Competitive holes per season | Est. time, one core | Est. time, 4 cores |
 |---|---|---|---|
-| Major | 29,988 | 1 s | 0 s |
-| Premier | 274,284 | 9 s | 2 s |
-| Challenger | 707,724 | 23 s | 6 s |
-| Regional | 568,980 | 18 s | 5 s |
-| Mini | 622,892 | 26 s | 6 s |
-| College | 377,946 | 16 s | 4 s |
-| Amateur | 621,150 | 26 s | 6 s |
-| Qualifying | 252,036 | 10 s | 3 s |
-| **All** | **3,455,000** | **2.1 min** | **0.5 min** |
+| Major | 29,988 | 2 s | 0 s |
+| Premier | 274,284 | 16 s | 4 s |
+| Challenger | 707,724 | 42 s | 10 s |
+| Regional | 568,980 | 33 s | 8 s |
+| Mini | 672,581 | 42 s | 10 s |
+| College | 377,946 | 24 s | 6 s |
+| Amateur | 621,150 | 39 s | 10 s |
+| Qualifying | 252,036 | 16 s | 4 s |
+| **All** | **3,504,689** | **3.5 min** | **0.9 min** |
 
-Measured engine speed on this machine: 32 µs per hole for a tour pro, 41 µs for a weaker amateur (more shots per hole). The 4-core column assumes the week's independent events run in parallel (planned). Golf only — season logic, rankings and saving history add to this.
+Measured engine speed on this machine: 59 µs per hole for a tour pro, 62 µs for a weaker amateur (more shots per hole). The 4-core column assumes the week's independent events run in parallel (planned). Golf only — season logic, rankings and saving history add to this.
 
 ## How players get into the majors
 

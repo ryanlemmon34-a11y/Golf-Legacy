@@ -40,7 +40,7 @@ Challenger event ever plays a shortened layout.
 
 Ten seasons of the calendar are replayed. Every edition — and every site of a multi-site qualifier —
 needs a free course of the right standard in its host city that week (no course hosts two events in a
-week). Where none exists, one is built there; the result (about 370) is the minimum the calendar needs.
+week). Where none exists, one is built there; the result (about 360) is the minimum the calendar needs.
 The rest of the 380 are added as extra clubs where golf is busiest. Major venues are fixed: Georgia
 National for the Tour Masters every year, an elite course in every city of the other three majors' rotas
 (Britannia Open venues are always links).

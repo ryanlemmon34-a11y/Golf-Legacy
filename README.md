@@ -12,10 +12,11 @@ majors, and a full season must still run quickly. See `docs/ENGINE_DESIGN.md`, s
 
 | Path | What it is |
 |---|---|
-| `golfsim/` | The engine: ratings, golfers, courses, shot-by-shot hole simulation, stats, tournaments (stroke and match play), world calendar, geography, major qualification, course library, course records |
+| `golfsim/` | The engine: ratings, golfers, courses, shot-by-shot hole simulation, stats, tournaments (stroke and match play), world calendar, geography, major qualification, course library, course records, nations and the world population |
 | `tools/balance_test.py` | Runs the balance study and writes `reports/BALANCE_REPORT.md` |
 | `tools/calibrate.py` | Quick rating-ladder check against target scores |
 | `tools/calendar_report.py` | Writes the full world calendar to `reports/CALENDAR_REPORT.md` |
+| `tools/world_report.py` | Generates the starting world of golfers and writes `reports/WORLD_POPULATION_REPORT.md` |
 | `tools/build_course_library.py` | Rates every course layout and writes `data/` and `reports/COURSE_LIBRARY_REPORT.md` |
 | `tools/qualifying_demo.py` | Plays two seasons at the top of the calendar and builds the major fields by the qualifying rules |
 | `tools/major_test.py`, `tools/high_school_test.py` | Realism tests at Georgia National and Cedar Creek |
@@ -23,8 +24,9 @@ majors, and a full season must still run quickly. See `docs/ENGINE_DESIGN.md`, s
 | `docs/ENGINE_DESIGN.md` | Plain-language explanation of how the engine works |
 | `docs/CALENDAR_AND_QUALIFYING.md` | The world calendar and how players get into the majors |
 | `docs/COURSE_LIBRARY.md` | The 380 courses, their layouts, venues and records |
+| `docs/WORLD_POPULATION.md` | Nations and how the world's golfers are generated |
 | `data/` | Generated course library (`course_library.json`) and layout ratings |
-| `reports/` | Latest reports (balance, majors, high school, calendar, qualifying, course library) |
+| `reports/` | Latest reports (balance, majors, high school, calendar, qualifying, course library, world population) |
 | `legacy/` | The original v0.13 package, untouched |
 
 ## Running it (Windows)

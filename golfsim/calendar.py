@@ -200,6 +200,7 @@ TOURS = (
            _window((1, 16), (40, 52)), 8, 78, 1),
           ('MN_MEXICO_CARIBBEAN', 'Mexico & Caribbean Pro Circuit', (('Mexico', 2), ('Colombia', .6)),
            _window((1, 52)), 8, 78, 1),
+          ('MN_JAPAN', 'Japan Challenge Circuit', (('Japan', 1),), _window((14, 46)), 12, 96, 1),
       )],
     # Tier 5 -- College (regular seasons; post-season events are anchors)
     Tour('CO_US_D1', 'US College Division I', 5, 'college', (('USA', 1),), _window((36, 46), (6, 16)), 48,
