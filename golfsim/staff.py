@@ -517,11 +517,35 @@ def end_of_season(season, year, snap):
     for country, n in sorted(demand.items()):
         for _ in range(max(0, round(1.1 * n) - supply.get(country, 0))):
             st.generated_caddie(rng, country, year + 1, 'a club caddie (outside recruit)')
+    release_departed(season, year)
     capacity = sum(c.capacity for c in st.coaches.values() if c.status == 'active')
     if capacity < 1.2 * len(st.coach_of):
         pool = {c: p.pool for c, p in season.world.nations.items()}
         for country in rng.choices(sorted(pool), [pool[c] for c in sorted(pool)], k=10):
             st.generated_coach(rng, country, year + 1, 'a teaching professional (outside recruit)')
+
+
+def release_departed(season, year):
+    """Golfers who retired from competition (or joined the staff) leave their coach and caddie, and
+    coaches and caddies who retired leave their players — at once, not at the next hiring market."""
+    st = season.staff
+    for gid, cid in list(st.coach_of.items()):
+        g, c = season.g[gid], st.coaches[cid]
+        if g.lifestyle == 'retired' or c.status != 'active':
+            del st.coach_of[gid]
+            st.deal.pop(gid, None)
+            if g.lifestyle == 'retired':
+                c.history.append((year, f'Stopped coaching {g.name} (retired from competition)'))
+            else:
+                season.log(gid, year, 53, f'Coach {c.name} retired')
+    for gid, kid in list(st.caddie_of.items()):
+        g, k = season.g[gid], st.caddies[kid]
+        if g.lifestyle == 'retired' or k.status != 'active':
+            del st.caddie_of[gid]
+            if g.lifestyle == 'retired':
+                k.history.append((year, f'Left the bag of {g.name} (retired from competition)'))
+            else:
+                season.log(gid, year, 53, f'Caddie {k.name} retired')
 
 
 def former_golfer_role(season, g, year, rng, level):

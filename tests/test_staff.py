@@ -193,10 +193,19 @@ class LifecycleTests(unittest.TestCase):
 
     def test_staff_invariants_across_rollovers(self):
         s = fresh(30)
+        def check(st):
+            load = Counter(st.coach_of.values())
+            self.assertTrue(all(n <= st.coaches[cid].capacity for cid, n in load.items()))
+            self.assertEqual(len(set(st.caddie_of.values())), len(st.caddie_of))
+            self.assertTrue(all(st.coaches[cid].status == 'active' for cid in st.coach_of.values()))
+            self.assertTrue(all(st.caddies[kid].status == 'active' for kid in st.caddie_of.values()))
+            self.assertTrue(all(s.g[gid].lifestyle != 'retired' for gid in list(st.coach_of) + list(st.caddie_of)))
+            self.assertEqual(set(st.deal), set(st.coach_of))
         for year in (2027, 2028, 2029):
             s.refresh_people(year)
             s.start_finances(year)
             st = s.staff
+            check(st)
             load = Counter(st.coach_of.values())
             self.assertTrue(all(n <= st.coaches[cid].capacity for cid, n in load.items()))
             self.assertEqual(len(set(st.caddie_of.values())), len(st.caddie_of))      # one golfer per caddie
@@ -205,6 +214,7 @@ class LifecycleTests(unittest.TestCase):
             self.assertTrue(all(s.g[gid].lifestyle != 'retired' for gid in list(st.coach_of) + list(st.caddie_of)))
             self.assertEqual(set(st.deal), set(st.coach_of))
             s.end_of_season(year)
+            check(st)                                                        # and between seasons too
         former = [p for p in list(st.coaches.values()) + list(st.caddies.values()) if p.former_golfer]
         self.assertTrue(former)
         for p in former:                                                     # identity and history kept
