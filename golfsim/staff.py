@@ -168,6 +168,7 @@ class Staff:
         self.deal = {}                 # golfer id -> 'fee' or 'share'
         self.caddie_of = {}            # golfer id -> caddie id
         self.taken = set()             # names in use
+        self.unserved = {}             # year -> country -> golfers who could pay but found no coach with room
         self._next = 1
 
     def _id(self):
@@ -395,6 +396,8 @@ def start_of_season(season, year):
                     leave_coach(g, f'joined {c.name}')
                 take_coach(g, c, 'share', 'saw their potential')
     # 2. golfers looking for a coach they can pay
+    st.unserved[year] = {}
+
     def priority(g):
         return (-season.player_prestige(g.id), g.id)
     for g in sorted((g for g in active if g.id not in st.coach_of and g.status in ('pro', 'amateur')), key=priority):
@@ -411,8 +414,12 @@ def start_of_season(season, year):
         options = by_region.get(region(g.country), []) + [c for c in coaches if c.reputation >= 70
                                                           and region(c.country) != region(g.country)]
         best = None
+        affordable = False
         for c in options:
-            if c.fee > budget or students.get(c.id, 0) >= c.capacity:
+            if c.fee > budget:
+                continue
+            affordable = True
+            if students.get(c.id, 0) >= c.capacity:
                 continue
             v = c.reputation + (12 if c.speciality == weak else 0) + (10 if c.youth and g.age(year) <= YOUTH_AGE else 0) \
                 + (5 if c.country == g.country else 0) + rng.gauss(0, 4)
@@ -420,6 +427,8 @@ def start_of_season(season, year):
                 best = (v, c)
         if best:
             take_coach(g, best[1], 'fee', f'${best[1].fee:,.0f} a year')
+        elif affordable:                              # could pay, but every coach they could afford was full
+            st.unserved[year][g.country] = st.unserved[year].get(g.country, 0) + 1
     # 3. caddies
     cads = [k for k in st.caddies.values() if k.status == 'active']
     employed = {kid for kid in st.caddie_of.values()}
@@ -492,7 +501,15 @@ def end_of_season(season, year, snap):
             k.history.append((year, f'Let go by {season.g[gid].name} after a difficult season'))
             season.log(gid, year, 53, f'Let caddie {k.name} go after a difficult season')
     for gid in list(st.coach_of):
-        if progress_signal(snap.get(gid, {})) < -0.3 and rng.random() < 0.2:
+        row = snap.get(gid, {})
+        if st.deal.get(gid) == 'share' and season.g[gid].age(year) > SCOUT_AGE + 2 and not row.get('prize') \
+                and progress_signal(row) <= 0 and rng.random() < 0.4:
+            c = st.coaches[st.coach_of.pop(gid)]               # the coach stops believing
+            st.deal.pop(gid, None)
+            c.history.append((year, f'Stopped coaching {season.g[gid].name} (the promise had not come through)'))
+            season.log(gid, year, 53, f'Coach {c.name} moved on: the promise they saw had not come through')
+            continue
+        if progress_signal(row) < -0.3 and rng.random() < 0.2:
             c = st.coaches[st.coach_of.pop(gid)]
             st.deal.pop(gid, None)
             c.history.append((year, f'Let go by {season.g[gid].name} after a difficult season'))
@@ -518,10 +535,10 @@ def end_of_season(season, year, snap):
         for _ in range(max(0, round(1.1 * n) - supply.get(country, 0))):
             st.generated_caddie(rng, country, year + 1, 'a club caddie (outside recruit)')
     release_departed(season, year)
-    capacity = sum(c.capacity for c in st.coaches.values() if c.status == 'active')
-    if capacity < 1.2 * len(st.coach_of):
-        pool = {c: p.pool for c, p in season.world.nations.items()}
-        for country in rng.choices(sorted(pool), [pool[c] for c in sorted(pool)], k=10):
+    # new coaches come in where golfers wanted to pay for coaching and found every coach they could
+    # afford full (scouting demand alone does not create coaches)
+    for country, n in sorted(st.unserved.get(year, {}).items()):
+        for _ in range(round(n / 6)):
             st.generated_coach(rng, country, year + 1, 'a teaching professional (outside recruit)')
 
 

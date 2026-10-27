@@ -389,7 +389,9 @@ def staff_stories(d, limit=4):
     people = [('coach', c) for c in d['coaches'].values() if c['former_golfer']] + \
              [('caddie', k) for k in d['caddies'].values() if k['former_golfer']]
     people.sort(key=lambda x: (-x[1]['earnings'], x[1]['name']))
-    for role, p in people[:limit]:
+    coaches = [x for x in people if x[0] == 'coach'][:limit // 2]
+    people = coaches + [x for x in people if x[0] == 'caddie'][:limit - len(coaches)]
+    for role, p in people:
         gid = p['former_golfer']
         hist = d['golfers'][gid]['history']
         played = [t for _, t in hist if t.startswith(('Turned professional', 'Won the'))][:3]

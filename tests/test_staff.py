@@ -226,6 +226,37 @@ class LifecycleTests(unittest.TestCase):
         self.assertTrue(any(c.status == 'retired' for c in st.coaches.values()))
         self.assertTrue(s.juniors_added)
 
+    def test_outside_coaches_only_answer_paying_demand(self):
+        s = fresh(32)
+        s.start_finances(2027)
+        st = s.staff
+        st.unserved[2027] = {}
+        n0 = len(st.coaches)
+        ST.end_of_season(s, 2027, s.season_snapshot(2027))
+        self.assertEqual(sum(1 for c in st.coaches.values() if 'outside recruit' in c.background), 0)
+        st.unserved[2028] = {'USA': 12}
+        ST.end_of_season(s, 2028, s.season_snapshot(2028))
+        new = [c for c in st.coaches.values() if 'outside recruit' in c.background]
+        self.assertEqual(len(new), 2)
+        self.assertTrue(all(c.country == 'USA' for c in new))
+
+    def test_coaches_give_up_on_stalled_share_deals_but_not_young_ones(self):
+        s = fresh(33)
+        s.start_finances(2027)
+        st = s.staff
+        shares = [gid for gid, d in st.deal.items() if d == 'share'][:80]
+        old, young = shares[:40], shares[40:]
+        for gid in old:
+            s.g[gid].born = 2027 - 28
+        for gid in young:
+            s.g[gid].born = 2027 - 20
+        snap = s.season_snapshot(2027)
+        ST.end_of_season(s, 2027, snap)
+        dropped_old = sum(1 for gid in old if gid not in st.coach_of)
+        dropped_young = sum(1 for gid in young if gid not in st.coach_of and s.g[gid].lifestyle != 'retired')
+        self.assertGreater(dropped_old, 5)
+        self.assertLess(dropped_young, dropped_old / 2)
+
     def test_match_play_holes_teach_the_course(self):
         s = fresh(31)
         ed = next(e for e in s.cal.editions(2027) if e.series.series_id == 'USA_AMATEUR')
