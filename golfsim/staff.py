@@ -51,6 +51,8 @@ SELF_TEACHING = 0.3                               # coaching quality of a golfer
 YOUTH_AGE = 22
 SCOUT_AGE = 23                                    # coaches scout players this age and younger
 SCOUT_SHARE = 0.05                                # of prize money, for a coach who approached the player
+SHARE_BAR = 66.0                                  # the projected level a scouting coach must believe in
+INITIAL_COACHES = 480                             # sized so the first season's paying demand finds room
 CADDIE_TIERS = 2                                  # tour tiers whose members hire professional caddies
 SELF_CADDIE = 40.0                                # skills of carrying your own bag / a friend on the bag
 COACH_RETIRE_AGE, CADDIE_RETIRE_AGE = 68.0, 60.0
@@ -268,7 +270,7 @@ def initial_staff(world, seed):
     pool = {c: p.pool for c, p in world.nations.items()}
     total = sum(pool.values())
     for country, w in sorted(pool.items()):
-        for _ in range(max(1, round(320 * w / total))):
+        for _ in range(max(1, round(INITIAL_COACHES * w / total))):
             st.generated_coach(rng, country, year)
     bags = {}
     for g in world.golfers:
@@ -311,7 +313,7 @@ def wants_caddie(g):
     return g.status == 'pro' and g.lifestyle == 'full_time' and t is not None and t.tier <= CADDIE_TIERS
 
 
-def scouting_estimate(season, g, year, rng, sd):
+def scouting_estimate(season, g, year, rng, sd, coach_id=0):
     """A coach's judgement of where a young player is heading, from what can be watched: their
     current level (seen with some error), the growth typical for their age, and how much they really
     improved over the last year (a fast improver looks like more to come) — through the coach's own
@@ -323,7 +325,10 @@ def scouting_estimate(season, g, year, rng, sd):
     last = season.overall_start.get(year - 1, {}).get(g.id)
     recent = (g.overall - last) if last is not None else 0.0
     typical = age_deficit(age, 27.0) - age_deficit(age + 1, 27.0)     # a typical year's growth at this age
-    return seen + age_deficit(age, 27.0) + 1.5 * (recent - typical) + rng.gauss(0, sd)
+    # the coach's view of this player persists (a scout does not re-roll their opinion every winter);
+    # it moves only as the player's observed level and improvement move
+    view = random.Random(f'{season.seed}:view:{coach_id}:{g.id}').gauss(0, sd)
+    return seen + age_deficit(age, 27.0) + 1.5 * (recent - typical) + view + rng.gauss(0, 0.3 * sd)
 
 
 def start_of_season(season, year):
@@ -360,6 +365,10 @@ def start_of_season(season, year):
             elif st.deal.get(g.id) == 'fee' and st.coaches[st.coach_of[g.id]].fee > 1.5 * coach_budget(season, g, year):
                 leave_coach(g, 'could no longer afford the fee')
     coaches = [c for c in st.coaches.values() if c.status == 'active']
+    shares = {}
+    for gid, cid in st.coach_of.items():
+        if st.deal.get(gid) == 'share':
+            shares[cid] = shares.get(cid, 0) + 1
     by_region = {}
     for c in coaches:
         by_region.setdefault(region(c.country), []).append(c)
@@ -369,7 +378,9 @@ def start_of_season(season, year):
     for g in young:
         near.setdefault(g.country, []).append(g)
     for c in sorted(coaches, key=lambda c: (-c.reputation, c.id)):
-        free = c.capacity - students.get(c.id, 0)
+        # a coach still has to make a living from paying students: at most a third of their book is
+        # players coached for a share of future winnings
+        free = min(c.capacity - students.get(c.id, 0), c.capacity // 3 - shares.get(c.id, 0))
         if free <= 0:
             continue
         pool = list(near.get(c.country, ()))
@@ -380,10 +391,12 @@ def start_of_season(season, year):
         crng = random.Random(f'{season.seed}:scout:{year}:{c.id}')
         look = crng.sample(pool, min(60, len(pool)))
         sd = 3 + 12 * (1 - c.scouting / 100)
-        bar = 50 + 0.35 * c.reputation                # top coaches only approach the best prospects
+        # a share of prize money is only worth anything if the player can reach a level where professionals
+        # earn (about Challenger standard); better-known coaches hold out for better prospects
+        bar = max(SHARE_BAR, 50 + 0.35 * c.reputation)
         picks = []
         for g in sorted(look, key=lambda x: x.id):
-            est = scouting_estimate(season, g, year, crng, sd)   # what this coach believes they can become
+            est = scouting_estimate(season, g, year, crng, sd, c.id)   # what this coach believes they can become
             raw = est - g.overall
             if est >= bar and raw >= 6:
                 picks.append((est + 0.3 * raw, g.id, g))
@@ -395,6 +408,7 @@ def start_of_season(season, year):
                 if cur is not None:
                     leave_coach(g, f'joined {c.name}')
                 take_coach(g, c, 'share', 'saw their potential')
+                shares[c.id] = shares.get(c.id, 0) + 1
     # 2. golfers looking for a coach they can pay
     st.unserved[year] = {}
 

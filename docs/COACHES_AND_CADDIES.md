@@ -33,7 +33,10 @@ level, so they pick better things to work on.
    country; well-known coaches their whole region). They judge where a player is heading from what they
    can watch — current level (seen with some error), the growth typical for the player's age, and how
    much the player really improved over the last year — through the noise of their own scouting skill,
-   **never the player's hidden potential**; they approach young, *raw* players they believe in (the better the coach, the
+   **never the player's hidden potential**. A coach's opinion of a player persists (a fixed personal
+   misjudgement plus a small yearly wobble) rather than being re-rolled every winter. They approach young,
+   *raw* players they believe can reach about Challenger standard (where a share of prize money is worth
+   something), and no more than a third of a coach's book is unpaid share deals (the better the coach, the
    higher their bar). Players usually accept, and switch only to a clearly better-known coach. The coach
    works for free in return for **5% of future prize money**.
 2. **Hiring.** Golfers who want a coach (coachability, and almost every tour professional) hire the
@@ -78,10 +81,14 @@ link to their playing career.
 
 ## Initialization and outside recruits (explicit)
 
-The world has no recorded past, so the starting coaches (~325, by each nation's golf pool) and caddies
-(~1,450, by where tour players come from) are generated with a background ("a teaching professional",
-"a club caddie"). When demand outgrows the profession (more tour players wanting caddies than caddies,
-or coaching capacity running short), outside recruits are generated and labelled "(outside recruit)".
+The world has no recorded past, so the starting coaches (~480, by each nation's golf pool, sized so the
+first season's paying demand largely finds room) and caddies (~1,450, by where tour players come from)
+are generated with a background ("a teaching professional", "a club caddie"). Outside recruits are
+generated and labelled "(outside recruit)" only for real unmet demand: caddies where tour players
+outnumber caddies, and coaches where golfers who could pay found every coach they could afford full
+(one recruit per six such golfers). Scouting does not create coaches.
+
+A coach drops a share-deal student over 25 who has earned nothing and made no progress (40% a year).
 
 ## Money
 
