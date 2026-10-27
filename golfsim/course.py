@@ -64,6 +64,18 @@ class Course:
     city: str = ''
     description: str = ''
     tags: tuple = field(default_factory=tuple)
+    course_id: str = ''              # site id in the course library ('' for hand-built test courses)
+    layout: str = ''                 # 'Championship', 'Club', 'Forward' or 'Regular'
+
+    @property
+    def layout_id(self):
+        """Records are kept per layout: '<course_id>:<layout>'."""
+        return f'{self.course_id or self.name}:{self.layout or "Championship"}'
+
+    @property
+    def familiarity_key(self):
+        """Familiarity is with the ground, not the tees: shared by all layouts of a course."""
+        return self.course_id or self.name
 
     def __post_init__(self):
         if len(self.holes) != 18:
@@ -191,7 +203,7 @@ def tight_classic():
                               water=lambda h: h.green_water, exposure=-.3)
                   for h in base.holes)
     holes = tuple(replace(h, rough_width=min(h.rough_width, 8.0)) for h in holes)
-    return Course('Old Elm Club (tight)', 'USA', 'Woodland', holes, typical_wind=5.0,
+    return Course('Hollin Wood Club (tight)', 'USA', 'Woodland', holes, typical_wind=5.0,
                   description='Short but narrow: trees everywhere, tiny fast greens.', tags=('calibration', 'tight'))
 
 

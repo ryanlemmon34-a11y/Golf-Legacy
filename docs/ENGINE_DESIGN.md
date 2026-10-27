@@ -145,7 +145,7 @@ players on a wide course does not get to swing freely on a tight one without pay
 Calibration courses (`golfsim/course.py`):
 
 - **Ashford Ridge** — the hand-built mid-difficulty test course, par 72, 7,174 yards; each hole has a note.
-- **Meadowbrook** (easy), **Blackthorn National** (hard), **Old Elm** (tight, tree-lined, tiny greens),
+- **Meadowbrook** (easy), **Blackthorn National** (hard), **Hollin Wood** (tight, tree-lined, tiny greens),
   **Saltcliff Links** (open, firm, windy) — derived variants for course-fit testing.
 
 - **Georgia National** — hand-built, the hardest course in the world (fictional, Athens, Georgia), home
@@ -154,8 +154,9 @@ Calibration courses (`golfsim/course.py`):
   Calibrated against real Masters patterns by `tools/major_test.py` (winning score, field scoring
   average, cut line, playoffs, favourite and long-shot win rates, number of different champions).
 
-Each course gets a scratch score and a USGA-style slope by simulation, so generated courses can be sorted
-from very easy to brutal with evidence.
+Every layout in the course library is rated by simulation: the average score of a tour pro (75), an
+amateur event winner (40), an amateur (25) and a high schooler (10), so courses are sorted from very easy
+to brutal with evidence (`data/layout_ratings.json`).
 
 ## 5. Caddies and familiarity
 
@@ -187,24 +188,12 @@ current measured values.
 - Performance: ~35–50 microseconds per hole in pure Python (≈2–3 minutes of scoring for a 6,000-golfer
   season on one core; independent tournaments can run in parallel).
 
-## 8. Next: the world course library (planned)
+## 8. The world course library
 
-Hundreds, then thousands, of fictional courses, each in a real city where that style makes sense:
-links on the Scottish and Irish coasts, sandbelt in Melbourne, desert in Arizona and the Gulf, mountain
-courses in Colorado and the Alps, tropical resorts in Florida, Thailand and Hawaii, parkland and
-woodland across Europe, North America and Japan.
-
-- **City database:** real cities with country, region, climate and terrain tags, and a weight for how
-  much golf the country has (the USA, UK, Japan, Canada, Australia, etc. get the most courses).
-- **Style templates:** each style sets realistic ranges for length, width, rough, trees/water, bunkering,
-  green size/speed/slope/firmness and wind; course class (championship / member / resort / municipal)
-  sets length and set-up.
-- **Hole-by-hole generation** with a sensible par mix and routing variety, fictional local-language
-  names, opening year and a fictional architect (later: renovations as versioned layouts).
-- **Automatic rating:** every generated course is simulated with benchmark golfers to get its scratch
-  score and slope, so the world can be sorted from very easy to brutal with evidence.
-- **Hand-built legends:** the major venues (Georgia National plus rotating pools for the other three
-  majors) and a handful of famous national-open courses are designed by hand like Georgia National.
+Built: 380 fictional courses in real calendar cities, four classes (elite / championship / standard /
+municipal), 793 layouts, records per layout. See `docs/COURSE_LIBRARY.md` and
+`reports/COURSE_LIBRARY_REPORT.md`. Still planned: thousands more courses (home clubs, high-school
+venues), hand-designed hole names for every elite course, and renovations as new layouts.
 
 ## 9. Owner requirements recorded for the career/training phase (not built yet)
 

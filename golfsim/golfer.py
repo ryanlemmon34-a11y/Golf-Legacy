@@ -27,7 +27,7 @@ class Golfer:
     name: str
     attrs: dict
     personality: dict = field(default_factory=lambda: {k: 50.0 for k in PERSONALITY_KEYS})
-    familiarity: dict = field(default_factory=dict)   # course name -> competitive rounds played
+    familiarity: dict = field(default_factory=dict)   # course id (or name) -> competitive rounds played
     archetype: str = ''
 
     def __post_init__(self):
@@ -46,7 +46,7 @@ class Golfer:
 class Caddie:
     name: str
     skills: dict
-    familiarity: dict = field(default_factory=dict)   # course name -> rounds caddied there
+    familiarity: dict = field(default_factory=dict)   # course id (or name) -> rounds caddied there
 
     def __post_init__(self):
         missing = set(CADDIE_SKILLS) - set(self.skills)

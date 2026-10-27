@@ -148,8 +148,8 @@ class Player:
         self.c_yard = (cad.skills['yardage'] - 50) / 50 * comm
         self.c_strat = (cad.skills['strategy'] - 50) / 50 * comm
         self.c_mental = (cad.skills['mental_support'] - 50) / 50 * comm
-        fam = 1 - math.exp(-golfer.familiarity.get(course.name, 0) / 15.0)
-        cfam = 1 - math.exp(-cad.familiarity.get(course.name, 0) / 15.0)
+        fam = 1 - math.exp(-golfer.familiarity.get(course.familiarity_key, 0) / 15.0)
+        cfam = 1 - math.exp(-cad.familiarity.get(course.familiarity_key, 0) / 15.0)
         cfam *= R.norm(cad.skills['course_knowledge']) * comm
         self.fam = fam + (1 - fam) * 0.5 * cfam
 

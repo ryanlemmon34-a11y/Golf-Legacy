@@ -94,4 +94,4 @@ venues, week 28, four places each); reserves from the world ranking.
 - **World ranking and points lists:** the demo uses simple stand-ins.
 - **Populations:** college players, amateurs, club professionals and lower-tour pros as real careers.
 - **High-school golf** (later, owner decision).
-- **Course library:** fictional courses in the host cities above (at least 380 needed to stage the calendar).
+- ~~Course library~~ — built: 380 courses, venue for every edition; see `docs/COURSE_LIBRARY.md`.

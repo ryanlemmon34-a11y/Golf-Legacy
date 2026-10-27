@@ -17,10 +17,11 @@ def _pressure_fn(level_front, level_back):
 
 
 def play_event(field, course, rng, cut_top=65, prestige=1.0, cond_by_round=None, caddies=None,
-               rounds_n=4, cut_after=2):
+               rounds_n=4, cut_after=2, on_round=None):
     """field: list of Golfer. Returns ordered leaderboard [(golfer, total, rounds)].
 
     rounds_n: 1-4 rounds; cut_after: round after which the cut is made (None = no cut).
+    on_round(golfer, round_no, RoundStats) is called after every round (e.g. RecordBook.round_recorder).
     """
     caddies = caddies or {}
     forms = {id(g): WeekForm.draw(rng, g) for g in field}
@@ -50,6 +51,8 @@ def play_event(field, course, rng, cut_top=65, prestige=1.0, cond_by_round=None,
                 elif gap <= 6:
                     pf = _pressure_fn(0.2 * prestige, 0.4 * prestige)
             st = play_round(g, course, rng, cond, caddies.get(id(g)), rd, forms[id(g)], pf, pins)
+            if on_round:
+                on_round(g, rd, st)
             totals[id(g)] += st.score
             rounds[id(g)].append(st.score)
         if cut_after and rd == cut_after and rd < rounds_n:
@@ -105,7 +108,7 @@ def play_match(a, b, course, rng, holes=18, pressure=0.5, caddies=None):
     return (a, b, text) if up > 0 else (b, a, text)
 
 
-def play_stroke_and_match(field, course, rng, stroke_holes=36, bracket=64, final_holes=36):
+def play_stroke_and_match(field, course, rng, stroke_holes=36, bracket=64, final_holes=36, on_round=None):
     """Amateur-championship format: stroke-play qualifying, then a seeded knockout.
 
     Returns finishers [(golfer, position)]: 1 champion, 2 runner-up, 3 semi-finalists, 5 quarter-
@@ -116,7 +119,10 @@ def play_stroke_and_match(field, course, rng, stroke_holes=36, bracket=64, final
     for rd in range(1, stroke_holes // 18 + 1):
         pins = pin_sheet(course, Conditions(), rng)       # shared by the whole stroke-play field
         for g in field:
-            totals[id(g)] += play_round(g, course, rng, Conditions(), None, rd, forms[id(g)], None, pins).score
+            st = play_round(g, course, rng, Conditions(), None, rd, forms[id(g)], None, pins)
+            if on_round:
+                on_round(g, rd, st)
+            totals[id(g)] += st.score
     order = sorted(field, key=lambda g: (totals[id(g)], rng.random()))
     seeds, rest = order[:bracket], order[bracket:]
     # Standard seeding: 1 v 64, 32 v 33 ... arranged so the top seeds meet last.
