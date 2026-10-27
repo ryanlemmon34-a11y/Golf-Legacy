@@ -38,7 +38,9 @@ Every event has a prestige from 0 to 100, recomputed after each edition:
 | Prize money | 20% | Purse on a log scale ($10k = 0, $25M = 100) |
 | Course | 15% | Elite course 100; championship course's Championship tees 80; standard course 62 (Club tees 45, Forward 32); municipal 25 |
 
-New prestige = 60% of last year's + 40% of this year's measure, so reputations move slowly.
+Prestige is the weighted **rolling average of the last 4 editions** of every factor (owner: 3–5 years),
+so an event's reputation moves slowly: one great or poor field shifts it by only a quarter of the change.
+Before an event has history, its expected values fill the window.
 **Every event is on the same week every year** (only rotating host cities change), so an opportunity
 event is the same event every season and builds its own identity.
 
@@ -53,7 +55,9 @@ Each golfer scores every event they may enter that week:
     value = event prestige
           + 6 if it is in their home country (+2 home region, −6 overseas for lower tours)
           − fatigue after two or more weeks in a row, − 8 the week after playing a major
-          + catching up on (or easing off) their season plan (about 19–27 events, by stamina)
+          − their season fatigue (good course managers rest more wisely)
+          + catching up on (or easing off) their season plan (about 19–27 events by stamina;
+            Premier players about 15–23 and stars about 4 fewer)
           + 5 when defending their title, ± a little randomness
 
 They enter events worth more than their own **bar**: the larger of (their tour's typical event − 20) and
@@ -68,12 +72,26 @@ willing players who were just below their bar.
 
 Players earn **fame** from every finish: event prestige cubed (a major is worth 6× a Challenger event)
 times their finish (win 100%, 2nd 45%, 3rd 30%, top 5 20%, top 10 10%, top 25 3%, made cut 1%).
-Fame fades 20% a year. Wins add lasting **legacy** (major 40, flagship 10, other Premier 4) that barely
-fades. Player prestige (0–100) = a curve of fame + half the legacy: about 85 for a dominant world No.1,
+Fame counts over a **rolling 52 weeks** (owner: about a one-year window). Wins also add lasting
+**legacy** (major 40, flagship 10, other Premier 4) that fades only 3% a year. Player prestige (0–100) = a curve of fame + half the legacy: about 85 for a dominant world No.1,
 ~41 for an average Premier Tour player, ~20 on the Challenger tours, single digits below.
 
 **Sponsor income** is driven by player prestige: ~$20M+ a year for the biggest stars, ~$1–5M for top-30
 players, a few thousand for mini-tour players. (Reported now; a full finance model is on the backlog.)
+
+## Fatigue and injuries (owner requirement)
+
+Every golfer carries a **season fatigue** level (0 fresh, 1 exhausted):
+
+- Each event adds fatigue by rounds played, more for **low stamina**, travel to another region, and age
+  (over 30). A week off recovers it, faster with a high **recovery rate**.
+- Tiredness is mostly **physical**: shorter drives and a body that tires sooner in the round (wider
+  dispersion, more mishits). A tour-average player at fatigue 0.6 loses about 0.8 strokes a round.
+- **Injuries:** after every event there is a chance of injury that rises steeply with fatigue, and with
+  low **injury resistance**, age and low stamina. Injuries (back, wrist, shoulder, knee...) keep a player
+  out for a median of about 4 weeks, sometimes much longer (longer when older). Injured players cannot
+  enter any event, including majors.
+- Golfers see their own fatigue when choosing events, so tired players skip weeks.
 
 ## World ranking, money, points lists
 

@@ -5,8 +5,8 @@ Code: `golfsim/nations.py` (nation profiles), `golfsim/names.py` (names), `golfs
 
 ## What it makes
 
-The starting world for 2027: about **5,700 competitive golfers** from 56 countries, generated in about
-1.5 seconds, the same every time for the same seed. Every golfer has:
+The starting world for 2027: about **6,200 competitive golfers** from 56 countries, generated in about
+2 seconds, the same every time for the same seed. Every golfer has:
 
 - a name in their country's language (no copies of famous real golfers; every name unique),
   nationality, hometown, birth year, height and handedness;
@@ -18,15 +18,24 @@ The starting world for 2027: about **5,700 competitive golfers** from 56 countri
 - hidden development values for the development system: **potential** (the overall they can reach),
   **prime age** and **aging rate**.
 
-| Level | Golfers | Average overall |
+| Level | Golfers | Average overall (default world) |
 |---|---|---|
-| Premier Tour | 300 | ~79 |
-| Challenger tours | ~930 | ~68 |
-| Regional tours | ~450 | ~58 |
-| Mini tours | ~1,300 | ~54 |
-| College | ~960 | ~49 |
-| Amateurs | ~1,450 | ~38 |
-| Club professionals | ~300 | ~46 |
+| Premier Tour | 300 | ~74 |
+| Challenger tours | ~940 | ~66 |
+| Regional tours | ~520 | ~57 |
+| Mini tours | ~1,600 | ~54 |
+| College | ~880 | ~47 |
+| Amateurs | ~1,600 | ~37 |
+| Club professionals | ~330 | ~45 |
+
+## No ceiling: eras rise and fall (owner principle)
+
+The world is meant to evolve over centuries with ups and downs, so nothing caps the best players.
+Each golfer's talent is drawn naturally from their nation's pool (the only limit is the rating scale's
+99). The spread of talent is set so a *typical* world resembles today's game, but any one world — and,
+once development is built, any one era — can be weak or golden: across generated worlds the No.1 ranges
+from about 89 to 99 (median ~93), and the number of players rated 90+ from none to five. The default world
+(seed 2027) happens to start in a down era: its best player is 87.
 
 ## How nations work
 

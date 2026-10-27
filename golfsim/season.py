@@ -40,6 +40,10 @@ from .records import Mark, RecordBook
 from .tournament import play_event, play_stroke_and_match
 
 PREMIER_TOURS = ('PT_AMERICAS', 'PT_EUROPE', 'PT_ASIA_PACIFIC')
+FATIGUE_PER_ROUND = 0.03          # a four-round week adds ~0.12 for an average-stamina golfer
+INJURY_BASE = 0.0045              # chance of an injury per four-round event for a fresh, average golfer
+INJURIES = ('back', 'wrist', 'shoulder', 'elbow', 'knee', 'hip', 'neck', 'rib', 'hand', 'ankle', 'thumb',
+            'oblique')
 STAT_KEYS = ('drive_yards', 'drives', 'fairways', 'fairway_att', 'gir', 'putts', 'sg_ott', 'sg_app', 'sg_arg',
              'sg_putt')
 AMATEUR_CAP = {1: 4, 2: 8, 3: 8, 4: 8}          # most amateurs (sponsor invitations) in a pro event
@@ -136,8 +140,15 @@ class Season:
         self.champions = defaultdict(list)                   # series_id -> [(year, gid, to_par)]
         self.event_prestige = {}                             # series_id -> prestige now
         self.prestige_history = defaultdict(list)            # series_id -> [(year, prestige, field)]
-        self.fame = {}
+        self.fame = {}                                       # gid -> fame over the last 52 weeks
+        self.fame_log = defaultdict(list)                    # gid -> [(abs_week, fame points)]
         self.legacy = defaultdict(float)
+        self.event_factors = {}                              # series_id -> [(tour, field, purse, course)]
+        self.fatigue = defaultdict(float)                    # gid -> season fatigue, 0 (fresh) .. 1 (exhausted)
+        self.injured = {}                                    # gid -> (abs week fit again, injury, weeks)
+        self.injuries = defaultdict(list)                    # year -> [(week, gid, injury, weeks out, event_id)]
+        self._week_load = defaultdict(float)
+        self._week_event = {}
         self.wr = defaultdict(list)                          # gid -> [(abs_week, points)]
         self.am = defaultdict(list)
         self.wr_pos, self.am_pos = {}, {}
@@ -165,7 +176,9 @@ class Season:
         rng = random.Random(_seed(self.seed, 'seed-world'))
         for g in self.world.golfers:
             u = rng.random()
-            self.fame[g.id] = PR.seeded_fame(g.overall, u) if g.status == 'pro' else 0.2 * PR.seeded_fame(g.overall, u)
+            last_year = PR.seeded_fame(g.overall, u) * (1.0 if g.status == 'pro' else 0.2)
+            for k in range(6):
+                self.fame_log[g.id].append((-k * 9, last_year / 6))
             for k in range(16):
                 aw = -rng.randint(1, 100)
                 if g.status == 'pro':
@@ -180,8 +193,11 @@ class Season:
         prem = [g for g in self.world.golfers if g.tour in PREMIER_TOURS]
         prem.sort(key=lambda g: self.wr_pos.get(g.id, 10 ** 6))
         self.ctx.standings[('PREMIER', self.first_year - 1)] = [g.id for g in prem]
+        self.update_fame(self.first_year - 1, 52)
         for ed in self.cal.editions(self.first_year):
-            self.event_prestige[ed.series.series_id] = PR.initial_prestige(ed.series, self.course_quality(ed, 0))
+            f0 = PR.initial_factors(ed.series, self.course_quality(ed, 0))
+            self.event_factors[ed.series.series_id] = [f0] * PR.WINDOW   # no history yet: expected values
+            self.event_prestige[ed.series.series_id] = PR.prestige_from(self.event_factors[ed.series.series_id])
         tours = defaultdict(list)
         for s in self.cal.series:
             if s.category == 'regular' or s.tier == 1:
@@ -221,6 +237,12 @@ class Season:
         self.am_pos = {g: i + 1 for i, g in enumerate(am_ids)}
         self.ctx.world_rankings[(year, week)] = wr_ids[:2000]
         self.ctx.amateur_rankings[(year, week)] = am_ids[:1000]
+
+    def update_fame(self, year, week):
+        now = self.abs_week(year, week)
+        for gid, rows in self.fame_log.items():
+            rows[:] = [(aw, pts) for aw, pts in rows if now - aw < PR.FAME_WEEKS]
+            self.fame[gid] = sum(pts for _, pts in rows)
 
     def player_prestige(self, gid):
         return PR.player_prestige(self.fame.get(gid, 0.0), self.legacy[gid])
@@ -284,8 +306,9 @@ class Season:
             return 15
         if g.status == 'amateur':
             return 10
-        star = 3 if self.player_prestige(g.id) >= 75 else 0      # the best players play fewer, bigger events
-        return 19 + 8 * g.attrs['stamina'] / 100 - star
+        if g.tour in PREMIER_TOURS:                             # Premier players pick their spots
+            return 15 + 8 * g.attrs['stamina'] / 100 - (4 if self.player_prestige(g.id) >= 65 else 0)
+        return 19 + 8 * g.attrs['stamina'] / 100
 
     def bar(self, g):
         """The minimum event value worth playing for this golfer."""
@@ -313,9 +336,13 @@ class Season:
             v -= 5 * (streak - 1) ** 1.4
         # catching up or easing off against the season plan
         pace = self.target_events(g) * week / 52 - len(weeks)
-        v += max(-14.0, min(6.0, 2.5 * pace))
+        v += max(-25.0, min(6.0, 3.5 * pace))
+        if week + 1 in MAJOR_WEEKS and self.wr_pos.get(g.id, 9999) <= 100:
+            v -= 6                                           # resting before a major
         if week - 1 in MAJOR_WEEKS and week - 1 in weeks:
             v -= 8                                           # resting after a major
+        # tired golfers rest; good course managers plan their rest better
+        v -= (8 + 10 * g.attrs["management"] / 100) * 2 * max(0.0, self.fatigue[g.id] - 0.1)
         champs = self.champions.get(s.series_id)
         if champs and champs[-1][1] == g.id:
             v += 5                                           # defending champion
@@ -355,10 +382,9 @@ class Season:
             self.regular_entries(regular, year, week, rng, venues, busy, commit)
         self.play_week(year, week, [e for e in eds if e.event_id in fields], fields, venues)
         self.update_rankings(year, week)
+        self.update_fame(year, week)
         self.snapshot_standings(year, week)
-        decay = PR.FAME_DECAY ** (1 / 52)
-        for gid in self.fame:
-            self.fame[gid] *= decay
+        self.update_fatigue(year, week)
 
     def is_special(self, s):
         return (s.kind in ('major', 'qualifying') or s.category in ('elite_amateur', 'national_amateur',
@@ -371,7 +397,7 @@ class Season:
         by_id = {ed.event_id: ed for ed in regular}
         prefs = {}
         for g in self.world.golfers:
-            if not g.tour and g.status != 'club_pro':
+            if (not g.tour and g.status != 'club_pro') or g.id in self.injured:
                 continue
             opts = []
             bar = self.bar(g)
@@ -437,7 +463,7 @@ class Season:
 
     # ---- special fields --------------------------------------------------------------------------
     def available(self, gid, s, busy):
-        return not (busy[gid] & s.day_set)
+        return not (busy[gid] & s.day_set) and gid not in self.injured
 
     def ranked_amateurs(self, pred):
         ams = [g for g in self.world.golfers if g.status == 'amateur' and pred(g)]
@@ -449,17 +475,18 @@ class Season:
         free = lambda g: self.available(g.id, s, busy)
         if s.kind == 'major':
             f = Q.build_field(sid, year, self.ctx)
-            ids = [gid for gid in f.ids() if gid in self.g]
+            ids = [gid for gid in f.ids() if gid in self.g and gid not in self.injured]
             target = s.field
             if len(ids) < (90 if sid == 'TOUR_MASTERS' else target):
                 # The world's first year has no qualifying history: fill from the world ranking.
-                fill = [gid for gid in self.ctx.ranking(year, week - 1) if gid not in ids and gid in self.g]
+                fill = [gid for gid in self.ctx.ranking(year, week - 1) if gid not in ids and gid in self.g
+                        and gid not in self.injured]
                 ids += fill[:(90 if sid == 'TOUR_MASTERS' else target) - len(ids)]
             self.stage_log[(year, sid, 'field')] = f
             return [ids]
         if sid == 'PT_PREMIER_TOUR_FINALS':
             rows = self.ctx.standing('PREMIER', year, week - 1)
-            return [[gid for gid in rows if self.g[gid].status == 'pro'][:s.field]]
+            return [[gid for gid in rows if self.g[gid].status == 'pro' and gid not in self.injured][:s.field]]
         if s.category == 'elite_amateur':
             regions = ELITE_AMATEUR_REGIONS.get(sid)
             pred = (lambda g: free(g) and region_of(g) in regions) if regions else (lambda g: free(g))
@@ -708,6 +735,13 @@ class Season:
             for gid, idx, strokes, stage in o['holes']:
                 rec.add_hole(idx, strokes, pars[idx], self.g[gid].name, ed.event_id, year, stage)
                 self.holes_played[year] += 1
+            rounds = Counter(gid for gid, *_ in o['rounds'])
+            for gid, n in Counter(gid for gid, *_ in o['holes']).items():
+                rounds[gid] += n / 18
+            host_region = COUNTRIES[CITY_BY_NAME[v.city].country].region
+            for gid, n in rounds.items():
+                self._week_load[gid] += self.load(self.g[gid], n, region_of(self.g[gid]) != host_region, year)
+                self._week_event[gid] = ed.event_id
             if s.rounds and finish and finish[0][2] is not None and site == 0:
                 win_total = finish[0][2]
                 self.champions[sid].append((year, finish[0][0], win_total - course.par * s.rounds))
@@ -724,7 +758,7 @@ class Season:
                         self.am[gid].append((aw, PR.amateur_points(p, pos)))
                     if s.tier <= 4:
                         self.wr[gid].append((aw, PR.world_points(p, pos)))
-                    self.fame[gid] = self.fame.get(gid, 0.0) + PR.fame_points(p, pos)
+                    self.fame_log[gid].append((aw, PR.fame_points(p, pos)))
                     if pos == 1:
                         kind = 'major' if s.kind == 'major' else 'flagship' if s.category == 'flagship' else \
                             'premier' if s.tier == 1 else None
@@ -735,10 +769,55 @@ class Season:
         res.field_strength = PR.field_strength(ranks, amateur=amateur_event)
         quality = S.mean(PR.COURSE_QUALITY[(self.lib.sites[v.course_id]['cls'], v.layout)] for v in venue_list)
         if s.kind not in ('qualifying',):
-            self.event_prestige[sid] = PR.updated_prestige(p, s, res.field_strength, quality)
+            self.event_factors[sid].append(PR.factors(s, res.field_strength, quality))
+            self.event_prestige[sid] = PR.prestige_from(self.event_factors[sid])
         self.prestige_history[sid].append((year, p, res.field_strength))
         self.results[ed.event_id] = res
         self.stats[year]['events'] += 1
+
+    # ---- fatigue and injuries ------------------------------------------------------------------
+    def load(self, g, rounds, travelled, year):
+        """Fatigue from playing: rounds, travel and age, eased by stamina."""
+        stam = g.attrs['stamina'] / 100
+        return (rounds * FATIGUE_PER_ROUND * (1.4 - 0.8 * stam) * (1.15 if travelled else 1.0)
+                * (1 + 0.02 * max(0, g.age(year) - 30)))
+
+    def injury_chance(self, g, rounds, year):
+        """Chance of an injury from one event: tiredness, injury resistance, age and stamina."""
+        f = self.fatigue[g.id]
+        return (INJURY_BASE * rounds / 4 * (1 + 6 * f * f) * (1.8 - 1.6 * g.attrs['injury_resistance'] / 100)
+                * (1 + 0.05 * max(0, g.age(year) - 30)) * (1 + 0.5 * (1 - g.attrs['stamina'] / 100)))
+
+    def update_fatigue(self, year, week):
+        """After the week: players who played get more tired (and may get hurt); the rest recover."""
+        rng = random.Random(_seed(self.seed, year, week, 'injury'))
+        now = self.abs_week(year, week)
+        for gid in [gid for gid, (back, _, _) in self.injured.items() if back <= now]:
+            del self.injured[gid]
+        played = set(self._week_load)
+        for g in self.world.golfers:
+            f = self.fatigue[g.id]
+            if g.id in played:
+                load = self._week_load[g.id]
+                rounds = load / max(1e-9, self.load(g, 1, False, year))
+                if rng.random() < self.injury_chance(g, rounds, year):
+                    weeks = max(1, min(40, round(math.exp(rng.gauss(math.log(3), 0.9))
+                                                 * (1 + 0.03 * max(0, g.age(year) - 30)))))
+                    kind = rng.choice(INJURIES)
+                    self.injured[g.id] = (now + weeks + 1, kind, weeks)
+                    self.injuries[year].append((week, g.id, kind, weeks, self._week_event.get(g.id)))
+                    f = 0.0                                  # the time off rests them
+                else:
+                    f = 1 - (1 - 0.9 * f) * (1 - min(0.9, load))
+            elif f:
+                f *= 0.40 + 0.30 * (1 - g.attrs['recovery_rate'] / 100)
+            self.fatigue[g.id] = f if f > 0.005 else 0.0
+            g.fatigue = self.fatigue[g.id]
+        self._week_load.clear()
+        self._week_event.clear()
+
+    def is_injured(self, gid):
+        return gid in self.injured
 
     def pay_out(self, s, finish, year):
         if not s.purse:
@@ -784,5 +863,7 @@ class Season:
         for t in TOUR_BY_KEY:
             if (t, year) not in self.ctx.standings:
                 self.ctx.standings[(t, year)] = []
+        for gid in self.legacy:
+            self.legacy[gid] *= PR.LEGACY_DECAY
         from .cards import apply_cards
         apply_cards(self, year)

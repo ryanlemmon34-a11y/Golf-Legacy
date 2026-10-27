@@ -59,10 +59,18 @@ class PopulationTests(unittest.TestCase):
         self.assertGreater(mean['Challenger'], mean['Regional'] + 5)
         self.assertGreater(mean['Mini tour'], mean['College'])
         self.assertGreater(mean['College'], mean['Amateur'])
-        self.assertTrue(75 <= mean['Premier Tour'] <= 82)
+        self.assertTrue(71 <= mean['Premier Tour'] <= 80)
         pros = WORLD.ranked(WORLD.pros())
-        self.assertTrue(90 <= pros[0].overall <= 97)
-        self.assertTrue(73 <= pros[299].overall <= 78)
+        self.assertTrue(68 <= pros[299].overall <= 76)
+
+    def test_no_ceiling_eras_vary(self):
+        """Nothing caps the best players: some worlds have a weak era, some a golden one."""
+        tops = []
+        for seed in range(10):
+            pros = [r for r in candidates(2027, 500 + seed, nations()) if r[5] == 'pro']
+            tops.append(pros[0][4])
+        self.assertTrue(89 <= S.median(tops) <= 96, tops)
+        self.assertGreater(max(tops) - min(tops), 3, tops)
 
     def test_memberships(self):
         members = Counter(g.tour for g in WORLD.golfers)

@@ -159,6 +159,7 @@ def main():
             ids = {x for site in r.finish for x, _, _ in site}
             cat_rows[ser.category][r.year].append((r.prestige, r.field_strength, len(ids & top20)))
     out += ['', '## 4. Event prestige and where the stars play', '',
+            'Event prestige is a rolling average of the last 4 editions of each factor (tour, field, purse, course). '
             'Average per event: prestige going into the event, field strength (0–100, from the world ranking of the '
             'best 30 entrants) and how many of the world\'s 20 best players entered.', '',
             '| Season | ' + ' | '.join(f'{c.title()} prestige / field / top-20' for c in ('flagship', 'standard', 'national_open', 'opportunity')) + ' |',
@@ -180,9 +181,72 @@ def main():
         lvl[TIERS[ser.tier]].append(s.event_prestige[ser.series_id])
     out.append('\nAverage prestige by level now: ' + ', '.join(f'{k} {S.mean(v):.0f}' for k, v in lvl.items()) + '.')
 
+    # ---- 4b. schedules, fatigue and injuries --------------------------------------------------------
+    y = years[-1]
+    out += ['', f'## 5. Schedules, fatigue and injuries', '',
+            f'Events played in {y} by level (median / 90th percentile), and the world\'s 20 best players.', '',
+            '| Level | Golfers | Events (median) | Events (90th pct) |', '|---|---|---|---|']
+    for L in LEVELS:
+        xs = sorted(len(s.played[y][i]) for i, l in level_by_year[y].items() if l == L and s.played[y][i])
+        if xs:
+            out.append(f'| {L} | {len(xs)} | {S.median(xs):.0f} | {xs[int(len(xs) * .9)]} |')
+    best20 = sorted((x for x in world.golfers if x.status == 'pro'), key=lambda x: -x.overall)[:20]
+    ev = [len(s.played[y][x.id]) for x in best20]
+    out.append(f'\nThe 20 best players averaged **{S.mean(ev):.1f} events** in {y} (range {min(ev)}–{max(ev)}; '
+               'real-life top players play about 18–24 including majors). Stamina sets each golfer\'s plan '
+               '(Premier players about 15–23 events, stars about 4 fewer; lower tours 19–27), tiredness makes them skip weeks, and good course '
+               'managers rest more wisely.')
+    inj = [row for yy in years for row in s.injuries[yy]]
+    pros_n = sum(1 for x in world.golfers if x.status == 'pro')
+    out += ['', f'**Injuries:** {len(inj)} over {a.years} seasons ({len(inj) / a.years:.0f} a year; about '
+            f'{sum(1 for r in inj if g[r[1]].status == "pro") / a.years / pros_n:.0%} of professionals a year). Median time out '
+            f'{S.median(r[3] for r in inj):.0f} weeks; longest {max(r[3] for r in inj)} weeks.' if inj else 'No injuries.', '',
+            'Injury risk by group, per 1,000 events played by professionals (so golfers who play more are compared '
+            'fairly with those who play less):', '',
+            '| Group | Professionals | Events played | Injuries per 1,000 events |', '|---|---|---|---|']
+    def rate(pred):
+        grp = [x for x in world.golfers if x.status == 'pro' and pred(x)]
+        ids = {x.id for x in grp}
+        events = sum(len(s.played[yy][i]) for yy in years for i in ids)
+        n = sum(1 for _, gid, *_ in inj if gid in ids)
+        return len(grp), events, 1000 * n / max(1, events)
+    for label, pred in (('Age under 30', lambda x: x.age(y) < 30), ('Age 30-39', lambda x: 30 <= x.age(y) < 40),
+                        ('Age 40+', lambda x: x.age(y) >= 40),
+                        ('Injury resistance under 40', lambda x: x.attrs['injury_resistance'] < 40),
+                        ('Injury resistance 40-60', lambda x: 40 <= x.attrs['injury_resistance'] <= 60),
+                        ('Injury resistance over 60', lambda x: x.attrs['injury_resistance'] > 60),
+                        ('Stamina under 40', lambda x: x.attrs['stamina'] < 40),
+                        ('Stamina over 70', lambda x: x.attrs['stamina'] > 70)):
+        n, e, r = rate(pred)
+        out.append(f'| {label} | {n} | {e:,} | {r:.1f} |')
+    stars = [r for r in inj if r[1] in {x.id for x in best20}]
+    if stars:
+        out.append('\nInjuries to the world\'s 20 best: ' + '; '.join(
+            f'{g[gid].name} — {kind}, {wk} weeks ({yy_w})' for yy_w, gid, kind, wk, _ in stars[:8]) + '.')
+    from golfsim.course import ashford_ridge
+    from golfsim.engine import play_round
+    from golfsim.golfer import uniform_golfer
+    import random as _r
+    out += ['', '**What tiredness costs** (tour-average golfer, strokes per round at Ashford Ridge versus fresh):', '',
+            '| Stamina | Fatigue 0.3 | Fatigue 0.6 | Fatigue 0.9 |', '|---|---|---|---|']
+    for stam in (30, 60, 90):
+        base = None
+        cells = []
+        for f in (0.0, 0.3, 0.6, 0.9):
+            gg = uniform_golfer(75)
+            gg.attrs['stamina'] = stam
+            gg.fatigue = f
+            rr = _r.Random(1)
+            m = S.mean(play_round(gg, ashford_ridge(), rr).score for _ in range(2000))
+            if base is None:
+                base = m
+            else:
+                cells.append(f'+{m - base:.2f}')
+        out.append(f'| {stam} | ' + ' | '.join(cells) + ' |')
+
     # ---- 5. players: prestige, money, sponsors --------------------------------------------------
     y = years[-1]
-    out += ['', f'## 5. Player prestige, money and sponsors ({y})', '',
+    out += ['', f'## 6. Player prestige, money and sponsors ({y})', '',
             '| # | Player | Overall | World rank | Wins (all seasons) | Majors | Prize money (season) | Prestige | Sponsor income |',
             '|---|---|---|---|---|---|---|---|---|']
     wins_all = Counter(w for rows in wins_by_tier.values() for _, w in rows)
@@ -198,7 +262,7 @@ def main():
     out.append('\nAverage player prestige by level: ' + ', '.join(f'{k} {S.mean(v):.0f}' for k, v in by_level.items()) + '.')
 
     # ---- 6. attributes in the statistics --------------------------------------------------------
-    out += ['', '## 6. Do the attributes show up in the statistics?', '',
+    out += ['', '## 7. Do the attributes show up in the statistics?', '',
             f'Professionals with 30+ rounds in {y}. Correlation between an attribute and the season statistic it '
             'should drive (−1 to 1; strokes-gained per round and scoring relative to the field in the same round, so '
             'different courses are comparable).', '',
@@ -240,7 +304,7 @@ def main():
 
     # ---- 7. course records ---------------------------------------------------------------------
     recs = sorted((r for r in s.records.layouts.values() if r.course_record), key=lambda r: r.course_record.to_par)[:8]
-    out += ['', '## 7. Lowest rounds and course records', '', '| Round | Course (layout) | Golfer | Event |', '|---|---|---|---|']
+    out += ['', '## 8. Lowest rounds and course records', '', '| Round | Course (layout) | Golfer | Event |', '|---|---|---|---|']
     for r in recs:
         cid, lay = r.layout_id.split(':')
         m = r.course_record

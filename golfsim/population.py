@@ -35,18 +35,17 @@ from .nations import STYLES, nations as starting_nations
 from .ratings import ATTRIBUTE_KEYS, PERSONALITY_KEYS
 
 # ---- talent model (tuned by tools/world_report.py against the real world ranking) ------------------
-CANDIDATES_PER_POOL = 520      # candidate golfers per unit of nation pool
-BASE_POTENTIAL = 31.0          # mean potential for a development-60 nation
+CANDIDATES_PER_POOL = 900      # candidate golfers per unit of nation pool
+BASE_POTENTIAL = 33.0          # mean potential for a development-60 nation
 DEV_EFFECT = 0.55              # potential points per development point
-POTENTIAL_SD = 15.5
+POTENTIAL_SD = 13.0
 KEEP_OVERALL = 22.0            # below this: a weekend golfer, not part of the competitive world
 CAREER_LUCK_SD = 2.0
 PRO_LINE = 47.0               # overall at which half of golfers over 22 have turned professional
-TOP_KNEE, TOP_SPAN = 84.0, 11.0   # soft ceiling: ~93 for the world No.1, ~88 for the world top 10
 # Sampling of weaker golfers: (overall at which everyone is kept, decay of the share kept below it,
 # minimum share kept)
-KEEP_RULES = {'pro': (74.0, 9.0, 0.05), 'college_age': (68.0, 11.0, 0.0), 'amateur': (92.0, 14.0, 0.0),
-              'club_pro': (62.0, 6.0, 0.0)}
+KEEP_RULES = {'pro': (71.0, 7.0, 0.03), 'college_age': (74.0, 11.0, 0.0), 'amateur': (100.0, 14.0, 0.0),
+              'club_pro': (65.0, 6.0, 0.0)}
 
 PHYSICAL = ('power', 'stamina', 'recovery_rate', 'injury_resistance')
 MENTAL = ('composure', 'resilience', 'management', 'focus', 'green_reading')
@@ -170,11 +169,6 @@ def _age(rng):
             return int(a)
 
 
-def _top_compress(x):
-    """Ratings get harder to gain near the very top: nobody runs away from the world."""
-    return x if x <= TOP_KNEE else TOP_KNEE + TOP_SPAN * math.tanh((x - TOP_KNEE) / TOP_SPAN)
-
-
 def _keep_probability(status, age, cur):
     """The world holds every good golfer and a sample of the many weaker competitive golfers.
 
@@ -201,8 +195,8 @@ def candidates(year, seed, profiles, scale=1.0):
             cur = pot - age_deficit(age, peak, aging) + crng.gauss(0, CAREER_LUCK_SD)
             if cur < KEEP_OVERALL:
                 continue
-            cur = _top_compress(cur)
-            pot = max(_top_compress(pot), cur)
+            cur = min(cur, 99.0)                     # the rating scale tops out at 99
+            pot = max(min(pot, 99.0), cur)
             status = _status(age, cur, prof, crng.random(), crng)
             if crng.random() < _keep_probability(status, age, cur):
                 out.append((country, age, pot, peak, cur, status, aging))

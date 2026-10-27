@@ -65,6 +65,66 @@ class PrestigeTests(unittest.TestCase):
             self.assertEqual(a, {e.series.series_id: e.week for e in SEASON.cal.editions(y)})
 
 
+    def test_event_prestige_is_a_rolling_average(self):
+        from golfsim.calendar import WorldCalendar
+        ser = WorldCalendar().by_id['PT_GULF_COAST_CLASSIC']
+        hist = [PR.factors(ser, 70, 80)] * PR.WINDOW
+        before = PR.prestige_from(hist)
+        hist.append(PR.factors(ser, 100, 80))                 # one great field
+        after = PR.prestige_from(hist)
+        self.assertAlmostEqual(after - before, PR.WEIGHTS['field'] * 30 / PR.WINDOW)
+        for _ in range(PR.WINDOW):
+            hist.append(PR.factors(ser, 100, 80))
+        self.assertAlmostEqual(PR.prestige_from(hist) - before, PR.WEIGHTS['field'] * 30)
+
+    def test_player_fame_is_last_52_weeks(self):
+        s = SEASON
+        gid = s.world.ranked(s.world.pros())[0].id
+        s.fame_log[gid].append((s.abs_week(2027, WEEKS) - 60, 999.0))   # an old result
+        s.update_fame(2027, WEEKS)
+        self.assertLess(s.fame[gid], 999.0)
+
+
+class FatigueTests(unittest.TestCase):
+    def test_fatigue_injury_risk_and_recovery(self):
+        s = SEASON
+        g = next(x for x in s.world.golfers if x.status == 'pro' and 40 < x.attrs['injury_resistance'] < 60)
+        s.fatigue[g.id] = 0.0
+        fresh = s.injury_chance(g, 4, 2027)
+        s.fatigue[g.id] = 0.8
+        tired = s.injury_chance(g, 4, 2027)
+        self.assertGreater(tired, 3 * fresh)
+        fragile = dict(g.attrs, injury_resistance=20)
+        sturdy = dict(g.attrs, injury_resistance=90)
+        from dataclasses import replace
+        self.assertGreater(s.injury_chance(replace(g, attrs=fragile), 4, 2027),
+                           2 * s.injury_chance(replace(g, attrs=sturdy), 4, 2027))
+        old = replace(g, born=2027 - 45)
+        young = replace(g, born=2027 - 25)
+        self.assertGreater(s.injury_chance(old, 4, 2027), s.injury_chance(young, 4, 2027))
+        self.assertGreater(s.load(replace(g, attrs=dict(g.attrs, stamina=20)), 4, False, 2027),
+                           s.load(replace(g, attrs=dict(g.attrs, stamina=90)), 4, False, 2027))
+        s.fatigue[g.id] = 0.0
+
+    def test_tired_golfers_score_worse(self):
+        from golfsim.course import ashford_ridge
+        from golfsim.engine import play_round
+        from golfsim.golfer import uniform_golfer
+        def avg(f):
+            gg = uniform_golfer(75)
+            gg.fatigue = f
+            rng = random.Random(4)
+            return sum(play_round(gg, ashford_ridge(), rng).score for _ in range(1500)) / 1500
+        self.assertGreater(avg(0.8), avg(0.0) + 0.6)
+
+    def test_injured_players_sit_out(self):
+        s = SEASON
+        for yy, rows in s.injuries.items():
+            for week, gid, kind, weeks, _ in rows:
+                later = [w for w in s.played[yy][gid] if week < w <= week + weeks]
+                self.assertEqual(later, [], (gid, week, weeks))
+
+
 class SeasonTests(unittest.TestCase):
     def test_fields_respect_capacity_days_and_amateur_limits(self):
         s = SEASON

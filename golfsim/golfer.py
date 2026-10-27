@@ -42,6 +42,7 @@ class Golfer:
     potential: float = 0.0           # hidden: the overall this golfer can reach at their peak
     peak_age: float = 0.0            # hidden: when their prime starts
     aging_rate: float = 1.0          # hidden: how fast they decline after their prime (1 = typical)
+    fatigue: float = 0.0             # season fatigue, 0 (fresh) .. 1 (exhausted); set by the season engine
 
     def __post_init__(self):
         missing = set(ATTRIBUTE_KEYS) - set(self.attrs)

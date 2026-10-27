@@ -1,17 +1,17 @@
 """Prestige: of events and of players, plus the ranking-point and prize-money scales built on them.
 
-Event prestige (0-100), recomputed after every edition and smoothed over the years:
+Event prestige (0-100), from a rolling average of the last 4 editions of every factor:
     tour        the series' standing: majors 100, Premier flagship 93, a mini-tour event ~24...  35%
     field       how good last year's field was: its best 30 players by world ranking (amateur
                 ranking for amateur events)                                                         30%
     purse       prize money, on a log scale ($10k = 0, $25M = 100)                                   20%
     course      the venue: an elite course 100, a championship course's Championship tees 80,
                 a standard course's Forward tees 32, a municipal course 25                          15%
-    new prestige = 60% last year's + 40% this year's measure, so reputations move slowly.
+    so an event's reputation moves slowly: one strong or weak year shifts it by a quarter.
 
-Player prestige (0-100) comes from fame: every finish earns fame in proportion to the event's prestige
-(cubed: a major is worth far more than a mini-tour win), fame fades by 20% a year, and big titles add
-a lasting legacy that barely fades. Sponsors pay on player prestige.
+Player prestige (0-100) comes from fame over the last 52 weeks (a one-year rolling window): every
+finish earns fame in proportion to the event's prestige (cubed: a major is worth far more than a
+mini-tour win). Big titles also add a lasting legacy that barely fades. Sponsors pay on player prestige.
 
 Event prestige drives where AI golfers choose to play (see season.py): stars only bother with the
 big events, so weaker "opportunity" events get weaker fields, which in turn lowers their prestige.
@@ -21,7 +21,7 @@ from __future__ import annotations
 import math
 
 WEIGHTS = {'tour': 0.35, 'field': 0.30, 'purse': 0.20, 'course': 0.15}
-SMOOTHING = 0.6                       # share of last year's prestige kept
+WINDOW = 4                            # editions in the rolling average
 
 COURSE_QUALITY = {('elite', 'Championship'): 100, ('championship', 'Championship'): 80,
                   ('standard', 'Championship'): 62, ('championship', 'Club'): 55, ('standard', 'Club'): 45,
@@ -54,23 +54,31 @@ def field_strength(ranks, amateur=False, top=30):
     return sum(vals) / top
 
 
-def compose(tour, field, purse, course):
-    return (WEIGHTS['tour'] * tour + WEIGHTS['field'] * field + WEIGHTS['purse'] * purse_score(purse)
-            + WEIGHTS['course'] * course)
+def factors(series, field, course_quality):
+    """One edition's factors: (tour standing, field strength, purse score, course quality)."""
+    return (series.prestige, field, purse_score(series.purse), course_quality)
 
 
-def initial_prestige(series, course_quality):
-    """Prestige before an event's first simulated edition (expected field for its level)."""
+def initial_factors(series, course_quality):
+    """Factors before an event's first simulated edition (expected field for its level)."""
     field = DEFAULT_FIELD_CATEGORY.get(series.category)
     if field is None:
         field = DEFAULT_FIELD[series.tier]
     if series.tier == 1 and series.category == 'national_open':
         field = 92
-    return compose(series.prestige, field, series.purse, course_quality)
+    return factors(series, field, course_quality)
 
 
-def updated_prestige(old, series, field, course_quality):
-    return SMOOTHING * old + (1 - SMOOTHING) * compose(series.prestige, field, series.purse, course_quality)
+def prestige_from(history):
+    """Event prestige from the rolling average of the last WINDOW editions' factors."""
+    rows = history[-WINDOW:]
+    n = len(rows)
+    tour, field, purse, course = (sum(r[i] for r in rows) / n for i in range(4))
+    return WEIGHTS['tour'] * tour + WEIGHTS['field'] * field + WEIGHTS['purse'] * purse + WEIGHTS['course'] * course
+
+
+def initial_prestige(series, course_quality):
+    return prestige_from([initial_factors(series, course_quality)])
 
 
 # ---- what results are worth --------------------------------------------------------------------
@@ -108,10 +116,10 @@ def fame_points(prestige, pos, made_cut=True):
     return 100 * (prestige / 100) ** 3 * share
 
 
-FAME_DECAY = 0.80          # per year
+FAME_WEEKS = 52            # player prestige: fame earned in the last year
 LEGACY = {'major': 40.0, 'flagship': 10.0, 'premier': 4.0}
-LEGACY_DECAY = 0.97
-FAME_SCALE = 500.0
+LEGACY_DECAY = 0.97        # per year
+FAME_SCALE = 100.0
 
 
 def player_prestige(fame, legacy):
@@ -125,10 +133,10 @@ def endorsements(prestige):
 
 
 def seeded_fame(overall, u):
-    """Fame stock for a golfer at the start of the world (no simulated history yet), from what a
+    """Last year's fame for a golfer at the start of the world (no simulated history yet), from what a
     player of this ability earns in a typical year; u in [0, 1) spreads careers apart."""
     annual = math.exp(3.69 + 0.186 * (overall - 79))
-    return 5 * annual * (0.6 + 0.8 * u)
+    return annual * (0.6 + 0.8 * u)
 
 
 # ---- prize money -------------------------------------------------------------------------------

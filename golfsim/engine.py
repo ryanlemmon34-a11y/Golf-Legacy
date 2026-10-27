@@ -185,6 +185,14 @@ class Player:
         stam, rec = R.norm(a['stamina']), R.norm(a['recovery_rate'])
         self.fatigue_round = (1 - stam) * 0.9
         self.fatigue_week = (round_no - 1) * 0.22 * (1 - rec) * (1 - 0.4 * stam)
+        # Season fatigue (a long run of events): mostly physical — less distance, and a body that tires
+        # sooner during the round (wider dispersion, more mishits), worst for low-stamina golfers.
+        # A normal schedule (fatigue up to 0.2) costs nothing; only overplaying does.
+        tired = max(0.0, getattr(golfer, 'fatigue', 0.0) - 0.2) * 1.25
+        if tired:
+            self.drive *= 1 - 0.03 * tired
+            self.fatigue_round += 0.5 * tired * (1 - 0.5 * stam)
+            self.fatigue_week += 0.1 * tired
         # The day's form: how sharp the swing and the putter are today.
         self.day_disp = math.exp(rng.gauss(0, ip(R.STRIKE_FORM_SD, a['striking_consistency'])) + wf.strike)
         self.day_putt = rng.gauss(0, ip(R.PUTT_FORM_SD, a['putting_consistency'])) + wf.putt

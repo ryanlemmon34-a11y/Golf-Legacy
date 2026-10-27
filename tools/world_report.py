@@ -82,9 +82,21 @@ def main():
 
     # ---- nations vs the real world -----------------------------------------------------------------
     tot = Counter()
+    eras = []
     for s in range(a.seeds):
         c = candidates(year, a.seed + 1000 + s, nations())
-        tot.update(r[0] for r in [r for r in c if r[5] == 'pro'][:200])
+        ps = [r for r in c if r[5] == 'pro']
+        tot.update(r[0] for r in ps[:200])
+        eras.append((ps[0][4], ps[1][4], ps[9][4], sum(1 for r in ps if r[4] >= 90)))
+    out += ['', '## Eras: nothing caps the best players', '',
+            f'The best players in {a.seeds} other generated worlds. Talent is drawn naturally from each nation\'s pool, '
+            'with no ceiling, so some worlds start in a weak era and some in a golden one.', '',
+            f'- World No.1: from **{min(e[0] for e in eras):.1f}** to **{max(e[0] for e in eras):.1f}** '
+            f'(median {S.median(e[0] for e in eras):.1f}); this world: {pros[0].overall:.1f}.',
+            f'- World No.2: {min(e[1] for e in eras):.1f} to {max(e[1] for e in eras):.1f}; No.10: '
+            f'{min(e[2] for e in eras):.1f} to {max(e[2] for e in eras):.1f}.',
+            f'- Players rated 90 or more: from {min(e[3] for e in eras)} to {max(e[3] for e in eras)} '
+            f'(median {S.median(e[3] for e in eras):.0f}).']
     this = Counter(g.country for g in pros[:200])
     out += ['', '## Nations: world top 200 compared with the real world', '',
             f'Average over {a.seeds} generated worlds, this world, and the approximate real world top 200 (mid-2020s).', '',

@@ -29,11 +29,20 @@ Owner requirements and planned work, in rough order. "Built" items link to where
   a constraint on mini-tour players' schedules.
 - **Coaches:** hiring the best coaches depends on money and prestige (owner, career phase).
 
+## Owner principles
+
+- **The world evolves over time, with ups and downs over centuries.** No artificial ceilings or floors
+  on talent: a weak era (best player 83) and a golden one (two players at 95) are both fine.
+- Event prestige moves slowly (rolling 3–5 years); player prestige over about a year.
+- Stamina matters across a season: tiredness affects mostly physical attributes and raises injury risk,
+  especially with low injury resistance or older age.
+
 ## Next
 
 1. **Player development** (owner): aging year to year, AI training decisions, coach quality and
    recommendations, potential, work ethic and coachability; new juniors entering the world each year;
-   college players graduating and turning pro; retirements.
+   college players graduating and turning pro; retirements. Include lasting effects of serious
+   injuries (lost power or stamina, re-injury risk) and training load as a source of fatigue.
 2. **Nation improvement** (owner): nations' pool, development and pathway move with their golfers'
    results (a nation that wins majors grows more and better juniors a decade later).
 3. **Long-term test with development on**: realistic careers and stable long-run trends.
