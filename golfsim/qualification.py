@@ -437,7 +437,11 @@ def build_field(major, year, ctx):
     entries, in_field = [], {}
     counts = defaultdict(int)
     alternates = []
-    for route in RULES[major]:
+    rules = RULES[major]
+    # Every exempt category is applied before any qualifying places are handed out, whatever order the
+    # routes are listed in: a player who is exempt anyway (e.g. a club professional inside the world
+    # top 100) never uses up a qualifying place; it passes to the next finisher.
+    for route in [r for r in rules if r.kind == 'exempt'] + [r for r in rules if r.kind != 'exempt']:
         if route.kind == 'exempt':
             for gid in route.select(ctx, year):
                 if not _eligible(ctx, gid, route, year):
@@ -488,8 +492,13 @@ def build_field(major, year, ctx):
         # Too many exempt players: the last-added qualifying/fill entries become alternates.
         keep = entries[:size]
         alternates = [e.golfer_id for e in entries[size:]] + alternates
+        for e in entries[size:]:
+            counts[e.primary] -= 1
         entries = keep
-    return Field(major, year, entries, alternates, dict(counts))
+    # Alternates who were promoted into the field are no longer alternates; keep the order, no repeats.
+    entered = {e.golfer_id for e in entries}
+    alternates = list(dict.fromkeys(g for g in alternates if g not in entered))
+    return Field(major, year, entries, alternates, {k: v for k, v in counts.items() if v})
 
 
 def stage_entrants(stage_series, year, ctx, pool_ids):

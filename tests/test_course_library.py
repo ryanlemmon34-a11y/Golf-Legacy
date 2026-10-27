@@ -145,6 +145,23 @@ class RecordTests(unittest.TestCase):
         self.assertTrue(all(b is not None for b in champ.hole_best))
         self.assertIn(champ.layout_id, book.to_dict())
 
+    def test_match_play_holes_kept_but_not_as_rounds(self):
+        from golfsim.tournament import play_stroke_and_match
+        course = LIB.course(next(s for s in LIB.sites.values() if s['cls'] == 'standard')['course_id'] + ':Championship')
+        book = RecordBook()
+        field = [uniform_golfer(40 + i % 15, name=f'A{i}') for i in range(20)]
+        play_stroke_and_match(field, course, random.Random(2), stroke_holes=36, bracket=16, final_holes=36,
+                              on_round=book.round_recorder(course, '2027:USA_AMATEUR', 2027, 33, 6),
+                              on_hole=book.hole_recorder(course, '2027:USA_AMATEUR', 2027))
+        rec = book.get(course)
+        self.assertEqual(rec.rounds, 40)                         # stroke-play rounds only
+        self.assertGreater(rec.holes_played, 40 * 18)            # plus every match-play hole
+        # an ace in the final is a memorable moment, not a round
+        book.hole_recorder(course, '2027:USA_AMATEUR', 2027)(field[0], 2, 1, 'final')
+        self.assertEqual(rec.aces[-1], (3, 'A0', '2027:USA_AMATEUR', 2027, 'final'))
+        self.assertEqual(rec.rounds, 40)
+        self.assertEqual(rec.hole_best[2][0], 1)
+
     def test_record_setting_order(self):
         from golfsim.records import LayoutRecords, Mark
         r = LayoutRecords('x:Championship', 72)

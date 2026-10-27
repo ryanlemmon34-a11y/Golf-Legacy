@@ -10,8 +10,11 @@ For each layout the book keeps:
     tier records      lowest round at each level of golf (Premier, Challenger, college, ...)
     lowest totals     lowest 36 / 54 / 72-hole tournament totals
     highest round     the worst competitive round ever posted there
-    hole bests        lowest score ever made on each hole, and every hole-in-one
+    hole bests        lowest score ever made on each hole, and every hole-in-one and albatross
     scoring           rounds played and scoring average
+
+Match-play holes and playoff holes count for the hole records and the memorable moments (an ace in a
+championship final is kept), but never as an 18-hole round: a match that ends 5&4 is not a round.
 """
 from __future__ import annotations
 
@@ -45,7 +48,9 @@ class LayoutRecords:
     lowest_totals: dict = field(default_factory=dict)     # holes -> Mark
     highest_round: Mark | None = None
     hole_best: list = field(default_factory=lambda: [None] * 18)   # (score, golfer, event_id)
-    aces: list = field(default_factory=list)              # (hole number, golfer, event_id, year)
+    aces: list = field(default_factory=list)              # (hole number, golfer, event_id, year, stage)
+    albatrosses: list = field(default_factory=list)       # (hole number, golfer, event_id, year, stage)
+    holes_played: int = 0                                 # every competitive hole, rounds or not
     rounds: int = 0
     strokes: int = 0
 
@@ -68,11 +73,19 @@ class LayoutRecords:
         if self.highest_round is None or mark.score > self.highest_round.score:
             self.highest_round = mark
         for i, s in enumerate(hole_scores):
-            b = self.hole_best[i]
-            if b is None or s < b[0]:
-                self.hole_best[i] = (s, mark.golfer, mark.event_id)
-            if s == 1:
-                self.aces.append((i + 1, mark.golfer, mark.event_id, mark.year))
+            self.add_hole(i, s, hole_pars[i] if hole_pars else 0, mark.golfer, mark.event_id, mark.year,
+                          f'round {mark.round_no}' if mark.round_no else '')
+
+    def add_hole(self, idx, score, par, golfer, event_id, year, stage=''):
+        """One competitive hole: a round's hole, a match-play hole or a playoff hole."""
+        self.holes_played += 1
+        b = self.hole_best[idx]
+        if b is None or score < b[0]:
+            self.hole_best[idx] = (score, golfer, event_id)
+        if score == 1:
+            self.aces.append((idx + 1, golfer, event_id, year, stage))
+        elif par and score == par - 3:
+            self.albatrosses.append((idx + 1, golfer, event_id, year, stage))
 
     def add_total(self, holes, mark):
         cur = self.lowest_totals.get(holes)
@@ -101,6 +114,15 @@ class RecordBook:
             rec.add_round(Mark(stats.score, stats.score - course.par, golfer.name, event_id, year, week, round_no,
                                tier), stats.holes, pars)
         return on_round
+
+    def hole_recorder(self, course, event_id, year):
+        """A callback for `on_hole=` (match play, playoffs): records single holes, never rounds."""
+        rec = self.get(course)
+        pars = [h.par for h in course.holes]
+
+        def on_hole(golfer, idx, strokes, stage=''):
+            rec.add_hole(idx, strokes, pars[idx], golfer.name, event_id, year, stage)
+        return on_hole
 
     def add_event(self, course, leaderboard, holes, event_id, year, week, tier=-1):
         """Lowest tournament totals from a finished `play_event` leaderboard (players who finished)."""

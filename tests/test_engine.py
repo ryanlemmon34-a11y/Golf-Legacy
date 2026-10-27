@@ -203,3 +203,57 @@ class TournamentTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class ReviewFixTests(unittest.TestCase):
+    """Issues found in code review: driven greens, match-play byes, holes outside full rounds."""
+
+    def test_driven_green_putts_from_the_pin(self):
+        """A tee shot that finishes on or beside the green is measured to the pin, not the green's centre."""
+        hole = Hole(1, 4, 255, fairway_width=45, rough_width=20, left='open', right='open', green_radius=17,
+                    greenside_bunkers=0, fairway_bunkers=0, green_slope=0.3)
+        g = uniform_golfer(85)
+        course = Course('Drivable', 'USA', 'Parkland', tuple(replace(hole, number=i + 1) for i in range(18)))
+        def sg_off_tee(pin):
+            tot = 0.0
+            for i in range(2000):
+                rng = random.Random(i)
+                st = RoundStats()
+                play_hole(Player(g, course, Conditions(), None, rng), hole, 0, rng, st, 0.0, HoleState(), pin)
+                tot += st.sg_ott
+            return tot / 2000
+        centre, front, side = sg_off_tee((0.0, 0.0)), sg_off_tee((-14.0, 0.0)), sg_off_tee((0.0, 14.0))
+        # Same tee shots (same seeds); only the pin moved. A tucked pin leaves longer first putts.
+        self.assertGreater(centre - front, 0.03)
+        self.assertGreater(centre - side, 0.005)
+
+    def test_match_play_bracket_with_byes(self):
+        rng = random.Random(4)
+        for n in (63, 40, 33, 5, 2, 1):
+            field = [uniform_golfer(40 + (i % 20), name=f'P{i}') for i in range(n)]
+            res = T.play_stroke_and_match(field, MID, rng, stroke_holes=18, bracket=64, final_holes=18)
+            self.assertEqual(len(res), n)
+            self.assertEqual(len({id(g) for g, _ in res}), n)
+            self.assertEqual(sum(1 for _, p in res if p == 1), 1)
+        # 63 qualifiers: the top seed gets the only bye, so one first-round match fewer.
+        field = [uniform_golfer(50, name=f'Q{i}') for i in range(63)]
+        res = T.play_stroke_and_match(field, MID, rng, stroke_holes=18, bracket=64, final_holes=18)
+        self.assertEqual(sum(1 for _, p in res if p == 33), 31)
+
+    def test_match_and_playoff_holes_are_reported(self):
+        holes = []
+        rng = random.Random(9)
+        a, b = uniform_golfer(60, name='A'), uniform_golfer(60, name='B')
+        T.play_match(a, b, MID, rng, on_hole=lambda g, i, s, stage: holes.append((g.name, i, s, stage)),
+                     stage='final')
+        self.assertTrue(holes and len(holes) % 2 == 0)
+        self.assertTrue(all(st == 'final' for *_, st in holes))
+        playoff = []
+        for seed in range(200):
+            board, ph = play_event([uniform_golfer(70, name=f'X{i}') for i in range(4)], MID, random.Random(seed),
+                                   rounds_n=1, cut_after=None,
+                                   on_hole=lambda g, i, s, stage: playoff.append((i, stage)))
+            if ph:
+                break
+        self.assertTrue(ph)
+        self.assertTrue(playoff and all(st.startswith('playoff hole') for _, st in playoff))

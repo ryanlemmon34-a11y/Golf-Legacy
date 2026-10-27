@@ -318,6 +318,22 @@ def _attack_pin(pl, hole, mean_ft, rng):
 # ---------------------------------------------------------------------------
 # The hole
 # ---------------------------------------------------------------------------
+def _beside_green(hole, bx, by, to_pin, off, prev_dist, rng):
+    """Where a ball that just missed the green finishes. (bx, by): yards from the green's centre;
+    off: yards beyond the green's holding edge. Returns (lie, distance to the pin, penalty strokes)."""
+    if hole.green_water and off > 1.5:
+        side = ('front' if bx < -abs(by) else 'back' if bx > abs(by) else 'left' if by < 0 else 'right')
+        if side == hole.green_water and rng.random() < (0.85 if off > 3 else 0.5):
+            return 'rough', max(25.0, min(prev_dist, to_pin + 15)), 1      # dropped short of the water
+    if off > 30:
+        return 'rough', to_pin, 0
+    if off <= 2.0:
+        return 'fringe', max(3.0, to_pin), 0
+    if rng.random() < hole.greenside_bunkers * 0.55 * (1.0 if off < 8 else 0.4):
+        return 'sand', max(3.0, to_pin), 0
+    return 'around', max(3.0, to_pin), 0
+
+
 def play_hole(pl, hole, hidx, rng, st, pressure=0.0, state=None, pin=None):
     """Play one hole shot by shot until the ball is holed. Returns strokes; updates RoundStats `st`.
 
@@ -422,13 +438,21 @@ def play_hole(pl, hole, hidx, rng, st, pressure=0.0, state=None, pin=None):
             corridor = half + hole.rough_width
             # Hazards first: a drive that leaves the corridor is in trouble however far it went.
             if a <= corridor and abs(rem) <= 30:     # drove it to the green complex
-                if abs(rem) <= G and a <= G:
-                    lie, dist = 'green', 3 * math.hypot(rem, lat)
-                elif rng.random() < hole.greenside_bunkers * 0.55:
-                    lie, dist = 'sand', math.hypot(rem, lat)
-                else:
-                    lie, dist = 'around', max(3.0, math.hypot(rem, lat))
-                sg_add('ott', before, baseline(_LIE_BASELINE[lie] if lie != 'green' else 'green', dist))
+                # Same geometry as an approach: where the ball finishes relative to the green's centre
+                # and to the day's pin (x along the line of play, + = past the centre; y across it).
+                bx, by = -rem, lat
+                to_pin = math.hypot(bx - pin_x, by - pin_y)
+                off = math.hypot(bx, by) - G * 0.88
+                if off <= 0:
+                    lie, dist = 'green', max(0.5, to_pin * 3)
+                    sg_add('ott', before, baseline('green', dist))
+                    continue
+                lie, dist, penalty = _beside_green(hole, bx, by, to_pin, off, hole.plays, rng)
+                if penalty:
+                    st.penalties += 1
+                    strokes += 1
+                short_sided = (to_pin - off) < 4
+                sg_add('ott', before, baseline(_LIE_BASELINE[lie], dist), penalty)
                 continue
             dist = abs(rem) if abs(rem) > 60 else max(3.0, math.hypot(rem, a))
             if a <= half and not forced_rough:
@@ -638,23 +662,12 @@ def play_hole(pl, hole, hidx, rng, st, pressure=0.0, state=None, pin=None):
             lie, dist = side_lie, max(10.0, to_pin)
             sg_add('app', before, baseline(_LIE_BASELINE[lie], dist), penalty)
             continue
-        if hole.green_water and off > 1.5:
-            side = ('front' if bx < -abs(by) else 'back' if bx > abs(by) else 'left' if by < 0 else 'right')
-            if side == hole.green_water and rng.random() < (0.85 if off > 3 else 0.5):
-                penalty = 1
-                st.penalties += 1
-                strokes += 1
-                lie, dist = 'rough', max(25.0, min(dist, to_pin + 15))
-                sg_add('app', before, baseline('rough', dist), penalty)
-                continue
-        if off > 30:
-            lie, dist = 'rough', to_pin
-        elif off <= 2.0:
-            lie, dist = 'fringe', max(3.0, to_pin)
-        elif rng.random() < hole.greenside_bunkers * 0.55 * (1.0 if off < 8 else 0.4):
-            lie, dist = 'sand', max(3.0, to_pin)
-        else:
-            lie, dist = 'around', max(3.0, to_pin)
+        lie, dist, penalty = _beside_green(hole, bx, by, to_pin, off, dist, rng)
+        if penalty:
+            st.penalties += 1
+            strokes += 1
+            sg_add('app', before, baseline('rough', dist), penalty)
+            continue
         short_sided = (to_pin - off) < 4
         sg_add('app', before, baseline(_LIE_BASELINE[lie], dist))
 

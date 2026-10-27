@@ -17,11 +17,13 @@ def _pressure_fn(level_front, level_back):
 
 
 def play_event(field, course, rng, cut_top=65, prestige=1.0, cond_by_round=None, caddies=None,
-               rounds_n=4, cut_after=2, on_round=None):
+               rounds_n=4, cut_after=2, on_round=None, on_hole=None):
     """field: list of Golfer. Returns ordered leaderboard [(golfer, total, rounds)].
 
     rounds_n: 1-4 rounds; cut_after: round after which the cut is made (None = no cut).
     on_round(golfer, round_no, RoundStats) is called after every round (e.g. RecordBook.round_recorder).
+    on_hole(golfer, hole_index, strokes, stage) is called for every playoff hole (RecordBook.hole_recorder),
+    so an ace or an eagle in a playoff is kept even though it is not part of an 18-hole round.
     """
     caddies = caddies or {}
     forms = {id(g): WeekForm.draw(rng, g) for g in field}
@@ -70,7 +72,9 @@ def play_event(field, course, rng, cut_top=65, prestige=1.0, cond_by_round=None,
         scores = {}
         for g in tied:
             pl = Player(g, course, Conditions(), caddies.get(id(g)), rng, rounds_n, forms[id(g)])
-            scores[id(g)] = play_hole(pl, hole, 17, rng, RoundStats(), 1.0 * prestige, HoleState(), playoff_pins[idx])
+            scores[id(g)] = play_hole(pl, hole, idx, rng, RoundStats(), 1.0 * prestige, HoleState(), playoff_pins[idx])
+            if on_hole:
+                on_hole(g, idx, scores[id(g)], f'playoff hole {playoff_holes + 1}')
         low = min(scores.values())
         tied = [g for g in tied if scores[id(g)] == low]
         playoff_holes += 1
@@ -80,8 +84,12 @@ def play_event(field, course, rng, cut_top=65, prestige=1.0, cond_by_round=None,
     return [(g, totals[id(g)], rounds[id(g)]) for g in board], playoff_holes
 
 
-def play_match(a, b, course, rng, holes=18, pressure=0.5, caddies=None):
-    """Hole-by-hole match play, every shot simulated. Returns (winner, loser, result text)."""
+def play_match(a, b, course, rng, holes=18, pressure=0.5, caddies=None, on_hole=None, stage='match'):
+    """Hole-by-hole match play, every shot simulated. Returns (winner, loser, result text).
+
+    Matches stop when decided, so they never count as 18-hole rounds; on_hole(golfer, hole_index,
+    strokes, stage) receives every hole actually played (aces, albatrosses, hole records).
+    """
     caddies = caddies or {}
     pls = {id(g): Player(g, course, Conditions(), caddies.get(id(g)), rng, 1, WeekForm.draw(rng, g)) for g in (a, b)}
     states = {id(g): HoleState() for g in (a, b)}
@@ -96,6 +104,9 @@ def play_match(a, b, course, rng, holes=18, pressure=0.5, caddies=None):
         late = pressure * (1.4 if remaining <= 4 else 1.0)
         sa = play_hole(pls[id(a)], hole, idx, rng, RoundStats(), late, states[id(a)], pins[idx])
         sb = play_hole(pls[id(b)], hole, idx, rng, RoundStats(), late, states[id(b)], pins[idx])
+        if on_hole:
+            on_hole(a, idx, sa, stage)
+            on_hole(b, idx, sb, stage)
         played += 1
         up += (sa < sb) - (sb < sa)
         remaining = holes - played
@@ -108,11 +119,14 @@ def play_match(a, b, course, rng, holes=18, pressure=0.5, caddies=None):
     return (a, b, text) if up > 0 else (b, a, text)
 
 
-def play_stroke_and_match(field, course, rng, stroke_holes=36, bracket=64, final_holes=36, on_round=None):
+def play_stroke_and_match(field, course, rng, stroke_holes=36, bracket=64, final_holes=36, on_round=None,
+                          on_hole=None):
     """Amateur-championship format: stroke-play qualifying, then a seeded knockout.
 
     Returns finishers [(golfer, position)]: 1 champion, 2 runner-up, 3 semi-finalists, 5 quarter-
     finalists, 9 / 17 / 33 earlier rounds, then non-qualifiers by stroke-play position.
+    If fewer players qualify than the bracket holds, the top seeds get byes into the next round.
+    on_round receives the stroke-play rounds; on_hole every match-play hole.
     """
     totals = {id(g): 0 for g in field}
     forms = {id(g): WeekForm.draw(rng, g) for g in field}
@@ -125,24 +139,36 @@ def play_stroke_and_match(field, course, rng, stroke_holes=36, bracket=64, final
             totals[id(g)] += st.score
     order = sorted(field, key=lambda g: (totals[id(g)], rng.random()))
     seeds, rest = order[:bracket], order[bracket:]
-    # Standard seeding: 1 v 64, 32 v 33 ... arranged so the top seeds meet last.
+    if not seeds:
+        return []
+    size = 1
+    while size < len(seeds):
+        size *= 2
+    # Standard seeding: 1 v 64, 32 v 33 ... arranged so the top seeds meet last. Empty slots are byes,
+    # and they fall against the top seeds.
     def bracket_order(n):
         slots = [1]
         while len(slots) < n:
             m = len(slots) * 2 + 1
             slots = [x for s in slots for x in (s, m - s)]
         return slots
-    alive = [seeds[s - 1] for s in bracket_order(len(seeds))]
-    places, size = [], len(alive)
+    alive = [seeds[s - 1] if s <= len(seeds) else None for s in bracket_order(size)]
+    places = []
     while len(alive) > 1:
         winners, losers = [], []
+        final = len(alive) == 2
+        stage = {2: 'final', 4: 'semi-final', 8: 'quarter-final'}.get(len(alive), f'round of {len(alive)}')
         for i in range(0, len(alive), 2):
-            w, l, _ = play_match(alive[i], alive[i + 1], course, rng, final_holes if len(alive) == 2 else 18)
+            a, b = alive[i], alive[i + 1]
+            if a is None or b is None:            # a bye
+                winners.append(a if b is None else b)
+                continue
+            w, l, _ = play_match(a, b, course, rng, final_holes if final else 18, on_hole=on_hole, stage=stage)
             winners.append(w)
             losers.append(l)
         pos = len(alive) // 2 + 1
         places = [(g, pos) for g in losers] + places
         alive = winners
     places = [(alive[0], 1)] + places
-    start = size + 1
+    start = len(seeds) + 1
     return places + [(g, start + i) for i, g in enumerate(rest)]

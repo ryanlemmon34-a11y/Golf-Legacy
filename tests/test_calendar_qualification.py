@@ -180,6 +180,31 @@ class QualificationTests(unittest.TestCase):
         self.assertEqual([e.golfer_id for e in f.entries if e.primary == 'BQ_PT_SCOTLAND_OPEN'], [700, 701, 702])
         self.assertEqual(len(ids), 156)
 
+    def test_exempt_club_pro_does_not_use_a_qualifying_place(self):
+        ctx = make_ctx()
+        ctx.people[5] = Q.Person(5, 'Club pro in the world top 100', 'club_pro', 38)
+        clubs = list(range(1000, 1030))
+        for g in clubs:
+            ctx.people[g] = Q.Person(g, f'Club pro {g}', 'club_pro', 40)
+        ctx.add_result('CLUB_PRO_CHAMPIONSHIP', 2027, [(5, 1)] + [(g, i + 2) for i, g in enumerate(clubs)])
+        ctx.standings[('PT_AMERICAS', 2026)] = list(range(1, 300))
+        f = Q.build_field('PREMIER_TOUR_CHAMPIONSHIP', 2027, ctx)
+        self.assertNotEqual(next(e for e in f.entries if e.golfer_id == 5).primary, 'P5')
+        self.assertEqual([e.golfer_id for e in f.entries if e.primary == 'P5'], clubs[:20])
+        self.assertNotIn(clubs[20], f.ids())
+
+    def test_promoted_alternates_leave_the_alternate_list(self):
+        ctx = make_ctx()
+        site = [(500 + i, i + 1) for i in range(30)]
+        for i in range(30):
+            ctx.people[500 + i] = Q.Person(500 + i, f'Q{i}', 'pro', 25)
+        ctx.add_result('USA_OPEN_FINAL_INTL', 2027, site, site=0)
+        f = Q.build_field('USA_OPEN', 2027, ctx)
+        self.assertIn(506, f.ids())                       # first alternate promoted into the field
+        self.assertFalse(set(f.alternates) & set(f.ids()))
+        self.assertEqual(len(f.alternates), len(set(f.alternates)))
+        self.assertEqual(len(f.entries), 156)
+
 
 if __name__ == '__main__':
     unittest.main()
