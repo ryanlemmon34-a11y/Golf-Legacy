@@ -181,6 +181,7 @@ class Season:
         self.staff = ST.initial_staff(world, seed)           # coaches and caddies
         self.staff_receipts = defaultdict(Counter)            # year -> ('coach'|'caddie', id) -> $ received
         self.overall_start = {}                              # year -> gid -> overall on 1 January
+        self.entry_misses = defaultdict(Counter)             # year -> gid -> weeks shut out of full fields
         self.transitions = {}                                # year -> [career decisions with their reasons]
         self.activity_counts = defaultdict(lambda: defaultdict(Counter))  # year -> gid -> weeks per activity
         self.assignments = {}                                # year -> staff assignments at the season's start
@@ -308,8 +309,15 @@ class Season:
             return g.tour == s.tour or g.country in countries
         return False
 
+    def entry_ticket(self, g, s):
+        """A golfer's place in the entry queue for this season's edition of an event (a fair draw: it
+        never depends on how the population happens to be numbered)."""
+        return _seed(self.seed, self.year, s.series_id, 'entry', g.id)
+
     def priority(self, g, s):
-        """Lower sorts first: (class, strength)."""
+        """Lower sorts first: (class, strength, entry draw). Mini tours are open entry: their members
+        get in by the draw, not by world ranking. Elsewhere ranking decides and the draw breaks ties
+        (so unranked golfers are not ordered by id)."""
         mt = TOUR_BY_KEY.get(g.tour)
         mtier = mt.tier if mt else 9
         amateur_event = s.tier >= 5
@@ -328,7 +336,9 @@ class Season:
             cls = 3
         else:
             cls = 4
-        return (cls, strength)
+        if s.tier == 4:
+            strength = 0
+        return (cls, strength, self.entry_ticket(g, s))
 
     # ---- the AI's choice of events --------------------------------------------------------------
     def log(self, gid, year, week, text):
@@ -513,6 +523,9 @@ class Season:
             ids = [gid for _, gid in sorted(held[eid])]
             if ids:
                 commit(ed, [ids])
+        for gid, (want, _) in prefs.items():
+            if want and gid not in placed:
+                self.entry_misses[year][gid] += 1           # wanted to play; every field they tried was full
 
     def _amateurs_over(self, rows, s):
         lim = AMATEUR_CAP.get(s.tier)
@@ -1186,6 +1199,8 @@ class Season:
             return 'injured'
         if f['stuck'] >= months / 2:
             return 'could not afford any trip'
+        if self.entry_misses[year][gid] >= 4:
+            return 'wanted to play but every field they tried was full'
         if f['no event'] >= months / 2:
             return 'no event they were eligible for'
         if self.g[gid].lifestyle == 'part_time':

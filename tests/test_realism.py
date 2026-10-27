@@ -125,6 +125,21 @@ class FundingTests(unittest.TestCase):
         self.assertIs(s.best_affordable(g, opts, city, costs[dear.event_id])[0][1], dear)
         self.assertIsNone(s.best_affordable(g, opts, city, costs[cheap.event_id] - 1))
 
+    def test_open_entry_does_not_favour_low_ids(self):
+        """Unranked members of a full mini tour get in by a fair draw, not by how golfers are numbered
+        (regression: new professionals, who have the highest ids, were always shut out)."""
+        s = SEASON
+        series = next(x for x in s.cal.series if x.tier == 4)
+        members = sorted((g for g in s.world.golfers if g.tour == series.tour and g.status == 'pro'), key=lambda g: g.id)
+        order = sorted(members, key=lambda g: s.priority(g, series))
+        rank = {g.id: i for i, g in enumerate(order)}
+        n = len(members)
+        first_half_ids = [g.id for g in members[: n // 2]]
+        share = sum(1 for gid in first_half_ids if rank[gid] < n // 2) / max(1, len(first_half_ids))
+        self.assertTrue(0.3 < share < 0.7, share)                            # about half, by chance
+        ranked_out = s.priority(members[0], series)[1]
+        self.assertEqual(ranked_out, 0)                                      # mini tours ignore ranking
+
     def test_same_world_whatever_the_number_of_workers(self):
         def run(workers):
             s = Season(generate_world(seed=17), seed=17, development=True, workers=workers)

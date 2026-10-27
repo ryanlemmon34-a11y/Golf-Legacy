@@ -317,7 +317,7 @@ def analyse(d, mature):
     # transitions
     tr = Counter(t['kind'] for y in years for t in d['transitions'].get(y, ()))
     a['transitions'] = tr
-    a['tl'], a['eps'], a['best'], a['length'], a['netsum'], a['mincash'] = tl, eps, best, length, netsum, mincash
+    a['_tl'], a['_eps'], a['_best'], a['_length'] = tl, eps, best, length      # per-golfer lookups
     return a
 
 
@@ -343,7 +343,7 @@ def highlights(d, a):
         if cb:
             bits.append(f'{len(cb)} comeback(s)' + (', e.g. ' + ', '.join(f'{name(d, t["gid"])} at {t["age"]}' for t in cb[:2])))
         staff = [t for t in tr if t['kind'] in ('became coach', 'became caddie')]
-        winners = [t for t in staff if sum(sum(r['wins_by_tier'].values()) for r in (a['tl'][t['gid']].values())) > 0]
+        winners = [t for t in staff if sum(sum(r['wins_by_tier'].values()) for r in (a['_tl'][t['gid']].values())) > 0]
         if staff:
             bits.append(f'{len(staff)} golfer(s) joined the staff ranks' +
                         (', incl. tournament winners ' + ', '.join(f'{name(d, t["gid"])} ({t["kind"][7:]})' for t in winners[:2])
@@ -357,7 +357,7 @@ def highlights(d, a):
 
 def interesting(d, a, n=6):
     """Careers picked by rules on recorded results (not by hidden ability)."""
-    tl, eps, best = a['tl'], a['eps'], a['best']
+    tl, eps, best = a['_tl'], a['_eps'], a['_best']
     g = d['golfers']
     majors = Counter(d['majors'].values())
     wins = {gid: sum(sum(r['wins_by_tier'].values()) for r in t.values()) for gid, t in tl.items()}
@@ -376,7 +376,7 @@ def interesting(d, a, n=6):
     cbs = [gid for gid, e in eps.items() if len(e) > 1 and min(tl[gid][y]['tier'] for y in range(e[1][0], e[-1][1] + 1) if y in tl[gid])
            < min(tl[gid][y]['tier'] for y in range(e[0][0], e[0][1] + 1))]
     add('A comeback that went further than before', min(cbs) if cbs else None)
-    add('Longest full-time career', max(a['length'], key=lambda x: (a['length'][x], -x)) if a['length'] else None)
+    add('Longest full-time career', max(a['_length'], key=lambda x: (a['_length'][x], -x)) if a['_length'] else None)
     out = []
     for label, gid in picks[:n]:
         out.append(f'- **{label} — {name(d, gid)}**, born {g[gid]["born"]}:')
