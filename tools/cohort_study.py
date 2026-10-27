@@ -272,7 +272,7 @@ def report(results, args):
            row('Already full-time pros when the world began (left-censored)', lambda a: f'{a["left_censored"]:,}'),
            row(f'Debut cohort (followed {args.mature}+ seasons)', lambda a: f'{a["cohort"]:,}'),
            '', '## 2. The debut cohort: how careers went', '', head, sep,
-           row('Age turning pro (10/50/90%)', lambda a: fmt_dist(a['debut_age'])),
+           row('Age in first full-time pro season (10/50/90%)', lambda a: fmt_dist(a['debut_age'])),
            row('Full-time seasons, all episodes (10/50/90%)', lambda a: fmt_dist(a['length'])),
            row('Lasted 2 seasons or fewer', lambda a: pct(sum(1 for x in a['length'] if x <= 2), a['cohort'])),
            row('Lasted 10 seasons or more', lambda a: pct(sum(1 for x in a['length'] if x >= 10), a['cohort'])),

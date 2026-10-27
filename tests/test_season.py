@@ -5,6 +5,7 @@ Run from the project folder:  python -m unittest discover -s tests -v
 from __future__ import annotations
 
 import random
+import statistics
 import sys
 import unittest
 from collections import Counter, defaultdict
@@ -177,7 +178,9 @@ class SeasonTests(unittest.TestCase):
         top30 = {g.id for g in s.world.ranked(s.world.pros())[:30]}
         def stars(category):
             rs = [r for r in s.results.values() if s.cal.by_id[r.series_id].category == category]
-            return sum(len(top30 & {gid for gid, _, _ in r.finish[0]}) for r in rs) / max(1, len(rs))
+            return statistics.median(len(top30 & {gid for gid, _, _ in r.finish[0]}) for r in rs)
+        # medians: the week-2 season opener is an opportunity event that stars play because nothing
+        # else is on that week, which made a mean hinge on one event
         self.assertGreater(stars('flagship'), 20)
         self.assertLess(stars('opportunity'), stars('flagship') / 3)
 
