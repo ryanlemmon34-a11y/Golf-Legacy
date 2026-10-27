@@ -64,10 +64,17 @@ def run_world(seed, years, workers, data_dir):
                        r['wr_end'], r['am_end']]
         rows[y] = yr
         print(f'seed {seed}: {y} done, {len(yr)} active, {time.perf_counter() - t0:.0f} s', flush=True)
+        if (y - first + 1) % 5 == 0 or y == first + years - 1:
+            path = save(s, seed, first, y - first + 1, rows, start, data_dir, t0)   # a checkpoint
     s.close()
+    return path
+
+
+def save(s, seed, first, years, rows, start, data_dir, t0):
+    """Write everything recorded so far (an interrupted run still leaves its completed seasons)."""
     golfers = {g.id: {'born': g.born, 'country': g.country, 'name': g.name, 'final': [g.status, g.lifestyle],
                       'turned_pro': g.turned_pro, 'potential': g.potential, 'start': start.get(g.id)}
-               for g in world.golfers}
+               for g in s.world.golfers}
     keep = ('Turned professional', 'Stopped chasing', 'Quit their job', 'Retired', 'College eligibility')
     history = {gid: [(y, t) for y, _, t in h if t.startswith(keep)] for gid, h in s.history.items()}
     majors = {}
@@ -81,8 +88,10 @@ def run_world(seed, years, workers, data_dir):
             'majors': majors, 'routes': routes, 'unpaid': dict(s.unpaid),
             'holes': sum(s.holes_played.values()), 'minutes': (time.perf_counter() - t0) / 60}
     path = Path(data_dir) / f'cohort_{seed}.json.gz'
-    with gzip.open(path, 'wt') as f:
+    tmp = path.with_suffix('.tmp')
+    with gzip.open(tmp, 'wt') as f:
         json.dump(data, f)
+    tmp.replace(path)
     return path
 
 
