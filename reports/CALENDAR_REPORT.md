@@ -197,16 +197,16 @@ Every event series has a host country and a pool of real host cities (rotating e
 | Level | Competitive holes per season | Est. time, one core | Est. time, 4 cores |
 |---|---|---|---|
 | Major | 29,988 | 1 s | 0 s |
-| Premier | 274,284 | 11 s | 3 s |
-| Challenger | 707,724 | 28 s | 7 s |
-| Regional | 568,980 | 23 s | 6 s |
-| Mini | 622,892 | 25 s | 6 s |
-| College | 377,946 | 15 s | 4 s |
-| Amateur | 621,150 | 25 s | 6 s |
+| Premier | 274,284 | 9 s | 2 s |
+| Challenger | 707,724 | 23 s | 6 s |
+| Regional | 568,980 | 18 s | 5 s |
+| Mini | 622,892 | 26 s | 6 s |
+| College | 377,946 | 16 s | 4 s |
+| Amateur | 621,150 | 26 s | 6 s |
 | Qualifying | 252,036 | 10 s | 3 s |
-| **All** | **3,455,000** | **2.3 min** | **0.6 min** |
+| **All** | **3,455,000** | **2.1 min** | **0.5 min** |
 
-Measured engine speed on this machine: 40 µs per hole for a tour pro, 40 µs for a weaker amateur (more shots per hole). The 4-core column assumes the week's independent events run in parallel (planned). Golf only — season logic, rankings and saving history add to this.
+Measured engine speed on this machine: 32 µs per hole for a tour pro, 41 µs for a weaker amateur (more shots per hole). The 4-core column assumes the week's independent events run in parallel (planned). Golf only — season logic, rankings and saving history add to this.
 
 ## How players get into the majors
 
