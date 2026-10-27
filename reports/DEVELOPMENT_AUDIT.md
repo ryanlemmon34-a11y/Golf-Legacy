@@ -37,14 +37,14 @@ Mean score of an all-70 golfer over 600 rounds on Ashford Ridge (par 72), common
 ## 3. Lifecycle invariants (150 golfers aged 18-24, 25 years)
 
 - Attribute-years above their ceiling: **0**; above 99: **0**.
-- Plateau: golfers within 0.5 of their ceilings (under 30) gained +0.01 a year on average (262 golfer-years).
-- Injuries simulated: 142; with lasting damage: 87 (10+ weeks only).
+- Plateau: golfers within 0.5 of their ceilings (under 30) gained +0.02 a year on average (261 golfer-years).
+- Injuries simulated: 144; with lasting damage: 50 (10+ weeks only).
 
 | Age | Golfer-years | Average change in overall |
 |---|---|---|
 | 18-21 | 268 | +1.52 |
 | 22-25 | 562 | +0.49 |
-| 26-29 | 600 | +0.14 |
+| 26-29 | 600 | +0.15 |
 | 30-33 | 600 | -0.08 |
 | 34-37 | 600 | -0.39 |
 | 38-41 | 600 | -0.70 |
