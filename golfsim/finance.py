@@ -7,7 +7,10 @@ Income
                         by their club; college golfers are on scholarship
 Costs
     each event          travel and accommodation by level (more overseas), entry fees on the mini
-                        tours and at Q-School, and a caddie (a weekly fee plus a share of winnings)
+                        tours and at Q-School, and a professional caddie if they employ one (a weekly
+                        fee plus a share of winnings)
+    coaching            a coach's yearly fee (paid weekly), or a share of prize money to a coach who
+                        approached them
     living              a full-time touring professional lives on their winnings; everyone with a job
                         pays ordinary living costs from their salary (college golfers and teenagers
                         living at home pay none)
@@ -36,7 +39,7 @@ from .geography import CITY_BY_NAME, COUNTRIES
 EVENT_COST = {0: 5000, 1: 3500, 2: 1800, 3: 1200, 4: 600, 5: 0, 6: 350, 7: 1000}   # by tier, home country
 TRAVEL = {'home': 1.0, 'region': 1.3, 'abroad': 1.8}
 QSCHOOL_FEE = 4500
-CADDIE_SHARE = 0.08              # of prize money, tiers 0-2 (lower tours use friends or a pull cart)
+CADDIE_SHARE = 0.08              # of prize money, to a professional caddie (plus their weekly fee)
 LIVING = 32000                   # a full-time touring professional's yearly living costs
 LIVING_WORKING = 40000           # an adult with a job: normal life costs more than living on the road
 SALARY = {'part_time': 52000, 'club_pro': 65000}
@@ -108,11 +111,11 @@ def money_unit(available):
 
 class Ledger:
     """One golfer's money for one year."""
-    __slots__ = ('prize', 'sponsors', 'salary', 'work', 'support', 'events', 'caddie', 'living')
+    __slots__ = ('prize', 'sponsors', 'salary', 'work', 'support', 'events', 'caddie', 'coaching', 'living')
 
     def __init__(self):
         self.prize = self.sponsors = self.salary = self.work = self.support = 0.0
-        self.events = self.caddie = self.living = 0.0
+        self.events = self.caddie = self.coaching = self.living = 0.0
 
     @property
     def income(self):
@@ -120,7 +123,7 @@ class Ledger:
 
     @property
     def costs(self):
-        return self.events + self.caddie + self.living
+        return self.events + self.caddie + self.coaching + self.living
 
     @property
     def net(self):

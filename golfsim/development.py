@@ -116,47 +116,48 @@ def judgement(g):
 _SELF_VIEW = {}
 
 
-def perceived_gap(g, k):
+def perceived_gap(g, k, insight=0.0):
     """The room a golfer *believes* attribute k has left: the true gap seen through a persistent personal
-    misreading (fixed per golfer and attribute; wider for poor judges of their own game)."""
+    misreading (fixed per golfer and attribute; wider for poor judges of their own game). A coach's
+    `insight` (their teaching skill, 0-1) narrows it when it is better than the golfer's own judgement."""
     z = _SELF_VIEW.get((g.id, k))
     if z is None:
         z = _SELF_VIEW[(g.id, k)] = random.Random(f'{g.id}:{k}:selfview').gauss(0, 1)
-    sd = 2.0 + 6.0 * (1 - judgement(g))
+    sd = 2.0 + 6.0 * (1 - max(judgement(g), insight))
     return max(0.0, g.ceilings[k] - g.attrs[k] + sd * z)
 
 
-def development_value(g, activity, age, category=None):
+def development_value(g, activity, age, category=None, insight=0.0, coach=0.5):
     """Overall a golfer expects to gain this week from an activity, from their own (imperfect) view of
     their game (used by the planner)."""
     lr = learning_rate(age) * (0.5 + g.personality['work_ethic'] / 100)
     gain = 0.0
     total_w = sum(OVERALL_WEIGHTS.values())
     if activity == 'train' and category:
-        k_train = BASE_TRAIN * lr * (0.6 + 0.8 * g.personality['coachability'] / 100)
+        k_train = BASE_TRAIN * lr * (0.6 + 0.8 * g.personality['coachability'] / 100) * (0.7 + 0.6 * coach)
         if category == 'mental':
             k_train *= MENTAL_TRAIN
         for k in CATEGORIES[category]:
-            gain += OVERALL_WEIGHTS[k] * k_train * perceived_gap(g, k)
+            gain += OVERALL_WEIGHTS[k] * k_train * perceived_gap(g, k, insight)
     elif activity == 'play':
         k_play = BASE_PLAY * lr
         for k, cat in CATEGORY_OF.items():
             if cat != 'physical':
-                gain += OVERALL_WEIGHTS[k] * k_play * perceived_gap(g, k) * (
+                gain += OVERALL_WEIGHTS[k] * k_play * perceived_gap(g, k, insight) * (
                     MENTAL_PLAY if cat == 'mental' else 1.0)
     return gain / total_w
 
 
-def choose_category(g, rng):
+def choose_category(g, rng, insight=0.0):
     """What to train: the category with the most to gain (weighted by what matters for scoring).
     Good course managers and coachable golfers read their game better; others guess more."""
     scores = {}
     for cat, ks in CATEGORIES.items():
-        gain = sum(OVERALL_WEIGHTS[k] * perceived_gap(g, k) for k in ks)
+        gain = sum(OVERALL_WEIGHTS[k] * perceived_gap(g, k, insight) for k in ks)
         if cat == 'mental':
             gain *= MENTAL_TRAIN
         scores[cat] = gain
-    noise = 0.25 + 0.75 * (1 - judgement(g))
+    noise = 0.25 + 0.75 * (1 - max(judgement(g), insight))
     top = max(scores.values()) or 1.0
     return max(scores, key=lambda c: scores[c] / top + rng.gauss(0, noise))
 

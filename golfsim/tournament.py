@@ -120,7 +120,7 @@ def play_match(a, b, course, rng, holes=18, pressure=0.5, caddies=None, on_hole=
 
 
 def play_stroke_and_match(field, course, rng, stroke_holes=36, bracket=64, final_holes=36, on_round=None,
-                          on_hole=None):
+                          on_hole=None, caddies=None):
     """Amateur-championship format: stroke-play qualifying, then a seeded knockout.
 
     Returns finishers [(golfer, position)]: 1 champion, 2 runner-up, 3 semi-finalists, 5 quarter-
@@ -128,12 +128,13 @@ def play_stroke_and_match(field, course, rng, stroke_holes=36, bracket=64, final
     If fewer players qualify than the bracket holds, the top seeds get byes into the next round.
     on_round receives the stroke-play rounds; on_hole every match-play hole.
     """
+    caddies = caddies or {}
     totals = {id(g): 0 for g in field}
     forms = {id(g): WeekForm.draw(rng, g) for g in field}
     for rd in range(1, stroke_holes // 18 + 1):
         pins = pin_sheet(course, Conditions(), rng)       # shared by the whole stroke-play field
         for g in field:
-            st = play_round(g, course, rng, Conditions(), None, rd, forms[id(g)], None, pins)
+            st = play_round(g, course, rng, Conditions(), caddies.get(id(g)), rd, forms[id(g)], None, pins)
             if on_round:
                 on_round(g, rd, st)
             totals[id(g)] += st.score
@@ -163,7 +164,8 @@ def play_stroke_and_match(field, course, rng, stroke_holes=36, bracket=64, final
             if a is None or b is None:            # a bye
                 winners.append(a if b is None else b)
                 continue
-            w, l, _ = play_match(a, b, course, rng, final_holes if final else 18, on_hole=on_hole, stage=stage)
+            w, l, _ = play_match(a, b, course, rng, final_holes if final else 18, caddies=caddies, on_hole=on_hole,
+                                 stage=stage)
             winners.append(w)
             losers.append(l)
         pos = len(alive) // 2 + 1

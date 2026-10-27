@@ -18,7 +18,8 @@ Competition rules are separate from choices: college eligibility ends at 22 (so 
 must decide what's next), Q-School and tour cards decide where a professional may play.
 
 Decisions: give up the chase (and take a job: part-time professional, regained amateur status or club
-professional), retire from competitive golf, make a comeback, turn professional. New juniors arrive
+professional — or join the profession as a coach or caddie, see staff.py), retire from competitive golf,
+make a comeback, turn professional. New juniors arrive
 every year. Every decision is written to the golfer's career history.
 """
 from __future__ import annotations
@@ -31,6 +32,7 @@ from .cards import home_challenger, home_lower, home_mini
 from .development import init_ceilings
 from . import finance as FIN
 from . import prestige as PR
+from . import staff as ST
 from .finance import initial_backing, initial_cash
 from .geography import COUNTRIES
 
@@ -87,6 +89,8 @@ def runway_years(season, g, year, tour, events, last_prize=None):
         income = 0.5 * income + 0.5 * last_prize
     income += PR.endorsements(season.player_prestige(g.id))
     costs = events * cost + FIN.LIVING
+    k, c = season.staff.caddie(g.id), season.staff.coach(g.id)
+    costs += events * (k.weekly_fee if k else 0.0) + (c.fee if c and season.staff.deal.get(g.id) == 'fee' else 0.0)
     shortfall = costs - income
     if shortfall <= 0:
         return 10.0
@@ -108,6 +112,12 @@ def progress_signal(row):
 
 
 OPPORTUNITY = {1: 1.0, 2: 0.7, 3: 0.4, 4: 0.15}
+LEVEL_NAME = {1: 'Premier Tour', 2: 'Challenger Tour', 3: 'regional tour', 4: 'mini-tour', 5: 'college',
+              6: 'amateur', 9: 'club'}
+
+
+def level_name(row):
+    return LEVEL_NAME.get(row.get('tier', 9), 'club') if row.get('status') != 'amateur' else 'amateur'
 
 
 def lasting_damage(season, gid, year, years=3):
@@ -196,9 +206,12 @@ def decide(season, year, snap):
         college = g.tour.startswith('CO_')
         # ---- retirement ---------------------------------------------------------------------
         if not college and rng.random() < p_retire(season, g, row, year):
-            log(g.id, year, 53, f'Retired from competitive golf at {age}')
+            role = ST.former_golfer_role(season, g, year, rng, level_name(row)) if g.status != 'amateur' or age >= 23 \
+                else None
+            if role is None:
+                log(g.id, year, 53, f'Retired from competitive golf at {age}')
             g.lifestyle, g.tour = 'retired', ''
-            note('retired')
+            note(f'became {role}' if role else 'retired')
             continue
         # ---- amateurs: graduation (an eligibility rule) and turning professional ---------------
         if g.status == 'amateur':
@@ -228,6 +241,11 @@ def decide(season, year, snap):
         # ---- full-time professionals (every tier): keep chasing, or stop? ------------------------
         p, why = p_stop_chasing(season, g, row, year)
         if rng.random() < p:
+            role = ST.former_golfer_role(season, g, year, rng, level_name(row))
+            if role is not None:                                    # off to coach or caddie
+                g.lifestyle, g.tour = 'retired', ''
+                note(f'became {role}')
+                continue
             mind = (g.attrs['management'] + g.attrs['composure']) / 200
             earned = sum(e.get(g.id, 0.0) for e in season.earnings.values())
             r = rng.random()

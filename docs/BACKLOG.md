@@ -50,7 +50,7 @@ Owner requirements and planned work, in rough order. "Built" items link to where
   34 — qualify for a big event or win a tour card. Very rare, but possible and part of the history.
 - **Every individual has a history** — players, caddies and coaches: careers, results, moves, injuries,
   money, milestones. *Players: first version built (career log).*
-- **Caddies and coaches as people (not built yet):** players who never make the Premier Tour but have
+- **Caddies and coaches as people:** *Built (v1), see `docs/COACHES_AND_CADDIES.md`.* players who never make the Premier Tour but have
   great mental attributes can become caddies or coaches; caddies and coaches have their own skills,
   careers, reputations, employers and histories; the best players hire the best of them (money and
   prestige).

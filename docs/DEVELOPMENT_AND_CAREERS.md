@@ -21,6 +21,9 @@ golfer does one thing:
 | **Rest** | No skill growth; fatigue recovers fully. |
 | **Work** | A paid work week (only for full-time pros who are genuinely short of money): earns a wage, no skill growth. |
 
+A **coach** (see `docs/COACHES_AND_CADDIES.md`) makes training count for more — most in their
+speciality, and for young players if that is their gift — and helps the golfer see what to work on.
+
 Growth also scales with a **learning rate** that is highest in the teens (1.2 at 18, 0.9 at 25, 0.6 at
 30, 0.25 at 40) and with **work ethic** (a hard worker realises far more of their potential). Teenagers
 also mature physically on their own, **every week, whatever they are doing** — resting and working
@@ -95,7 +98,7 @@ completed season, snapshotted **before** tour cards change (see `docs/SEASON_SYS
 | Decision | How it works |
 |---|---|
 | **Giving up the chase** (any tour) | The odds rise with money pressure (1 / (1 + runway)), life stage, poor health and a weak card, and fall with funded progress and willingness. The log records the runway and progress behind every decision. |
-| **After stopping** | They take a job and keep playing a few local events as part-time pros, regain amateur status (more likely for those who never earned much from golf), or (with a strong mental game, from their mid-twenties) become club professionals. |
+| **After stopping** | Some become **coaches or caddies** (see `docs/COACHES_AND_CADDIES.md`; rarely anyone who made a fortune). The rest take a job and keep playing a few local events as part-time pros, regain amateur status (more likely for those who never earned much from golf), or (with a strong mental game, from their mid-twenties) become club professionals. |
 | **Comebacks** | A part-timer who wins or contends — often because their mental game has matured — may quit their job for another run. The odds come from those results, how much of a year on tour they could fund, age (smoothly) and willingness. No age limit and no savings threshold. |
 | **Turning pro** | College eligibility ends at 22 — a **rule**, so every graduate must choose; the choice weighs their amateur ranking (observed standing), wins, means and willingness. Other amateurs turn pro on the same evidence, less often the further they are from their early twenties. |
 | **Retirement** | Smooth in age for everyone (club pros mostly in their sixties; touring pros later the better their standing and card). Part-timers and amateurs who play less often and less well stop competing sooner — work and family crowd competition out. |
