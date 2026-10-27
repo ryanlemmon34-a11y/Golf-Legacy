@@ -73,8 +73,9 @@ def config():
 def checks(s, year, snap, active_before):
     """Invariants for one completed season (after its end-of-season decisions)."""
     led = s.ledgers[year]
-    recon = sum(1 for g in s.world.golfers
-                if abs(g.cash - (s.cash_start[year][g.id] + (led[g.id].net if g.id in led else 0.0))) > 1e-6)
+    start = s.cash_start[year]                        # juniors arriving at year end start next season
+    recon = sum(1 for gid, c0 in start.items()
+                if abs(s.g[gid].cash - (c0 + (led[gid].net if gid in led else 0.0))) > 1e-6)
     rec = s.staff_receipts[year]
     paid_caddie = sum(l.caddie + l.caddie_share for l in led.values())
     paid_coach = sum(l.coaching + l.coach_share for l in led.values())
