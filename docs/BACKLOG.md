@@ -11,6 +11,7 @@ Owner requirements and planned work, in rough order. "Built" items link to where
 - Season system v1 with event and player prestige (`docs/SEASON_SYSTEM.md`)
 - Development, monthly planning, money and careers v1 (`docs/DEVELOPMENT_AND_CAREERS.md`)
 - Coaches and caddies as people, with dated relationships (`docs/COACHES_AND_CADDIES.md`)
+- Nationality, birthplace, residence and dated moves (`docs/RESIDENCE.md`)
 - Persistent identities, the history archive and resumable saves (`docs/HISTORY_AND_PERSISTENCE.md`)
 
 ## Prestige (owner, recorded for the backlog; first version built in the season system)

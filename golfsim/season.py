@@ -35,6 +35,7 @@ from . import finance as FIN
 from . import staff as ST
 from . import prestige as PR
 from . import qualification as Q
+from . import residence as RES
 from .calendar import MAJOR_WEEKS, TOUR_BY_KEY, _in_window
 from .course_library import default_library
 from .engine import Conditions
@@ -283,6 +284,9 @@ class Season:
         self.new_pros_added = {}                             # year -> new professionals from outside the amateur game
         self.entry_routes = {}                               # (year, series) -> {gid: route code}
         self.staff = ST.initial_staff(world, seed)           # coaches and caddies
+        self.places = RES.Places()                           # birthplace, residence and moves of every person
+        self.move_log = {}                                   # year -> [moves recorded that winter]
+        self.move_blocked = {}                               # year -> career moves not made for lack of money
         self.staff_receipts = defaultdict(Counter)            # year -> ('coach'|'caddie', id) -> $ received
         self.overall_start = {}                              # year -> gid -> overall on 1 January
         self._teams = {}                                     # event id -> {gid: (coach, caddie)} this week
@@ -331,6 +335,7 @@ class Season:
             if t.tier in (2, 3):
                 tour_target(self, k)                         # remember each tour's starting size
         self._seed_world()
+        RES.settle(self, self.first_year, 0)                 # everyone's birthplace and where they live
 
     # ---- people and starting state --------------------------------------------------------------
     def refresh_people(self, year):
@@ -550,24 +555,28 @@ class Season:
         home = self.home_level.get(g.tour, 20.0)
         if g.tour in PREMIER_TOURS and self.rights_of(g.id, self.year) in ('graduate', 'conditional'):
             # uncertain access: a Challenger event is a real alternative when the Premier field is full
-            home = self.home_level.get(CHALLENGER_BY_COUNTRY.get(g.country, CHALLENGER_BY_REGION[region_of(g)])[0], home)
+            near = self.home_country(g)                      # the Challenger tour nearest where they live
+            home = self.home_level.get(CHALLENGER_BY_COUNTRY.get(near, CHALLENGER_BY_REGION[COUNTRIES[near].region])[0], home)
         return max(home - 20, 0.9 * self.player_prestige(g.id) + 3, 8.0)
 
     def base_value(self, g, ed, venue_country):
-        """An event's appeal before personal circumstances: prestige, home country, travel."""
+        """An event's appeal before personal circumstances: prestige, closeness to where they live,
+        travel (residence, not nationality: callers' caches are keyed by the country of residence)."""
         v = self.event_prestige[ed.series.series_id]
-        if venue_country == g.country:
+        home = self.home_country(g)
+        region = COUNTRIES[home].region
+        if venue_country == home:
             v += 6
-        elif COUNTRIES[venue_country].region == region_of(g):
+        elif COUNTRIES[venue_country].region == region:
             v += 2
         else:
             v -= 6 if ed.series.tier >= 2 else 2
         if g.lifestyle == 'part_time':                       # they have a job: local events only
-            if venue_country == g.country:
+            if venue_country == home:
                 v += 8
-            elif g.status == 'club_pro' and ed.series.tier == 8 and COUNTRIES[venue_country].region == region_of(g):
+            elif g.status == 'club_pro' and ed.series.tier == 8 and COUNTRIES[venue_country].region == region:
                 # a section event over the border: a drive in Europe and North America, a flight elsewhere
-                v += 9 if region_of(g) in CLUB_PRO_DRIVING_REGIONS else 4
+                v += 9 if region in CLUB_PRO_DRIVING_REGIONS else 4
             else:
                 v -= 40
         if g.status == 'club_pro' and ed.series.tier == 8:
@@ -586,10 +595,15 @@ class Season:
         state or province, a fixed draw per (hometown, venue) pair otherwise, standing in for distance
         (the geography has no coordinates). It only ranks venues: club pros near one venue favour it
         together, and the events of a big country do not all draw the same crowd from everywhere."""
-        if city == g.hometown:
-            return -3.0
-        near = ', ' in city and city.split(', ', 1)[1] == g.hometown.split(', ', 1)[-1]
-        u = _seed(self.seed, 'drive', g.hometown, city) % 1000 / 1000
+        home = self.places.home.get(g.id)
+        if home is None or home == self.places.birth.get(g.id):  # still in the place they grew up in
+            if city == g.hometown:
+                return -3.0
+            near = ', ' in city and city.split(', ', 1)[1] == g.hometown.split(', ', 1)[-1]
+            u = _seed(self.seed, 'drive', g.hometown, city) % 1000 / 1000
+        else:                                                # living elsewhere now: from where they live
+            near = RES.place_of_city(city) == home
+            u = _seed(self.seed, 'drive', home[0], home[1], city) % 1000 / 1000
         return -3.0 + 2.0 * u if near else -2.0 + 5.0 * u
 
     def golfer_week(self, g, year, week):
@@ -734,8 +748,8 @@ class Season:
         city = {ed.event_id: venues[ed.event_id][0].city for ed in regular}
         prefs = {}
         open_to = {}                                         # who may enter which events this week (by kind)
-        fees = {}                                            # (paid by school?, home country, event) -> cost
-        bases = {}                                           # (home country, lifestyle, event) -> base value
+        fees = {}                                            # (paid by school?, country of residence, event) -> cost
+        bases = {}                                           # (country of residence, lifestyle, event) -> base value
         for g in self.active_golfers():
             if (not g.tour and g.status != 'club_pro') or g.id in self.injured or g.lifestyle == 'retired':
                 continue
@@ -756,18 +770,19 @@ class Season:
             k = self.staff.caddie(g.id)
             caddie_fee = k.weekly_fee if k is not None and g.id not in self._caddie_week else 0.0
             gw = self.golfer_week(g, year, week)
+            home = self.home_country(g)                      # costs and appeal start where they live
             for ed in evs:
                 if days & ed.series.day_set:
                     continue
                 eid = ed.event_id
-                fk = (g.tour.startswith('CO_'), g.status == 'club_pro', g.country, eid)
+                fk = (g.tour.startswith('CO_'), g.status == 'club_pro', home, eid)
                 fee = fees.get(fk)
                 if fee is None:
-                    fee = fees[fk] = FIN.event_cost(g, ed.series, city[eid])
+                    fee = fees[fk] = FIN.event_cost(g, ed.series, city[eid], home)
                 cost = fee + caddie_fee                      # = trip_cost: the can_afford rule
                 if not (cost <= 0 or cost <= money):
                     continue                                 # cannot pay for the trip (school-paid trips cost 0)
-                bk = (g.country, g.lifestyle, eid, g.id if g.status == 'club_pro' else 0)
+                bk = (home, g.lifestyle, eid, g.id if g.status == 'club_pro' else 0)
                 base = bases.get(bk)
                 if base is None:
                     base = bases[bk] = self.base_value(g, ed, country[eid])
@@ -1166,7 +1181,8 @@ class Season:
         """36-hole sectionals, open to club professionals who choose to (and can afford to) enter:
         most home-country club pros do, a few from abroad travel. Played and recorded like any event."""
         s = ed.series
-        keen = lambda g: 0.9 if g.country == s.host_country else 0.4 if region_of(g) in QS_AMERICAS else 0.08
+        keen = lambda g: (0.9 if self.home_country(g) == s.host_country else 0.4 if self.home_region(g) in QS_AMERICAS
+                          else 0.08)                         # how far they live from the sites
         ids = [g.id for g in sorted(self.active_golfers(), key=lambda x: x.id)
                if g.status == 'club_pro' and free(g) and rng.random() < keen(g)]
         rng.shuffle(ids)
@@ -1310,7 +1326,7 @@ class Season:
                         or g.lifestyle == 'retired':
                     continue
                 good = g.status in ('pro', 'club_pro') or self.am_pos.get(g.id, 9999) <= 400
-                keen = 0.75 if region_of(g) in home else 0.08
+                keen = 0.75 if self.home_region(g) in home else 0.08   # open to all: proximity decides
                 if good and rng.random() < keen:
                     pool.append(g.id)
             pool.sort(key=lambda gid: (self.wr_pos.get(gid, 9999) if self.g[gid].status != 'amateur'
@@ -1331,10 +1347,10 @@ class Season:
             direct = [gid for gid in st['direct'] if free(self.g[gid]) and gid not in st['entered']]
             direct.sort(key=lambda gid: self.wr_pos.get(gid, 9999))
             if sid == 'USA_OPEN_FINAL_INTL':
-                ids = [gid for gid in direct if region_of(self.g[gid]) not in QS_AMERICAS and rng.random() < 0.6][:n]
+                ids = [gid for gid in direct if self.home_region(self.g[gid]) not in QS_AMERICAS and rng.random() < 0.6][:n]
             elif sid == 'USA_OPEN_FINAL':
                 ids = [gid for gid in st['advanced'] if free(self.g[gid])]
-                ids += [gid for gid in direct if region_of(self.g[gid]) in QS_AMERICAS and rng.random() < 0.7]
+                ids += [gid for gid in direct if self.home_region(self.g[gid]) in QS_AMERICAS and rng.random() < 0.7]
                 ids = ids[:n]
             else:
                 ids = [gid for gid in st['advanced'] if free(self.g[gid])]
@@ -1345,7 +1361,7 @@ class Season:
         if s.sites == 1:
             return [ids]
         if sid == 'USA_OPEN_FINAL_INTL':                        # England site for Europe, Japan for Asia
-            eu = [gid for gid in ids if region_of(self.g[gid]) in QS_EUROPE]
+            eu = [gid for gid in ids if self.home_region(self.g[gid]) in QS_EUROPE]   # the site nearer home
             asia = [gid for gid in ids if gid not in set(eu)]
             return [eu[:s.field], asia[:s.field]]
         return [ids[i::s.sites] for i in range(s.sites)]
@@ -1413,6 +1429,11 @@ class Season:
         if state.get('lib') == 'default':
             state['lib'] = default_library()
             state['cal'] = state['lib'].calendar
+        if 'places' not in state:                           # saves from before residence: everyone there now
+            places = RES.Places()                            # has unknown geography (never invented)
+            places.legacy = {g.id for g in state['world'].golfers} | set(state['staff'].coaches) \
+                | set(state['staff'].caddies)
+            state['places'], state['move_log'], state['move_blocked'] = places, {}, {}
         now = state.get('year') or state.get('first_year')
         for rec in (r for tiers in state['prize_record'].values() for r in tiers.values()):
             if len(rec) == 2:                                # evidence from before it was dated: as of now
@@ -1504,7 +1525,7 @@ class Season:
                     self.staff.rel.add_work('caddie', gid, n, year)     # time on the bag together
             host_region = COUNTRIES[CITY_BY_NAME[v.city].country].region
             for gid, n in rounds.items():
-                self._week_load[gid] += self.load(self.g[gid], n, region_of(self.g[gid]) != host_region, year)
+                self._week_load[gid] += self.load(self.g[gid], n, self.home_region(self.g[gid]) != host_region, year)
                 self._week_event[gid] = ed.event_id
                 self.week_rounds[gid] += n
             for gid, _, _ in finish:
@@ -1515,7 +1536,7 @@ class Season:
                 elif payer == 'club':
                     self.club_trips[year][gid] += 1
                 else:
-                    cost = FIN.event_cost(g_, s, v.city)
+                    cost = FIN.event_cost(g_, s, v.city, self.home_country(g_))   # the rule they were priced by
                     if cost:
                         self.spend(g_, year, 'events', cost)
                 k = self.staff.caddie(gid)
@@ -1700,7 +1721,7 @@ class Season:
             del self.prior_rounds[gid]                       # their first season is over
         for d in (self.earnings, self.level_earnings, self.played, self.pstats, self.ledgers, self.season_rounds, self.entry_wants,
                   self.entry_misses, self.entry_stats, self.declined, self.school_trips, self.club_trips,
-                  self.backer_flows, self.activity_counts,
+                  self.backer_flows, self.move_log, self.move_blocked, self.activity_counts,
                   self.block_flags, self.cash_start, self.support_start, self.overall_start, self.rank_start, self.am_start,
                   self.staff_receipts, self.injuries, self.card_log, self.career_counts, self.transitions,
                   self.assignments, self.staff_year, self.unheld, self.rights, self.card_reasons, self.snapshots,
@@ -1765,6 +1786,11 @@ class Season:
                 self.fatigue[g.id] = g.fatigue = 0.0         # the off-season rests everyone
         ST.end_of_season(self, year, snap)                   # coaches' and caddies' year
         self._active = None                                  # retirements and arrivals: rebuilt when next needed
+        if self.development:
+            RES.review_moves(self, year, snap)               # career moves (and staying put, or going home)
+            RES.staff_moves(self, year)
+        RES.settle(self, year, 53)                           # arrivals' places; college bases (school-paid)
+        self._active = None
 
     def start_finances(self, year):
         """Sponsor contracts for the season, from each professional's prestige at its start
@@ -1960,7 +1986,7 @@ class Season:
         for g in self.active_golfers():
             if g.lifestyle == 'retired':
                 continue
-            key = (g.tour, g.country, g.status, g.lifestyle, self.wr_pos.get(g.id, 9999) <= 500,
+            key = (g.tour, g.country, self.home_country(g), g.status, g.lifestyle, self.wr_pos.get(g.id, 9999) <= 500,
                    self.am_pos.get(g.id, 9999) <= 25, self.am_pos.get(g.id, 9999) <= 300,
                    g.id if g.status == 'club_pro' else 0)      # club pros: their own diary and drives
             if key not in cache:                             # every eligible event, best first
@@ -2227,12 +2253,23 @@ class Season:
         cost = self.trip_cost(g, series, city)
         return cost <= 0 or cost <= money
 
+    def home_country(self, g):
+        """Where a golfer lives (residence.Places): every travel cost and proximity starts here. Their
+        nationality only for legacy golfers whose residence was never recorded."""
+        return self.places.country(g.id, g.country)
+
+    def home_region(self, g):
+        return COUNTRIES[self.home_country(g)].region
+
+    def money_unit(self, g, year):
+        return FIN.money_unit(max(0.0, self.funds(g, year)))
+
     def trip_cost(self, g, series, city):
         """What playing an event costs a golfer: travel and fees, plus their caddie's weekly fee (unless
         already booked for another event this week)."""
         k = self.staff.caddie(g.id)
-        return FIN.event_cost(g, series, city) + (k.weekly_fee if k is not None and g.id not in self._caddie_week
-                                                  else 0.0)
+        return FIN.event_cost(g, series, city, self.home_country(g)) + (
+            k.weekly_fee if k is not None and g.id not in self._caddie_week else 0.0)
 
     def prize_kept(self, g):
         """Share of prize money a golfer keeps after their caddie's and a scouting coach's shares."""
@@ -2310,17 +2347,20 @@ class Season:
         contracts pay and the forecasts expect)."""
         return PR.endorsements(self.player_prestige(g.id)) if g.status == 'pro' and g.lifestyle != 'retired' else 0.0
 
-    def tour_trip_cost(self, g, tour):
+    def tour_trip_cost(self, g, tour, home=None, caddie=True):
         """What one of a tour's events typically costs this golfer (finance.event_cost averaged over the
-        tour's events: their travel, entry fees; nothing when their school or club pays), with their
-        caddie's weekly fee."""
+        tour's events: their travel from where they live -- or from `home`, a country they might live in
+        -- and entry fees; nothing when their school or club pays), with their caddie's weekly fee. The
+        cache is keyed by everything the cost depends on (the country they travel from included), so
+        golfers of one nationality living in different places never share an entry."""
         cache = self.__dict__.setdefault('_trip_cost', {})
-        key = (tour, g.country, g.status, g.tour.startswith('CO_'))
+        home = home or self.home_country(g)
+        key = (tour, home, g.status, g.tour.startswith('CO_'))
         if key not in cache:
             ss = [x for x in self.cal.series if x.tour == tour and x.category == 'regular'] or \
                  [x for x in self.cal.series if x.tour == tour]
-            cache[key] = (sum(FIN.event_cost(g, x, x.cities[0]) for x in ss) / len(ss)) if ss else 0.0
-        k = self.staff.caddie(g.id)
+            cache[key] = (sum(FIN.event_cost(g, x, x.cities[0], home) for x in ss) / len(ss)) if ss else 0.0
+        k = self.staff.caddie(g.id) if caddie else None
         return cache[key] + (k.weekly_fee if k is not None else 0.0)
 
     def season_forecast(self, g, tour, events, last=None, without_backers=False, cautious=False):

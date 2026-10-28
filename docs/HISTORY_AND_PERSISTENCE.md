@@ -97,7 +97,8 @@ world/
 
 ```
 world.json            format, seed, years written; tours, series, courses and layouts
-people.json.gz        every person: name, country, born, hometown, arrival, roles (golfer/coach/caddie)
+people.json.gz        every person: name, country (nationality), born, hometown, birthplace, residence and
+                      dated moves (docs/RESIDENCE.md), arrival, roles (golfer/coach/caddie)
 relations.json.gz     every stint, and each pair's working relationship
 records.json.gz       course records per layout, every mark with golfer id and event id
 years/YYYY.json.gz    one season: every edition (venues, finishers per site, each golfer's team that

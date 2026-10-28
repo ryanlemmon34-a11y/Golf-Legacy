@@ -415,6 +415,32 @@ class TransactionTests(unittest.TestCase):
         self.assertEqual(archive_view(self.dir), view)                  # repaired, exactly
         s.close()
 
+    def test_moves_and_money_survive_an_interrupted_season_end(self):
+        """The winter's moves (and their cost) are in the committed world and the published history
+        exactly once after a crash before publication, a reopening and a replay."""
+        ref_view, ref_print = self.after_end[2027]
+        ref_moves = {pid: p['moves'] for pid, p in ref_view['people.json.gz'].items() if p['moves']}
+        self.assertTrue(ref_moves)                                          # the reference winter had moves
+        s = self.at_season_end(2027)
+        with mock.patch.object(SES, '_publish_archive', side_effect=OSError('power cut')), \
+                self.assertRaises(OSError):
+            s.advance_one_week()
+        s.close()
+        t = Session.open(self.dir, workers=1)                            # recovery publishes it
+        view = archive_view(self.dir)
+        self.assertEqual({pid: p['moves'] for pid, p in view['people.json.gz'].items() if p['moves']}, ref_moves)
+        P = t.season.places
+        self.assertEqual({str(pid): len(m) for pid, m in P.moves.items()}, {pid: len(m) for pid, m in ref_moves.items()})
+        for pid, ms in P.moves.items():
+            self.assertEqual(len(ms), len(set(ms)))                     # none twice
+        self.assertEqual(fingerprint(t.season), ref_print)               # cash (moving costs included)
+        led = t.season.ledgers[2027]
+        for g in t.season.world.golfers:                                 # and every golfer reconciles
+            c0 = t.season.cash_start[2027].get(g.id)
+            if c0 is not None:
+                self.assertAlmostEqual(g.cash, c0 + (led[g.id].net if g.id in led else 0.0), delta=0.01)
+        t.close()
+
     def test_a_retry_through_another_handle_is_recognised(self):
         a = self.new()
         b = Session.open(self.dir, workers=1)                            # a second, independently opened handle

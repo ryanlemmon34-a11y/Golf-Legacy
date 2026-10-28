@@ -110,7 +110,9 @@ class PromotionTests(unittest.TestCase):
             g, l = s.g[gid], led.get(gid)
             support, backer_support = (l.support, l.backer_support) if l else (0.0, 0.0)
             cash0 = s.cash_start[2027][gid]
-            self.assertAlmostEqual(self.end[gid][0], cash0 + (l.net if l else 0.0), delta=0.01)
+            moving = l.moving if l else 0.0                                  # a winter move is paid at the season's end
+            self.assertAlmostEqual(self.end[gid][0], cash0 + (l.net if l else 0.0) + moving, delta=0.01)
+            self.assertAlmostEqual(g.cash, cash0 + (l.net if l else 0.0), delta=0.01)   # and after it
             self.assertAlmostEqual(self.end[gid][1], backing0 - support, delta=0.01)      # family money
             put_up = s.backer_flows[2027][(gid, 'put_up')]
             self.assertAlmostEqual(self.end[gid][2], funds0 + put_up - backer_support, delta=0.01)

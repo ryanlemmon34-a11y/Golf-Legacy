@@ -462,23 +462,26 @@ def start_of_season(season, year):
         if st.deal.get(gid) == 'share':
             shares[cid] = shares.get(cid, 0) + 1
     coaches = [c for c in st.coaches.values() if c.status == 'active']
+    lives = {c.id: season.places.country(c.id, c.country) for c in coaches}   # where they work from
+    home = season.home_country
     by_region = {}
     for c in coaches:
-        by_region.setdefault(region(c.country), []).append(c)
+        by_region.setdefault(region(lives[c.id]), []).append(c)
     # 1. scouting: coaches approach young, raw players they believe in
     young = [g for g in active if g.age(year) <= SCOUT_AGE and g.status in ('amateur', 'pro')]
     near = {}
     for g in young:
-        near.setdefault(g.country, []).append(g)
+        near.setdefault(home(g), []).append(g)
     for c in sorted(coaches, key=lambda c: (-c.reputation, c.id)):
         # a coach still has to make a living from paying students: at most a third of their book is
         # players coached for a share of future winnings
         free = min(c.capacity - students.get(c.id, 0), c.capacity // 3 - shares.get(c.id, 0))
         if free <= 0:
             continue
-        pool = list(near.get(c.country, ()))
+        here = lives[c.id]
+        pool = list(near.get(here, ()))
         if c.reputation >= 60:                        # well-known coaches look further afield
-            pool += [g for cc, gs in near.items() if cc != c.country and region(cc) == region(c.country) for g in gs]
+            pool += [g for cc, gs in near.items() if cc != here and region(cc) == region(here) for g in gs]
         if not pool:
             continue
         crng = random.Random(f'{season.seed}:scout:{year}:{c.id}')
@@ -524,8 +527,8 @@ def start_of_season(season, year):
         # the part of their game they believe has most room (their own imperfect view)
         weak = max(SPECIALITIES, key=lambda cat: (sum(perceived_gap(g, k) for k in CATEGORIES[cat])
                                                   if g.ceilings else 0, cat))
-        options = by_region.get(region(g.country), []) + [c for c in coaches if c.reputation >= 70
-                                                          and region(c.country) != region(g.country)]
+        options = by_region.get(region(home(g)), []) + [c for c in coaches if c.reputation >= 70
+                                                         and region(lives[c.id]) != region(home(g))]
         best = None
         affordable = False
         for c in options:
@@ -536,14 +539,14 @@ def start_of_season(season, year):
                 continue
             past = st.rel.pairs.get(('coach', c.id, g.id))
             v = c.reputation + (12 if c.speciality == weak else 0) + (10 if c.youth and g.age(year) <= YOUTH_AGE else 0) \
-                + (5 if c.country == g.country else 0) + (4 * past.fit if past else 0) + rng.gauss(0, 4)
+                + (5 if lives[c.id] == home(g) else 0) + (4 * past.fit if past else 0) + rng.gauss(0, 4)
             if best is None or v > best[0]:
                 best = (v, c)
         if best:
             st.assign_coach(season, g, best[1], 'fee', when, 'golfer', f'${best[1].fee:,.0f} a year')
             students[best[1].id] = students.get(best[1].id, 0) + 1
         elif affordable:                              # could pay, but every coach they could afford was full
-            st.unserved[year][g.country] = st.unserved[year].get(g.country, 0) + 1
+            st.unserved[year][home(g)] = st.unserved[year].get(home(g), 0) + 1
     # 3. caddies (one touring golfer each)
     for g in active:
         k = st.caddie(g.id)
@@ -724,11 +727,11 @@ def end_of_season(season, year, snap):
     demand = {}
     for g in season.world.golfers:
         if wants_caddie(g) and g.lifestyle != 'retired':
-            demand[g.country] = demand.get(g.country, 0) + 1
+            demand[season.home_country(g)] = demand.get(season.home_country(g), 0) + 1
     supply = {}
     for k in st.caddies.values():
         if k.status == 'active':
-            supply[k.country] = supply.get(k.country, 0) + 1
+            supply[season.places.country(k.id, k.country)] = supply.get(season.places.country(k.id, k.country), 0) + 1
     for country, n in sorted(demand.items()):
         for _ in range(max(0, round(1.1 * n) - supply.get(country, 0))):
             st.generated_caddie(rng, country, year + 1, 'a club caddie (outside recruit)')

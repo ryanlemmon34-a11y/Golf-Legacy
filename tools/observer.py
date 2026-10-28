@@ -229,6 +229,17 @@ def golfer(w, q, pid):
     out.append(f'<p>{esc(country)} · born {esc(born)} · roles: {esc(", ".join(roles))}'
                + (' · <span class="tag">career began before the archive</span>' if p and p.get('initial') else '')
                + '</p>')
+    # one geography per person (golfer, coach or caddie): live from the session, else from the archive
+    places = w.session.season.places if w.session and w.session.season.places.known(pid) else None
+    geo = places.export(pid) if places else (w.a.geography(pid) if p else None)
+    if geo:
+        where = lambda x: (f'{x["region"]}, {x["country"]}' if x.get('region') else x['country']) if x else 'unknown'
+        out.append(f'<p>Nationality: {esc(country)} · born in {esc(where(geo["birthplace"]))}'
+                   f' · lives in {esc(where(geo["residence"]))}</p>')
+        if geo['moves']:
+            out.append('<h2>Where they have lived</h2><table><tr><th>When</th><th>From</th><th>To</th><th>Why</th></tr>'
+                       + ''.join(f'<tr><td>{m["year"]}</td><td>{esc(where(m["from"]))}</td><td>{esc(where(m["to"]))}</td>'
+                                 f'<td>{esc(m["reason"])}</td></tr>' for m in geo['moves']) + '</table>')
     if g:
         out.append(f'<p>Now: {esc(g.status)}, {esc(g.lifestyle)}, {esc(g.tour or "no tour")}'
                    + (f', world No. {w.session.season.wr_pos[pid]}' if pid in w.session.season.wr_pos else '') + '</p>')

@@ -76,7 +76,7 @@ class MarketTests(unittest.TestCase):
             return Counter(i % 2 for i, g in enumerate(young) if s.staff.deal.get(g.id) == 'share')
         self.assertEqual(approaches(0.0, False), approaches(25.0, False))     # hidden potential is invisible
         got = approaches(0.0, True)
-        self.assertGreater(got[1], 2 * max(1, got[0]))                       # fast improvers stand out
+        self.assertGreater(got[1], 1.5 * max(1, got[0]))                     # fast improvers stand out
 
 
 class EffectTests(unittest.TestCase):

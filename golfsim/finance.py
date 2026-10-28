@@ -15,6 +15,8 @@ Costs
     living              a full-time touring professional lives on their winnings; everyone with a job
                         pays ordinary living costs from their salary (college golfers and teenagers
                         living at home pay none)
+    moving              a career move to another country (residence.MOVE_COST); college moves are paid
+                        by the school and never charged
 
 Money moves when it is earned or spent (weekly), never in a lump at the end of the season, and every
 dollar passes through the golfer's ledger, so savings always reconcile exactly:
@@ -137,13 +139,16 @@ def event_payer(g, series):
     return None
 
 
-def event_cost(g, series, city):
-    """What one event costs a golfer: travel by distance, entry fees (0 when a school or club pays,
-    event_payer). A caddie's weekly fee is not part of it (Season.trip_cost adds it once a week)."""
+def event_cost(g, series, city, home=None):
+    """What one event costs a golfer: travel by distance from where they live (`home`: their country of
+    residence, Season.home_country; their nationality only for legacy people whose residence is unknown),
+    entry fees (0 when a school or club pays, event_payer). A caddie's weekly fee is not part of it
+    (Season.trip_cost adds it once a week)."""
     if event_payer(g, series):
         return 0.0
+    home = home or g.country
     country = CITY_BY_NAME[city].country
-    where = 'home' if country == g.country else 'region' if COUNTRIES[country].region == COUNTRIES[g.country].region \
+    where = 'home' if country == home else 'region' if COUNTRIES[country].region == COUNTRIES[home].region \
         else 'abroad'
     cost = EVENT_COST[series.tier] * TRAVEL[where]
     if series.tier == 4 and series.field:
@@ -206,15 +211,15 @@ def money_unit(available):
 class Ledger:
     """One golfer's money for one year."""
     __slots__ = ('prize', 'sponsors', 'salary', 'work', 'support', 'backer_support', 'events', 'caddie',
-                 'caddie_share', 'coaching', 'coach_share', 'living', 'backer_share')
+                 'caddie_share', 'coaching', 'coach_share', 'living', 'backer_share', 'moving')
 
     def __init__(self):
         self.prize = self.sponsors = self.salary = self.work = self.support = self.backer_support = 0.0
         self.events = self.caddie = self.caddie_share = self.coaching = self.coach_share = self.living = 0.0
-        self.backer_share = 0.0
+        self.backer_share = self.moving = 0.0
 
     def __setstate__(self, state):                    # ledgers saved before backer shares (or backers'
-        self.backer_share = self.backer_support = 0.0 # draws kept apart from family money) existed
+        self.backer_share = self.backer_support = self.moving = 0.0   # draws, or moves) existed
         for k, v in (state[1] if isinstance(state, tuple) else state).items():
             setattr(self, k, v)
 
@@ -225,7 +230,7 @@ class Ledger:
     @property
     def costs(self):
         return (self.events + self.caddie + self.caddie_share + self.coaching + self.coach_share + self.living
-                + self.backer_share)
+                + self.backer_share + self.moving)
 
     @property
     def net(self):

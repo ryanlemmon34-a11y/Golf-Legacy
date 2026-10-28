@@ -11,16 +11,19 @@ Layout of an archive directory (JSON, gzip):
 
     world.json          format, seed, years written; catalogues of tours, event series, courses and
                         layouts (stable string ids)
-    people.json.gz      every person ever (golfers and staff share one person-id space): name, country,
-                        birth year, hometown, when they appeared, and their roles (playing career,
-                        coaching career, caddying career)
+    people.json.gz      every person ever (golfers and staff share one person-id space): name, country
+                        (nationality, fixed for life), birth year, hometown, birthplace and residence
+                        (country and state / province; None when unknown), every dated move (from, to,
+                        reason), when they appeared, and their roles (playing career, coaching career,
+                        caddying career)
     relations.json.gz   every coaching, caddying and school-team stint, and each pair's working
                         relationship
     records.json.gz     course records per layout; every mark carries golfer id and event id
     years/YYYY.json.gz  one season: every edition (series, week, venues, finishers per site, and the
                         coach and caddie each golfer had that week), each golfer's season (tour, events,
-                        wins, money, rankings, injuries), career decisions with their reasons, staff work,
-                        and that season's narrative log lines (display text only)
+                        wins, money, rankings, injuries, where they lived that season), career decisions
+                        with their reasons, that winter's moves, staff work, and that season's narrative
+                        log lines (display text only)
 
 Facts are stored once and referenced by id (a win is in the edition; a coach's record is derived from
 stints and editions), so the archive grows by one season file a year rather than copying data into
@@ -115,11 +118,15 @@ class ArchiveWriter:
             careers[gid]['rights'] = season.rights.get(year, {}).get(gid)          # Premier status at entry, why
             careers[gid]['access'] = dict(season.week_access.get(year, {}).get(gid, {}))
             careers[gid]['denied'] = season.access_log.get(year, {}).get(gid, [])   # (week, outcome, wanted, played)
+            home = season.places.residence_at(gid, year, 52)                     # where they lived that season
+            careers[gid]['residence'] = list(home) if home else None
             careers[gid]['prize'] = round(careers[gid]['prize'] or 0)
             careers[gid]['net'] = round(careers[gid]['net'] or 0)
         log = {gid: [(w, t) for y, w, t in h if y == year] for gid, h in season.history.items()}
         chunk = {'year': year, 'events': events, 'careers': careers,
                  'transitions': season.transitions.get(year, []),
+                 'moves': [dict(m, **{'from': list(m['from']) if m['from'] else None, 'to': list(m['to'])})
+                           for m in season.move_log.get(year, [])],
                  'unheld': list(season.unheld.get(year, [])),          # scheduled, but nobody entered
                  'moments': list(season.moments.get(year, [])),        # aces, albatrosses, playoffs, course records
                  # each week's top 100 of the world and amateur rankings (No. 1 = first): weeks at No. 1,
@@ -154,6 +161,11 @@ class ArchiveWriter:
             p = people.setdefault(k.id, {'name': k.name, 'country': k.country, 'born': k.born, 'hometown': None})
             p['caddie'] = {'reputation': k.reputation, 'background': k.background, 'status': k.status,
                            'earnings': round(k.earnings), 'seasons': k.seasons, 'history': k.history}
+        places = getattr(season, 'places', None)
+        for pid, p in people.items():                 # one geography per person, whatever their roles
+            p['nationality'] = p['country']
+            p.update(places.export(pid) if places else {'birthplace': None, 'residence': None,
+                                                        'first_residence': None, 'moves': []})
         return {'people.json.gz': people, 'relations.json.gz': st.rel.export(),
                 'records.json.gz': season.records.to_dict()}
 
@@ -228,6 +240,24 @@ class Archive:
     def find(self, name):
         """Person ids with this name (names are not unique; ids are)."""
         return sorted(pid for pid, p in self.people.items() if p['name'] == name)
+
+    def residence_at(self, pid, year, week=53):
+        """Where a person lived at (year, week), from their dated moves (None if unknown): never today's
+        address for an earlier season."""
+        p = self.people.get(pid) or {}
+        first = p.get('first_residence')
+        place = first['place'] if first else None
+        for m in p.get('moves', ()):
+            if (m['year'], m['week']) <= (year, week):
+                place = m['to']
+        return place
+
+    def geography(self, pid):
+        """Nationality, birthplace, current residence and residence history (None = unknown)."""
+        p = self.people[pid]
+        return {'nationality': p.get('nationality', p.get('country')), 'birthplace': p.get('birthplace'),
+                'residence': p.get('residence'), 'first_residence': p.get('first_residence'),
+                'moves': p.get('moves', [])}
 
     def roles(self, pid):
         p = self.people[pid]
