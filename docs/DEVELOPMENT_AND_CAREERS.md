@@ -100,9 +100,13 @@ winter backers decide with bounded odds from what they can see (`careers.p_backe
 (promotion, a rising world ranking, wins, top-10s), places already secured, how far the season's losses
 outrun the deal, their own patience (drawn with each deal), seasons in a row without progress, and age.
 Progress almost always renews a deal; flat seasons make withdrawal likelier, never certain. A deal also
-ends when the golfer pays their own way — judged without the
-support being withdrawn: their own expected winnings and sponsors cover a season, or their own savings
-(not family money, not the backers', not credit) cover three seasons of losses; the history says which. A professional
+ends when the golfer pays their own way — judged without the support being withdrawn
+(`careers.own_way`): their own cash must pay for the first quarter of the season's costs before any
+winnings arrive, and then either their winnings *proven at that level* (eight or more events there,
+counted cautiously) and sponsors cover a season, or their sponsor contract alone does, or their own savings
+(not family money, not the backers', not credit) cover three seasons of losses with no winnings counted
+at a level they have not proven; the history says which. A new card raises the golfer's desire to
+continue and their opportunities, but is not yet an income. A professional
 without backers can attract them with a breakthrough season (a win, promotion or a big ranking jump; the
 younger, the likelier).
 Every deal, renewal and withdrawal is in the golfer's history. Club professionals' own events (section
@@ -119,8 +123,14 @@ every entry, qualifier and invitation** (majors, elite and national amateur cham
 Finals): an invited golfer who cannot pay declines (recorded) and the next in line or the next alternate
 takes the place. College events are paid by the school, never blocked by a golfer's debt, and the school
 is recorded as the payer. Expected prize money
-comes from their own record (the share of purses they have actually been winning, discounted for fields
-above their usual level), never from hidden ability, and it is never spent before it is won. How much
+comes from their own record, kept by level of competition (the share of purses they have actually won
+against Premier, Challenger, regional or mini-tour fields, and in how many events): at a level they have
+not played, their record elsewhere is translated (half the share one level up, twice one level down) and
+counts for less, so a promotion forecast is uncertain until they have played there. Never from hidden
+ability, never for amateurs (who take no prize money and have no sponsor contracts), and never spent
+before it is won. Forecasts, the caddie budget, affordability and payments use the same definitions
+(`Season.season_forecast`, `sponsor_income`, `tour_trip_cost` over `finance.event_cost`, which knows
+when a school or club pays). How much
 a dollar matters scales with their funds: a broke mini-tour player weighs a long trip heavily, a
 millionaire barely notices. When funds run short, full-time players take paid work weeks instead of
 training; when they can't cover the next weeks' living costs, they must. No tour card makes anyone
@@ -144,7 +154,7 @@ completed season, snapshotted **before** tour cards change (see `docs/SEASON_SYS
 
 | Decision | How it works |
 |---|---|
-| **Giving up the chase** (any tour) | Money pressure (1 / (1 + runway)) weighed against their **desire to continue** — progress, the card earned, a secured event, health, willingness and life stage. The runway counts only savings and backers' money (next season's deal included), not the line of credit, which pays for a few weeks, not another season: under half a season of money of their own, the pressure rises steeply (smoothly, no cliff), so a broke player without backers usually stops chasing rather than lingering unable to afford events. Desire is kept separate from funds: an improving golfer may willingly accept another losing season, but desire creates no money — what they can actually enter is still decided week by week by what they can afford, and their credit stays limited. Every decision is recorded with its reasons (probability, runway, progress, desire, what was secured). |
+| **Giving up the chase** (any tour) | Money pressure (1 / (1 + runway)) weighed against their **desire to continue** — progress, the card earned, a secured event, health, willingness and life stage. The runway counts only savings and backers' money (next season's deal included), not the line of credit, which pays for a few weeks, not another season: with less than a season of money of their own, the pressure rises (smoothly, no cliff), so a broke player without backers usually stops chasing rather than lingering unable to afford events. Desire is kept separate from funds: an improving golfer may willingly accept another losing season, but desire creates no money — what they can actually enter is still decided week by week by what they can afford, and their credit stays limited. Every decision is recorded with its reasons (probability, runway, progress, desire, what was secured). |
 | **After stopping** | Some become **coaches or caddies** (see `docs/COACHES_AND_CADDIES.md`; rarely anyone who made a fortune). The rest take a job and keep playing a few local events as part-time pros, regain amateur status (more likely for those who never earned much from golf), or (with a strong mental game, from their mid-twenties) become club professionals. |
 | **Comebacks** | A part-timer who wins or contends — often because their mental game has matured — may quit their job for another run. The odds come from those results, how much of a year on tour they could fund, age (smoothly) and willingness. No age limit and no savings threshold. |
 | **Adult amateurs take jobs** | Amateurs outside college live at home on savings and family help, with no salary. Each year they may take a job and keep playing as part-time amateurs ($52k salary, $40k living): smooth in age (rare at 19-20, likely by the mid-twenties), likelier in debt or with a short runway, less likely with money to keep going. Recorded as a career transition ("amateur took a job"); their chance of turning professional is decided first. |

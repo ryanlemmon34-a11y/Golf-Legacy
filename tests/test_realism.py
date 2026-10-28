@@ -29,6 +29,11 @@ from golfsim.season import PREMIER_TOURS, Season                      # noqa: E4
 SEASON = Season(generate_world(seed=11), seed=11, development=True, workers=1)
 
 
+def set_record(s, g, share):
+    """A proven earnings record (20 events) at the golfer's own level."""
+    s.prize_record[g.id] = {tier(g) if g.tour in TOUR_BY_KEY else 4: [share, 20]}
+
+
 def tier(g):
     return TOUR_BY_KEY[g.tour].tier if g.tour in TOUR_BY_KEY else 9
 
@@ -86,25 +91,28 @@ class FundingTests(unittest.TestCase):
         saved = {g.id: (g.cash, g.backing) for g in group}
         for g in group:
             g.backing = 0.0
-            s.prize_share[g.id] = 0.05                                       # a good record
+            set_record(s, g, 0.05)                                           # a good record
             g.cash = 0.0
             g.cash = 300.0 - s.spendable(g, 2027)                            # $300 to spend: no trip costs that little
         s.plan_block(2027, week0)
         for g in group:
             g.cash, g.backing = saved[g.id]
-            del s.prize_share[g.id]
+            del s.prize_record[g.id]
         self.assertTrue(all('work' in [a for a, _ in s.plans[g.id].values()] for g in group))
 
     def test_a_season_without_events_counts_against_the_record(self):
         s = SEASON
         g = copy.deepcopy(full_timers(s, 3)[0])
         g.cash, g.backing = 5000.0, 0.0
-        purse, cost = C._tour_economics(s, g.tour)
-        share = 1.2 * (20 * cost + FIN.LIVING) / (20 * purse)                # a record that pays its way
-        s.prize_share[g.id] = share
-        played = C.runway_years(s, g, 2027, g.tour, 20, last_prize=share * 20 * purse)
-        idle = C.runway_years(s, g, 2027, g.tour, 20, last_prize=0.0)
-        del s.prize_share[g.id]
+        set_record(s, g, 0.0)
+        _, costs = s.season_forecast(g, g.tour, 20)
+        ss = [x for x in s.cal.series if x.tour == g.tour and x.purse]
+        purse = sum(x.purse for x in ss) / len(ss)
+        share = 1.2 * costs / (20 * purse * s.prize_kept(g))                 # a record that pays its way
+        set_record(s, g, share)
+        played = C.runway_years(s, g, 2027, g.tour, 20, {'prize': share * 20 * purse, 'tier': tier(g)})
+        idle = C.runway_years(s, g, 2027, g.tour, 20, {'prize': 0.0, 'tier': tier(g)})
+        del s.prize_record[g.id]
         self.assertLess(idle, played)
 
     def test_a_cheaper_event_is_still_an_option(self):
@@ -158,7 +166,7 @@ class FundingTests(unittest.TestCase):
         s = SEASON
         g = min(full_timers(s, 2, 400), key=lambda x: (s.player_prestige(x.id), x.id))   # no sponsor to lean on
         row = {'status': 'pro', 'tier': 2, 'events': 20}
-        s.prize_share[g.id] = 0.0                                            # their results earn nothing
+        set_record(s, g, 0.0)                                                # their results earn nothing
         rich, broke = copy.deepcopy(g), copy.deepcopy(g)
         rich.cash, broke.cash, broke.backing = 10 ** 7, -10 ** 6, 0.0
         p_rich, _ = C.p_stop_chasing(s, rich, row, 2027)
@@ -169,7 +177,7 @@ class FundingTests(unittest.TestCase):
         mini = copy.deepcopy(broke)
         mini.tour = full_timers(s, 4)[0].tour
         self.assertGreater(C.p_stop_chasing(s, mini, row, 2027)[0], p_broke)  # a better card still helps
-        del s.prize_share[g.id]
+        del s.prize_record[g.id]
 
 
 # ---- 2. smooth, individual career odds ---------------------------------------------------------------
@@ -347,18 +355,18 @@ class BackerTests(unittest.TestCase):
         rng = random.Random(4)
         g = at_age(self.g, 24)
         g.backer, g.backing = 30000.0, 10 ** 6                               # rich family, no winnings
-        self.s.prize_share[g.id] = 0.0
+        set_record(self.s, g, 0.0)
         self.assertNotEqual(C.review_backers(self.s, g, self.good, 2027, rng), 'backers no longer needed')
         self.assertEqual(g.backer, 30000.0)
         h = at_age(self.g, 24)
-        h.backer = 30000.0
-        self.s.prize_share[h.id] = 0.1                                       # winning enough to pay the way
+        h.backer, h.cash = 30000.0, 20000.0                                  # can pay for the season's start
+        set_record(self.s, h, 0.15)                                          # winning enough to pay the way
         try:
             self.assertEqual(C.review_backers(self.s, h, self.good, 2027, rng), 'backers no longer needed')
             self.assertIn('winnings', self.s.history[h.id][-1][2])          # and the reason given is true
         finally:
-            self.s.prize_share.pop(h.id, None)
-            self.s.prize_share.pop(g.id, None)
+            self.s.prize_record.pop(h.id, None)
+            self.s.prize_record.pop(g.id, None)
 
     def test_backers_money_goes_back_when_the_deal_ends(self):
         """Backers' money and family money are kept apart: when a deal ends the undrawn backers' money

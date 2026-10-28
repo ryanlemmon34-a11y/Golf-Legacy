@@ -76,7 +76,7 @@ class IdentityTests(unittest.TestCase):
             g.cash, g.backing, g.born = -40000.0, 0.0, 2027 - 30
             g.attrs.update(management=85.0, composure=85.0, green_reading=85.0)
             g.personality.update(coachability=85.0, work_ethic=85.0)
-            s.prize_share[g.id] = 0.0
+            s.prize_record[g.id] = {4: [0.0, 20]}                     # earns nothing (proven)
         s.snapshots[2027] = snap = s.season_snapshot(2027)
         decide(s, 2027, snap)
         staff = [p for p in list(s.staff.coaches.values()) + list(s.staff.caddies.values()) if p.former_golfer]

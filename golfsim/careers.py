@@ -64,44 +64,22 @@ def life_stage(age):
     return 2.0 * (_sig((age - LIFE_AGE) / 2.0) - 0.5) + 0.04 * max(0.0, age - 32)
 
 
-def _tour_economics(season, tour):
-    """Typical purse and travel cost of a tour's events (for a golfer's own budget estimate)."""
-    cache = season.__dict__.setdefault('_tour_econ', {})
-    if tour not in cache:
-        ss = [x for x in season.cal.series if x.tour == tour]
-        t = TOUR_BY_KEY.get(tour)
-        purse = sum(x.purse for x in ss) / len(ss) if ss else 0.0
-        cost = FIN.EVENT_COST.get(t.tier if t else 4, 600) * FIN.TRAVEL['region']
-        if t and t.tier == 4 and ss:
-            cost += 1.1 * purse / max(1, ss[0].field)
-        cache[tour] = (purse, cost)
-    return cache[tour]
-
-
-def season_shortfall(season, g, tour, events, last_prize=None, without_backers=False):
-    """What a season chasing golf on `tour` would cost a golfer beyond what it brings in, judged from
-    their own record: expected prize money (the share of purses they have been winning, weighed equally
-    with what they actually won in the season just played, so a season spent unable to afford events
-    counts) net of the caddie's and a scouting coach's shares (and the backers', unless
-    `without_backers`), their sponsor contract, against trips and committed weekly costs. 0 or less: the
-    season pays for itself."""
-    purse, cost = _tour_economics(season, tour)
-    income = season.prize_share.get(g.id, FIN.PRIOR_PRIZE_SHARE) * purse * events
-    if last_prize is not None:
-        income = 0.5 * income + 0.5 * last_prize
-    kept = season.prize_kept(g) + (FIN.BACKER_SHARE if without_backers and g.backer else 0.0)
-    income = income * kept + PR.endorsements(season.player_prestige(g.id))
-    k = season.staff.caddie(g.id)
-    costs = events * (cost + (k.weekly_fee if k else 0.0)) + 52 * season.committed_weekly(g)
+def season_shortfall(season, g, tour, events, row=None, without_backers=False, cautious=False):
+    """What a season chasing golf on `tour` would cost a golfer beyond what it brings in
+    (Season.season_forecast: the same income and cost definitions the season pays out and charges);
+    `row`: the season just played (what they actually won, and at what level). 0 or less: the season
+    pays for itself."""
+    last = (row.get('prize', 0.0), row.get('tier')) if row else None
+    income, costs = season.season_forecast(g, tour, events, last, without_backers, cautious)
     return costs - income
 
 
-def runway_years(season, g, year, tour, events, last_prize=None, own_money=False):
+def runway_years(season, g, year, tour, events, row=None, own_money=False):
     """Years a golfer's funds would last chasing golf on `tour` (season_shortfall); 10 = self-funding or
     funds for ten seasons. `own_money`: count only savings, family money and backers' money (next
     season's deal included), not what a lender would advance -- a line of credit pays for a few weeks,
     not for another season."""
-    shortfall = season_shortfall(season, g, tour, events, last_prize)
+    shortfall = season_shortfall(season, g, tour, events, row)
     if shortfall <= 0:
         return 10.0
     funds = (max(0.0, g.cash + g.backing + max(g.backer_funds, g.backer)) if own_money
@@ -113,16 +91,27 @@ SELF_FUNDED_SEASONS = 3          # own savings covering this many seasons of los
 
 
 def own_way(season, g, year, row):
-    """Whether a backed golfer could pay their own way without backers, and why: their own expected
-    winnings and sponsors cover a season (backers' share not taken), or their own savings (cash alone:
-    not family money, not the backers' money being withdrawn, not credit) cover SELF_FUNDED_SEASONS
-    seasons of losses. None if not."""
-    shortfall = season_shortfall(season, g, g.tour, season.target_events(g), row.get('prize', 0.0),
-                                 without_backers=True)
-    if shortfall <= 0:
-        return 'their winnings and sponsors now cover a season'
-    if g.cash >= SELF_FUNDED_SEASONS * shortfall:
-        return f'their own savings now cover {g.cash / shortfall:.0f} seasons'
+    """Whether a backed golfer could pay their own way without backers next season, and why. Judged
+    on their own resources, without the support being withdrawn: their cash must pay for the start of
+    the season before any winnings arrive (UPFRONT_SHARE of its costs), and then either their earnings
+    *proven at that level* (PROVEN_EVENTS events or more there, counted cautiously: a new card is not yet
+    an income) and sponsors cover the season, or their savings cover SELF_FUNDED_SEASONS seasons of
+    losses. None if not."""
+    events = season.target_events(g)
+    income, costs = season.season_forecast(g, g.tour, events, (row.get('prize', 0.0), row.get('tier')),
+                                           without_backers=True, cautious=True)
+    if g.cash < FIN.UPFRONT_SHARE * costs:
+        return None
+    tier = TOUR_BY_KEY[g.tour].tier if g.tour in TOUR_BY_KEY else 4
+    if season.events_at_level(g.id, tier) >= FIN.PROVEN_EVENTS:
+        if income >= costs:
+            return 'their winnings at this level and sponsors now cover a season'
+    else:
+        income = season.sponsor_income(g)                    # unproven here: no winnings counted on
+        if income >= costs:
+            return 'their sponsor contract now covers a season'
+    if g.cash >= SELF_FUNDED_SEASONS * (costs - income):
+        return f'their own savings now cover {g.cash / (costs - income):.0f} seasons'
     return None
 
 
@@ -175,13 +164,13 @@ def desire_to_continue(season, g, row, year):
 
 def p_stop_chasing(season, g, row, year):
     """Chance a full-time professional gives up the chase this winter (every tier): money pressure
-    (1 / (1 + runway)) against their desire to continue. Under half a season of money of their own
-    (savings and backers), wanting to continue is not enough: the season cannot be paid for, so the
-    pressure rises steeply (smoothly) as the runway runs out."""
-    runway = runway_years(season, g, year, g.tour, season.target_events(g), row.get('prize', 0.0), own_money=True)
+    (1 / (1 + runway)) against their desire to continue. With less than a season of money of their
+    own (savings, family and backers), wanting to continue is not enough: the season cannot be paid for,
+    so the pressure rises (smoothly) as the runway runs out."""
+    runway = runway_years(season, g, year, g.tour, season.target_events(g), row, own_money=True)
     pressure = 1 / (1 + runway)                    # 1 = broke and losing money, ~0 = self-funding
     desire = desire_to_continue(season, g, row, year)
-    x = -4.5 + 4.0 * pressure + 2.2 * max(0.0, 1 - 2 * runway) - desire
+    x = -4.5 + 4.0 * pressure + 2.2 * max(0.0, 1 - runway) - desire
     return _sig(x), {'runway': runway, 'progress': progress_signal(row), 'desire': desire,
                      'secured': list(row.get('secured', ()))}
 
@@ -194,7 +183,7 @@ def p_backers_continue(season, g, row, year):
     age = g.age(year) + 1
     progress = progress_signal(row)
     secured = min(1, len(row.get('secured', ()))) + (0.5 if row.get('promoted') else 0.0)
-    shortfall = season_shortfall(season, g, g.tour, season.target_events(g), row.get('prize', 0.0),
+    shortfall = season_shortfall(season, g, g.tour, season.target_events(g), row,
                                  without_backers=True)
     burn = max(0.0, shortfall) / g.backer if g.backer else 0.0          # deals' worth the season loses
     x = (1.4 + 1.5 * progress + 0.8 * secured + 2.0 * (g.backer_patience - 0.5) - 0.6 * g.backer_stale
@@ -220,7 +209,7 @@ def review_backers(season, g, row, year, rng):
                 if g.backer_stale else ''))
             return 'backers withdrew'
         return None
-    paying = season_shortfall(season, g, g.tour, season.target_events(g), row.get('prize', 0.0)) <= 0
+    paying = season_shortfall(season, g, g.tour, season.target_events(g), row) <= 0
     if (not paying and (row.get('wins', 0) or row.get('promoted') or progress >= 0.6)
             and rng.random() < 0.5 * FIN.backer_youth(age) / FIN.backer_youth(22)):
         g.backer = FIN.backer_deal(22, max(0.6, amateur_standing(row.get('wr_end'))), 0.0, rng.random())

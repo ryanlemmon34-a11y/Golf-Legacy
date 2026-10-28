@@ -38,8 +38,9 @@ Funding decisions (before money is spent)
                      (credit grows with a golfer's recent income, up to a cap; nobody can borrow
                      without limit)
     committed        the next few weeks of living costs are set aside before any trip is booked
-    expected prize   estimated from the golfer's own results so far (the share of purses they have
-                     actually won), not from their hidden ability; it is never spent before it is won
+    expected prize   estimated from the golfer's own results so far, by level of competition (the
+                     share of purses they have actually won there, Season.prize_forecast), not from
+                     their hidden ability; it is never spent before it is won
 A golfer can only enter an event they can pay for. How much a dollar matters scales with their funds,
 so a broke mini-tour player weighs a long trip heavily and a millionaire barely notices it. When
 funds run short, full-time players take paid work weeks instead of training.
@@ -105,6 +106,11 @@ WORK_WAGE = 900                  # a week of paid work for a full-time player wh
 CREDIT_BASE, CREDIT_SHARE, CREDIT_CAP = 8000, 0.25, 60000
 RESERVE_WEEKS = 4                # living costs set aside before booking any trip
 PRIOR_PRIZE_SHARE = 0.004        # a professional's assumed share of a purse before they have results
+PRIOR_EVENTS = 3                 # ... weighed as this many events of evidence
+LEVEL_STEP = 0.5                 # share of the purse one level of competition up (twice as much one down)
+MAX_PRIZE_SHARE = 0.25           # no forecast expects more than this share of a purse
+PROVEN_EVENTS = 8                # events at a level by which earnings there count as fairly proven
+UPFRONT_SHARE = 0.25             # of a season's costs that must be paid before winnings come in
 
 
 def credit_limit(last_income):

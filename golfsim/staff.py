@@ -397,9 +397,8 @@ def caddie_budget(season, g, year):
     """What a golfer can commit to a caddie's fees over the season. A caddie is paid only in weeks the
     golfer plays, and every trip must still be affordable when it is booked, so the prize money they
     expect to keep (from their own record) may inform this choice — at half weight."""
-    from .careers import _tour_economics
-    purse, _ = _tour_economics(season, g.tour)
-    expected = season.prize_share.get(g.id, 0.004) * purse * season.target_events(g) * (1 - 0.08)
+    income, _ = season.season_forecast(g, g.tour, season.target_events(g))
+    expected = income - season.sponsor_income(g)              # the prize money they expect to keep
     return CADDIE_OF_MEANS * (season.means(g, year) + 0.5 * expected)
 
 

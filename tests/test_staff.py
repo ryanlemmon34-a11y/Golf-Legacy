@@ -300,7 +300,7 @@ class FormerGolferTests(unittest.TestCase):
             g.cash, g.backing, g.born = -40000.0, 0.0, 2027 - 30
             g.attrs.update(management=85.0, composure=85.0, green_reading=85.0)
             g.personality.update(coachability=85.0, work_ethic=85.0)
-            s.prize_share[g.id] = 0.0
+            s.prize_record[g.id] = {4: [0.0, 20]}                     # earns nothing (proven)
         n0, k0 = len(s.staff.coaches), len(s.staff.caddies)
         counts = decide(s, 2027, s.season_snapshot(2027))
         self.assertGreater(counts.get('became coach', 0) + counts.get('became caddie', 0), 5)

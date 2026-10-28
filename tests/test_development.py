@@ -294,7 +294,7 @@ class CareerTests(unittest.TestCase):
             for g in minis:
                 g.born = 2027 - age
                 g.cash, g.backing, g.backer = 10000, 0.0, 0.0
-                s.prize_share[g.id] = 0.0
+                s.prize_record[g.id] = {4: [0.0, 20]}                     # earns nothing (proven)
             decide(s, 2027, s.season_snapshot(2027))
             return s, [g for g in minis if g.lifestyle != 'full_time']
         _, young = quits(22)

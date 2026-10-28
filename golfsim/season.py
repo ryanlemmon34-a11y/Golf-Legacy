@@ -263,7 +263,9 @@ class Season:
         self.career_counts = {}                              # year -> {decision: count}
         self.contracts = {}                                  # gid -> this season's sponsor income
         self.cash_start = {}                                 # year -> gid -> cash on 1 January
-        self.prize_share = {}                                # gid -> share of a purse they tend to win
+        self.prize_share = {}                                # gid -> share of a purse they tend to win (all levels)
+        self.prize_record = {}                               # gid -> {tier: [share of purse they tend to win
+                                                             #   at that level of competition, events]}
         self.snapshots = {}                                  # year -> gid -> completed-season evidence
         self.rank_start, self.am_start = {}, {}              # year -> world / amateur ranking on 1 January
         self.unpaid = Counter()                              # year -> purse money not paid out (small fields)
@@ -1368,6 +1370,10 @@ class Season:
 
     def __setstate__(self, state):
         state.setdefault('new_pros_added', {})              # saves from before new professionals arrived
+        if 'prize_record' not in state:                     # saves from before earnings kept their level:
+            tier = lambda gid: next((TOUR_BY_KEY[g.tour].tier for g in (state['g'].get(gid),)   # their
+                                     if g is not None and g.tour in TOUR_BY_KEY), 4)            # tour's
+            state['prize_record'] = {gid: {tier(gid): [v, 5]} for gid, v in state.get('prize_share', {}).items()}
         if 'prior_rounds' not in state:
             state['prior_rounds'] = _migrate_prior_rounds(state)
         if state.get('lib') == 'default':
@@ -1488,6 +1494,7 @@ class Season:
                     if self.g[gid].status == 'pro':           # learn what this player tends to win
                         old = self.prize_share.get(gid, FIN.PRIOR_PRIZE_SHARE)
                         self.prize_share[gid] = 0.8 * old + 0.2 * won.get(gid, 0.0) / s.purse
+                        self.learn_prize(gid, s.tier, won.get(gid, 0.0) / s.purse)
             for gid, pos, _ in finish:
                 all_ids.append(gid)
                 self.played[year][gid].append(week)
@@ -1710,7 +1717,7 @@ class Season:
     def start_finances(self, year):
         """Sponsor contracts for the season, from each professional's prestige at its start
         (paid weekly), and the cash each golfer starts the year with (for reconciliation)."""
-        self.contracts = {g.id: PR.endorsements(self.player_prestige(g.id)) for g in self.world.golfers
+        self.contracts = {g.id: self.sponsor_income(g) for g in self.world.golfers
                           if g.status == 'pro' and g.lifestyle != 'retired'}
         self.rank_start[year] = dict(self.wr_pos)
         self.am_start[year] = dict(self.am_pos)
@@ -2148,14 +2155,79 @@ class Season:
         disposable = self.earned_income(g, year - 1) - (led.living if led else 0.0)
         return max(0.0, self.spendable(g, year)) + 0.8 * max(0.0, disposable)
 
+    # ---- what a golfer can expect to earn and spend (one set of definitions for every decision) ----
+    def learn_prize(self, gid, tier, share):
+        """Record a professional's share of an event's purse, with the level of competition it was won
+        against (a share won on a mini tour says little about a Challenger Tour field)."""
+        rec = self.prize_record.setdefault(gid, {}).setdefault(tier, [FIN.PRIOR_PRIZE_SHARE, 0])
+        rec[1] += 1
+        rec[0] += (share - rec[0]) / min(rec[1], 5)          # running mean, then mostly the recent events
+
+    def prize_forecast(self, g, tier, cautious=False):
+        """The share of a purse a golfer can expect at a level of competition (tier), from what they have
+        won at each level (evidence from another level translated by LEVEL_STEP per level, and counting
+        for less), plus a weak prior. `cautious`: what can be counted on -- only what they have won at
+        this level, shrunk by how few events that is (a new card is not yet an income).
+        Amateurs take no prize money."""
+        if g.status == 'amateur':
+            return 0.0
+        rec = self.prize_record.get(g.id, {})
+        if cautious:                                         # only what they have shown at this level
+            share, n = rec.get(tier, (0.0, 0))
+            return share * n / (n + FIN.PROVEN_EVENTS)
+        num, den = FIN.PRIOR_PRIZE_SHARE * FIN.PRIOR_EVENTS, float(FIN.PRIOR_EVENTS)
+        for t, (share, n) in rec.items():
+            gap = t - tier                                   # > 0: earned against weaker fields
+            w = n * 0.5 ** abs(gap)
+            num += min(FIN.MAX_PRIZE_SHARE, share * FIN.LEVEL_STEP ** gap) * w
+            den += w
+        return num / den
+
+    def events_at_level(self, gid, tier):
+        """Events with a prize record at a level of competition (how proven their earnings there are)."""
+        return self.prize_record.get(gid, {}).get(tier, (0.0, 0))[1]
+
     def expected_prize(self, g, series):
-        """The prize a golfer expects from an event, from the share of purses they have actually won
-        (halved for each level the field is above their own tour's)."""
+        """The prize a golfer expects from an event: their forecast share at the event's level."""
         if g.status == 'amateur' or not series.purse:
             return 0.0
-        own = TOUR_BY_KEY[g.tour].tier if g.tour in TOUR_BY_KEY else 4
-        stronger = max(0, own - series.tier)                 # a field above their usual level
-        return self.prize_share.get(g.id, FIN.PRIOR_PRIZE_SHARE) * series.purse * 0.5 ** stronger
+        return self.prize_forecast(g, series.tier) * series.purse
+
+    def sponsor_income(self, g):
+        """This season's sponsor contract: professionals only, from their prestige (the same number the
+        contracts pay and the forecasts expect)."""
+        return PR.endorsements(self.player_prestige(g.id)) if g.status == 'pro' and g.lifestyle != 'retired' else 0.0
+
+    def tour_trip_cost(self, g, tour):
+        """What one of a tour's events typically costs this golfer (finance.event_cost averaged over the
+        tour's events: their travel, entry fees; nothing when their school or club pays), with their
+        caddie's weekly fee."""
+        cache = self.__dict__.setdefault('_trip_cost', {})
+        key = (tour, g.country, g.status, g.tour.startswith('CO_'))
+        if key not in cache:
+            ss = [x for x in self.cal.series if x.tour == tour and x.category == 'regular'] or \
+                 [x for x in self.cal.series if x.tour == tour]
+            cache[key] = (sum(FIN.event_cost(g, x, x.cities[0]) for x in ss) / len(ss)) if ss else 0.0
+        k = self.staff.caddie(g.id)
+        return cache[key] + (k.weekly_fee if k is not None else 0.0)
+
+    def season_forecast(self, g, tour, events, last=None, without_backers=False, cautious=False):
+        """(income, costs) of a season on `tour`: expected prize money at the tour's level (blended
+        equally with what they actually won last season when that was at the same level: `last` =
+        (prize, tier)), net of the caddie's, a scouting coach's and (unless `without_backers`) the
+        backers' shares, plus their sponsor contract; against the tour's trips and committed weekly
+        costs."""
+        t = TOUR_BY_KEY.get(tour)
+        tier = t.tier if t else 4
+        ss = [x for x in self.cal.series if x.tour == tour and x.purse]
+        purse = sum(x.purse for x in ss) / len(ss) if ss else 0.0
+        prize = self.prize_forecast(g, tier, cautious) * purse * events
+        if last is not None and last[1] == tier and g.status != 'amateur':
+            prize = 0.5 * prize + 0.5 * last[0]
+        kept = self.prize_kept(g) + (FIN.BACKER_SHARE if without_backers and g.backer else 0.0)
+        income = prize * kept + self.sponsor_income(g)
+        costs = events * self.tour_trip_cost(g, tour) + 52 * self.committed_weekly(g)
+        return income, costs
 
     def expected_kept(self, g, series):
         return self.expected_prize(g, series) * self.prize_kept(g)
