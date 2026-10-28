@@ -551,6 +551,45 @@ class QualificationTests(unittest.TestCase):
 
 
 # ---- 5. development ----------------------------------------------------------------------------------
+class SecuredPlacesTests(unittest.TestCase):
+    """Next season's major places come from the majors' own rules applied to what is known at the end
+    of the season: earned invitations and continuing exemptions count, ranking cut-offs still to come
+    and qualifying do not, and an amateur title's place keeps its condition."""
+
+    def test_secured_places_follow_the_qualification_rules(self):
+        s = SEASON
+        ctx = s.ctx
+        pros = [g for g in s.world.golfers if g.status == 'pro' and g.lifestyle == 'full_time'
+                and s.wr_pos.get(g.id, 9999) > 300 and g.tour not in PREMIER_TOURS]
+        top10, recent, expired, other = pros[:4]
+        ranked_55 = next(gid for gid in ctx.ranking(2027, 52)[50:60] if s.g[gid].status == 'pro')
+        amateur = next(g for g in s.world.golfers if g.status == 'amateur' and g.lifestyle == 'full_time')
+        added = {('USA_OPEN', 2027): {0: [(other.id, 1), (top10.id, 5)] + [(g.id, 30 + i) for i, g in enumerate(pros[4:10])]},
+                 ('BRITANNIA_OPEN', 2023): {0: [(recent.id, 1)]},           # 5 years back from 2028: still exempt
+                 ('USA_OPEN', 2017): {0: [(expired.id, 1)]},                # 10 years back: lapsed
+                 ('USA_AMATEUR', 2027): {0: [(amateur.id, 1)]}}
+        saved = {k: ctx.results.get(k) for k in added}
+        ctx.results.update(added)
+        try:
+            snap = s.season_snapshot(2027)
+        finally:
+            for k, v in saved.items():
+                if v is None:
+                    ctx.results.pop(k, None)
+                else:
+                    ctx.results[k] = v
+        self.assertIn('USA Open 2028: Top 10 and ties, last USA Open', snap[top10.id]['secured'])
+        self.assertEqual(snap[top10.id]['wins'], 0)                          # earned without winning
+        self.assertTrue(any(t.startswith('Tour Masters 2028: Major champions, last 5 years') for t in snap[recent.id]['secured']))
+        self.assertTrue(any(t.startswith('Britannia Open 2028: Past Britannia Open champions') for t in snap[recent.id]['secured']))
+        self.assertFalse(any('USA Open' in t for t in snap[expired.id]['secured']))
+        self.assertFalse(snap[expired.id]['secured'])
+        self.assertFalse(any('USA Open 2028' in t for t in snap[ranked_55]['secured']))   # top 60 cut-off still to come
+        self.assertFalse(snap[amateur.id]['secured'])                       # nothing a professional could keep...
+        self.assertIn('Tour Masters 2028: USA Amateur champion and runner-up (if still an amateur)',
+                      snap[amateur.id]['secured_if'])                        # ...but the place, with its condition
+
+
 class DevelopmentRealismTests(unittest.TestCase):
     def _golfer(self, age):
         g = copy.deepcopy(next(x for x in SEASON.world.golfers if x.age(2027) == age))

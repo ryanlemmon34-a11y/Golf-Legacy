@@ -1690,6 +1690,10 @@ class Season:
         for gid in self.legacy:
             self.legacy[gid] *= PR.LEGACY_DECAY
         self.snapshots[year] = snap = self.season_snapshot(year)
+        for gid, row in snap.items():                        # what they have earned for next season, in their history
+            places = row['secured'] + row.get('secured_if', [])
+            if places:
+                self.log(gid, year, 53, 'Secured for next season: ' + '; '.join(places))
         from .cards import apply_cards
         apply_cards(self, year)
         for gid, row in snap.items():                        # promotion: a separate fact from money rank
@@ -1825,13 +1829,17 @@ class Season:
         for week, gid, kind, weeks, _ in self.injuries[year]:
             if gid in snap:
                 snap[gid]['injury_weeks'] += weeks
-        for gid, row in snap.items():                        # places already secured for next season
-            if row['majors']:
-                row['secured'].append('major champion (5-year exemptions)')
-            if row['wins_by_tier'].get(1, 0) and row['status'] == 'pro':
-                row['secured'].append('Premier Tour winner (Masters and other invitations)')
-            if row['wr_end'] and row['wr_end'] <= 50:
-                row['secured'].append('world top 50 (Tour Masters invitation)')
+        # places already earned in next season's majors, by the majors' own rules (qualification.RULES)
+        # applied to what is known now: unconditional ones count for decisions; an amateur title's place
+        # is kept with its condition (it lapses on turning professional)
+        for gid, places in Q.secured_places(self.ctx, year).items():
+            row = snap.get(gid)
+            if row is None:
+                continue
+            for major, code, label, cond in places:
+                text = f'{self.cal.by_id[major].name} {year + 1}: {label}'
+                (row.setdefault('secured_if', []) if cond else row['secured']).append(
+                    f'{text} ({cond})' if cond else text)
         for gid, row in snap.items():
             row['zero_start_reason'] = self.zero_start_reason(gid, year, row) if row['events'] == 0 else ''
         by_tour = defaultdict(list)

@@ -125,6 +125,8 @@ class Route:
     spots: int = 0                 # qualifying routes: places on offer (0 = all who qualify)
     site_spots: tuple = ()         # qualifying stages: places per site
     alternates: bool = False       # next finishers become first alternates for the field
+    cutoff: bool = False           # decided by a ranking or points list published during the major's own
+                                   # season: never a place secured in advance
 
 
 def winners_of(series_ids, years_back, include_current=True):
@@ -284,7 +286,7 @@ RULES = {
         Route('M13', 'World top 50 at the end of last year', 'OWGR top 50, final ranking of previous year',
               ranking_top(50, 52, -1)),
         Route('M14', 'World top 50 two weeks before', 'OWGR top 50, ranking published before the Masters',
-              ranking_top(50, 16)),
+              ranking_top(50, 16), cutoff=True),
         Route('M15', 'International invitations', 'Special invitations to international players',
               lambda ctx, year: [g for g in ctx.ranking(year, 16)[50:100]
                                  if ctx.people[g].country not in ('USA',)], kind='qualifying', spots=4),
@@ -302,11 +304,11 @@ RULES = {
               'last places settled by playoff)', qualifier_finishers(('CLUB_PRO_CHAMPIONSHIP',)), kind='qualifying',
               status='club_pro', spots=20),
         Route('P6', 'Top 70, Premier Tour Americas points list', 'Top 70, PGA Tour points list',
-              points_list('PT_AMERICAS', 22, 0, 70)),
+              points_list('PT_AMERICAS', 22, 0, 70), cutoff=True),
         Route('P7', 'Premier Tour winners since the last Premier Tour Championship', 'PGA Tour winners since previous PGA',
               tour_winners_between(_is_premier, (-1, 25), (0, 23))),
         Route('P8', 'Invitations: world top 100', 'PGA of America invitations (effectively the OWGR top 100)',
-              ranking_top(100, 22)),
+              ranking_top(100, 22), cutoff=True),
         Route('PF', 'Alternates from the points list', 'Field filled from the PGA Tour points list',
               points_list('PT_AMERICAS', 22, 70), kind='fill'),
     ),
@@ -324,8 +326,8 @@ RULES = {
         Route('U7', 'Top 10 and ties, last USA Open', 'Top 10 and ties, previous US Open', top_finishers('USA_OPEN', 10)),
         Route('U8', 'Last season\'s Premier Tour Finals qualifiers', 'Tour Championship qualifiers (previous season)',
               standing_top('PT_AMERICAS', 30)),
-        Route('U9', 'World top 60, first cut-off', 'OWGR top 60, mid-May ranking', ranking_top(60, 21)),
-        Route('U10', 'World top 60, final cut-off', 'OWGR top 60, ranking the week before', ranking_top(60, 23)),
+        Route('U9', 'World top 60, first cut-off', 'OWGR top 60, mid-May ranking', ranking_top(60, 21), cutoff=True),
+        Route('U10', 'World top 60, final cut-off', 'OWGR top 60, ranking the week before', ranking_top(60, 23), cutoff=True),
         Route('UQ', 'Final Qualifying', 'US Open Final Qualifying (36 holes, one day)',
               stage_sites(('USA_OPEN_FINAL_INTL', 'USA_OPEN_FINAL')), kind='qualifying', site_spots=(6, 4, 8, 7, 6, 6, 8, 6, 7, 5),
               alternates=True),
@@ -339,7 +341,7 @@ RULES = {
               winners_of(OTHER_MAJORS['BRITANNIA_OPEN'], 5)),
         Route('B4', 'Premier Players Championship winners, last 3 years', 'Players Championship winners (3 years)',
               winners_of(('PT_PREMIER_PLAYERS_CHAMPIONSHIP',), 3)),
-        Route('B5', 'World top 50', 'OWGR top 50 (late-May ranking)', ranking_top(50, 21)),
+        Route('B5', 'World top 50', 'OWGR top 50 (late-May ranking)', ranking_top(50, 21), cutoff=True),
         Route('B6', 'Last season\'s Premier Tour Finals qualifiers', 'Tour Championship qualifiers (previous season)',
               standing_top('PT_AMERICAS', 30)),
         Route('B7', 'Top 30, last season\'s Premier Tour Europe standings', 'Top 30, Race to Dubai (previous season)',
@@ -356,7 +358,7 @@ RULES = {
               places('LATIN_AMERICA_AMATEUR', (1,), 0)(ctx, year) + places('AFRICA_AMATEUR', (1,), 0)(ctx, year),
               amateur_only=True),
         Route('B13', 'Leading amateur in the world amateur ranking', 'Mark McCormack Medal',
-              ranking_top(1, 26, amateur=True), amateur_only=True),
+              ranking_top(1, 26, amateur=True), amateur_only=True, cutoff=True),
         # Britannia Qualifying Series: leading finishers not already exempt.
         *[Route(f'BQ_{sid}', f'Britannia Qualifying Series: {label}', f'Open Qualifying Series: {real}',
                 qualifier_finishers((sid,), off), kind='qualifying', spots=n)
@@ -414,6 +416,33 @@ class Field:
 
     def ids(self):
         return [e.golfer_id for e in self.entries]
+
+
+def secured_places(ctx, year):
+    """Places in next season's majors already earned by the end of `year`: every exemption route
+    applied (with the same rules as build_field) to the facts known then, leaving out routes decided by
+    rankings or points lists not yet published (cutoff) and qualifying stages still to be played.
+    {gid: [(major, route code, route label, condition)]}: condition '' for a place that is theirs, or
+    'if still an amateur' for an amateur title's place (it lapses if they turn professional)."""
+    view = ctx.as_of(year + 1, 1)                     # everything of `year`, nothing of the next
+    out = {}
+    for major, rules in RULES.items():
+        taken = set()
+        for route in rules:
+            if route.kind != 'exempt' or route.cutoff:
+                continue
+            for gid in route.select(view, year + 1):
+                p = ctx.people.get(gid)
+                if p is None or not p.active or gid in taken:
+                    continue
+                if route.amateur_only and p.status != 'amateur':
+                    continue
+                if (route.status and p.status != route.status) or (route.max_age and p.age + 1 > route.max_age):
+                    continue
+                taken.add(gid)
+                out.setdefault(gid, []).append((major, route.code, route.label,
+                                                'if still an amateur' if route.amateur_only else ''))
+    return out
 
 
 def _eligible(ctx, gid, route, year):

@@ -377,7 +377,8 @@ def decide(season, year, snap):
         # ---- full-time professionals (every tier): backers decide first, then keep chasing or stop --
         change = review_backers(season, g, row, year, rng)
         if change:
-            note(change, g, backer=round(g.backer), progress=round(progress_signal(row), 2))
+            note(change, g, backer=round(g.backer), progress=round(progress_signal(row), 2),
+                 secured=list(row.get('secured', ())))
         p, why = p_stop_chasing(season, g, row, year)
         if rng.random() < p:
             why = dict(p=round(p, 4), runway=round(why['runway'], 2), progress=round(why['progress'], 2),

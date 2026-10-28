@@ -147,7 +147,7 @@ completed season, snapshotted **before** tour cards change (see `docs/SEASON_SYS
 | **Runway** | Years their funds would last chasing golf on their tour: trips (with a caddie's fees) and committed costs (living, a contracted coach) against the prize money their own record says they keep (net of staff shares) and their sponsor contract. "Self-funding" if income covers costs. |
 | **Progress** | Promotion, a rising world ranking, wins and top-10s. |
 | **Opportunity** | The card they hold for next season (a Premier card is worth more than a mini tour's). |
-| **Secured** | A significant event already secured for next season through a real route: a major title, a Premier Tour win, a world top-50 finish (Tour Masters invitation). |
+| **Secured** | Places in next season's majors already earned, by the majors' own rules (`qualification.secured_places`: every exemption route of `qualification.RULES` applied to what is known at the end of the season) — past champions' exemptions while they last, a top-10 finish in the USA Open, a Premier Tour win inside a major's window, the year-end world top 50. Routes decided by a ranking or points list not yet published (`cutoff`) and qualifying stages still to be played never count; an amateur title's place is kept apart with its condition ("if still an amateur") and does not count. Each place is in the golfer's history and in the backer and career decisions' evidence. |
 | **Health** | Weeks lost to injury and lasting damage from serious injuries. |
 | **Willingness** | Work ethic and appetite for the big stage. |
 | **Life stage** | A smooth pull towards an ordinary life that grows through the mid-twenties and keeps creeping up — a curve, not a cut-off. |
