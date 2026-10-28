@@ -36,7 +36,7 @@ import math
 
 from .geography import CITY_BY_NAME, COUNTRIES
 
-EVENT_COST = {0: 5000, 1: 3500, 2: 1800, 3: 1200, 4: 600, 5: 0, 6: 350, 7: 1000}   # by tier, home country
+EVENT_COST = {0: 5000, 1: 3500, 2: 1800, 3: 1200, 4: 600, 5: 0, 6: 350, 7: 1000, 8: 200}   # by tier, home country
 TRAVEL = {'home': 1.0, 'region': 1.3, 'abroad': 1.8}
 QSCHOOL_FEE = 4500
 CADDIE_SHARE = 0.08              # of prize money, to a professional caddie (plus their weekly fee)

@@ -12,8 +12,9 @@ Reports: `reports/CALENDAR_REPORT.md` (full week-by-week calendar), `reports/QUA
 | 25 | USA Open | U.S. Open | Rotates around classic US venues |
 | 30 | Britannia Open | The Open Championship | Rotates around links in Scotland, England and Northern Ireland |
 
-**No other competitive golf is played anywhere in the world in weeks 18, 24, 25 or 30** — no tour,
-college, amateur or qualifying event.
+**No Premier Tour event is played in weeks 18, 24, 25 or 30**; the Challenger, Regional and mini tours,
+college, amateur and club-professional golf go on, and golfers in the major cannot also play elsewhere
+that week (see `docs/COMPETITION_ACCESS.md`).
 
 ## The calendar
 
@@ -21,7 +22,9 @@ A permanent list of event *series* (stable identity, format, field size, prestig
 country and a pool of real host cities). Each year produces *editions*; rotating series move city each
 year. The scheduler fills the year in priority order: majors → fixed-week anchors (amateur
 championships, qualifying stages, college post-season, Q-School, designated national opens) →
-Premier Tour → Challenger, Regional and Mini tours → college and amateur seasons. Flexible events are
+Premier Tour → each circuit's season-ending championship (`docs/CIRCUIT_FLAGSHIPS.md`) → Challenger,
+Regional and Mini tours and the local amateur and club-professional circuits (events in every golfing
+country, in proportion to its golf scene) → college and amateur seasons. Flexible events are
 only placed where the host city's climate supports golf that week (Australia and South Africa in the
 southern summer, the Middle East and Arizona in winter, Scotland in summer, the tropics all year).
 
@@ -32,7 +35,8 @@ southern summer, the Middle East and Arizona in winter, Scotland in summer, the 
 | Regional | Southern Africa, Australasia, Korea, India, China, Middle East & North Africa | Sunshine, Australasia, KPGA, PGTI, China Tour, MENA | 54-72 holes |
 | Mini | 16 circuits worldwide | Mini tours (incl. the Japan Challenge Circuit, the ABEMA Tour's place) | 36-72 holes |
 | College | US Division I, US Small College, International University | NCAA D1, D2/D3/NAIA, university golf | 36-54 holes; post-season to 72 |
-| Amateur | Elite championships, 50 national amateur championships, 6 regional amateur series | US Amateur, The Amateur, Asia-Pacific Amateur; state/county events | 18-72 holes; two use match play |
+| Amateur | Elite championships, 50 national amateur championships, 6 regional amateur series of local events in every golfing country | US Amateur (with open qualifying), The Amateur, Asia-Pacific Amateur; state/county events | 18-72 holes; two use match play |
+| Club professional | Six regional circuits of one-day section events and pro-ams (Mondays and Tuesdays), each with a championship; the US Club Professional Championship via sectionals | PGA section events, PGA of GB&I Open Series, PGA Professional Championship | 18-36 holes |
 | Qualifying | USA Open local/final, Britannia regional/final, Club Professional sectionals and Championship, Q-Schools | The same stages in real life | 18-72 holes |
 
 Opportunity Premier events (weaker fields, the Barbasol / John Deere kind) sit in the weeks straight
@@ -104,4 +108,4 @@ venues, week 28, four places each); reserves from the world ranking.
 - **World ranking and points lists:** the demo uses simple stand-ins.
 - **Populations:** college players, amateurs, club professionals and lower-tour pros as real careers.
 - **High-school golf** (later, owner decision).
-- ~~Course library~~ — built: 380 courses, venue for every edition; see `docs/COURSE_LIBRARY.md`.
+- ~~Course library~~ — built: 520 courses, venue for every edition; see `docs/COURSE_LIBRARY.md`.

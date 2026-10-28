@@ -23,8 +23,8 @@ LIB = default_library()
 
 
 class LibraryTests(unittest.TestCase):
-    def test_380_courses_and_venue_checks(self):
-        self.assertEqual(len(LIB.sites), 380)
+    def test_520_courses_and_venue_checks(self):
+        self.assertEqual(len(LIB.sites), 520)
         self.assertEqual(LIB.validate(10), [])
 
     def test_deterministic(self):
@@ -88,7 +88,7 @@ class LibraryTests(unittest.TestCase):
         def avg(cls, layout, level):
             ss = [s for s in LIB.sites.values() if s['cls'] == cls and layout in s['layouts']]
             return sum(rate_layout(s['layouts'][layout], rounds=30)[level] - s['layouts'][layout].par
-                       for s in rng.sample(ss, 4)) / 4
+                       for s in rng.sample(ss, 8)) / 8
         elite_pro, muni_pro = avg('elite', 'Championship', 'tour'), avg('municipal', 'Regular', 'tour')
         elite_am, muni_am = avg('elite', 'Championship', 'amateur'), avg('municipal', 'Regular', 'amateur')
         self.assertGreater(elite_pro, 0.5)
@@ -113,7 +113,9 @@ class LibraryTests(unittest.TestCase):
                 for v in vs:
                     per_week[(week, v.course_id)] += 1
             self.assertEqual(max(per_week.values()), 1)
-            self.assertEqual(sum(1 for (w, _) in per_week if w in MAJOR_WEEKS), 4)
+            # lower levels play on in major weeks, but the major has the week's only elite course
+            elite = {cid for cid, site in LIB.sites.items() if site['cls'] == 'elite'}
+            self.assertEqual(sum(1 for (w, cid) in per_week if w in MAJOR_WEEKS and cid in elite), 4)
 
     def test_event_levels(self):
         by = LIB.calendar.by_id

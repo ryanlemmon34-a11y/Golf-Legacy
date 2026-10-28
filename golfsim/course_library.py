@@ -1,4 +1,4 @@
-"""The world course library: 380 fictional courses in the real cities where the calendar plays.
+"""The world course library: 520 fictional courses in the real cities where the calendar plays.
 
 How the library is sized
     The calendar is replayed for ten seasons. Every edition (and every site of a multi-site
@@ -43,7 +43,7 @@ from .course import cedar_creek_municipal, georgia_national
 from .course_gen import generate_site, CLASS_DIFFICULTY
 from .geography import CITIES_BY_COUNTRY, CITY_BY_NAME, COUNTRIES, season_weeks
 
-TARGET_COURSES = 380
+TARGET_COURSES = 520
 PLAN_YEARS = 10
 
 LEVEL_LAYOUTS = {
@@ -316,8 +316,8 @@ class CourseLibrary:
                 for cid, n in c.items():
                     if n > 1:
                         errors.append(f'{year} week {w}: {self.sites[cid]["name"]} hosts {n} events')
-                if w in MAJOR_WEEKS and sum(c.values()) != 1:
-                    errors.append(f'{year} week {w}: major week has {sum(c.values())} venues')
+                if w in MAJOR_WEEKS and sum(1 for cid in c if self.sites[cid]['cls'] == 'elite') != 1:
+                    errors.append(f'{year} week {w}: a major week must use exactly one elite course (the major\'s)')
         return errors
 
 

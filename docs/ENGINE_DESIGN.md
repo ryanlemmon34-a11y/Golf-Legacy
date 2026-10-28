@@ -190,7 +190,7 @@ current measured values.
 
 ## 8. The world course library
 
-Built: 380 fictional courses in real calendar cities, four classes (elite / championship / standard /
+Built: 520 fictional courses in real calendar cities, four classes (elite / championship / standard /
 municipal), 793 layouts, records per layout. See `docs/COURSE_LIBRARY.md` and
 `reports/COURSE_LIBRARY_REPORT.md`. Still planned: thousands more courses (home clubs, high-school
 venues), hand-designed hole names for every elite course, and renovations as new layouts.

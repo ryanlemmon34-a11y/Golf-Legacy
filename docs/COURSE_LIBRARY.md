@@ -6,7 +6,7 @@ Report: `reports/COURSE_LIBRARY_REPORT.md`. Data: `data/course_library.json`, `d
 
 ## What it is
 
-380 fictional courses, each in a real city the calendar plays in, in a style that fits the place:
+520 fictional courses, each in a real city the calendar plays in, in a style that fits the place:
 links on the coasts of Scotland, England and Ireland, sandbelt in Melbourne, desert in Arizona and the
 Gulf, mountain courses in the Alps and Colorado, tropical courses in Southeast Asia and Hawaii, parkland
 and woodland across Europe, North America and Japan. Every course has a local-language name (checked
@@ -41,7 +41,7 @@ Challenger event ever plays a shortened layout.
 Ten seasons of the calendar are replayed. Every edition — and every site of a multi-site qualifier —
 needs a free course of the right standard in its host city that week (no course hosts two events in a
 week). Where none exists, one is built there; the result (about 360) is the minimum the calendar needs.
-The rest of the 380 are added as extra clubs where golf is busiest. Major venues are fixed: Georgia
+The rest of the 520 are added as extra clubs where golf is busiest. Major venues are fixed: Georgia
 National for the Tour Masters every year, an elite course in every city of the other three majors' rotas
 (Britannia Open venues are always links).
 

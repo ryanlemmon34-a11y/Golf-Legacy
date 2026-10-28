@@ -17,7 +17,9 @@ CAL = WorldCalendar()
 
 
 class CalendarTests(unittest.TestCase):
-    def test_majors_fixed_and_exclusive(self):
+    def test_majors_fixed_and_exclusive_at_the_top(self):
+        """A major owns its week at the top level only: no Premier Tour event, but lower tours, college,
+        amateur and club-professional golf go on."""
         self.assertEqual({w: sid for w, (sid, _) in MAJORS.items()},
                          {18: 'TOUR_MASTERS', 24: 'PREMIER_TOUR_CHAMPIONSHIP', 25: 'USA_OPEN', 30: 'BRITANNIA_OPEN'})
         for seed in range(12):
@@ -25,8 +27,9 @@ class CalendarTests(unittest.TestCase):
             for year in (2027, 2031):
                 for w in MAJOR_WEEKS:
                     week = [e for e in cal.editions(year) if e.week == w]
-                    self.assertEqual(len(week), 1, f'seed {seed} week {w}')
-                    self.assertEqual(week[0].series.kind, 'major')
+                    self.assertEqual([e.series.series_id for e in week if e.series.kind == 'major'], [MAJORS[w][0]])
+                    self.assertFalse([e for e in week if e.series.tier == 1], f'seed {seed} week {w}')
+                    self.assertGreaterEqual(len({e.series.tier for e in week} & {2, 3, 4, 5, 6, 8}), 2, f'seed {seed} week {w}')
 
     def test_calendar_validates_for_many_worlds(self):
         for seed in range(25):

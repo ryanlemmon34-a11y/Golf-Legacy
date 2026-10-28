@@ -93,7 +93,7 @@ stamina fade first; composure and course management keep improving with experien
 
 A **Japan Challenge Circuit** (12 events, the real ABEMA Tour's place) was added to the calendar, so
 Japan's many professionals below the Japan Golf Tour have a home tour. The course library still
-covers it within 380 courses.
+covers it within 520 courses.
 
 ## Not built yet
 

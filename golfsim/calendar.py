@@ -5,11 +5,14 @@ purse, week, host country and venue policy). Each year produces *editions* (`eve
 "YEAR:SERIES_ID"); rotating series move to a different host city each year.
 
 Scheduling follows a priority cascade:
-  1. the four majors own their weeks outright: NO other competitive golf anywhere that week;
+  1. the four majors own their weeks at the top level: no Premier Tour event is played in a major
+     week, but Challenger, Regional and Mini tours, college, amateur and club-professional golf go on
+     (golfers in the major cannot also play elsewhere that week);
   2. fixed-week anchors: elite amateur championships, qualifying stages, college post-season,
      club-pro championship, Q-School stages and designated national opens;
   3. Premier Tour events (8 flagship / 20 standard / 8 opportunity);
-  4. Challenger, Regional and Mini tours;
+  3c. each circuit's season-ending championship (CIRCUIT_FLAGSHIPS), in its last weeks;
+  4. Challenger, Regional and Mini tours, and the regional club-professional circuits;
   5. College and amateur regular seasons.
 Flexible events are placed only in weeks when the host city's climate supports golf.
 Which events feed which majors (and how) lives in `qualification.py`.
@@ -33,7 +36,7 @@ MAJOR_WEEKS = frozenset(MAJORS)
 MAJOR_ID_BY_WEEK = {w: sid for w, (sid, _) in MAJORS.items()}
 
 TIERS = {0: 'Major', 1: 'Premier', 2: 'Challenger', 3: 'Regional', 4: 'Mini', 5: 'College',
-         6: 'Amateur', 7: 'Qualifying'}
+         6: 'Amateur', 7: 'Qualifying', 8: 'Club professional'}
 
 # Which days of the week an event occupies. A golfer may play a Monday qualifier and a
 # Thursday-Sunday tournament in the same week, as in real life, but never two overlapping events.
@@ -111,6 +114,7 @@ class Tour:
     purse: int = 0
     eligibility: str = 'members'
     cut: dict = dc_field(default_factory=dict)   # holes -> cut_top (cut after 36 holes)
+    days: dict = dc_field(default_factory=dict)  # holes -> days of the week, when not the default
 
 
 def _rng(*parts):
@@ -124,6 +128,33 @@ def _window(*pairs):
 
 def _in_window(week, windows):
     return any(a <= week <= b for a, b in windows)
+
+
+# ---------------------------------------------------------------------------------------------
+# Local golf: amateur series and club-professional circuits play in every golfing country of their
+# region, with events in proportion to the size of each country's golf scene (its starting nation pool;
+# see nations.py) and a floor so that no golfing country is without a season of local golf.
+# ---------------------------------------------------------------------------------------------
+LOCAL_RATE = {'amateur': 0.9, 'club_pro': 0.8}                       # events per unit of nation pool
+LOCAL_FLOOR = {'amateur': ((1.0, 4), (0.5, 3), (0.2, 2)), 'club_pro': ((2.0, 8), (0.8, 5), (0.3, 3))}
+LOCAL_PER_WEEK = 14                    # simultaneous local events a regional circuit can hold (different countries)
+
+
+def _local_countries(regions):
+    from .nations import NATIONS
+    return tuple((c, NATIONS[c].pool) for c, info in sorted(COUNTRIES.items()) if info.region in regions
+                 and CITIES_BY_COUNTRY.get(c))
+
+
+def local_allocation(regions, kind):
+    """Events per country for a local circuit: max(floor for the country's size, rate x pool)."""
+    out = {}
+    for c, pool in _local_countries(regions):
+        floor = next((n for size, n in LOCAL_FLOOR[kind] if pool >= size), 0)
+        n = max(floor, round(LOCAL_RATE[kind] * pool))
+        if n:
+            out[c] = n
+    return out
 
 
 # ---------------------------------------------------------------------------------------------
@@ -145,54 +176,54 @@ TOURS = (
          _window((8, 14), (36, 50)), 7, field=144, prestige=78, purse=7_000_000, cut=PRO_CUTS),
     # Tier 2 -- Challenger / developmental (Korn Ferry, Challenge Tour, Asian Tour, PGA Tour Americas, JGTO)
     Tour('CH_AMERICAS', 'Challenger Tour Americas', 2, 'pro', (('USA', 9), ('Canada', .5), ('Colombia', .5), ('Mexico', .5)),
-         _window((4, 45)), 22, field=156, prestige=61, purse=1_000_000, cut=PRO_CUTS),
+         _window((4, 45)), 26, field=156, prestige=61, purse=1_000_000, cut=PRO_CUTS),
     Tour('CH_EUROPE', 'Challenger Tour Europe', 2, 'pro',
          (('Spain', 2), ('France', 1.2), ('Germany', 1.2), ('Sweden', 1), ('Denmark', .8), ('Italy', 1),
           ('Czechia', .5), ('Austria', .6), ('Netherlands', .6), ('England', 1), ('Scotland', .6), ('Kenya', .5),
-          ('South Africa', .5), ('Oman', .4)), _window((10, 46)), 20, field=156, prestige=59, purse=400_000, cut=PRO_CUTS),
+          ('South Africa', .5), ('Oman', .4)), _window((10, 46)), 26, field=156, prestige=59, purse=400_000, cut=PRO_CUTS),
     Tour('CH_ASIA', 'Asian Challenger Tour', 2, 'pro',
          (('Thailand', 2), ('Malaysia', 1), ('Philippines', 1), ('Indonesia', .8), ('Taiwan', .8), ('Vietnam', .6),
-          ('Singapore', .4), ('Saudi Arabia', .5)), _window((1, 52)), 14, field=144, prestige=58, purse=1_000_000, cut=PRO_CUTS),
+          ('Singapore', .4), ('Saudi Arabia', .5)), _window((1, 52)), 22, field=144, prestige=58, purse=1_000_000, cut=PRO_CUTS),
     Tour('CH_LATAM_CANADA', 'Latin America & Canada Tour', 2, 'pro',
          (('Mexico', 1), ('Argentina', 1), ('Brazil', .8), ('Chile', .6), ('Colombia', .6), ('Peru', .3), ('Canada', 2)),
-         _window((6, 42)), 14, field=144, prestige=55, purse=250_000, cut=PRO_CUTS),
-    Tour('CH_JAPAN', 'Japan Golf Tour', 2, 'pro', (('Japan', 1),), _window((14, 49)), 20, field=132,
+         _window((6, 42)), 20, field=144, prestige=55, purse=250_000, cut=PRO_CUTS),
+    Tour('CH_JAPAN', 'Japan Golf Tour', 2, 'pro', (('Japan', 1),), _window((14, 49)), 24, field=132,
          prestige=62, purse=1_200_000, cut=PRO_CUTS),
     # Tier 3 -- Regional tours (Sunshine, Australasia, KPGA, PGTI, China Tour, MENA Tour)
     Tour('RG_SOUTHERN_AFRICA', 'Southern Africa Tour', 3, 'pro',
          (('South Africa', 6), ('Zimbabwe', .5), ('Namibia', .4), ('Zambia', .4), ('Mauritius', .4), ('Kenya', .4)),
-         _window((1, 14), (30, 52)), 20, formats=((72, .6), (54, .4)), field=144, prestige=45, purse=200_000, cut=PRO_CUTS),
+         _window((1, 14), (30, 52)), 26, formats=((72, .6), (54, .4)), field=144, prestige=45, purse=200_000, cut=PRO_CUTS),
     Tour('RG_AUSTRALASIA', 'Australasia Tour', 3, 'pro', (('Australia', 5), ('New Zealand', 1.2), ('Fiji', .3)),
-         _window((1, 12), (38, 52)), 12, field=144, prestige=46, purse=300_000, cut=PRO_CUTS),
-    Tour('RG_KOREA', 'Korea Tour', 3, 'pro', (('South Korea', 1),), _window((14, 44)), 14, field=144,
+         _window((1, 12), (38, 52)), 18, field=144, prestige=46, purse=300_000, cut=PRO_CUTS),
+    Tour('RG_KOREA', 'Korea Tour', 3, 'pro', (('South Korea', 1),), _window((14, 44)), 20, field=144,
          prestige=48, purse=600_000, cut=PRO_CUTS),
-    Tour('RG_INDIA', 'India Tour', 3, 'pro', (('India', 1),), _window((1, 14), (40, 52)), 12,
+    Tour('RG_INDIA', 'India Tour', 3, 'pro', (('India', 1),), _window((1, 14), (40, 52)), 20,
          formats=((72, .7), (54, .3)), field=126, prestige=40, purse=150_000, cut=PRO_CUTS),
-    Tour('RG_CHINA', 'China Tour', 3, 'pro', (('China', 1),), _window((10, 46)), 10, field=120,
+    Tour('RG_CHINA', 'China Tour', 3, 'pro', (('China', 1),), _window((10, 46)), 16, field=120,
          prestige=40, purse=200_000, cut=PRO_CUTS),
     Tour('RG_MENA', 'Middle East & North Africa Tour', 3, 'pro',
          (('United Arab Emirates', 1), ('Morocco', 1), ('Egypt', .8), ('Oman', .5), ('Bahrain', .4), ('Qatar', .4)),
-         _window((1, 16), (42, 52)), 10, formats=((54, .7), (72, .3)), field=120, prestige=38, purse=75_000, cut=PRO_CUTS),
+         _window((1, 16), (42, 52)), 14, formats=((54, .7), (72, .3)), field=120, prestige=38, purse=75_000, cut=PRO_CUTS),
     # Tier 4 -- Mini tours (independent pro circuits; open entry for a fee)
     *[Tour(k, n, 4, 'pro', c, w, e, formats=((54, .5), (36, .35), (72, .15)), field=f, per_week=pw,
            prestige=24, purse=60_000, eligibility='pro', cut={72: 50, 54: 40})
       for k, n, c, w, e, f, pw in (
-          ('MN_US_SUNBELT', 'Sunbelt Mini Tour', (('USA', 1),), _window((1, 46)), 16, 96, 1),
-          ('MN_US_DESERT', 'Desert Mini Tour', (('USA', 1),), _window((1, 16), (42, 52)), 12, 90, 1),
-          ('MN_US_MIDWEST', 'Midwest Mini Tour', (('USA', 1),), _window((18, 40)), 10, 84, 1),
-          ('MN_US_NORTHEAST', 'Northeast Mini Tour', (('USA', 1),), _window((20, 38)), 8, 84, 1),
-          ('MN_CANADA', 'Canadian Pro Circuit', (('Canada', 1),), _window((20, 38)), 8, 78, 1),
+          ('MN_US_SUNBELT', 'Sunbelt Mini Tour', (('USA', 1),), _window((1, 46)), 72, 96, 2),
+          ('MN_US_DESERT', 'Desert Mini Tour', (('USA', 1),), _window((1, 16), (42, 52)), 44, 90, 2),
+          ('MN_US_MIDWEST', 'Midwest Mini Tour', (('USA', 1),), _window((18, 40)), 40, 90, 2),
+          ('MN_US_NORTHEAST', 'Northeast Mini Tour', (('USA', 1),), _window((20, 38)), 34, 90, 2),
+          ('MN_CANADA', 'Canadian Pro Circuit', (('Canada', 1),), _window((20, 38)), 14, 78, 1),
           ('MN_UK_IRELAND', 'UK & Ireland Pro Circuit', (('England', 3), ('Scotland', 1.5), ('Ireland', 1), ('Wales', .6)),
-           _window((14, 40)), 12, 96, 1),
+           _window((14, 40)), 36, 96, 2),
           ('MN_NORDIC', 'Nordic Pro League', (('Sweden', 2), ('Denmark', 1.5), ('Norway', .8), ('Finland', .8)),
-           _window((18, 38)), 10, 90, 1),
+           _window((18, 38)), 24, 90, 2),
           ('MN_ALPS', 'Alps Pro Tour', (('Austria', 1), ('Switzerland', 1), ('Italy', 1.5), ('France', 1), ('Spain', .5)),
-           _window((10, 42)), 14, 96, 1),
-          ('MN_IBERIA', 'Iberian Pro Tour', (('Spain', 2), ('Portugal', 1)), _window((1, 52)), 10, 90, 1),
+           _window((10, 42)), 28, 96, 1),
+          ('MN_IBERIA', 'Iberian Pro Tour', (('Spain', 2), ('Portugal', 1)), _window((1, 52)), 16, 90, 1),
           ('MN_GERMANY', 'German Pro Tour', (('Germany', 3), ('Netherlands', 1), ('Czechia', .6), ('Poland', .5), ('Turkey', .5)),
-           _window((10, 44)), 12, 90, 1),
+           _window((10, 44)), 24, 90, 1),
           ('MN_SE_ASIA', 'Southeast Asia Pro Series', (('Thailand', 2), ('Malaysia', 1), ('Philippines', 1), ('Vietnam', .6)),
-           _window((1, 52)), 12, 90, 1),
+           _window((1, 52)), 16, 90, 1),
           ('MN_EAST_AFRICA', 'East Africa Pro Circuit', (('Kenya', 2), ('Zambia', .5), ('Zimbabwe', .5)),
            _window((1, 52)), 8, 72, 1),
           ('MN_AUSTRALIA', 'Australian State Pro Series', (('Australia', 1),), _window((1, 14), (38, 52)), 10, 90, 1),
@@ -200,34 +231,51 @@ TOURS = (
            _window((1, 16), (40, 52)), 8, 78, 1),
           ('MN_MEXICO_CARIBBEAN', 'Mexico & Caribbean Pro Circuit', (('Mexico', 2), ('Colombia', .6)),
            _window((1, 52)), 8, 78, 1),
-          ('MN_JAPAN', 'Japan Challenge Circuit', (('Japan', 1),), _window((14, 46)), 12, 96, 1),
+          ('MN_JAPAN', 'Japan Challenge Circuit', (('Japan', 1),), _window((14, 46)), 20, 96, 1),
       )],
     # Tier 5 -- College (regular seasons; post-season events are anchors)
-    Tour('CO_US_D1', 'US College Division I', 5, 'college', (('USA', 1),), _window((36, 46), (6, 16)), 48,
+    Tour('CO_US_D1', 'US College Division I', 5, 'college', (('USA', 1),), _window((36, 46), (6, 16)), 64,
          formats=((54, .85), (36, .15)), field=84, per_week=4, prestige=34, eligibility='college'),
-    Tour('CO_US_SMALL', 'US Small College Golf', 5, 'college', (('USA', 1),), _window((36, 45), (6, 16)), 24,
+    Tour('CO_US_SMALL', 'US Small College Golf', 5, 'college', (('USA', 1),), _window((36, 45), (6, 16)), 32,
          formats=((54, .6), (36, .4)), field=72, per_week=2, prestige=22, eligibility='college'),
     Tour('CO_INTL', 'International University Golf', 5, 'college',
          (('England', 1), ('Scotland', .6), ('Spain', .6), ('France', .5), ('Japan', 1), ('South Korea', .8),
-          ('Australia', .8), ('Canada', .6)), _window((10, 22), (36, 46)), 10, formats=((54, .6), (36, .4)),
-         field=132, per_week=1, prestige=24, eligibility='college'),
-    # Tier 6 -- Amateur regional series (state/county/club-level events; often 18 or 36 holes)
-    *[Tour(k, n, 6, 'amateur', c, _window((1, 52)), e, formats=((18, .3), (36, .4), (54, .25), (72, .05)),
-           field=f, per_week=pw, prestige=18, eligibility='amateur', cut={72: 50, 54: 50})
-      for k, n, c, e, f, pw in (
-          ('AM_NORTH_AMERICA', 'North American Amateur Series', (('USA', 9), ('Canada', 2)), 34, 96, 2),
-          ('AM_EUROPE', 'European Amateur Series',
-           (('England', 3), ('Scotland', 2), ('Ireland', 1.5), ('Wales', .6), ('Spain', 1), ('France', 1), ('Germany', 1),
-            ('Sweden', 1), ('Netherlands', .6), ('Denmark', .6), ('Italy', .6)), 24, 96, 2),
-          ('AM_ASIA', 'Asian Amateur Series', (('Japan', 3), ('South Korea', 2), ('China', 1), ('Thailand', 1),
-                                               ('India', 1), ('Taiwan', .6), ('Philippines', .5)), 14, 90, 1),
-          ('AM_OCEANIA', 'Oceania Amateur Series', (('Australia', 3), ('New Zealand', 1)), 10, 90, 1),
-          ('AM_AFRICA', 'African Amateur Series', (('South Africa', 3), ('Kenya', .6), ('Morocco', .4), ('Nigeria', .4)), 8, 84, 1),
-          ('AM_LATAM', 'Latin American Amateur Series', (('Argentina', 1), ('Mexico', 1), ('Brazil', .8), ('Chile', .6),
-                                                         ('Colombia', .6)), 8, 84, 1),
+          ('Australia', .8), ('Canada', .6)), _window((10, 22), (36, 46)), 24, formats=((54, .6), (36, .4)),
+         field=120, per_week=2, prestige=24, eligibility='college'),
+    # Tier 6 -- Amateur regional series: local club, county, state and regional events in every golfing
+    # country of the region, in proportion to the size of its golf scene (local_allocation)
+    *[Tour(k, n, 6, 'amateur', _local_countries(r), _window((1, 52)), sum(local_allocation(r, 'amateur').values()),
+           formats=((18, .4), (36, .4), (54, .17), (72, .03)), field=f, per_week=LOCAL_PER_WEEK, prestige=18,
+           eligibility='amateur', cut={72: 50, 54: 50})
+      for k, n, r, f in (
+          ('AM_NORTH_AMERICA', 'North American Amateur Series', ('North America',), 96),
+          ('AM_EUROPE', 'European Amateur Series', ('Europe',), 96),
+          ('AM_ASIA', 'Asian Amateur Series', ('Asia', 'Middle East'), 90),
+          ('AM_OCEANIA', 'Oceania Amateur Series', ('Oceania',), 90),
+          ('AM_AFRICA', 'African Amateur Series', ('Africa',), 84),
+          ('AM_LATAM', 'Latin American Amateur Series', ('Latin America',), 84),
+      )],
+    # Tier 8 -- Club professionals' regional circuits: one-day section events and pro-ams on Mondays and
+    # Tuesdays (club pros work weekends) in every golfing country of the region, for its club professionals
+    *[Tour(k, n, 8, 'club_pro', _local_countries(r), _window((1, 52)), sum(local_allocation(r, 'club_pro').values()),
+           formats=((18, .7), (36, .3)), field=f, per_week=LOCAL_PER_WEEK, prestige=22, purse=p,
+           eligibility='club_pro', days={18: 'Mon', 36: 'Mon-Tue'})
+      for k, n, r, f, p in (
+          ('CP_NORTH_AMERICA', 'North American Club Professional Series', ('North America',), 84, 25_000),
+          ('CP_EUROPE', 'European Club Professional Series', ('Europe',), 72, 20_000),
+          ('CP_ASIA', 'Asian Club Professional Series', ('Asia', 'Middle East'), 72, 15_000),
+          ('CP_OCEANIA', 'Oceania Club Professional Series', ('Oceania',), 72, 15_000),
+          ('CP_AFRICA', 'African Club Professional Series', ('Africa',), 60, 10_000),
+          ('CP_LATAM', 'Latin American Club Professional Series', ('Latin America',), 60, 10_000),
       )],
 )
 TOUR_BY_KEY = {t.key: t for t in TOURS}
+LOCAL_CIRCUITS = {'AM_NORTH_AMERICA': (('North America',), 'amateur'), 'AM_EUROPE': (('Europe',), 'amateur'),
+                  'AM_ASIA': (('Asia', 'Middle East'), 'amateur'), 'AM_OCEANIA': (('Oceania',), 'amateur'),
+                  'AM_AFRICA': (('Africa',), 'amateur'), 'AM_LATAM': (('Latin America',), 'amateur'),
+                  'CP_NORTH_AMERICA': (('North America',), 'club_pro'), 'CP_EUROPE': (('Europe',), 'club_pro'),
+                  'CP_ASIA': (('Asia', 'Middle East'), 'club_pro'), 'CP_OCEANIA': (('Oceania',), 'club_pro'),
+                  'CP_AFRICA': (('Africa',), 'club_pro'), 'CP_LATAM': (('Latin America',), 'club_pro')}
 
 # ---------------------------------------------------------------------------------------------
 # Major venues
@@ -311,6 +359,16 @@ NATIONAL_OPENS = (
 )
 
 
+# Each circuit's season-ending championship (see docs/CIRCUIT_FLAGSHIPS.md), by tier:
+# (field, holes, purse multiple of the tour's typical purse, prestige above the tour's events).
+# Fields come from the circuit's own order of merit (Season.circuit_championship); circuits that already
+# have their championship elsewhere in the calendar are listed in CIRCUIT_FLAGSHIP_ELSEWHERE.
+CIRCUIT_FLAGSHIPS = {2: (70, 72, 2.0, 14), 3: (60, 72, 1.8, 14), 4: (50, 54, 2.0, 12), 6: (72, 54, 0.0, 16),
+                     8: (60, 36, 2.0, 16)}
+CIRCUIT_FLAGSHIP_ELSEWHERE = {'CP_NORTH_AMERICA': 'CLUB_PRO_CHAMPIONSHIP'}
+FLAGSHIP_LAST_WEEK = 48                 # year-round circuits finish their season before the holidays
+
+
 def _anchor_specs():
     """Fixed-week anchors outside the Premier Tour: (series_id, name, tour, tier, kind, category, holes,
     field, week, eligibility, country, cities, policy, days, match_play, prestige, sites, cut_top)."""
@@ -335,6 +393,10 @@ def _anchor_specs():
     yield ('EUROPEAN_AMATEUR', 'European Amateur Championship', 'AMATEUR', 6, 'amateur', 'elite_amateur', 72, 144, 27,
            'amateur', 'Spain', ('Madrid', 'Copenhagen', 'Prague', 'Vienna', 'Stockholm', 'Lisbon', 'Hamburg', 'Milan'),
            'rotating', 'Tue-Fri', False, 66, 1, 60)
+    # The USA Amateur's open route: 36-hole qualifying at eight sites three weeks before (USA_AMATEUR_EXEMPT
+    # are exempt; Season.usa_amateur_field fills the rest of the field from here)
+    yield ('USA_AMATEUR_QUALIFYING', 'USA Amateur Qualifying', 'QUALIFYING', 7, 'qualifying', 'qualifier', 36, 78, 30,
+           'amateur', 'USA', None, 'rotating', 'Mon', False, 30, 8, 0)
     yield ('USA_AMATEUR', 'USA Amateur Championship', 'AMATEUR', 6, 'amateur', 'elite_amateur', 36, 156, 33,
            'amateur', 'USA', US_AM, 'rotating', 'Mon-Sun', True, 80, 1, 0)
     yield ('USA_MID_AMATEUR', 'USA Mid-Amateur Championship', 'AMATEUR', 6, 'amateur', 'elite_amateur', 36, 132, 38,
@@ -416,7 +478,7 @@ class WorldCalendar:
             raise ValueError(f'{s.name}: no host city in season in week {s.week}')
         if in_season != s.cities:
             s = replace(s, cities=in_season)
-        if s.week in MAJOR_WEEKS and s.kind != 'major':
+        if s.week in MAJOR_WEEKS and s.tier == 1:
             raise AssertionError(f'{s.name} scheduled in major week {s.week}')
         self.series.append(s)
         self._tour_weeks[s.tour][s.week] += 1
@@ -424,7 +486,8 @@ class WorldCalendar:
     def _free_weeks(self, tour, windows, per_week, countries):
         out = []
         for w in range(1, 53):
-            if w in MAJOR_WEEKS or not _in_window(w, windows) or self._tour_weeks[tour][w] >= per_week:
+            if (w in MAJOR_WEEKS and TOUR_BY_KEY[tour].tier == 1 or not _in_window(w, windows)
+                    or self._tour_weeks[tour][w] >= per_week):
                 continue
             if any(w in season_weeks(c) for country, _ in countries for c in CITIES_BY_COUNTRY[country]):
                 out.append(w)
@@ -446,6 +509,35 @@ class WorldCalendar:
         while len(picks) < n:
             picks.append(rest.pop(r.randrange(len(rest))))
         return sorted(picks)
+
+    def _local_events(self, tour, regions, kind):
+        """A local circuit's events: each country's allocation spread through the weeks its golf season
+        allows, country by country (largest first), within the circuit's weekly capacity."""
+        alloc = local_allocation(regions, kind)
+        free = self._free_weeks(tour.key, tour.weeks, tour.per_week, tour.countries)
+        room = {w: tour.per_week - self._tour_weeks[tour.key][w] for w in free}
+        r = _rng(self.seed, 'formats', tour.key)
+        i = 0
+        for country in sorted(alloc, key=lambda c: (-alloc[c], c)):
+            weeks = [w for w in free if room[w] > 0 and any(w in season_weeks(c) for c in CITIES_BY_COUNTRY[country])]
+            if not weeks:
+                continue
+            per = -(-alloc[country] // len(weeks))           # a busy golf country can hold several a week
+            slots = [w for w in weeks for _ in range(min(room[w], per))]
+            n = min(alloc[country], len(slots))
+            for week in (slots[int((j + 0.5) * len(slots) / n)] for j in range(n)):
+                room[week] -= 1
+                i += 1
+                holes = r.choices([h for h, _ in tour.formats], weights=[w for _, w in tour.formats])[0]
+                cut_top = tour.cut.get(holes, 0)
+                prestige = tour.prestige + {18: -6, 36: -2, 54: 3, 72: 6}[holes]
+                purse = int(tour.purse * {18: .45, 36: .7, 54: 1.0, 72: 1.35}[holes]) if tour.purse else 0
+                sid = f'{tour.key}_{i:03d}'
+                self._add(Series(sid, f'{tour.name} Event {i} ({country})', tour.key, tour.tier, tour.kind,
+                                 'regular', holes, tour.field, week, tour.eligibility, country,
+                                 self._cities_for(country, week, n=4, key=sid), 'rotating',
+                                 36 if cut_top else 0, cut_top, days=tour.days.get(holes, ''),
+                                 prestige=prestige, purse=purse))
 
     # -- the cascade -----------------------------------------------------------------------------
     def _build(self):
@@ -490,9 +582,38 @@ class WorldCalendar:
                              max(tour.field, 120), week, 'open_pro', country, self._cities_for(country, week, key=sid),
                              'rotating', 36, tour.cut.get(holes, 60), prestige=prestige,
                              purse=int(tour.purse * 1.4), anchored=True))
+        # 3c. Each circuit's championship, in the last weeks of its season
+        for tour in TOURS:
+            spec = CIRCUIT_FLAGSHIPS.get(tour.tier)
+            if spec is None or tour.key in CIRCUIT_FLAGSHIP_ELSEWHERE:
+                continue
+            field_n, holes, purse_x, bonus = spec
+            # professional circuits finish before (or between) the Q-School stages their players need
+            qs = {x.week for x in self.series if x.category == 'q_school'} if tour.tier in (2, 3, 4) else set()
+            free = [w for w in self._free_weeks(tour.key, tour.weeks, tour.per_week, tour.countries)
+                    if w <= FLAGSHIP_LAST_WEEK and w not in qs]
+            lead = max(tour.countries, key=lambda c: c[1])[0]
+            at_home = [w for w in free if any(w in season_weeks(c) for c in CITIES_BY_COUNTRY[lead])]
+            # the last week of the season, in the circuit's main country when it is in season there
+            # within the last two months; otherwise wherever the circuit is playing then
+            if at_home and at_home[-1] >= free[-1] - 8:
+                week, country = at_home[-1], lead
+            else:
+                week = free[-1]
+                country = self._pick_country(tour.countries, week, f'{tour.key}:championship')
+            sid = f'{tour.key}_CHAMPIONSHIP'
+            name = (f'{tour.name.replace(" Series", "")} Championship' if tour.tier == 8 else
+                    f'{tour.name} Championship')
+            self._add(Series(sid, name, tour.key, tour.tier, tour.kind, 'circuit_championship', holes, field_n, week,
+                             tour.eligibility, country, self._cities_for(country, week, n=4, key=sid), 'rotating',
+                             prestige=min(90, tour.prestige + bonus), purse=int(tour.purse * purse_x),
+                             days=tour.days.get(holes, ''), anchored=True))
         # 4-5. Remaining tour events
         for tour in TOURS:
             if tour.tier == 1:
+                continue
+            if tour.key in LOCAL_CIRCUITS:
+                self._local_events(tour, *LOCAL_CIRCUITS[tour.key])
                 continue
             already = sum(1 for s in self.series if s.tour == tour.key and s.category == 'national_open')
             n = tour.events - (already if tour.tier <= 4 else 0)
@@ -512,12 +633,13 @@ class WorldCalendar:
                 self._add(Series(f'{tour.key}_{i:02d}', f'{tour.name} Event {i}', tour.key, tour.tier, tour.kind,
                                  'regular', holes, tour.field, week, tour.eligibility, country,
                                  self._cities_for(country, week, n=4, key=f'{tour.key}{i}'), 'rotating',
-                                 36 if cut_top else 0, cut_top, prestige=prestige, purse=purse))
+                                 36 if cut_top else 0, cut_top, days=tour.days.get(holes, ''),
+                                 prestige=prestige, purse=purse))
         # National amateur championships: one per country in its golf season
         for country, info in COUNTRIES.items():
             if info.golf < 0.3:
                 continue
-            weeks = sorted(set.union(*(season_weeks(c) for c in CITIES_BY_COUNTRY[country])) - MAJOR_WEEKS)
+            weeks = sorted(set.union(*(season_weeks(c) for c in CITIES_BY_COUNTRY[country])))
             summer = [w for w in weeks if (2 <= w <= 9) == info.south and (26 <= w <= 36 or 2 <= w <= 9)]
             week = self._spread(summer or weeks, 1, f'NA:{country}')[0]
             sid = 'NATIONAL_AMATEUR_' + country.upper().replace(' ', '_')
@@ -545,9 +667,12 @@ class WorldCalendar:
         for w in range(1, 53):
             week_eds = [e for e in eds if e.week == w]
             if w in MAJOR_WEEKS:
-                if len(week_eds) != 1 or week_eds[0].series.kind != 'major':
-                    errors.append(f'Week {w}: major week must contain only the major ({len(week_eds)} events)')
-        regular = Counter((s.tour, s.week) for s in self.series if s.category not in ('college_postseason',))
+                if sum(1 for e in week_eds if e.series.kind == 'major') != 1:
+                    errors.append(f'Week {w}: major week must contain its major')
+                if any(e.series.tier == 1 for e in week_eds):
+                    errors.append(f'Week {w}: Premier Tour event in a major week')
+        regular = Counter((s.tour, s.week) for s in self.series if s.category not in ('college_postseason',
+                                                                                    'circuit_championship'))
         for (tour_key, w), n in regular.items():
             tour = TOUR_BY_KEY.get(tour_key)
             if tour and tour.tier == 1 and n > 1:

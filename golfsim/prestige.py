@@ -27,9 +27,9 @@ COURSE_QUALITY = {('elite', 'Championship'): 100, ('championship', 'Championship
                   ('standard', 'Championship'): 62, ('championship', 'Club'): 55, ('standard', 'Club'): 45,
                   ('standard', 'Forward'): 32, ('municipal', 'Regular'): 25, ('municipal', 'Forward'): 15}
 
-# Expected field strength before an event has any history, by tier (0 = majors ... 7 = qualifying),
+# Expected field strength before an event has any history, by tier (0 = majors ... 8 = club pros),
 # set from where fields settle in the multi-season test so prestige starts near its long-run level.
-DEFAULT_FIELD = {0: 92, 1: 85, 2: 33, 3: 18, 4: 1, 5: 22, 6: 12, 7: 8}
+DEFAULT_FIELD = {0: 92, 1: 85, 2: 33, 3: 18, 4: 1, 5: 22, 6: 12, 7: 8, 8: 2}
 DEFAULT_FIELD_CATEGORY = {'flagship': 88, 'opportunity': 72, 'elite_amateur': 50, 'national_amateur': 28,
                           'college_postseason': 32, 'national_open': None}
 
