@@ -118,8 +118,11 @@ and eventually as-of-year views. Not built. Before it, close the archive gaps li
 1. ~~Record each edition's tour, tier and category at the time~~ — done (archive events carry them).
 2. ~~Archive the weekly No. 1 and ranking snapshots~~ — done: each week's top 100 of the world and
    amateur rankings (`Archive.ranking`, `Archive.weeks_at_number_one`).
-3. A records/definitions module over the archive (start, win, major, debut, age, ties, scope, coverage of
-   careers that began before the world), used by both the Records and Frivolities views.
+3. ~~A records/definitions module over the archive~~ — first version: `golfsim/history_stats.py`
+   (definitions; boards for wins, majors, starts, prize, ages, debuts, starts before a first win,
+   not-won-yet vs retired-without-a-win, waits between wins, runner-ups, major droughts, wins across
+   tours, streaks, weeks at No. 1, partnerships, coaches of major champions; evidence and active/partial
+   flags on every row). Still to choose: the owner's first lists and their filters (era, nation).
 4. Archive indexes for incremental, century-scale browsing.
 5. First usable slice: Overview, Golfer profile, Tournament edition, Course profile and one Records or
    Frivolities list, tested as complete browsing journeys (see the document).

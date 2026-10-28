@@ -103,7 +103,7 @@ Assessed against `golfsim/archive.py` and `docs/HISTORY_AND_PERSISTENCE.md` as o
 | Coverage of careers that began before the world | `initial` and `created` flags per person | Use them in every record definition |
 | Ages at achievement | Birth year and event week | Event dates are weeks, not days: age precision is annual unless dates are added |
 | Weekly No. 1 and weekly rankings (weeks at No. 1, as-of views) | Yes: each week's world and amateur top 100 (`Archive.ranking`, `weeks_at_number_one`) | Deeper ranking history if as-of views need it |
-| Cuts made, runner-ups, droughts, starts before first win | Derivable from finishes | Shared, tested definitions |
-| Central records and frivolities from one set of definitions | Not built | A records/definitions module over the archive |
+| Cuts made, runner-ups, droughts, starts before first win | Yes, from finishes, in `history_stats` | — |
+| Central records and frivolities from one set of definitions | First version: `golfsim/history_stats.py` (definitions, 25 boards with evidence and active/partial flags; `tools/history_query.py ARCHIVE board NAME`) | Owner's choice of the first lists; more scopes and filters (era, nation) |
 | Century-scale browsing | One file per season | Indexes (person → results, series → editions) for incremental loading |
 | Season recaps from recorded facts | `Archive.recap` and the narrative log | Richer recap selection rules |

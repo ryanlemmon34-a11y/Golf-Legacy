@@ -7,6 +7,8 @@
     python tools/history_query.py ARCHIVE course georgia-national-golf-club
     python tools/history_query.py ARCHIVE recap 2029
     python tools/history_query.py ARCHIVE examples          # finds real linked histories to show
+    python tools/history_query.py ARCHIVE boards            # the records and frivolities lists
+    python tools/history_query.py ARCHIVE board most-majors # one list, with its evidence
 
 Everything is read from the archive's facts (ids, dated stints, the team recorded with each result).
 """
@@ -116,6 +118,21 @@ def examples(a):
     return out
 
 
+def boards(a):
+    from golfsim.history_stats import BOARDS
+    return [f'{k:30s} {t}' for k, (t, _, _) in BOARDS.items()]
+
+
+def one_board(a, name):
+    from golfsim.history_stats import HistoryStats, board
+    title, rows = board(HistoryStats(a), name, n=20)
+    out = [title, '(A = active career, still changing; P = began before the archive: earlier results unknown)']
+    for i, r in enumerate(rows, 1):
+        flags = ('A' if r['active'] else '-') + ('P' if r['partial'] else '-')
+        out.append(f'{i:3d}. {r["name"]:34s} {r["value"]:>10} {flags}  ' + ', '.join(r['evidence'][:4]))
+    return out
+
+
 def main():
     a = Archive(sys.argv[1])
     cmd = sys.argv[2]
@@ -123,7 +140,7 @@ def main():
     fn = {'person': lambda: person(a, int(arg)), 'staff': lambda: staff(a, int(arg)), 'clients': lambda: clients(a, int(arg)),
           'course': lambda: course(a, arg), 'recap': lambda: recap(a, int(arg)),
           'find': lambda: [f'{pid}: {a.name(pid)}, born {a.people[pid]["born"]}' for pid in a.find(arg)],
-          'examples': lambda: examples(a)}[cmd]
+          'examples': lambda: examples(a), 'boards': lambda: boards(a), 'board': lambda: one_board(a, arg)}[cmd]
     print('\n'.join(fn()))
 
 
