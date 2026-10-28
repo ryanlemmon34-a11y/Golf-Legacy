@@ -83,13 +83,24 @@ median 23-24, reaching them by taking Challenger alternatives (capped at 10% of 
 ## Performance
 
 Every shot is still simulated. Season one on this machine (4 worker processes): about 5.5 million holes
-(3.3 million before the pass), 123-147 s for a full season including archive writes and checks
-(103 s before). Speed-ups made in this pass with identical results: interpolation tables, faster
+(3.3 million before the pass), 128-147 s for a full season including archive writes and checks
+(103 s before); after the later exact-result speed-ups, 128 s (season one) and 138 s (season two). Speed-ups made in this pass with identical results: interpolation tables, faster
 entries (eligible events prepared once per kind of golfer; fields kept sorted with running counts),
 smaller worker payloads. Seasons two and three took 135-158 s. **The 120 s target is not yet met here**;
 whether the intended hardware meets it is untested. The earlier 25-season runs slowed about 17% by season
 25; this pass stops the weekly ranking and standings snapshots from accumulating, and the weekly session
 now keeps only recent seasons in memory, but season 100 is untested.
+
+## Seasons two and three: the limit moves from fields to money
+
+Full mini-tour pros, seed 2027: weeks unable to afford any event 3% → 14% → 22% (2027 → 2029), paid work
+weeks 4% → 10% → 13%, median starts 21 → 21 → 14; Regional pros' unaffordable weeks 2% → 11% → 17%. Shut-out
+weeks fall at the same time (mini 38% → 22% → 14% of weeks). Playing 20+ events burns savings faster than
+the 8 starts the old calendar allowed. Careers, though, come out as before: mini membership falls from 1,505
+to about 1,080 in three seasons both before and after this pass, and about as many golfers stop chasing each
+year (2029: 404 after, 449 before). Before, full fields hid the money limit; now golfers get to play and
+money decides who keeps going. Whether lower-tour economics (entry fees, travel, purses, sponsorship) are
+right is a calibration question for the owner, outside this access pass.
 
 ## Remaining shortages and assumptions
 
