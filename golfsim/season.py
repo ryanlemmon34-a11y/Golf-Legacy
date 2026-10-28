@@ -1888,10 +1888,14 @@ class Season:
             row = snap.get(gid)
             if row is None:
                 continue
-            for major, code, label, cond in places:
-                text = f'{self.cal.by_id[major].name} {year + 1}: {label}'
-                (row.setdefault('secured_if', []) if cond else row['secured']).append(
-                    f'{text} ({cond})' if cond else text)
+            for major, routes, cond in places:
+                sure = [label for _, label, c in routes if not c]
+                maybe = [label for _, label, c in routes if c]
+                text = f'{self.cal.by_id[major].name} {year + 1}: ' + '; '.join(sure or maybe)
+                if cond:
+                    row.setdefault('secured_if', []).append(f'{text} ({cond})')
+                else:                                        # guaranteed; amateur routes kept as support
+                    row['secured'].append(text + (f' (also: {"; ".join(maybe)})' if maybe else ''))
         for gid, row in snap.items():
             row['zero_start_reason'] = self.zero_start_reason(gid, year, row) if row['events'] == 0 else ''
         by_tour = defaultdict(list)

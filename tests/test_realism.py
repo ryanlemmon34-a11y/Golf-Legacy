@@ -590,6 +590,38 @@ class SecuredPlacesTests(unittest.TestCase):
         self.assertIn('Tour Masters 2028: USA Amateur champion and runner-up (if still an amateur)',
                       snap[amateur.id]['secured_if'])                        # ...but the place, with its condition
 
+    def test_an_unconditional_route_is_not_hidden_by_an_amateur_one(self):
+        """An amateur champion who also earned a place outright (a top-ten USA Open; a top-twelve Tour
+        Masters) holds it whatever they do next: guaranteed, with the amateur title kept as support."""
+        s = SEASON
+        ctx = s.ctx
+        ams = [g for g in s.world.golfers if g.status == 'amateur' and g.lifestyle == 'full_time']
+        usa, brit, only = ams[1], ams[2], ams[3]
+        filler = [g.id for g in s.world.golfers if g.status == 'pro'][:12]
+        added = {('USA_AMATEUR', 2027): {0: [(usa.id, 1), (only.id, 2)]},
+                 ('USA_OPEN', 2027): {0: [(filler[0], 1), (filler[1], 2), (usa.id, 3)] + [(f, 20 + i) for i, f in enumerate(filler[2:])]},
+                 ('BRITANNIA_AMATEUR', 2027): {0: [(brit.id, 1)]},
+                 ('TOUR_MASTERS', 2027): {0: [(filler[0], 1), (brit.id, 10)] + [(f, 30 + i) for i, f in enumerate(filler[1:])]}}
+        saved = {k: ctx.results.get(k) for k in added}
+        ctx.results.update(added)
+        try:
+            snap = s.season_snapshot(2027)
+        finally:
+            for k, v in saved.items():
+                if v is None:
+                    ctx.results.pop(k, None)
+                else:
+                    ctx.results[k] = v
+        self.assertIn('USA Open 2028: Top 10 and ties, last USA Open (also: USA Amateur champion and runner-up)',
+                      snap[usa.id]['secured'])
+        self.assertTrue(any(t.startswith("Tour Masters 2028: Top 4 and ties, last year's other majors")
+                            and 'USA Amateur champion' in t for t in snap[usa.id]['secured']))
+        self.assertFalse([t for t in snap[usa.id].get('secured_if', []) if 'USA Open' in t or 'Tour Masters' in t])
+        self.assertTrue(any(t.startswith('Tour Masters 2028: Top 12 and ties, last Tour Masters') for t in snap[brit.id]['secured']))
+        self.assertFalse([t for t in snap[brit.id].get('secured_if', []) if 'Tour Masters' in t])
+        self.assertFalse([t for t in snap[only.id]['secured'] if 'USA Open' in t])   # runner-up only: conditional
+        self.assertIn('USA Open 2028: USA Amateur champion and runner-up (if still an amateur)', snap[only.id]['secured_if'])
+
 
 class DevelopmentRealismTests(unittest.TestCase):
     def _golfer(self, age):

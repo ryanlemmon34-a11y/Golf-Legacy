@@ -422,26 +422,31 @@ def secured_places(ctx, year):
     """Places in next season's majors already earned by the end of `year`: every exemption route
     applied (with the same rules as build_field) to the facts known then, leaving out routes decided by
     rankings or points lists not yet published (cutoff) and qualifying stages still to be played.
-    {gid: [(major, route code, route label, condition)]}: condition '' for a place that is theirs, or
-    'if still an amateur' for an amateur title's place (it lapses if they turn professional)."""
+    {gid: [(major, routes, condition)]}, one entry per major with every route that supports the place
+    (routes: [(code, label, condition)], in the rules' order). The place is guaranteed (condition '')
+    if any route is unconditional, however many amateur routes also lead there; it is conditional
+    ('if still an amateur': it lapses if they turn professional) only if every route is an amateur's."""
     view = ctx.as_of(year + 1, 1)                     # everything of `year`, nothing of the next
-    out = {}
+    found = {}
     for major, rules in RULES.items():
-        taken = set()
         for route in rules:
             if route.kind != 'exempt' or route.cutoff:
                 continue
             for gid in route.select(view, year + 1):
                 p = ctx.people.get(gid)
-                if p is None or not p.active or gid in taken:
+                if p is None or not p.active:
                     continue
                 if route.amateur_only and p.status != 'amateur':
                     continue
                 if (route.status and p.status != route.status) or (route.max_age and p.age + 1 > route.max_age):
                     continue
-                taken.add(gid)
-                out.setdefault(gid, []).append((major, route.code, route.label,
-                                                'if still an amateur' if route.amateur_only else ''))
+                routes = found.setdefault((gid, major), [])
+                if all(code != route.code for code, _, _ in routes):
+                    routes.append((route.code, route.label, 'if still an amateur' if route.amateur_only else ''))
+    out = {}
+    for (gid, major), routes in found.items():
+        cond = '' if any(not c for _, _, c in routes) else 'if still an amateur'
+        out.setdefault(gid, []).append((major, routes, cond))
     return out
 
 
