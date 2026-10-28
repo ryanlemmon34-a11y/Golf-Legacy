@@ -23,8 +23,9 @@ country and a pool of real host cities). Each year produces *editions*; rotating
 year. The scheduler fills the year in priority order: majors → fixed-week anchors (amateur
 championships, qualifying stages, college post-season, Q-School, designated national opens) →
 Premier Tour → each circuit's season-ending championship (`docs/CIRCUIT_FLAGSHIPS.md`) → Challenger,
-Regional and Mini tours and the local amateur and club-professional circuits (events in every golfing
-country, in proportion to its golf scene) → college and amateur seasons. Flexible events are
+Regional and Mini tours and the local amateur and club-professional circuits (amateur events in every
+golfing country, club-pro section events in the countries with a club-pro scene, both in proportion to
+its golf scene) → college and amateur seasons. Flexible events are
 only placed where the host city's climate supports golf that week (Australia and South Africa in the
 southern summer, the Middle East and Arizona in winter, Scotland in summer, the tropics all year).
 

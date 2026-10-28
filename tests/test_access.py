@@ -12,7 +12,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from golfsim.calendar import (CIRCUIT_FLAGSHIP_ELSEWHERE, CIRCUIT_FLAGSHIPS, MAJOR_WEEKS, TOUR_BY_KEY,   # noqa: E402
-                              local_allocation)
+                              local_allocation, LOCAL_MIN)
 from golfsim.geography import COUNTRIES                                  # noqa: E402
 from golfsim.population import generate_world                            # noqa: E402
 from golfsim.season import ACCESS, FULL_STATUS, PREMIER_TOURS, PREMIER_VISITOR_SHARE, Season   # noqa: E402
@@ -131,7 +131,11 @@ class LocalGolfTests(unittest.TestCase):
                 for c, n in want.items():
                     self.assertGreaterEqual(got[c], min(n, 2), (k, c))
         sweden = [x for x in cal.series if x.tour == 'CP_EUROPE' and x.host_country == 'Sweden']
-        self.assertGreaterEqual(len(sweden), 6)
+        self.assertGreaterEqual(len(sweden), 3)
+        # club-pro circuits: fewer, bigger events, but every region still a full season of choices
+        for k in (k for k, t in TOUR_BY_KEY.items() if t.tier == 8):
+            n = sum(1 for x in cal.series if x.tour == k and x.category == 'regular')
+            self.assertGreaterEqual(n, LOCAL_MIN['club_pro'], k)
 
     def test_club_professionals_outside_north_america_are_eligible(self):
         s = SEASON

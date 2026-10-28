@@ -476,7 +476,12 @@ class Season:
         else:
             v -= 6 if ed.series.tier >= 2 else 2
         if g.lifestyle == 'part_time':                       # they have a job: local events only
-            v += 8 if venue_country == g.country else -40
+            if venue_country == g.country:
+                v += 8
+            elif g.status == 'club_pro' and ed.series.tier == 8 and COUNTRIES[venue_country].region == region_of(g):
+                v -= 2                                       # a section event over the border is a drive
+            else:
+                v -= 40
         return v
 
     def golfer_week(self, g, year, week):

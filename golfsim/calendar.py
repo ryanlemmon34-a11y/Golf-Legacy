@@ -135,8 +135,14 @@ def _in_window(week, windows):
 # region, with events in proportion to the size of each country's golf scene (its starting nation pool;
 # see nations.py) and a floor so that no golfing country is without a season of local golf.
 # ---------------------------------------------------------------------------------------------
-LOCAL_RATE = {'amateur': 0.9, 'club_pro': 0.8}                       # events per unit of nation pool
-LOCAL_FLOOR = {'amateur': ((1.0, 4), (0.5, 3), (0.2, 2)), 'club_pro': ((2.0, 8), (0.8, 5), (0.3, 3))}
+# Club professionals are far fewer than amateurs (about one per unit of nation pool, each wanting ~12
+# starts), so their circuits hold fewer, bigger events -- section events of 30-40 club pros, not a dozen --
+# in the countries with a real club-pro scene; club pros from smaller golf countries cross a border in
+# their region to play. LOCAL_MIN keeps every region's circuit a full season of choices (more events than
+# any one club pro will play), topped up in proportion to each country's golf scene.
+LOCAL_RATE = {'amateur': 0.9, 'club_pro': 0.3}                       # events per unit of nation pool
+LOCAL_FLOOR = {'amateur': ((1.0, 4), (0.5, 3), (0.2, 2)), 'club_pro': ((5.0, 3), (3.0, 2))}
+LOCAL_MIN = {'amateur': 0, 'club_pro': 16}                           # events per regional circuit at least
 LOCAL_PER_WEEK = 14                    # simultaneous local events a regional circuit can hold (different countries)
 
 
@@ -147,13 +153,19 @@ def _local_countries(regions):
 
 
 def local_allocation(regions, kind):
-    """Events per country for a local circuit: max(floor for the country's size, rate x pool)."""
+    """Events per country for a local circuit: max(floor for the country's size, rate x pool), topped
+    up to the circuit's minimum (LOCAL_MIN) one event at a time, each to the country with the most golf
+    per event it already has."""
     out = {}
-    for c, pool in _local_countries(regions):
+    countries = _local_countries(regions)
+    for c, pool in countries:
         floor = next((n for size, n in LOCAL_FLOOR[kind] if pool >= size), 0)
         n = max(floor, round(LOCAL_RATE[kind] * pool))
         if n:
             out[c] = n
+    while countries and sum(out.values()) < LOCAL_MIN[kind]:
+        c = max(countries, key=lambda cp: (cp[1] / (out.get(cp[0], 0) + 1), cp[0]))[0]
+        out[c] = out.get(c, 0) + 1
     return out
 
 

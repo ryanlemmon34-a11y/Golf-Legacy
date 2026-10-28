@@ -84,7 +84,13 @@ grow without limit.
   every golfing country of their region with events in proportion to the size of its golf scene (its
   starting nation pool) and a floor, so no country depends on one national championship
   (`calendar.local_allocation`). Club professionals' events are one-day section events and pro-ams on
-  Mondays and Tuesdays.
+  Mondays and Tuesdays. Club pros are far fewer than amateurs (about one per unit of nation pool, ~350
+  in the starting world), so their circuits hold fewer, bigger events: 0.3 per unit of pool, in the
+  countries with a club-pro scene (pool 3 or more), and at least 16 a season in every region; club pros
+  from smaller golf countries cross a border in their region to play (a section event over the border
+  counts as a drive, not a flight). About 150 events a season, against ~470 when every country had
+  its own: fields of a few dozen club pros rather than a dozen, so a win means beating a real field,
+  while every club pro still has more events within reach than the ~12 they want to play.
 - **College.** More college events, and college golfers can play amateur events around their college
   schedule (in the USA, the country they study in). Not making a lineup is recorded as such
   (`not selected for the college lineup`), separately from a shortage of golf.
