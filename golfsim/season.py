@@ -65,6 +65,11 @@ def region_of(g):
     return COUNTRIES[g.country].region
 
 
+# What happened in each golfer's week (Season.week_access), most to least successful
+ACCESS = ('played: first choice', 'played: alternative', 'played: selected field', 'injured',
+          'shut out: every acceptable field full', 'not selected for the college lineup', 'no suitable event scheduled',
+          'not eligible for the events scheduled', 'could not afford any event', 'declined the events on offer',
+          'chose to train', 'chose to rest', 'chose to work')
 ROTATION_RANK_STARTS = 3          # college/amateur lineups: ranking is worth a head start of this many starts
 AMATEUR_OPEN_EXPANSION = 1.5      # open amateur events can take this many times their usual field
 
@@ -209,6 +214,13 @@ class Season:
             if g.lifestyle != 'retired':                     # before it was a typical one for their lifestyle
                 self.season_rounds[self.first_year - 1][g.id] = D.EXPERIENCE_ROUNDS * (1.0 if g.lifestyle == 'full_time' else 0.5)
         self.entry_stats = defaultdict(_dd_counter)          # year -> first-choice tour -> wanted/placed/shut out
+        self.week_access = defaultdict(_dd_counter)          # year -> gid -> weeks by access outcome (ACCESS)
+        self.denied_run = Counter()                          # gid -> consecutive weeks shut out of full fields
+        self.max_denied_run = defaultdict(Counter)           # year -> gid -> longest such run
+        self.week_avail = {}                                 # gid -> {week: 'ok'|'none'|'inelig'|'unaff'} (plan)
+        self._week_entered = {}                              # gid -> (event id, how) this week
+        self._week_first = {}                                # gid -> first-choice event id this week
+        self._week_shut = set()                              # gids shut out of every field they tried
         self.transitions = {}                                # year -> [career decisions with their reasons]
         self.activity_counts = defaultdict(_dd_counter)      # year -> gid -> weeks per activity
         self.assignments = {}                                # year -> staff assignments at the season's start
@@ -467,11 +479,12 @@ class Season:
         busy = defaultdict(set)                              # gid -> days committed this week
         fields = {}                                          # event_id -> [per-site golfer lists]
 
-        def commit(ed, ids_by_site):
+        def commit(ed, ids_by_site, how='selected'):
             fields[ed.event_id] = ids_by_site
             for ids in ids_by_site:
                 for gid in ids:
                     busy[gid] |= ed.series.day_set
+                    self._week_entered.setdefault(gid, (ed.event_id, how))
 
         if self.development and (week - 1) % 4 == 0:
             self.plan_block(year, week)
@@ -486,6 +499,7 @@ class Season:
             self.regular_entries(regular, year, week, rng, venues, busy, commit)
         self.play_week(year, week, [e for e in eds if e.event_id in fields], fields, venues)
         self.develop_week(year, week)
+        self.record_access(year, week)
         self.weekly_finances(year, week)
         self.update_rankings(year, week)
         self.update_fame(year, week)
@@ -558,12 +572,13 @@ class Season:
                     placed.add(gid)
             ids = [gid for _, gid in sorted(held[eid])]
             if ids:
-                commit(ed, [ids])
+                commit(ed, [ids], 'entry')
         stats = self.entry_stats[year]
         for gid, (want, _) in prefs.items():
             if not want:
                 continue
             tour = by_id[want[0]].series.tour                # where they most wanted to play
+            self._week_first[gid] = want[0]
             self.entry_wants[year][gid] += 1
             stats[tour]['wanted'] += 1
             if gid in placed:
@@ -571,6 +586,7 @@ class Season:
             else:
                 stats[tour]['shut out'] += 1
                 self.entry_misses[year][gid] += 1           # wanted to play; every field they tried was full
+                self._week_shut.add(gid)
 
     def _amateurs_over(self, rows, s):
         lim = AMATEUR_CAP.get(s.tier)
@@ -1308,6 +1324,9 @@ class Season:
         rng = random.Random(_seed(self.seed, year, week0, 'plan'))
         cache = {}
         now = self.abs_week(year, 0)
+        # (region, tier) pairs with a regular event in each week: 'no suitable event' vs 'not eligible'
+        level_weeks = {w: {(COUNTRIES[CITY_BY_NAME[city[e.event_id]].country].region, e.series.tier)
+                           for e in by_week[w]} for w in weeks}
         for g in self.world.golfers:
             if g.lifestyle == 'retired':
                 continue
@@ -1326,6 +1345,15 @@ class Season:
                 pick = self.best_affordable(g, opts, city, money0)
                 base.append(pick[0] if pick else None)
                 costs.append(pick[1] if pick else 0.0)
+            avail = {}
+            for i, w in enumerate(weeks):
+                if base[i] is not None:
+                    avail[w] = 'ok'
+                elif options[i]:
+                    avail[w] = 'unaff'
+                else:
+                    avail[w] = 'inelig' if (region_of(g), self.level_tier(g)) in level_weeks[w] else 'none'
+            self.week_avail[g.id] = avail
             eligible_any = any(options)
             stuck = (money0 < 0 and self.committed_weekly(g) > 0) or (eligible_any and not any(base))
             self.stuck_blocks[g.id] = self.stuck_blocks[g.id] + 1 if stuck else 0
@@ -1401,6 +1429,60 @@ class Season:
                 best_acts = ['work' if g.status == 'pro' and g.lifestyle == 'full_time' else 'train'
                              for _ in weeks]
             self.plans[g.id] = {w: (a, cat) for w, a in zip(weeks, best_acts)}
+
+    def level_tier(self, g):
+        """The tier of ordinary events a golfer's status is built around (club pros: none)."""
+        if g.status == 'club_pro':
+            return 7
+        if g.status == 'amateur':
+            return 5 if g.tour.startswith('CO_') else 6
+        t = TOUR_BY_KEY.get(g.tour)
+        return t.tier if t else 4
+
+    def record_access(self, year, week):
+        """Classify every active golfer's week (see ACCESS): what they played, or why they did not."""
+        acc = self.week_access[year]
+        for g in self.world.golfers:
+            if g.lifestyle == 'retired':
+                continue
+            gid = g.id
+            entered = self._week_entered.get(gid)
+            if entered and self.week_rounds.get(gid, 0) > 0:
+                eid, how = entered
+                if how == 'selected':
+                    why = 'played: selected field'
+                elif self._week_first.get(gid) in (None, eid):
+                    why = 'played: first choice'
+                else:
+                    why = 'played: alternative'
+            elif gid in self.injured:
+                why = 'injured'
+            elif gid in self._week_shut:
+                first = self._week_first.get(gid, '')
+                why = ('not selected for the college lineup' if g.tour.startswith('CO_') and
+                       self.cal.by_id[first.split(':', 1)[1]].tier == 5 else 'shut out: every acceptable field full')
+            else:
+                av = self.week_avail.get(gid, {}).get(week, 'ok')
+                act = self.week_activity.get(gid, 'rest')
+                if av == 'none':
+                    why = 'no suitable event scheduled'
+                elif av == 'inelig':
+                    why = 'not eligible for the events scheduled'
+                elif av == 'unaff':
+                    why = 'could not afford any event'
+                elif self.plans.get(gid, {}).get(week, ('rest',))[0] == 'play':
+                    why = 'declined the events on offer'
+                else:
+                    why = {'train': 'chose to train', 'work': 'chose to work'}.get(act, 'chose to rest')
+            acc[gid][why] += 1
+            if why.startswith(('shut out', 'not selected')):
+                self.denied_run[gid] += 1
+                self.max_denied_run[year][gid] = max(self.max_denied_run[year][gid], self.denied_run[gid])
+            elif why.startswith('played'):
+                self.denied_run[gid] = 0
+        self._week_entered.clear()
+        self._week_first.clear()
+        self._week_shut.clear()
 
     def best_affordable(self, g, opts, city, money):
         """The most valuable of a week's eligible events (`opts`, best first) whose trip the golfer can
