@@ -463,6 +463,8 @@ def add_new_professionals(season, year):
         g.cash = initial_cash(g, age, rng.random())
         g.status, g.lifestyle, g.tour = 'pro', 'full_time', home_mini(g)
         g.backer = FIN.backer_deal(age, 0.2, rng.random(), rng.random())     # no ranking to show backers
+        if g.backer and g.cash >= FIN.SELF_FUNDED_SEASONS * FIN.seeded_losses(g, TOUR_BY_KEY[g.tour].tier):
+            g.backer = 0.0                               # their savings pay for it: backers if they need them later
         g.backer_patience = rng.random()
         season.world.golfers.append(g)
         season.g[g.id] = g
