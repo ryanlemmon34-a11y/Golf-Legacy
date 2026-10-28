@@ -350,11 +350,13 @@ def analyse(d, mature):
             if r['events'] == 0:
                 access[(lv, r['zero_start'])] += 1
     a['access'], a['levels'], a['rounds'] = access, levels, rounds
-    shut = defaultdict(Counter)
-    from golfsim.calendar import TOUR_BY_KEY
-    for y, tours in d.get('entry_stats', {}).items():
-        for t, c in tours.items():
-            shut[LEVEL.get(TOUR_BY_KEY[t].tier if t in TOUR_BY_KEY else 9, '—')].update(c)
+    shut = defaultdict(Counter)                                  # by the golfer's own level (membership)
+    for y in years[1:]:
+        for r in d['rows'][y].values():
+            if r.get('wanted_wk'):
+                lv = LEVEL.get(r['tier'], '—') + (' (part-time)' if r['lifestyle'] == 'part_time' else '')
+                shut[lv]['wanted'] += r['wanted_wk']
+                shut[lv]['shut out'] += r['shut_wk']
     a['entry'] = shut
     a['declined'] = sum(r.get('declined', 0) for y in years for r in d['rows'][y].values())
     a['school_trips'] = sum(r.get('school_trips', 0) for y in years for r in d['rows'][y].values())
@@ -487,8 +489,9 @@ def report(results, man, mature):
         out.append(row(f'{LEVEL[t]}: {why}', lambda a, d, t=t, why=why: pct(a['zero'][(t, why)], a['ft_seasons'][t])))
     out += ['', '## 3b. Competition access for everyone playing (season two on)', '',
             'Seasons with no start, by level and recorded reason (blocked: full fields, no affordable trip, no '
-            'eligible event; or choice), and the weeks golfers wanted to play: share placed in a field and share '
-            'shut out of every field they tried. Competitive rounds per season: 10th / median / 90th percentile.', '',
+            'eligible event; or choice), and the weeks golfers wanted to play a regular event, by their own level: '
+            'the share shut out of every field they tried (majors and invitations are chosen by the event and not '
+            'counted here). Competitive rounds per season: 10th / median / 90th percentile.', '',
             head, sep]
     lvls = sorted({lv for a in A for lv in a['levels']})
     for lv in lvls:
