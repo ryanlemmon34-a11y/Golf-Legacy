@@ -251,6 +251,13 @@ class HistoryStats:
     def consecutive_cuts_made(self, scope='professional', n=25):
         return self._longest_run(lambda s: s[6] is not None, scope, n)
 
+    def most_moments(self, kind='hole-in-one', n=25):
+        """Most holes-in-one (or albatrosses, playoff wins, course records) — moments recorded as facts."""
+        got = defaultdict(list)
+        for m in self.a.moments(kind=kind) if hasattr(self.a, 'moments') else ():
+            got[m['person']].append(m['event'])
+        return self._top([self._row(pid, len(ev), ev) for pid, ev in got.items()], n)
+
     def weeks_at_number_one(self, n=25):
         return self._top([self._row(pid, w) for pid, w in self.a.weeks_at_number_one().items()], n)
 
@@ -309,6 +316,9 @@ BOARDS = {   # name -> (title, function name, keyword arguments): the lists the 
     'consecutive-wins': ('Most consecutive professional wins', 'consecutive_wins', {'scope': 'professional'}),
     'consecutive-cuts': ('Most consecutive cuts made (professional events)', 'consecutive_cuts_made', {}),
     'weeks-at-number-one': ('Weeks at world No. 1', 'weeks_at_number_one', {}),
+    'most-holes-in-one': ('Most holes-in-one', 'most_moments', {'kind': 'hole-in-one'}),
+    'most-playoff-wins': ('Most playoff wins', 'most_moments', {'kind': 'playoff'}),
+    'most-course-records': ('Most course records set', 'most_moments', {'kind': 'course record'}),
     'longest-coach-partnerships': ('Longest coach partnerships', 'longest_partnerships', {'kind': 'coach'}),
     'longest-caddie-partnerships': ('Longest caddie partnerships', 'longest_partnerships', {'kind': 'caddie'}),
     'coaches-major-champions': ('Coaches who worked with the most major champions', 'coaches_with_most_major_champions', {}),

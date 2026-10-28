@@ -80,6 +80,7 @@ ACCESS = ('played: first choice', 'played: alternative', 'played: selected field
 RIGHTS = ('exempt', 'full', 'graduate', 'conditional')
 FULL_STATUS = 125                 # top of last season's Premier money list with full status
 PREMIER_VISITOR_SHARE = 0.10      # places in a Challenger event Premier members may take ahead of residents
+COURSE_RECORD_ROUNDS = 300       # a new course record is a moment once the layout had this many earlier rounds
 ROTATION_RANK_STARTS = 3          # college/amateur lineups: ranking is worth a head start of this many starts
 AMATEUR_OPEN_EXPANSION = 1.5      # open amateur events can take this many times their usual field
 
@@ -236,6 +237,7 @@ class Season:
         self.entry_stats = defaultdict(_dd_counter)          # year -> first-choice tour -> wanted/placed/shut out
         self.card_reasons = {}                               # year -> gid -> why they hold that season's card
         self.unheld = defaultdict(list)                      # year -> event ids with no entrants
+        self.moments = defaultdict(list)                     # year -> special moments (aces, playoffs, records)
         self.rights = {}                                     # year -> gid -> (Premier playing rights, why)
         self.week_access = defaultdict(_dd_counter)          # year -> gid -> weeks by access outcome (ACCESS)
         self.denied_run = Counter()                          # gid -> consecutive weeks shut out of full fields
@@ -1257,6 +1259,13 @@ class Season:
             self._pool.shutdown()
             del self._pool
 
+    def _moments_from(self, rec, aces, albs, year, week, event_id, layout):
+        """Holes-in-one and albatrosses just added to a layout's records become the season's moments."""
+        for kind, rows, before in (('hole-in-one', rec.aces, aces), ('albatross', rec.albatrosses, albs)):
+            for hole, _, _, _, stage, gid in rows[before:]:
+                self.moments[year].append({'kind': kind, 'person': gid, 'event': event_id, 'week': week,
+                                           'layout': layout, 'hole': hole, 'stage': stage})
+
     def record_event(self, ed, year, week, site_out, venue_list):
         s = ed.series
         sid = s.series_id
@@ -1275,6 +1284,7 @@ class Season:
             res.playoff = max(res.playoff, o['playoff'])
             self.ctx.add_result(sid, year, [(gid, pos) for gid, pos, _ in finish], site=site)
             rec = self.records.get(course)
+            prior = rec.rounds                               # rounds on this layout before this event
             pars = [h.par for h in course.holes]
             # scoring relative to the field in the same round (the fair way to compare across courses)
             by_round = defaultdict(list)
@@ -1288,16 +1298,29 @@ class Season:
                 ps['vs_field'] += score - round_avg[rd]
                 for k, val in zip(STAT_KEYS, st):
                     ps[k] += val
-                rec.add_round(Mark(score, score - course.par, self.g[gid].name, ed.event_id, year, week, rd, s.tier, gid),
-                              holes, pars)
+                aces, albs, cr = len(rec.aces), len(rec.albatrosses), rec.course_record
+                mark = Mark(score, score - course.par, self.g[gid].name, ed.event_id, year, week, rd, s.tier, gid)
+                rec.add_round(mark, holes, pars)
+                self._moments_from(rec, aces, albs, year, week, ed.event_id, course.layout_id)
+                if prior >= COURSE_RECORD_ROUNDS and cr is not None and score < cr.score:
+                    self.moments[year].append({'kind': 'course record',
+                                               'person': gid, 'event': ed.event_id, 'week': week, 'layout': course.layout_id,
+                                               'score': score, 'to_par': score - course.par, 'round': rd,
+                                               'previous': cr.score, 'previous_holder': cr.golfer_id})
                 self.holes_played[year] += len(holes)
                 self.g[gid].familiarity[course.familiarity_key] = self.g[gid].familiarity.get(course.familiarity_key, 0) + 1
                 k = self.staff.caddie(gid)
                 if k is not None:                            # caddies learn the course too
                     k.familiarity[course.familiarity_key] = k.familiarity.get(course.familiarity_key, 0) + 1
             for gid, idx, strokes, stage in o['holes']:
+                aces, albs = len(rec.aces), len(rec.albatrosses)
                 rec.add_hole(idx, strokes, pars[idx], self.g[gid].name, ed.event_id, year, stage, gid)
+                self._moments_from(rec, aces, albs, year, week, ed.event_id, course.layout_id)
                 self.holes_played[year] += 1
+            if o['playoff'] and finish and site == 0:
+                losers = [gid for gid, pos, total in finish if pos == 2 and total == finish[0][2]]
+                self.moments[year].append({'kind': 'playoff', 'person': finish[0][0], 'event': ed.event_id, 'week': week,
+                                           'layout': course.layout_id, 'holes': o['playoff'], 'beat': losers})
             rounds = Counter(gid for gid, *_ in o['rounds'])
             fk = course.familiarity_key
             for gid, n in Counter(gid for gid, *_ in o['holes']).items():
@@ -1501,7 +1524,7 @@ class Season:
                   self.block_flags, self.cash_start, self.overall_start, self.rank_start, self.am_start,
                   self.staff_receipts, self.injuries, self.card_log, self.career_counts, self.transitions,
                   self.assignments, self.staff_year, self.unheld, self.rights, self.card_reasons, self.snapshots,
-                  self.juniors_added, self.stats):
+                  self.juniors_added, self.stats, self.moments):
             for y in [y for y in d if isinstance(y, int) and old(y)]:
                 del d[y]
         for k in [k for k in self.money if old(k[1])]:

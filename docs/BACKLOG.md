@@ -125,7 +125,11 @@ and eventually as-of-year views. Not built. Before it, close the archive gaps li
    flags on every row). Still to choose: the owner's first lists and their filters (era, nation).
 4. ~~Archive indexes~~ — done: a SQLite index beside the season files (`golfsim/archive_index.py`),
    updated idempotently with each archived season and trimmed with session recovery.
-5. First usable slice: Overview, Golfer profile, Tournament edition, Course profile and one Records or
+5. ~~Special moments as linked facts~~ — done: holes-in-one, albatrosses, playoffs (with who lost them) and
+   course records set after a fair sample (300 earlier rounds on the layout) are archived each season with
+   golfer, edition, week and layout (`Archive.moments`, indexed; boards for most holes-in-one, playoff
+   wins, course records).
+6. First usable slice: Overview, Golfer profile, Tournament edition, Course profile and one Records or
    Frivolities list, tested as complete browsing journeys (see the document).
 
 Open owner decisions: framework and desktop packaging, visual design, the first record definitions and

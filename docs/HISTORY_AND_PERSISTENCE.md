@@ -127,8 +127,13 @@ some of it). Effectiveness = (0.75 + 0.25 × rapport) × (1 + 0.05 × fit) scale
 member's ability reaches the golfer — it never changes attributes, and a long-familiar average coach
 never outperforms a clearly better new one.
 
+**Special moments** are archived as facts with each season (`Archive.moments`): every hole-in-one and
+albatross (golfer, edition, layout, hole, round or stage), every playoff (winner, who lost it, holes) and
+every new course record once the layout had 300 earlier rounds (score, previous record and holder).
+**Records and frivolities** are computed from the archive with one set of definitions
+(`golfsim/history_stats.py`).
+
 ## Not yet
 
-Profile screens; special moments (aces, playoffs) as their own linked facts beyond course records;
-archive indexes for very long histories (queries scan season files); migration of old saves across
-engine versions (saves are for resuming, the archive is for history).
+Profile screens; migration of old saves across engine versions (saves are for resuming, the archive is
+for history).

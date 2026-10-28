@@ -108,6 +108,7 @@ class ArchiveWriter:
         chunk = {'year': year, 'events': events, 'careers': careers,
                  'transitions': season.transitions.get(year, []),
                  'unheld': list(season.unheld.get(year, [])),          # scheduled, but nobody entered
+                 'moments': list(season.moments.get(year, [])),        # aces, albatrosses, playoffs, course records
                  # each week's top 100 of the world and amateur rankings (No. 1 = first): weeks at No. 1,
                  # as-of views
                  'rankings': {kind: {str(w): table.get((year, w), [])[:100] for w in range(1, 53)
@@ -236,6 +237,17 @@ class Archive:
             for top in self.year(y).get('rankings', {}).get('amateur' if amateur else 'world', {}).values():
                 if top:
                     out[top[0]] = out.get(top[0], 0) + 1
+        return out
+
+    def moments(self, year=None, kind=None, person=None):
+        """Special moments as facts: holes-in-one, albatrosses, playoffs (with who lost them), course records
+        set or equalled — each with the golfer, the edition, the week and the layout."""
+        out = []
+        for y in ([year] if year else self.years):
+            for m in self.year(y).get('moments', []):
+                if (kind is None or m['kind'] == kind) and (person is None or m['person'] == person
+                                                           or person in m.get('beat', ())):
+                    out.append(dict(m, year=y))
         return out
 
     def access(self, pid, year):

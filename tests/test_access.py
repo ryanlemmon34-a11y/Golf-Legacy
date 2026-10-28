@@ -262,6 +262,18 @@ class HistoryContractTests(unittest.TestCase):
             idx.index_year(2027, _read(arc.dir / 'years' / '2027.json.gz'))
             self.assertEqual(arc.results(gid), scan)
             self.assertEqual(idx.editions('TOUR_MASTERS')[0]['winner'], s.results['2027:TOUR_MASTERS'].winner())
+            # special moments are facts linked to the golfer, the edition and the layout
+            moments = arc.moments(year=2027)
+            self.assertEqual(len(moments), len(s.moments[2027]))
+            self.assertEqual(len(idx.moments()), len(moments))
+            for m in moments:
+                self.assertIn(m['kind'], ('hole-in-one', 'albatross', 'playoff', 'course record'))
+                self.assertIn(m['person'], s.g)
+                self.assertTrue(m['event'].startswith('2027:'))
+            aces = [m for m in moments if m['kind'] == 'hole-in-one']
+            for m in aces:
+                lay = s.records.layouts[m['layout']]
+                self.assertTrue(any(a[0] == m['hole'] and a[5] == m['person'] and a[2] == m['event'] for a in lay.aces))
 
     def test_weekly_detail_is_pruned_but_finals_and_results_stay(self):
         s = fresh()

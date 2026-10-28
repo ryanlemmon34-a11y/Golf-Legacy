@@ -8,11 +8,13 @@ anything, and dropping seasons beyond a committed point (session recovery) is on
 
 Tables: editions (one per event played, with its classification when played and its winner), sites
 (course and layout of each site), starts (one per golfer per edition: position, total, the coach and
-caddie that week, the entry route), seasons (one per golfer per season). Indexed by person, event,
+caddie that week, the entry route), seasons (one per golfer per season), moments (holes-in-one,
+albatrosses, playoffs, course records). Indexed by person, event,
 series and course, so a profile, a tournament's history or a course's history is one query.
 """
 from __future__ import annotations
 
+import json
 import sqlite3
 from pathlib import Path
 
@@ -28,6 +30,10 @@ CREATE TABLE IF NOT EXISTS starts(person INT, eid INT, year INT, week INT, site 
     coach INT, caddie INT, rid INT);
 CREATE TABLE IF NOT EXISTS seasons(person INT, year INT, tour TEXT, status TEXT, lifestyle TEXT, events INT,
     wins INT, prize INT, wr_end INT, am_end INT, PRIMARY KEY(person, year));
+CREATE TABLE IF NOT EXISTS moments(year INT, week INT, kind TEXT, person INT, event_id TEXT, layout TEXT,
+    detail TEXT);
+CREATE INDEX IF NOT EXISTS moments_person ON moments(person);
+CREATE INDEX IF NOT EXISTS moments_kind ON moments(kind, year);
 CREATE INDEX IF NOT EXISTS starts_person ON starts(person, year, week);
 CREATE INDEX IF NOT EXISTS starts_event ON starts(eid);
 CREATE INDEX IF NOT EXISTS editions_series ON editions(series, year);
@@ -72,6 +78,10 @@ class ArchiveIndex:
                         start_rows.append((g, eid, year, e['week'], k, p, total, coach, caddie, rid.get(route)))
             self.db.executemany('INSERT INTO sites VALUES (?,?,?,?,?,?)', site_rows)
             self.db.executemany('INSERT INTO starts VALUES (?,?,?,?,?,?,?,?,?,?)', start_rows)
+            self.db.executemany('INSERT INTO moments VALUES (?,?,?,?,?,?,?)', [
+                (year, m.get('week'), m['kind'], m['person'], m['event'], m.get('layout'),
+                 json.dumps({k: v for k, v in m.items() if k not in ('kind', 'person', 'event', 'layout', 'week')}))
+                for m in chunk.get('moments', [])])
             self.db.executemany('INSERT INTO seasons VALUES (?,?,?,?,?,?,?,?,?,?)', [
                 (int(g), year, r.get('tour'), r.get('status'), r.get('lifestyle'), r.get('events'), r.get('wins'),
                  r.get('prize'), r.get('wr_end'), r.get('am_end')) for g, r in chunk['careers'].items()])
@@ -81,7 +91,7 @@ class ArchiveIndex:
             self._delete(year, '>')
 
     def _delete(self, year, op):
-        for t in ('editions', 'sites', 'starts', 'seasons'):
+        for t in ('editions', 'sites', 'starts', 'seasons', 'moments'):
             self.db.execute(f'DELETE FROM {t} WHERE year {op} ?', (year,))
         # (the routes table is a shared dictionary of route texts; unused entries are harmless)
 
@@ -125,6 +135,15 @@ class ArchiveIndex:
              'LEFT JOIN routes r USING(rid) WHERE e.event_id = ? ORDER BY s.site, s.pos IS NULL, s.pos')
         return [dict(zip(('person', 'site', 'pos', 'total', 'coach', 'caddie', 'route'), r))
                 for r in self.db.execute(q, (event_id,))]
+
+    def moments(self, kind=None, person=None):
+        q, args = 'SELECT year, week, kind, person, event_id, layout, detail FROM moments WHERE 1=1', []
+        if kind:
+            q, args = q + ' AND kind = ?', args + [kind]
+        if person is not None:
+            q, args = q + ' AND person = ?', args + [person]
+        return [dict(json.loads(d), year=y, week=w, kind=k, person=p, event=e, layout=lay)
+                for y, w, k, p, e, lay, d in self.db.execute(q + ' ORDER BY year, week', args)]
 
     def seasons(self, pid):
         q = 'SELECT year, tour, status, lifestyle, events, wins, prize, wr_end, am_end FROM seasons WHERE person = ? ORDER BY year'
