@@ -208,6 +208,47 @@ class EntryBudgetTests(unittest.TestCase):
         self.assertTrue(two)                                             # some played twice in a week
 
 
+class InjuryDebtTests(unittest.TestCase):
+    """The debt rule (finance.py, 'Debt'): the line of credit limits what a golfer chooses to spend;
+    living costs go on whatever their funds, so a long injury can take a touring professional past
+    their credit. The debt is neither erased nor covered by anyone new, blocks spending until repaid,
+    and weighs on the season's-end decision smoothly, with no threshold."""
+
+    def test_a_long_injury_runs_up_debt_that_is_kept_and_weighed_smoothly(self):
+        s = Season(generate_world(seed=13, scale=0.2), seed=13, development=True, workers=4)
+        s.start_year(2027)
+        g = next(g for g in s.active_golfers() if g.status == 'pro' and g.lifestyle == 'full_time'
+                 and not g.backer and s.staff.coach(g.id) is None and s.staff.caddie(g.id) is None)
+        g.cash, g.backing, g.backer_funds = 1000.0, 0.0, 0.0
+        s.cash_start[2027][g.id] = g.cash
+        s.injured[g.id] = (s.abs_week(2027, 1) + 31, 'back', 30)            # out for weeks 1-30
+        for w in range(1, 31):
+            s.advance_week(2027, w)
+        led = s.ledger(2027, g.id)
+        self.assertFalse(s.played[2027].get(g.id))                           # no golf ...
+        self.assertEqual(led.work, 0.0)                                      # ... and no paid work while hurt
+        self.assertAlmostEqual(led.living, 30 * FIN.LIVING / 52, delta=0.01)  # but living costs go on
+        self.assertEqual(led.support + led.backer_support, 0.0)              # nobody new pays them
+        credit = FIN.credit_limit(0.0)
+        self.assertLess(g.cash, -credit)                                     # past the credit allowance
+        self.assertLess(s.spendable(g, 2027), 0.0)                           # nothing more can be chosen
+        for w in range(31, 53):
+            s.advance_week(2027, w)
+        led = s.ledger(2027, g.id)
+        self.assertAlmostEqual(g.cash, 1000.0 + led.net, delta=0.01)        # kept, never erased
+        self.assertEqual(led.events, 0.0)                                    # no trip bought on credit beyond the limit
+        row = s.season_snapshot(2027)[g.id]
+        p, _ = C.p_stop_chasing(s, g, row, 2027)
+        cash = g.cash
+        g.cash = cash - 1000                                                 # a little more debt ...
+        p2, _ = C.p_stop_chasing(s, g, row, 2027)
+        g.cash = cash
+        self.assertLess(p, 1.0)
+        self.assertGreaterEqual(p2, p)                                       # ... a little more pressure,
+        self.assertLess(p2 - p, 0.05)                                        # never a cliff
+        s.close()
+
+
 class AmateurForecastTests(unittest.TestCase):
     def test_an_amateurs_forecast_income_is_what_an_amateur_can_receive(self):
         """Sponsor contracts and prize money are for professionals: an amateur's forecast must not count

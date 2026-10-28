@@ -126,7 +126,14 @@ is recorded as the payer (a club professional's section golf likewise, by the cl
 budget: every entry accepted books its cost at once, so a Monday qualifier and that weekend's
 tournament are not both paid from the same money, and a qualifier is priced at the site the golfer is
 sent to (England or Japan for the USA Open's international final qualifying). A caddie's weekly fee is
-paid once a week, however many events. Expected prize money
+paid once a week, however many events.
+
+**Debt.** The credit limit bounds what a golfer *chooses* to spend. Living costs and a contracted
+coach's fee are charged weekly whatever their funds, so a golfer with no income — above all an injured
+touring professional, who can neither play nor work while hurt — can go past their credit. That debt is
+kept exactly (never erased), nobody new pays it, it blocks every chosen cost until it is repaid, and it
+weighs smoothly on the end-of-season decision through the runway; no debt threshold forces retirement
+or a change of life, and careers change only at the end of a season. Expected prize money
 comes from their own record, kept by level of competition (the share of purses they have actually won
 against Premier, Challenger, regional or mini-tour fields, and in how many events): at a level they have
 not played, their record elsewhere is translated (half the share one level up, twice one level down) and

@@ -55,6 +55,17 @@ A golfer can only enter an event they can pay for. How much a dollar matters sca
 so a broke mini-tour player weighs a long trip heavily and a millionaire barely notices it. When
 funds run short, full-time players take paid work weeks instead of training.
 
+Debt
+    The line of credit limits what a golfer *chooses* to spend: entries, travel, a caddie, a coach
+    hired. Costs they cannot choose are charged every week whatever their funds: living costs (net of
+    any salary) and a contracted coach's fee until the monthly review stops it. So a golfer with no
+    income can go deeper into debt than the credit allowance -- above all an injured touring
+    professional, who can neither play nor take paid work while hurt (an injury lasts up to 40 weeks:
+    about $25,000 of living costs). Such debt is kept, exactly, in their cash: it is never erased,
+    nobody new pays it (only the family and backers' pots they already had are drawn), it blocks every
+    cost they could choose until it is repaid from later income, and it weighs on the end-of-season
+    decision through the runway, smoothly (no debt threshold forces any decision; careers change only
+    at the end of a season, so a long injury runs its course in the life they had).
 """
 from __future__ import annotations
 
