@@ -233,5 +233,40 @@ class AccessRecordTests(unittest.TestCase):
         self.assertTrue(all(isinstance(v, str) and v for v in some.values()))
 
 
+class HistoryContractTests(unittest.TestCase):
+    def test_archive_keeps_classification_routes_rankings_and_access(self):
+        import tempfile
+        from golfsim.archive import Archive, write_archive
+        s = SEASON
+        s.snapshots[2027] = s.season_snapshot(2027)
+        with tempfile.TemporaryDirectory() as d:
+            arc = Archive(write_archive(s, d, years=[2027]))
+            ev = next(e for e in arc.year(2027)['events'] if e['id'] == '2027:TOUR_MASTERS')
+            self.assertEqual((ev['tour'], ev['tier'], ev['category']), ('MAJORS', 0, 'major'))
+            top = arc.ranking(2027, 18)
+            self.assertEqual(top[:100], s.ctx.world_rankings[(2027, 18)][:100])
+            self.assertEqual(arc.weeks_at_number_one()[top[0]] >= 1, True)
+            gid = next(g for g, _ in ev['team'].items())
+            starts = [r for r in arc.results(gid) if r['event'] == '2027:TOUR_MASTERS']
+            self.assertTrue(starts[0]['route'])                          # how they got into the Masters
+            acc = arc.access(gid, 2027)
+            self.assertEqual(sum(acc['weeks'].values()), 2)
+
+    def test_weekly_detail_is_pruned_but_finals_and_results_stay(self):
+        s = fresh()
+        s.ctx.world_rankings[(2020, 5)] = [1]
+        s.ctx.standings[('CH_EUROPE', 2020, 5)] = [1]
+        s.ctx.standings[('CH_EUROPE', 2020)] = [1]
+        s.ctx.add_result('PT_TEXAS_OPEN', 2020, [(1, 1)])
+        s.week_access[2020][1]['chose to train'] = 1
+        s.prune_history(2027)
+        self.assertNotIn((2020, 5), s.ctx.world_rankings)
+        self.assertNotIn(('CH_EUROPE', 2020, 5), s.ctx.standings)
+        self.assertIn(('CH_EUROPE', 2020), s.ctx.standings)
+        self.assertIn(('PT_TEXAS_OPEN', 2020), s.ctx.results)
+        self.assertNotIn(2020, s.week_access)
+        self.assertIn((2026, 52), s.ctx.world_rankings)                    # last season's weeks stay
+
+
 if __name__ == '__main__':
     unittest.main()

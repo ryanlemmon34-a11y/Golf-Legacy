@@ -99,10 +99,10 @@ Assessed against `golfsim/archive.py` and `docs/HISTORY_AND_PERSISTENCE.md` as o
 | Tournament identity vs editions; edition leaderboard, course, staff | Yes (series id, event id, sites, finish, team) | — |
 | Entry route and status at entry per start | Yes (this access pass) | — |
 | Course records with golfer and event | Yes, per layout | Course version ids if layouts are ever changed |
-| Classification at event time (tour, tier, category, prestige) | Prestige per edition; tour/tier/category only in the current catalogue | Record tour, tier and category with each edition |
+| Classification at event time (tour, tier, category, prestige) | Yes: every archived edition carries its name, tour, tier, category and prestige when played | — |
 | Coverage of careers that began before the world | `initial` and `created` flags per person | Use them in every record definition |
 | Ages at achievement | Birth year and event week | Event dates are weeks, not days: age precision is annual unless dates are added |
-| Weekly No. 1 and weekly rankings (weeks at No. 1, as-of views) | Season start/end ranking per golfer | Archive the weekly No. 1 (and ranking snapshots) |
+| Weekly No. 1 and weekly rankings (weeks at No. 1, as-of views) | Yes: each week's world and amateur top 100 (`Archive.ranking`, `weeks_at_number_one`) | Deeper ranking history if as-of views need it |
 | Cuts made, runner-ups, droughts, starts before first win | Derivable from finishes | Shared, tested definitions |
 | Central records and frivolities from one set of definitions | Not built | A records/definitions module over the archive |
 | Century-scale browsing | One file per season | Indexes (person → results, series → editions) for incremental loading |

@@ -115,9 +115,9 @@ stints; courses, nations, tours, tournaments and their editions), central and co
 set of definitions, a Frivolities section of real unusual patterns, season recaps from recorded facts,
 and eventually as-of-year views. Not built. Before it, close the archive gaps listed in that document:
 
-1. Record each edition's tour, tier and category at the time (history must not be rewritten by later
-   calendar changes).
-2. Archive the weekly No. 1 and ranking snapshots (weeks at No. 1, as-of views).
+1. ~~Record each edition's tour, tier and category at the time~~ — done (archive events carry them).
+2. ~~Archive the weekly No. 1 and ranking snapshots~~ — done: each week's top 100 of the world and
+   amateur rankings (`Archive.ranking`, `Archive.weeks_at_number_one`).
 3. A records/definitions module over the archive (start, win, major, debut, age, ties, scope, coverage of
    careers that began before the world), used by both the Records and Frivolities views.
 4. Archive indexes for incremental, century-scale browsing.

@@ -1403,11 +1403,22 @@ class Season:
                 self.ctx.standings[(tour, year, week)] = sorted(m, key=lambda gid: self.standing_key(m, gid))
 
     # ---- end of season -----------------------------------------------------------------------------
-    def end_of_season(self, year):
-        # the weekly access detail is history (the archive keeps it); the season keeps two years of it
+    def prune_history(self, year):
+        """Weekly detail older than last season leaves the live simulation (the archive keeps it), so what
+        the simulation holds week by week does not grow with the years."""
         for d in (self.week_access, self.max_denied_run, self.access_log, self.event_routes, self.denied_behind):
             for y in [y for y in d if y < year - 1]:
                 del d[y]
+        # weekly ranking and in-season standings snapshots: the rules look back at most a season (the
+        # archive keeps each week's top of the rankings); final standings and every result stay
+        for table in (self.ctx.world_rankings, self.ctx.amateur_rankings):
+            for k in [k for k in table if k[0] < year - 1]:
+                del table[k]
+        for k in [k for k in self.ctx.standings if len(k) == 3 and k[1] < year - 1]:
+            del self.ctx.standings[k]
+
+    def end_of_season(self, year):
+        self.prune_history(year)
         for (tour, y), m in list(self.money.items()):
             if y != year:
                 continue

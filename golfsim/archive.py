@@ -86,7 +86,10 @@ class ArchiveWriter:
             if r.year != year:
                 continue
             routes = season.event_routes.get(year, {}).get(r.event_id) or season.entry_routes.get((year, r.series_id), {})
+            ser = season.cal.by_id[r.series_id]
             events.append({'id': r.event_id, 'series': r.series_id, 'week': r.week, 'sites': r.sites,
+                           # classification when it was played: later calendar changes never rewrite it
+                           'name': ser.name, 'tour': ser.tour, 'tier': ser.tier, 'category': ser.category,
                            'prestige': round(r.prestige, 2), 'playoff': r.playoff, 'finish': r.finish,
                            'team': {str(g): list(t) for g, t in r.team.items()},
                            'routes': {str(g): v for g, v in routes.items()}})
@@ -105,6 +108,12 @@ class ArchiveWriter:
         chunk = {'year': year, 'events': events, 'careers': careers,
                  'transitions': season.transitions.get(year, []),
                  'unheld': list(season.unheld.get(year, [])),          # scheduled, but nobody entered
+                 # each week's top 100 of the world and amateur rankings (No. 1 = first): weeks at No. 1,
+                 # as-of views
+                 'rankings': {kind: {str(w): table.get((year, w), [])[:100] for w in range(1, 53)
+                                     if (year, w) in table}
+                              for kind, table in (('world', season.ctx.world_rankings),
+                                                  ('amateur', season.ctx.amateur_rankings))},
                  'staff_year': {f'{k}:{i}': v for (k, i), v in season.staff_year.get(year, {}).items()},
                  'log': {g: v for g, v in log.items() if v}}
         _write(self.dir / 'years' / f'{year}.json.gz', chunk)
@@ -202,6 +211,19 @@ class Archive:
                         coach, caddie = e['team'].get(pid, (0, 0))
                         out.append({'year': y, 'week': e['week'], 'event': e['id'], 'series': e['series'],
                                     'pos': pos, 'coach': coach, 'caddie': caddie, 'route': e['routes'].get(pid)})
+        return out
+
+    def ranking(self, year, week, amateur=False):
+        """The top 100 of the world (or amateur) ranking after that week: [person ids], No. 1 first."""
+        return self.year(year).get('rankings', {}).get('amateur' if amateur else 'world', {}).get(str(week), [])
+
+    def weeks_at_number_one(self, amateur=False):
+        """{person id: weeks at No. 1} over the archive's coverage."""
+        out = {}
+        for y in self.years:
+            for top in self.year(y).get('rankings', {}).get('amateur' if amateur else 'world', {}).values():
+                if top:
+                    out[top[0]] = out.get(top[0], 0) + 1
         return out
 
     def access(self, pid, year):
