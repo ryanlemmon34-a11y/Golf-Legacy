@@ -556,6 +556,7 @@ class Season:
                 seen = set()
                 sites = [[gid for gid in site if not (busy[gid] & ed.series.day_set) and not (gid in seen or seen.add(gid))]
                          for site in sites]
+                self._default_routes(ed.series, year, sites)
                 commit(ed, sites)
         # Regular events: golfers choose, events accept in priority order (deferred acceptance)
         if regular:
@@ -680,6 +681,31 @@ class Season:
                 stats[tour]['shut out'] += 1
                 self.entry_misses[year][gid] += 1           # wanted to play; every field they tried was full
                 self._week_shut.add(gid)
+
+    def _default_routes(self, s, year, sites):
+        """Every selected field explains each entrant: fields whose rule records no routes of its own are
+        given the rule's name, with the entrant's standing where a ranking decided it."""
+        routes = self.entry_routes.setdefault((year, s.series_id), {})
+        for site in sites:
+            for gid in site:
+                if gid in routes:
+                    continue
+                g = self.g[gid]
+                if s.category == 'national_amateur':
+                    routes[gid] = ('HOME AMATEUR' if g.country == s.host_country else 'REGIONAL AMATEUR') + \
+                        (f' (amateur ranking {self.am_pos[gid]})' if gid in self.am_pos else ' (unranked)')
+                elif s.category == 'elite_amateur':
+                    routes[gid] = f'AMATEUR RANKING {self.am_pos[gid]}' if gid in self.am_pos else 'AMATEUR (unranked, by form)'
+                elif s.category == 'college_postseason':
+                    routes[gid] = 'COLLEGE POST-SEASON'
+                elif s.category == 'q_school':
+                    routes[gid] = 'Q-SCHOOL ENTRY'
+                elif s.series_id == 'PT_PREMIER_TOUR_FINALS':
+                    routes[gid] = 'PREMIER POINTS LIST'
+                elif s.kind == 'qualifying':
+                    routes[gid] = 'QUALIFYING ENTRY'
+                else:
+                    routes[gid] = 'SELECTED'
 
     def entry_route(self, g, s, late=False):
         """How a golfer got into a regular event, with their status at entry (kept in history)."""
