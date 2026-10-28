@@ -78,7 +78,7 @@ qualifiers and championships they are selected for are commitments and override 
 | Prize money (amateurs take none) | Each event: travel and accommodation by level (×1.3 in the home region, ×1.8 overseas) |
 | Sponsors, from player prestige (paid weekly) | Mini-tour entry fees (their purses are paid by entry fees); Q-School fees |
 | A salary for part-timers ($52k) and club professionals ($65k) | A caddie: 8% of prize money on the bigger tours |
-| Paid work weeks ($900) for full-time pros who are short | Living costs: $32k a year for a touring pro, $40k for anyone with a job (none for college golfers and teenagers at home) |
+| Paid work weeks ($900) for full-time pros who are short | Living costs: $32k a year for a touring pro, $40k for anyone with a job (none for college golfers and amateurs living at home) |
 | Family / private backing drawn when savings run out | |
 
 Money moves weekly when it is earned or spent, and every dollar passes through the golfer's ledger:
@@ -87,7 +87,11 @@ Money moves weekly when it is earned or spent, and every dollar passes through t
 **Money decides before it is spent.** Each golfer sees their *available funds*: savings, what is left of
 any family or private backing, and a **limited** line of credit (it grows with their recent earned
 income, up to $60k — nobody borrows without limit). The next four weeks of living costs are set aside
-first. A trip they cannot pay for is not booked, however much they want to play. Expected prize money
+first. A trip they cannot pay for is not booked, however much they want to play — **one rule for
+every entry, qualifier and invitation** (majors, elite and national amateur championships, the Tour
+Finals): an invited golfer who cannot pay declines (recorded) and the next in line or the next alternate
+takes the place. College events are paid by the school, never blocked by a golfer's debt, and the school
+is recorded as the payer. Expected prize money
 comes from their own record (the share of purses they have actually been winning, discounted for fields
 above their usual level), never from hidden ability, and it is never spent before it is won. How much
 a dollar matters scales with their funds: a broke mini-tour player weighs a long trip heavily, a
@@ -116,6 +120,7 @@ completed season, snapshotted **before** tour cards change (see `docs/SEASON_SYS
 | **Giving up the chase** (any tour) | Money pressure (1 / (1 + runway)) weighed against their **desire to continue** — progress, the card earned, a secured event, health, willingness and life stage. Desire is kept separate from funds: an improving golfer may willingly accept another losing season, but desire creates no money — what they can actually enter is still decided week by week by what they can afford, and their credit stays limited. Every decision is recorded with its reasons (probability, runway, progress, desire, what was secured). |
 | **After stopping** | Some become **coaches or caddies** (see `docs/COACHES_AND_CADDIES.md`; rarely anyone who made a fortune). The rest take a job and keep playing a few local events as part-time pros, regain amateur status (more likely for those who never earned much from golf), or (with a strong mental game, from their mid-twenties) become club professionals. |
 | **Comebacks** | A part-timer who wins or contends — often because their mental game has matured — may quit their job for another run. The odds come from those results, how much of a year on tour they could fund, age (smoothly) and willingness. No age limit and no savings threshold. |
+| **Adult amateurs take jobs** | Amateurs outside college live at home on savings and family help, with no salary. Each year they may take a job and keep playing as part-time amateurs ($52k salary, $40k living): smooth in age (rare at 19-20, likely by the mid-twenties), likelier in debt or with a short runway, less likely with money to keep going. Recorded as a career transition ("amateur took a job"); their chance of turning professional is decided first. |
 | **Turning pro** | College eligibility ends at 22 — a **rule**, so every graduate must choose; the choice weighs their amateur ranking (observed standing), wins, means and willingness. Other amateurs turn pro on the same evidence, less often the further they are from their early twenties. |
 | **Retirement** | Smooth in age for everyone (club pros mostly in their sixties; touring pros later the better their standing and card). Part-timers and amateurs who play less often and less well stop competing sooner — work and family crowd competition out. |
 | **New juniors** | Every year a class of 18-year-olds arrives from every nation (each nation's pool, development and pathway decide how many and how good), selected on what scouts can see, not on hidden potential. |

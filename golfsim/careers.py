@@ -187,6 +187,16 @@ def p_turn_pro(season, g, row, year, graduating):
     return _sig(x)
 
 
+def p_amateur_job(season, g, row, year):
+    """An adult amateur outside college, living on savings and family help, taking a job and playing
+    alongside it (as college graduates who stay amateur do). Smooth in age, pushed by debt and a short
+    runway, held back by money to keep going; their hope of turning professional is p_turn_pro's."""
+    age = g.age(year)
+    runway = runway_years(season, g, year, g.tour, max(8, row.get('events', 0)))
+    x = -1.2 + 0.8 * (age - 22) - 0.4 * min(runway, 5.0) + (1.0 if g.cash < 0 else 0.0)
+    return _sig(x)
+
+
 def p_comeback(season, g, row, year):
     """A part-timer quitting their job to make another full-time run at it."""
     age = g.age(year)
@@ -247,6 +257,13 @@ def decide(season, year, snap):
                     g.tour, g.lifestyle = amateur_series(g), 'part_time'
                     log(g.id, year, 53, 'College eligibility ended; kept playing as an amateur alongside a job')
                     note('college to amateur', g, p=round(1 - p_pro, 4), am_rank=row.get('am_end'))
+                elif g.lifestyle == 'full_time' and age >= 19:
+                    p_job = p_amateur_job(season, g, row, year)
+                    if rng.random() < p_job:
+                        g.lifestyle = 'part_time'
+                        log(g.id, year, 53, f'Took a job at {age} and kept playing as an amateur')
+                        note('amateur took a job', g, p=round(p_job, 4), am_rank=row.get('am_end'),
+                             cash=round(g.cash))
             continue
         if g.status != 'pro':
             continue

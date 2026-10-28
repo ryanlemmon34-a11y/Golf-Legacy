@@ -204,6 +204,65 @@ class CareerTests(unittest.TestCase):
         self.assertTrue(all(g.age(2028) == 18 and g.ceilings and g.status == 'amateur' for g in new))
         self.assertEqual(len({g.name for g in s.world.golfers}), len(s.world.golfers))
 
+    def test_adult_amateurs_take_jobs(self):
+        """Non-college amateurs living on savings take a job and keep playing: likelier with age and
+        debt, less likely with money to keep going; recorded as a career transition."""
+        s = Season(generate_world(), seed=8, development=True, workers=1)
+        ams = [g for g in s.world.golfers if g.status == 'amateur' and not g.tour.startswith('CO_')
+               and g.lifestyle == 'full_time'][:300]
+        def share(age, cash):
+            t = copy.deepcopy(s)
+            gs = [t.g[g.id] for g in ams]
+            for g in gs:
+                g.born, g.cash, g.backing = 2027 - age, cash, 0.0
+                t.am_pos.pop(g.id, None)                      # no hope of turning pro from the rankings
+            decide(t, 2027, t.season_snapshot(2027))
+            took = [g for g in gs if g.lifestyle == 'part_time' and g.status == 'amateur']
+            if took:
+                self.assertTrue(any(x['kind'] == 'amateur took a job' and x['gid'] == took[0].id
+                                    for x in t.transitions[2027]))
+                self.assertTrue(any('Took a job' in txt for _, _, txt in t.history[took[0].id]))
+            return len(took) / len(gs)
+        self.assertLess(share(20, 5000), share(24, 5000))
+        self.assertLess(share(24, 200000), share(24, 5000))
+        self.assertLess(share(24, 5000), share(24, -20000))
+        self.assertLess(share(19, 5000), 0.2)
+        self.assertGreater(share(27, -20000), 0.8)
+        self.assertEqual(FIN.weekly_living(ams[0]), (0.0, 0.0))
+        ams[0].lifestyle = 'part_time'
+        self.assertEqual(FIN.weekly_living(ams[0]), (FIN.SALARY['part_time'] / 52, FIN.LIVING_WORKING / 52))
+
+
+class InvitationTests(unittest.TestCase):
+    def test_invitations_follow_the_entry_affordability_rule(self):
+        """An invited golfer who cannot pay the trip declines and the next in line takes the place; the
+        same rule as a regular entry. School-paid college events are never out of reach."""
+        from collections import defaultdict
+        s = Season(generate_world(), seed=9, development=True, workers=1)
+        eds = s.cal.editions(2027)
+        busy = defaultdict(set)
+        rng = random.Random(1)
+        for ed in (e for e in eds if e.series.category in ('elite_amateur', 'national_amateur')):
+            first = s.special_field(ed, 2027, ed.week, rng, busy)[0]
+            if len(first) == ed.series.field:                            # more eligible than places
+                break
+        broke = s.g[first[0]]
+        broke.cash, broke.backing = -1e6, 0.0
+        again = s.special_field(ed, 2027, ed.week, rng, busy)[0]
+        self.assertNotIn(broke.id, again)
+        self.assertIn(ed.series.series_id, s.declined[2027][broke.id])
+        self.assertEqual(len(again), len(first))                         # the next in line took the place
+        city = s.lib.venues(2027)[ed.event_id][0].city
+        self.assertFalse(s.can_afford(broke, ed.series, city, s.spendable(broke, 2027)))
+        # a college golfer deep in debt still plays school events, and the school is recorded as payer
+        col = next(e for e in eds if e.series.category == 'college_postseason'
+                   and e.series.series_id == 'SMALL_COLLEGE_CHAMPIONSHIP')
+        top = s.special_field(col, 2027, col.week, rng, busy)[0]
+        student = s.g[top[0]]
+        student.cash = -1e6
+        self.assertIn(student.id, s.special_field(col, 2027, col.week, rng, busy)[0])
+        self.assertTrue(s.can_afford(student, col.series, s.lib.venues(2027)[col.event_id][0].city, -1e6))
+
 
 class PlanTests(unittest.TestCase):
     def test_monthly_plan_and_development_in_season(self):

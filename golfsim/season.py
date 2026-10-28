@@ -203,6 +203,8 @@ class Season:
         self.entry_misses = defaultdict(Counter)             # year -> gid -> weeks shut out of full fields
         self.entry_wants = defaultdict(Counter)              # year -> gid -> weeks they wanted to play
         self.season_rounds = defaultdict(Counter)            # year -> gid -> competitive rounds played
+        self.declined = defaultdict(_dd_list)                # year -> gid -> [series they could not pay to play]
+        self.school_trips = defaultdict(Counter)             # year -> gid -> events their school paid for
         for g in world.golfers:                              # the world starts mid-history: assume the season
             if g.lifestyle != 'retired':                     # before it was a typical one for their lifestyle
                 self.season_rounds[self.first_year - 1][g.id] = D.EXPERIENCE_ROUNDS * (1.0 if g.lifestyle == 'full_time' else 0.5)
@@ -513,8 +515,7 @@ class Season:
             for ed in regular:
                 if busy[g.id] & ed.series.day_set or not self.eligible(g, ed.series, week):
                     continue
-                cost = self.trip_cost(g, ed.series, venues[ed.event_id][0].city)
-                if cost > 0 and cost > money:
+                if not self.can_afford(g, ed.series, venues[ed.event_id][0].city, money):
                     continue                                 # cannot pay for the trip (school-paid trips cost 0)
                 v = self.event_value(g, ed, week, rng, country[ed.event_id])
                 opts.append((v, ed.event_id))
@@ -605,33 +606,50 @@ class Season:
         return sorted(ams, key=lambda g: (self.am_pos.get(g.id, 99999), self.observed_form(g.id), g.id))
 
     def special_field(self, ed, year, week, rng, busy):
+        """Fields chosen by the event: majors, invitations, championships and qualifiers. Everyone in
+        them pays their own way under the same rule as a regular entry (can_afford: school-paid trips
+        are free); a golfer who cannot pay declines (recorded in `declined`) and the next in line, or
+        the next alternate, takes the place."""
         s = ed.series
         sid = s.series_id
+        city0 = self.lib.venues(year)[ed.event_id][0].city
+        pays = lambda g: self.can_afford(g, s, city0, self.spendable(g, year))
         free = lambda g: self.available(g.id, s, busy)
-        if s.kind == 'qualifying':                           # entrants pay their own way
-            city0 = self.lib.venues(year)[ed.event_id][0].city
+        if s.kind == 'qualifying' or sid == 'CLUB_PRO_SECTIONALS':   # entrants decide, and pay, for themselves
             can_go = free
-            free = lambda g: can_go(g) and self.trip_cost(g, s, city0) <= self.spendable(g, year)
+            free = lambda g: can_go(g) and pays(g)
+
+        def invite(ranked, n):
+            """The first `n` of `ranked` (golfers, in order) who can pay their way."""
+            take = []
+            for g in ranked:
+                if len(take) >= n:
+                    break
+                if pays(g):
+                    take.append(g.id)
+                else:
+                    self.declined[year][g.id].append(sid)
+            return take
         if s.kind == 'major':
-            return [self.major_field(sid, year, week)]
+            return [self.major_field(sid, year, week, pays)]
         if sid == 'PT_PREMIER_TOUR_FINALS':
             rows = self.ctx.standing('PREMIER', year, week - 1)
-            return [[gid for gid in rows if self.g[gid].status == 'pro' and gid not in self.injured][:s.field]]
+            return [invite([self.g[gid] for gid in rows if self.g[gid].status == 'pro' and gid not in self.injured],
+                           s.field)]
         if s.category == 'elite_amateur':
             regions = ELITE_AMATEUR_REGIONS.get(sid)
             pred = (lambda g: free(g) and region_of(g) in regions) if regions else (lambda g: free(g))
             if s.eligibility == 'mid_amateur':
                 pred = lambda g: free(g) and g.age(year) >= 25
-            return [[g.id for g in self.ranked_amateurs(pred)[:s.field]]]
+            return [invite(self.ranked_amateurs(pred), s.field)]
         if s.category == 'national_amateur':
-            home = self.ranked_amateurs(lambda g: free(g) and g.country == s.host_country)
-            rest = self.ranked_amateurs(lambda g: free(g) and g.country != s.host_country and
-                                        region_of(g) == COUNTRIES[s.host_country].region)
-            take = home[:s.field]
-            take += rest[:max(0, min(s.field - len(take), s.field // 4))]
-            return [[g.id for g in take]]
-        if s.category == 'college_postseason':
-            return self.college_postseason(ed, year, free)
+            take = invite(self.ranked_amateurs(lambda g: free(g) and g.country == s.host_country), s.field)
+            take += invite(self.ranked_amateurs(lambda g: free(g) and g.country != s.host_country and
+                                                region_of(g) == COUNTRIES[s.host_country].region),
+                           max(0, min(s.field - len(take), s.field // 4)))
+            return [take]
+        if s.category == 'college_postseason':                  # the school pays: never out of reach
+            return self.college_postseason(ed, year, lambda g: free(g) and pays(g))
         if sid == 'CLUB_PRO_SECTIONALS':
             return self.club_pro_sectionals(ed, year, rng, free)
         if sid == 'CLUB_PRO_CHAMPIONSHIP':
@@ -645,16 +663,25 @@ class Season:
     # ---- majors: every entrant has a recorded route ------------------------------------------------
     INAUGURAL_MASTERS = 90           # the world's first Masters has no past champions or results to draw on
 
-    def major_field(self, sid, year, week):
+    def major_field(self, sid, year, week, pays=lambda g: True):
         """The major's field from its qualification routes. Each entrant's route is recorded in
         `entry_routes`. Golfers who are injured or retired withdraw and the next alternates (recorded
         as 'ALT') take their places; an invitation-only event without alternates simply plays with a
         smaller field. The only exception is explicit and limited to the world's first season, when
         no past results exist: the Tour Masters then invites the best of the seeded world ranking
-        (route 'INIT', 'Inaugural invitation')."""
+        (route 'INIT', 'Inaugural invitation'). Qualified golfers who cannot pay the trip decline
+        (`declined`) and alternates replace them in the same way."""
         f = Q.build_field(sid, year, self.ctx)
         self.stage_log[(year, sid, 'field')] = f
-        ok = lambda gid: gid in self.g and gid not in self.injured and self.g[gid].lifestyle != 'retired'
+        can_play = lambda gid: gid in self.g and gid not in self.injured and self.g[gid].lifestyle != 'retired'
+
+        def ok(gid):
+            if not can_play(gid):
+                return False
+            if not pays(self.g[gid]):
+                self.declined[year][gid].append(sid)
+                return False
+            return True
         routes = {}
         for e in f.entries:
             if ok(e.golfer_id):
@@ -963,7 +990,11 @@ class Season:
                 self._week_event[gid] = ed.event_id
                 self.week_rounds[gid] += n
             for gid, _, _ in finish:
-                self.spend(self.g[gid], year, 'events', FIN.event_cost(self.g[gid], s, v.city))
+                cost = FIN.event_cost(self.g[gid], s, v.city)
+                if cost:
+                    self.spend(self.g[gid], year, 'events', cost)
+                else:
+                    self.school_trips[year][gid] += 1                    # the payer: their school
                 k = self.staff.caddie(gid)
                 if k is not None:
                     self.pay_staff(self.g[gid], year, 'caddie', k, k.weekly_fee)
@@ -1435,6 +1466,12 @@ class Season:
     def spendable(self, g, year):
         """Funds left for golf after setting aside the next few weeks of committed costs."""
         return self.funds(g, year) - FIN.RESERVE_WEEKS * self.committed_weekly(g)
+
+    def can_afford(self, g, series, city, money):
+        """The one affordability rule for every entry, qualifier and invitation: the trip is free (the
+        school pays) or within the golfer's spendable funds `money`."""
+        cost = self.trip_cost(g, series, city)
+        return cost <= 0 or cost <= money
 
     def trip_cost(self, g, series, city):
         """What playing an event costs a golfer: travel and fees, plus their caddie's weekly fee."""
