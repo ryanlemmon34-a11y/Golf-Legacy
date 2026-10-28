@@ -49,7 +49,8 @@ LEVEL = {1: 'Premier', 2: 'Challenger', 3: 'Regional', 4: 'Mini', 5: 'College', 
 ROW = ('status', 'lifestyle', 'tier', 'next_tier', 'events', 'wins', 'wins_by_tier', 'majors', 'top10', 'cuts',
        'prize', 'net', 'cash', 'wr', 'am', 'injury_weeks', 'zero_start', 'coach', 'deal', 'caddie',
        'coaching', 'caddie_cost', 'sponsors', 'salary', 'work', 'support', 'living', 'event_costs',
-       'play_wk', 'train_wk', 'rest_wk', 'work_wk', 'rounds', 'wanted_wk', 'shut_wk', 'declined', 'school_trips')
+       'play_wk', 'train_wk', 'rest_wk', 'work_wk', 'rounds', 'wanted_wk', 'shut_wk', 'declined', 'school_trips',
+       'club_trips', 'backer_support')
 EXITS = ('retired', 'became coach', 'became caddie')
 
 
@@ -81,6 +82,14 @@ def checks(s, year, snap, active_before):
     recon = sum(1 for gid, c0 in start.items()
                 if abs(s.g[gid].cash - (c0 + (led[gid].net if gid in led else 0.0)))
                 > max(0.01, 1e-12 * abs(s.g[gid].cash)))      # a cent, or float rounding on fortunes
+    # family money falls only by what was drawn from it; backers' money (after they put up the season's
+    # on 1 January) only by what was drawn and what went back to them when a deal ended
+    pots = 0
+    for gid, (backing0, funds0) in s.support_start.get(year, {}).items():
+        l, g = led.get(gid), s.g[gid]
+        back = s.backer_flows[year][(gid, 'returned')]
+        pots += (abs(g.backing - (backing0 - (l.support if l else 0.0))) > 0.01
+                 or abs(g.backer_funds - (funds0 - (l.backer_support if l else 0.0) - back)) > 0.01)
     rec = s.staff_receipts[year]
     paid_caddie = sum(l.caddie + l.caddie_share for l in led.values())
     paid_coach = sum(l.coaching + l.coach_share for l in led.values())
@@ -96,7 +105,7 @@ def checks(s, year, snap, active_before):
     exits = sum(1 for t in s.transitions.get(year, ()) if t['kind'] in EXITS)
     juniors = s.juniors_added.get(year + 1, 0) + s.new_pros_added.get(year + 1, 0)   # every arrival
     active_after = sum(1 for g in s.world.golfers if g.lifestyle != 'retired')
-    return {'reconcile_errors': recon, 'caddie_paid': round(paid_caddie, 2), 'caddie_received': round(got_caddie, 2),
+    return {'reconcile_errors': recon, 'support_errors': pots, 'caddie_paid': round(paid_caddie, 2), 'caddie_received': round(got_caddie, 2),
             'coach_paid': round(paid_coach, 2), 'coach_received': round(got_coach, 2), 'staff_violations': staff_bad,
             'active_before': active_before, 'exits': exits, 'juniors': juniors, 'active_after': active_after,
             'population_ok': active_before - exits + juniors == active_after,
@@ -121,7 +130,8 @@ def year_rows(s, year, snap):
                      round(led.support) if led else 0, round(led.living) if led else 0, round(led.events) if led else 0,
                      act.get('play', 0), act.get('train', 0), act.get('rest', 0), act.get('work', 0),
                      round(s.season_rounds[year].get(gid, 0), 1), s.entry_wants[year].get(gid, 0),
-                     s.entry_misses[year].get(gid, 0), len(s.declined[year].get(gid, ())), s.school_trips[year].get(gid, 0)]
+                     s.entry_misses[year].get(gid, 0), len(s.declined[year].get(gid, ())), s.school_trips[year].get(gid, 0),
+                     s.club_trips[year].get(gid, 0), round(led.backer_support) if led else 0]
         debug[gid] = [round(g.overall, 2), round(g.potential, 1),
                       round(sum(g.ceilings[k] - g.attrs[k] for k in g.attrs) / len(g.attrs), 2) if g.ceilings else None]
     return rows, debug
@@ -180,7 +190,7 @@ def run_world(seed, years, workers, out, resume=False, save_every=1):
         data['years'] = y - first + 1
         c = data['checks'][y]
         print(f'seed {seed}: {y} done ({data["years"]}/{years}), {c["active_after"]} active, '
-              f'reconcile errors {c["reconcile_errors"]}, staff violations {c["staff_violations"]}, '
+              f'reconcile errors {c["reconcile_errors"]}+{c.get("support_errors", 0)}, staff violations {c["staff_violations"]}, '
               f'population {"ok" if c["population_ok"] else "MISMATCH"}, {time.perf_counter() - t0:.0f} s', flush=True)
         last = y == first + years - 1
         if data['years'] % 5 == 0 or last:
@@ -360,6 +370,7 @@ def analyse(d, mature):
     a['entry'] = shut
     a['declined'] = sum(r.get('declined', 0) for y in years for r in d['rows'][y].values())
     a['school_trips'] = sum(r.get('school_trips', 0) for y in years for r in d['rows'][y].values())
+    a['club_trips'] = sum(r.get('club_trips', 0) for y in years for r in d['rows'][y].values())
     # majors
     wins = Counter(d['majors'].values())
     a['majors'] = len(d['majors'])
@@ -470,6 +481,8 @@ def report(results, man, mature):
            'Every shot simulated. This report contains no hidden attributes (see DEBUG.md).', '',
            '## 1. Checks (every season)', '', head, sep,
            row('Seasons with cash not reconciling', lambda a, d: str(sum(1 for c in d['checks'].values() if c['reconcile_errors']))),
+           row('Seasons with family or backers\' money not reconciling',
+               lambda a, d: str(sum(1 for c in d['checks'].values() if c.get('support_errors')))),
            row('Seasons where staff payments ≠ receipts', lambda a, d: str(sum(1 for c in d['checks'].values()
                if abs(c['caddie_paid'] - c['caddie_received']) > 0.01 or abs(c['coach_paid'] - c['coach_received']) > 0.01))),
            row('Staff invariant violations', lambda a, d: str(sum(c['staff_violations'] for c in d['checks'].values()))),
@@ -502,7 +515,8 @@ def report(results, man, mature):
         out.append(row(f'{lv} entries: weeks wanted / shut out',
                        lambda a, d, lv=lv: f'{a["entry"][lv]["wanted"]:,} / {pct(a["entry"][lv]["shut out"], a["entry"][lv]["wanted"])}'))
     out += [row('Invitations and qualified places declined for cost', lambda a, d: f'{a["declined"]:,}'),
-            row('Events paid for by a school', lambda a, d: f'{a["school_trips"]:,}')]
+            row('Events paid for by a school', lambda a, d: f'{a["school_trips"]:,}'),
+            row('Events paid for by a club', lambda a, d: f'{a["club_trips"]:,}')]
     out += ['', '## 4. Careers (golfers who turned pro during the run, followed ' f'{mature}+ seasons)', '',
             'Golfers already professional when a world began are left-censored and excluded. 10th / median / 90th percentile.', '',
             head, sep,
@@ -643,7 +657,7 @@ def main():
     print('wrote', out / 'REPORT.md', 'and', out / 'DEBUG.md')
     if a.strict:
         bad = [(r['d']['seed'], y, c) for r in results for y, c in r['d']['checks'].items()
-               if c['reconcile_errors'] or c['staff_violations'] or not c['population_ok']
+               if c['reconcile_errors'] or c.get('support_errors') or c['staff_violations'] or not c['population_ok']
                or abs(c['caddie_paid'] - c['caddie_received']) > 0.01 or abs(c['coach_paid'] - c['coach_received']) > 0.01]
         if bad:
             print('CHECKS FAILED:', bad)

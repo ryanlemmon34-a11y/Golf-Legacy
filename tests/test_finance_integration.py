@@ -23,10 +23,13 @@ class PromotionTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.s = s = Season(generate_world(seed=11, scale=0.2), seed=11, development=True, workers=4)
+        cls.pots0 = {g.id: (g.cash, g.backing, g.backer_funds) for g in s.world.golfers}
         s.start_year(2027)
         for w in range(1, 53):
             s.advance_week(2027, w)
+        cls.end = {g.id: (g.cash, g.backing, g.backer_funds) for g in s.world.golfers}
         cls.before = {g.id: (g.backer, g.cash, g.tour) for g in s.world.golfers}
+        cls.status = {g.id: g.status for g in s.world.golfers}
         s.finish_year(2027)
         cls.promoted = {gid: (frm, to, why) for gid, frm, to, why in s.card_log[2027]
                         if TOUR_BY_KEY[frm].tier > TOUR_BY_KEY[to].tier}
@@ -57,17 +60,16 @@ class PromotionTests(unittest.TestCase):
             else:                                                              # proven at the new level
                 self.assertGreaterEqual(s.events_at_level(gid, TOUR_BY_KEY[g.tour].tier), FIN.PROVEN_EVENTS, (gid, why))
                 self.assertGreaterEqual(income, costs, (gid, why))
-        unproven = [gid for gid in backed if s.g[gid].tour in TOUR_BY_KEY
-                    and s.events_at_level(gid, TOUR_BY_KEY[s.g[gid].tour].tier) < FIN.PROVEN_EVENTS]
-        self.assertTrue(unproven)
-        for gid in unproven:                                                   # a new level is not an income yet
+        # a level they have barely played (if any such golfer was promoted in this world) is not an income yet
+        unproven = [gid for gid in backed
+                    if s.events_at_level(gid, TOUR_BY_KEY[self.promoted[gid][1]].tier) < FIN.PROVEN_EVENTS]
+        for gid in unproven:
             why = self.decisions.get(gid, {}).get('kind')
             if why == 'backers no longer needed':
                 why = next(t for y, w, t in reversed(s.history[gid]) if 'Paying their own way' in t)
                 self.assertTrue('savings' in why or 'sponsor contract' in why, why)   # money they have, not hope
-        unproven_poor = [gid for gid in unproven if gid in poor]
-        self.assertTrue(unproven_poor)
-        self.assertTrue(any(s.g[gid].backer for gid in unproven_poor))        # their backers stay with them
+        kept = [gid for gid in poor if s.g[gid].backer and s.g[gid].tour == self.promoted[gid][1]]
+        self.assertTrue(kept)                                                # patient backers stay with them
         for gid in poor:
             lines = [t for y, w, t in s.history[gid] if y == 2027 and w == 53]
             self.assertTrue(any('→' in t for t in lines), gid)              # the card change is in their history
@@ -86,6 +88,124 @@ class PromotionTests(unittest.TestCase):
         row = s.snapshots[2027][gid]
         self.assertGreater(C.desire_to_continue(s, g, dict(row, promoted=True), 2027),
                            C.desire_to_continue(s, before, dict(row, promoted=False), 2027))
+
+
+    def test_payers_are_labelled_and_support_money_is_conserved(self):
+        """Every event paid for by someone else is counted for the payer who really paid it, and the
+        money golfers draw on stays in its own pot: cash reconciles with the ledger, family money falls
+        only by what was drawn from it, and backers' money moves only by what they put up, what was drawn
+        and what went back to them when a deal ended."""
+        s = self.s
+        for gid, n in s.school_trips[2027].items():                         # the tour they had in the season
+            self.assertTrue(n == 0 or self.before[gid][2].startswith('CO_'), gid)
+        self.assertTrue(s.club_trips[2027])
+        for gid in s.club_trips[2027]:
+            self.assertEqual(self.status[gid], 'club_pro', gid)
+        self.assertFalse(set(s.club_trips[2027]) & {gid for gid, n in s.school_trips[2027].items() if n})
+        led = s.ledgers[2027]
+        drawn = backed = returned = 0
+        for gid, (_, backing0, funds0) in self.pots0.items():
+            g, l = s.g[gid], led.get(gid)
+            support, backer_support = (l.support, l.backer_support) if l else (0.0, 0.0)
+            cash0 = s.cash_start[2027][gid]
+            self.assertAlmostEqual(self.end[gid][0], cash0 + (l.net if l else 0.0), delta=0.01)
+            self.assertAlmostEqual(self.end[gid][1], backing0 - support, delta=0.01)      # family money
+            put_up = s.backer_flows[2027][(gid, 'put_up')]
+            self.assertAlmostEqual(self.end[gid][2], funds0 + put_up - backer_support, delta=0.01)
+            back = s.backer_flows[2027][(gid, 'returned')]
+            self.assertAlmostEqual(g.backer_funds, self.end[gid][2] - back, delta=0.01)  # deals that ended
+            drawn += backer_support > 0
+            backed += put_up > 0
+            returned += back > 0
+        self.assertTrue(drawn and backed and returned)
+
+
+class EntryBudgetTests(unittest.TestCase):
+    """One budget per golfer per week: entries reserve their cost as they are accepted, each site of a
+    qualifier is priced for the golfer at that site, and a caddie's weekly fee is paid once a week."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.s = s = Season(generate_world(seed=11, scale=0.2), seed=11, development=True, workers=1)
+        s.start_year(2027)
+        for w in range(1, 19):
+            s.advance_week(2027, w)
+
+    def _week(self, s, week):
+        return next(e for e in s.cal.editions(2027) if e.week == week and e.series.series_id.startswith(
+            'USA_OPEN_LOCAL' if week < 22 else 'USA_OPEN_FINAL'))
+
+    @staticmethod
+    def _set_spendable(s, g, amount):
+        g.backing = g.backer_funds = 0.0
+        g.cash += amount - s.spendable(g, 2027)
+
+    def _cheapest_regular(self, s, g, week):
+        venues = s.lib.venues(2027)
+        costs = [s.trip_cost(g, e.series, venues[e.event_id][0].city) for e in s.cal.editions(2027)
+                 if e.week == week and not s.is_special(e.series) and s.eligible(g, e.series, week)]
+        return min(costs) if costs else None
+
+    def test_a_qualifier_and_a_weekend_event_share_one_budget(self):
+        local = self._week(self.s, 19)
+        free = copy.deepcopy(self.s)
+        free.advance_week(2027, 19)
+        both = lambda s: {gid for gid, wks in s.played[2027].items() if wks.count(19) >= 2}
+        self.assertTrue(both(free))                                      # golfers do play both when they can
+        s = copy.deepcopy(self.s)
+        city = s.lib.venues(2027)[local.event_id][0].city
+        tight = {}
+        for g in s.active_golfers():
+            if g.status != 'pro' or g.lifestyle != 'full_time' or s.staff.caddie(g.id) is not None:
+                continue
+            q, r = s.trip_cost(g, local.series, city), self._cheapest_regular(s, g, 19)
+            if r is not None and q > 0:
+                self._set_spendable(s, g, max(q, r) + 1)                 # either one, not both
+                tight[g.id] = (q, r)
+        s.advance_week(2027, 19)
+        played_local = {gid for rows in s.ctx.results[(local.series.series_id, 2027)].values() for gid, _ in rows}
+        self.assertTrue(played_local & set(tight))                       # each was affordable on its own
+        self.assertFalse(both(s) & set(tight))                           # but not the two together
+
+    def test_qualifiers_are_priced_at_their_own_site_and_a_caddie_is_paid_once_a_week(self):
+        s = copy.deepcopy(self.s)
+        for w in (19, 20, 21):
+            s.advance_week(2027, w)
+        intl = self._week(s, 22)
+        assert intl.series.series_id == 'USA_OPEN_FINAL_INTL'
+        england, japan = (v.city for v in s.lib.venues(2027)[intl.event_id])
+        tight = []
+        for g in s.active_golfers():
+            if g.country != 'Japan' or g.status != 'pro' or g.lifestyle == 'retired':
+                continue
+            at_home, abroad = s.trip_cost(g, intl.series, japan), s.trip_cost(g, intl.series, england)
+            self.assertLess(at_home, abroad)
+            self._set_spendable(s, g, at_home + 1)                       # Japan, not England
+            tight.append(g.id)
+        self.assertTrue(tight)
+        before = {g.id: (s.ledger(2027, g.id).caddie, s.staff.caddie(g.id).weeks_worked)
+                  for g in s.active_golfers() if s.staff.caddie(g.id) is not None}
+        s.advance_week(2027, 22)
+        sites = s.ctx.results[('USA_OPEN_FINAL_INTL', 2027)]
+        self.assertTrue({gid for gid, _ in sites.get(1, ())} & set(tight))   # they qualify at the Japan site
+        for gid in tight:
+            self.assertNotIn(gid, {g for g, _ in sites.get(0, ())})
+            self.assertNotIn('USA_OPEN_FINAL_INTL', s.declined[2027].get(gid, ()))
+        two = 0
+        for w in (22, 23):
+            if w == 23:
+                before = {gid: (s.ledger(2027, gid).caddie, s.staff.caddie(gid).weeks_worked)
+                          for gid in before if s.staff.caddie(gid) is not None}
+                s.advance_week(2027, 23)
+            for gid, (paid, worked) in before.items():
+                k = s.staff.caddie(gid)
+                if k is None:
+                    continue
+                n = s.played[2027][gid].count(w)
+                self.assertAlmostEqual(s.ledger(2027, gid).caddie - paid, k.weekly_fee if n else 0.0, delta=0.01)
+                self.assertEqual(k.weeks_worked - worked, 1 if n else 0)
+                two += n >= 2
+        self.assertTrue(two)                                             # some played twice in a week
 
 
 class AmateurForecastTests(unittest.TestCase):

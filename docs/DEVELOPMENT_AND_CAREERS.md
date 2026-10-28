@@ -122,7 +122,11 @@ first. A trip they cannot pay for is not booked, however much they want to play 
 every entry, qualifier and invitation** (majors, elite and national amateur championships, the Tour
 Finals): an invited golfer who cannot pay declines (recorded) and the next in line or the next alternate
 takes the place. College events are paid by the school, never blocked by a golfer's debt, and the school
-is recorded as the payer. Expected prize money
+is recorded as the payer (a club professional's section golf likewise, by the club). A week has one
+budget: every entry accepted books its cost at once, so a Monday qualifier and that weekend's
+tournament are not both paid from the same money, and a qualifier is priced at the site the golfer is
+sent to (England or Japan for the USA Open's international final qualifying). A caddie's weekly fee is
+paid once a week, however many events. Expected prize money
 comes from their own record, kept by level of competition (the share of purses they have actually won
 against Premier, Challenger, regional or mini-tour fields, and in how many events): at a level they have
 not played, their record elsewhere is translated (half the share one level up, twice one level down) and

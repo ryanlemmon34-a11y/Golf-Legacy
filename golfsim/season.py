@@ -263,6 +263,7 @@ class Season:
         self.career_counts = {}                              # year -> {decision: count}
         self.contracts = {}                                  # gid -> this season's sponsor income
         self.cash_start = {}                                 # year -> gid -> cash on 1 January
+        self.support_start = {}                              # year -> gid -> (family money, backers' money) then
         self.prize_share = {}                                # gid -> share of a purse they tend to win (all levels)
         self.prize_record = {}                               # gid -> {tier: [share of purse they tend to win
                                                              #   at that level of competition, events]}
@@ -285,6 +286,11 @@ class Season:
         self.prior_rounds = {}
         self.declined = defaultdict(_dd_list)                # year -> gid -> [series they could not pay to play]
         self.school_trips = defaultdict(Counter)             # year -> gid -> events their school paid for
+        self.club_trips = defaultdict(Counter)               # year -> gid -> events their club paid for
+        self.backer_flows = defaultdict(Counter)             # year -> (gid, 'put_up'|'returned') -> dollars
+        self._reserved = Counter()                           # gid -> cost of entries accepted this week, not yet paid
+        self._caddie_week = set()                            # gids whose caddie's weekly fee is booked this week
+        self._caddie_paid = set()                            # ... and already paid this week
         for g in world.golfers:                              # the world starts mid-history: assume the season
             if g.lifestyle != 'retired':                     # before it was a typical one for their lifestyle
                 self.prior_rounds[g.id] = (self.first_year, D.EXPERIENCE_ROUNDS * (1.0 if g.lifestyle == 'full_time' else 0.5))
@@ -659,13 +665,19 @@ class Season:
         venues = self.lib.venues(year)
         busy = defaultdict(set)                              # gid -> days committed this week
         fields = {}                                          # event_id -> [per-site golfer lists]
+        self._reserved.clear()                               # one budget for the week: every accepted entry
+        self._caddie_week.clear()                            # books its cost at once (the caddie's weekly
+        self._caddie_paid.clear()                            # fee once), so the next entry sees what is left
 
         def commit(ed, ids_by_site, how='selected'):
             fields[ed.event_id] = ids_by_site
-            for ids in ids_by_site:
+            sites = venues[ed.event_id]
+            for k, ids in enumerate(ids_by_site):
+                city = sites[min(k, len(sites) - 1)].city
                 for gid in ids:
                     busy[gid] |= ed.series.day_set
                     self._week_entered.setdefault(gid, (ed.event_id, how))
+                    self.reserve(self.g[gid], ed.series, city)
 
         if self.development and (week - 1) % 4 == 0:
             self.plan_block(year, week)
@@ -678,6 +690,7 @@ class Season:
                 seen = set()
                 sites = [[gid for gid in site if not (busy[gid] & ed.series.day_set) and not (gid in seen or seen.add(gid))]
                          for site in sites]
+                sites = self.pay_at_sites(ed, year, sites, venues)
                 self._default_routes(ed.series, year, sites)
                 commit(ed, sites)
         # Regular events: golfers choose, events accept in priority order (deferred acceptance)
@@ -687,6 +700,7 @@ class Season:
             if e.event_id not in fields or not any(fields[e.event_id]):
                 fields.pop(e.event_id, None)
                 self.unheld[year].append(e.event_id)          # nobody entered: not held this year (recorded)
+        self._reserved.clear()                               # from here the real costs are charged as played
         self.play_week(year, week, [e for e in eds if e.event_id in fields], fields, venues)
         self.develop_week(year, week)
         self.record_access(year, week)
@@ -730,7 +744,7 @@ class Season:
             money = self.spendable(g, year)
             days = busy[g.id]
             k = self.staff.caddie(g.id)
-            caddie_fee = k.weekly_fee if k is not None else 0.0
+            caddie_fee = k.weekly_fee if k is not None and g.id not in self._caddie_week else 0.0
             gw = self.golfer_week(g, year, week)
             for ed in evs:
                 if days & ed.series.day_set:
@@ -920,8 +934,10 @@ class Season:
         the next alternate, takes the place."""
         s = ed.series
         sid = s.series_id
-        city0 = self.lib.venues(year)[ed.event_id][0].city
-        pays = lambda g: self.can_afford(g, s, city0, self.spendable(g, year))
+        cities = {v.city for v in self.lib.venues(year)[ed.event_id]}
+        # a golfer who can pay for at least one of the event's sites; the site they are given is checked
+        # again before the field is fixed (pay_at_sites)
+        pays = lambda g: any(self.can_afford(g, s, c, self.spendable(g, year)) for c in cities)
         free = lambda g: self.available(g.id, s, busy)
         if s.kind == 'qualifying' or sid == 'CLUB_PRO_SECTIONALS':   # entrants decide, and pay, for themselves
             can_go = free
@@ -1370,6 +1386,12 @@ class Season:
 
     def __setstate__(self, state):
         state.setdefault('new_pros_added', {})              # saves from before new professionals arrived
+        state.setdefault('club_trips', defaultdict(Counter))   # saves from before payers were told apart
+        state.setdefault('backer_flows', defaultdict(Counter))
+        state.setdefault('support_start', {})
+        for k in ('_caddie_week', '_caddie_paid'):           # this week's bookings (empty between weeks)
+            state.setdefault(k, set())
+        state.setdefault('_reserved', Counter())
         if 'prize_record' not in state:                     # saves from before earnings kept their level:
             tier = lambda gid: next((TOUR_BY_KEY[g.tour].tier for g in (state['g'].get(gid),)   # their
                                      if g is not None and g.tour in TOUR_BY_KEY), 4)            # tour's
@@ -1470,14 +1492,20 @@ class Season:
                 self._week_event[gid] = ed.event_id
                 self.week_rounds[gid] += n
             for gid, _, _ in finish:
-                cost = FIN.event_cost(self.g[gid], s, v.city)
-                if cost:
-                    self.spend(self.g[gid], year, 'events', cost)
+                g_ = self.g[gid]
+                payer = FIN.event_payer(g_, s)
+                if payer == 'school':
+                    self.school_trips[year][gid] += 1
+                elif payer == 'club':
+                    self.club_trips[year][gid] += 1
                 else:
-                    self.school_trips[year][gid] += 1                    # the payer: their school
+                    cost = FIN.event_cost(g_, s, v.city)
+                    if cost:
+                        self.spend(g_, year, 'events', cost)
                 k = self.staff.caddie(gid)
-                if k is not None:
-                    self.pay_staff(self.g[gid], year, 'caddie', k, k.weekly_fee)
+                if k is not None and gid not in self._caddie_paid:   # a weekly retainer: once a week,
+                    self._caddie_paid.add(gid)                        # however many events they play
+                    self.pay_staff(g_, year, 'caddie', k, k.weekly_fee)
                     k.weeks_worked += 1
             if s.kind != 'qualifying' and finish and finish[0][1] == 1:
                 w = finish[0][0]
@@ -1652,8 +1680,9 @@ class Season:
         for gid in [gid for gid, (y, _) in self.prior_rounds.items() if y < year]:
             del self.prior_rounds[gid]                       # their first season is over
         for d in (self.earnings, self.played, self.pstats, self.ledgers, self.season_rounds, self.entry_wants,
-                  self.entry_misses, self.entry_stats, self.declined, self.school_trips, self.activity_counts,
-                  self.block_flags, self.cash_start, self.overall_start, self.rank_start, self.am_start,
+                  self.entry_misses, self.entry_stats, self.declined, self.school_trips, self.club_trips,
+                  self.backer_flows, self.activity_counts,
+                  self.block_flags, self.cash_start, self.support_start, self.overall_start, self.rank_start, self.am_start,
                   self.staff_receipts, self.injuries, self.card_log, self.career_counts, self.transitions,
                   self.assignments, self.staff_year, self.unheld, self.rights, self.card_reasons, self.snapshots,
                   self.juniors_added, self.new_pros_added, self.stats, self.moments):
@@ -1726,19 +1755,22 @@ class Season:
         self.rank_start[year] = dict(self.wr_pos)
         self.am_start[year] = dict(self.am_pos)
         for g in self.world.golfers:                         # backers put up this season's money
-            self.start_backing(g)
+            self.start_backing(g, year)
         self.cash_start[year] = {g.id: g.cash for g in self.world.golfers}
+        self.support_start[year] = {g.id: (g.backing, g.backer_funds) for g in self.world.golfers
+                                    if g.backing or g.backer_funds}
         self.premier_rights(year)
         self.overall_start[year] = {g.id: g.overall for g in self.world.golfers if g.lifestyle != 'retired'}
         ST.start_of_season(self, year)                       # coaches scout, golfers hire coaches and caddies
         self.assignments[year] = {'coach_of': dict(self.staff.coach_of), 'deal': dict(self.staff.deal),
                                   'caddie_of': dict(self.staff.caddie_of)}
 
-    def start_backing(self, g):
+    def start_backing(self, g, year=None):
         """1 January: a backed golfer's backers put up the season's money (kept apart from family money:
-        it goes back to them if the deal ends)."""
-        if g.backer and g.lifestyle != 'retired':
-            g.backer_funds = max(g.backer_funds, g.backer)
+        it goes back to them if the deal ends; what they put up is recorded in backer_flows)."""
+        if g.backer and g.lifestyle != 'retired' and g.backer > g.backer_funds:
+            self.backer_flows[self.year if year is None else year][(g.id, 'put_up')] += g.backer - g.backer_funds
+            g.backer_funds = g.backer
 
     def premier_rights(self, year):
         """Each Premier member's playing rights for the season (RIGHTS), with the reason, fixed on
@@ -2110,7 +2142,7 @@ class Season:
     def funds(self, g, year):
         """What a golfer could draw on right now: savings, backers, and a limited line of credit."""
         last = self.ledgers.get(year - 1, {}).get(g.id)
-        earned = last.income - last.support if last else 0.0    # lenders look at earnings, not handouts
+        earned = last.income - last.support - last.backer_support if last else 0.0   # earnings, not handouts
         return g.cash + g.backing + g.backer_funds + FIN.credit_limit(earned)
 
     # The money definitions every decision shares (hiring, the monthly plan, entries, settlement and
@@ -2128,8 +2160,35 @@ class Season:
         return max(0.0, living - salary) + coach
 
     def spendable(self, g, year):
-        """Funds left for golf after setting aside the next few weeks of committed costs."""
-        return self.funds(g, year) - FIN.RESERVE_WEEKS * self.committed_weekly(g)
+        """Funds left for golf after setting aside the next few weeks of committed costs and the cost of
+        the entries already accepted this week."""
+        return self.funds(g, year) - FIN.RESERVE_WEEKS * self.committed_weekly(g) - self._reserved.get(g.id, 0.0)
+
+    def reserve(self, g, series, city):
+        """An accepted entry books its cost against the week's budget at once (paid when played)."""
+        cost = self.trip_cost(g, series, city)
+        if cost > 0:
+            self._reserved[g.id] += cost
+        if self.staff.caddie(g.id) is not None:
+            self._caddie_week.add(g.id)
+
+    def pay_at_sites(self, ed, year, sites, venues):
+        """A selected field, each golfer checked against the cost of the site they were given (a
+        qualifier's sites can be in different countries): one who cannot pay for it declines (recorded)."""
+        if len(sites) < 2:
+            return sites
+        s, where = ed.series, venues[ed.event_id]
+        out = []
+        for k, ids in enumerate(sites):
+            city = where[min(k, len(where) - 1)].city
+            keep = []
+            for gid in ids:
+                if self.can_afford(self.g[gid], s, city, self.spendable(self.g[gid], year)):
+                    keep.append(gid)
+                else:
+                    self.declined[year][gid].append(s.series_id)
+            out.append(keep)
+        return out
 
     def can_afford(self, g, series, city, money):
         """The one affordability rule for every entry, qualifier and invitation: the trip is free (the
@@ -2138,9 +2197,11 @@ class Season:
         return cost <= 0 or cost <= money
 
     def trip_cost(self, g, series, city):
-        """What playing an event costs a golfer: travel and fees, plus their caddie's weekly fee."""
+        """What playing an event costs a golfer: travel and fees, plus their caddie's weekly fee (unless
+        already booked for another event this week)."""
         k = self.staff.caddie(g.id)
-        return FIN.event_cost(g, series, city) + (k.weekly_fee if k is not None else 0.0)
+        return FIN.event_cost(g, series, city) + (k.weekly_fee if k is not None and g.id not in self._caddie_week
+                                                  else 0.0)
 
     def prize_kept(self, g):
         """Share of prize money a golfer keeps after their caddie's and a scouting coach's shares."""
@@ -2258,12 +2319,12 @@ class Season:
             if self.staff.deal.get(g.id) == 'fee':
                 c = self.staff.coach(g.id)
                 self.pay_staff(g, year, 'coaching', c, self.staff.agreed_fee(g.id) / 52)
-            for pot in ('backer_funds', 'backing'):          # backers' money first, then family money
-                have = getattr(g, pot)
-                if g.cash < 0 and have > 0:
+            for pot, field in (('backer_funds', 'backer_support'), ('backing', 'support')):   # backers'
+                have = getattr(g, pot)                                                         # money first,
+                if g.cash < 0 and have > 0:                                                    # then family's
                     draw = min(have, -g.cash)
                     setattr(g, pot, have - draw)
-                    self.earn(g, year, 'support', draw)
+                    self.earn(g, year, field, draw)
 
     def experience(self, gid, year, week):
         """Competitive experience over the last 52 weeks (0-1): rounds played this season, plus last

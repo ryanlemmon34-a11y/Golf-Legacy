@@ -41,9 +41,20 @@ Funding decisions (before money is spent)
     expected prize   estimated from the golfer's own results so far, by level of competition (the
                      share of purses they have actually won there, Season.prize_forecast), not from
                      their hidden ability; it is never spent before it is won
+    week's budget    every entry accepted in a week books its cost at once (Season.reserve), so a Monday
+                     qualifier and that weekend's tournament are paid from one budget, not each from the
+                     same funds; a qualifier's site is priced where the golfer is sent to play it
+                     (Season.pay_at_sites); a caddie's weekly fee is booked and paid once a week
+    payers           a school pays for its golfers' college events and a club for its professional's
+                     section golf (event_payer); each is counted for that payer (Season.school_trips,
+                     club_trips), never charged to the golfer
+    support          family money and backers' money are separate pots and separate ledger lines
+                     (support, backer_support); what backers put up and what goes back to them when a
+                     deal ends is recorded (Season.backer_flows), so every pot reconciles
 A golfer can only enter an event they can pay for. How much a dollar matters scales with their funds,
 so a broke mini-tour player weighs a long trip heavily and a millionaire barely notices it. When
 funds run short, full-time players take paid work weeks instead of training.
+
 """
 from __future__ import annotations
 
@@ -85,12 +96,21 @@ def initial_cash(g, age, u):
     return 15000 + 0.25 * expected_prize(g.overall) * years * (0.4 + 1.2 * u)
 
 
-def event_cost(g, series, city):
-    """What one event costs a golfer: travel by distance, entry fees, caddie fee."""
+def event_payer(g, series):
+    """Who pays for a golfer's trip when it is not the golfer: 'school' (a college's own events),
+    'club' (a club professional's section golf), or None."""
     if g.tour.startswith('CO_') and series.tier == 5:
-        return 0.0                                    # the college pays
+        return 'school'
     if g.status == 'club_pro' and series.eligibility == 'club_pro':
-        return 0.0                                    # the club pays for its professional's section golf
+        return 'club'
+    return None
+
+
+def event_cost(g, series, city):
+    """What one event costs a golfer: travel by distance, entry fees (0 when a school or club pays,
+    event_payer). A caddie's weekly fee is not part of it (Season.trip_cost adds it once a week)."""
+    if event_payer(g, series):
+        return 0.0
     country = CITY_BY_NAME[city].country
     where = 'home' if country == g.country else 'region' if COUNTRIES[country].region == COUNTRIES[g.country].region \
         else 'abroad'
@@ -153,22 +173,22 @@ def money_unit(available):
 
 class Ledger:
     """One golfer's money for one year."""
-    __slots__ = ('prize', 'sponsors', 'salary', 'work', 'support', 'events', 'caddie', 'caddie_share', 'coaching',
-                 'coach_share', 'living', 'backer_share')
+    __slots__ = ('prize', 'sponsors', 'salary', 'work', 'support', 'backer_support', 'events', 'caddie',
+                 'caddie_share', 'coaching', 'coach_share', 'living', 'backer_share')
 
     def __init__(self):
-        self.prize = self.sponsors = self.salary = self.work = self.support = 0.0
+        self.prize = self.sponsors = self.salary = self.work = self.support = self.backer_support = 0.0
         self.events = self.caddie = self.caddie_share = self.coaching = self.coach_share = self.living = 0.0
         self.backer_share = 0.0
 
-    def __setstate__(self, state):                    # ledgers saved before backer shares existed
-        self.backer_share = 0.0
+    def __setstate__(self, state):                    # ledgers saved before backer shares (or backers'
+        self.backer_share = self.backer_support = 0.0 # draws kept apart from family money) existed
         for k, v in (state[1] if isinstance(state, tuple) else state).items():
             setattr(self, k, v)
 
     @property
     def income(self):
-        return self.prize + self.sponsors + self.salary + self.work + self.support
+        return self.prize + self.sponsors + self.salary + self.work + self.support + self.backer_support
 
     @property
     def costs(self):

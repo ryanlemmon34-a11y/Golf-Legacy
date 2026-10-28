@@ -133,7 +133,7 @@ One set of definitions serves hiring, the monthly plan, entries, weekly settleme
 |---|---|
 | Committed (weekly) | Living costs net of salary, plus a contracted coach's fee / 52 |
 | Spendable | Funds (savings + backing + limited credit) − 4 weeks of committed costs: the money for travel |
-| Trip cost | Travel and fees + the caddie's weekly fee (a caddie is paid only in weeks the golfer plays) |
+| Trip cost | Travel and fees + the caddie's weekly fee (a caddie is paid only in weeks the golfer plays, once a week however many events: a Monday qualifier and that week's tournament cost one fee and count one week worked; the 8% share is paid per event from that event's winnings) |
 | Prize kept | Expected prize × (1 − 8% caddie share − 5% scouting-coach share, where they apply); it informs decisions but is never spent before it is won |
 | Means | Spendable + 80% of what last year's earned income left after living costs: what a contracted coach must fit into |
 

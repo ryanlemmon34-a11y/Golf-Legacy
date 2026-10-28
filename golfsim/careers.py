@@ -118,6 +118,8 @@ def own_way(season, g, year, row):
 def end_backing(season, g, year, why):
     """A backing deal ends: backers stop putting up money, the undrawn part of theirs goes back to them,
     and their share of winnings ends with it (family money stays the golfer's)."""
+    if g.backer_funds:
+        season.backer_flows[year][(g.id, 'returned')] += g.backer_funds
     g.backer, g.backer_funds, g.backer_stale = 0.0, 0.0, 0
     if why:
         season.log(g.id, year, 53, why)
