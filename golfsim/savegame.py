@@ -32,7 +32,7 @@ def engine_commit():
     return _git('rev-parse', 'HEAD')
 
 
-PERSISTENCE = ('golfsim/savegame.py', 'golfsim/archive.py')   # how worlds are stored, not how they play
+PERSISTENCE = ('golfsim/savegame.py', 'golfsim/archive.py', 'golfsim/session.py')   # how worlds are stored, not how they play
 
 
 def engine_id(commit='HEAD'):

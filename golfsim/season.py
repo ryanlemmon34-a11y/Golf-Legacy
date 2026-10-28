@@ -200,6 +200,7 @@ class Season:
         self.wr_pos, self.am_pos = {}, {}
         self.money = defaultdict(_dd_float)                  # (tour key, year) -> gid -> $
         self.earnings = defaultdict(_dd_float)               # year -> gid -> $ prize money
+        self.career_prize = Counter()                        # gid -> $ prize money over the whole career
         self.played = defaultdict(_dd_list)                  # year -> gid -> [weeks]
         self.stage_log = defaultdict(list)
         self.card_log = defaultdict(list)                    # year -> [(gid, from, to, reason)]
@@ -505,16 +506,31 @@ class Season:
         return v + rng.gauss(0, 3)
 
     # ---- the week ------------------------------------------------------------------------------
-    def run_year(self, year, progress=None):
+    # The season's three steps. A whole season (run_year) and the weekly session (session.py) both use
+    # exactly these, so a world advanced week by week is the same world as one run a season at a time.
+    def start_year(self, year):
+        """1 January: people refreshed, sponsor contracts, the staff market, playing rights."""
         self.year = year
         self.refresh_people(year)
         self.start_finances(year)
-        eds = self.cal.editions(year)
+
+    def advance_week(self, year, week):
+        """One week of the season (1-52)."""
+        self.year = year
+        self.run_week(year, week, [e for e in self.cal.editions(year) if e.week == week])
+
+    def finish_year(self, year):
+        """After week 52: the season's evidence, tour cards, careers, aging, new juniors."""
+        self.year = year
+        self.end_of_season(year)
+
+    def run_year(self, year, progress=None):
+        self.start_year(year)
         for week in range(1, 53):
-            self.run_week(year, week, [e for e in eds if e.week == week])
+            self.advance_week(year, week)
             if progress:
                 progress(year, week)
-        self.end_of_season(year)
+        self.finish_year(year)
 
     def run_week(self, year, week, eds):
         rng = random.Random(_seed(self.seed, year, week, 'entries'))
@@ -1177,6 +1193,22 @@ class Season:
         for ed in eds:
             self.record_event(ed, year, week, by_event[ed.event_id], venues[ed.event_id])
 
+    def __getstate__(self):
+        """Saved without the worker pool, and without the standard course library (rebuilt identically
+        from its seed on loading; 40% of a fresh save)."""
+        state = self.__dict__.copy()
+        state.pop('_pool', None)
+        if state.get('lib') is default_library():
+            state['lib'] = 'default'
+            state.pop('cal', None)
+        return state
+
+    def __setstate__(self, state):
+        if state.get('lib') == 'default':
+            state['lib'] = default_library()
+            state['cal'] = state['lib'].calendar
+        self.__dict__.update(state)
+
     def close(self):
         if hasattr(self, '_pool'):
             self._pool.shutdown()
@@ -1380,6 +1412,7 @@ class Season:
                 g = self.g[gid]
                 won[gid] = each
                 self.earnings[year][gid] += each
+                self.career_prize[gid] += each
                 self.earn(g, year, 'prize', each)
                 k = self.staff.caddie(gid)
                 if k is not None:
@@ -1416,6 +1449,31 @@ class Season:
                 del table[k]
         for k in [k for k in self.ctx.standings if len(k) == 3 and k[1] < year - 1]:
             del self.ctx.standings[k]
+        # Per-season working tables: the rules read this season and last at most; older seasons are in the
+        # archive. Results older than last season keep only their winners (champions, exemptions and the
+        # Masters' lifetime winners are the only rules that look further back).
+        old = lambda y: y < year - 1
+        for d in (self.earnings, self.played, self.pstats, self.ledgers, self.season_rounds, self.entry_wants,
+                  self.entry_misses, self.entry_stats, self.declined, self.school_trips, self.activity_counts,
+                  self.block_flags, self.cash_start, self.overall_start, self.rank_start, self.am_start,
+                  self.staff_receipts, self.injuries, self.card_log, self.career_counts, self.transitions,
+                  self.assignments, self.staff_year, self.unheld, self.rights, self.card_reasons, self.snapshots,
+                  self.juniors_added, self.stats):
+            for y in [y for y in d if isinstance(y, int) and old(y)]:
+                del d[y]
+        for k in [k for k in self.money if old(k[1])]:
+            del self.money[k]
+        for k in [k for k in self.entry_routes if old(k[0])]:
+            del self.entry_routes[k]
+        for k in [k for k in self.stage_log if old(k[0])]:
+            del self.stage_log[k]
+        for eid in [eid for eid, r in self.results.items() if old(r.year)]:
+            del self.results[eid]
+        for (sid, y), sites in self.ctx.results.items():
+            if old(y):
+                for site, rows in sites.items():
+                    if any(pos != 1 for _, pos in rows):
+                        sites[site] = [(gid, pos) for gid, pos in rows if pos == 1]
 
     def end_of_season(self, year):
         self.prune_history(year)

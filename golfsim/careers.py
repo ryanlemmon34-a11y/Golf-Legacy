@@ -288,7 +288,7 @@ def decide(season, year, snap):
                 note(f'became {role}', g, via='stopped chasing', **why)
                 continue
             mind = (g.attrs['management'] + g.attrs['composure']) / 200
-            earned = sum(e.get(g.id, 0.0) for e in season.earnings.values())
+            earned = season.career_prize.get(g.id, 0.0)
             r = rng.random()
             reason = f'runway {why["runway"]:.1f} yrs, progress {why["progress"]:+.1f}, desire {why["desire"]:+.1f}'
             p_club = 0.25 * mind * min(1.0, max(0.0, age - 22) / 8)

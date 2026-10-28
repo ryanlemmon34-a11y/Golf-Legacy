@@ -37,6 +37,43 @@ assignments change later. Course records carry the golfer's id and the event id,
 | **Analysis snapshot** (`tools/long_world.py` `seed_<s>.json.gz`, `REPORT.md`) | Yearly statistics and checks for a test run | Judging whether a world behaves believably | History browsing (it is a summary) |
 | **History archive** (`golfsim/archive.py`) | The world's history as normalised facts, one file per season | Exploring and querying history, decades later | Restarting the simulation |
 | **Simulation save** (`golfsim/savegame.py`) | The whole simulation state, pickled, tied to the engine commit | Resuming exactly where a run stopped (tested: identical results) | Long-term storage across engine versions |
+| **Session checkpoint** (`golfsim/session.py`) | The live simulation and its weekly cursor, committed atomically each week | The observer's Advance Week: always resumable, crash-safe | Long-term storage across engine versions |
+
+### The weekly session (`golfsim/session.py`, roadmap M1)
+
+The one way the observer advances a world: `Session.create(dir, seed)` / `Session.open(dir)`, then
+`advance_one_week(expected=cursor, op_key=...)`; longer advances (`advance(n, progress, cancel)`) repeat
+the same command and can stop between any two weeks. It reuses the season's own steps
+(`Season.start_year`, `advance_week`, `finish_year` — the same ones `run_year` uses), so a world advanced
+week by week is the world a whole-season run produces (tested, fingerprint-equal).
+
+- **Cursor** `{year, week, phase}`: 'start' means 1 January has not run (the next advance runs it, then
+  week 1); after week 52 the same advance runs the end of the season and archives it; the cursor moves to
+  the next year's 'start'. Year start and year end run once each.
+- **Idempotent and serialised.** A stale `expected` cursor is refused (`StaleCursor`) and changes
+  nothing; repeating the last committed `op_key` returns its stored result without simulating; advances
+  are serialised in the process (a lock) and across processes (a lock file; `Busy`). Two concurrent
+  requests for the same week commit exactly one (tested).
+- **One coherent world per checkpoint generation.** Each advance writes a new generation (the whole live
+  simulation plus the session state) to a temporary directory, hashes it and reads it back, renames it
+  into place, then atomically replaces the `CURRENT` pointer. A crash before the pointer moves leaves the
+  previous world; after, the new one; a failed advance also reloads the committed world in memory. The
+  last known good generation is kept; a damaged current one falls back to it. Orphaned temporary files
+  are removed on opening (all tested with simulated crashes).
+- **The archive is idempotent against the commit.** Seasons are archived only by the advance that
+  commits the season's end; each generation records which seasons the archive holds, and opening removes
+  any archived season beyond it (the retry writes it again, identically).
+- **Bounded checkpoints.** The live simulation keeps only this season and last of its per-season tables,
+  older results reduced to their winners (`Season.prune_history`), and is saved without the standard
+  course library (rebuilt from its seed), so a weekly checkpoint does not grow with the world's history.
+
+```
+world/
+  CURRENT              {"generation": n, "dir": "gen_00000n"}  (replaced atomically: the commit)
+  gen_00000n/          state.pkl.gz (simulation + session state), meta.json (cursor, engine, sha256 ...)
+  gen_00000(n-1)/      the last known good generation
+  archive/             the history archive (below)
+```
 
 ### The archive
 
