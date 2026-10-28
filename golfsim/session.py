@@ -193,6 +193,12 @@ class Session:
             return
         world = json.loads(p.read_text())
         through = self.state['archive_through']
+        idx_path = self.dir / 'archive' / 'index.sqlite'
+        if idx_path.exists():
+            from .archive_index import ArchiveIndex
+            idx = ArchiveIndex(idx_path)
+            idx.drop_years_after(through if through is not None else -1)
+            idx.close()
         extra = [y for y in world.get('years', []) if through is None or y > through]
         if extra:
             for y in extra:

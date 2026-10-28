@@ -105,5 +105,5 @@ Assessed against `golfsim/archive.py` and `docs/HISTORY_AND_PERSISTENCE.md` as o
 | Weekly No. 1 and weekly rankings (weeks at No. 1, as-of views) | Yes: each week's world and amateur top 100 (`Archive.ranking`, `weeks_at_number_one`) | Deeper ranking history if as-of views need it |
 | Cuts made, runner-ups, droughts, starts before first win | Yes, from finishes, in `history_stats` | — |
 | Central records and frivolities from one set of definitions | First version: `golfsim/history_stats.py` (definitions, 25 boards with evidence and active/partial flags; `tools/history_query.py ARCHIVE board NAME`) | Owner's choice of the first lists; more scopes and filters (era, nation) |
-| Century-scale browsing | One file per season | Indexes (person → results, series → editions) for incremental loading |
+| Century-scale browsing | Yes: `archive/index.sqlite` (person → starts and seasons, series → editions, course → editions, edition → leaderboard; ~8 MB a season), one query per page | Pagination in the UI |
 | Season recaps from recorded facts | `Archive.recap` and the narrative log | Richer recap selection rules |

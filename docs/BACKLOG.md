@@ -123,7 +123,8 @@ and eventually as-of-year views. Not built. Before it, close the archive gaps li
    not-won-yet vs retired-without-a-win, waits between wins, runner-ups, major droughts, wins across
    tours, streaks, weeks at No. 1, partnerships, coaches of major champions; evidence and active/partial
    flags on every row). Still to choose: the owner's first lists and their filters (era, nation).
-4. Archive indexes for incremental, century-scale browsing.
+4. ~~Archive indexes~~ — done: a SQLite index beside the season files (`golfsim/archive_index.py`),
+   updated idempotently with each archived season and trimmed with session recovery.
 5. First usable slice: Overview, Golfer profile, Tournament edition, Course profile and one Records or
    Frivolities list, tested as complete browsing journeys (see the document).
 

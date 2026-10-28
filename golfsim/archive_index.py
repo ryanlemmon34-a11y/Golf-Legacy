@@ -1,0 +1,132 @@
+"""A query index over the history archive, for browsing a century without reading every season.
+
+The archive's season files stay the record of facts; this is a derived index beside them
+(`archive/index.sqlite`, SQLite from Python's standard library), rebuilt from them at any time
+(`ArchiveIndex.rebuild`). Each archived season is indexed in one transaction that first removes that
+season's rows, so indexing is idempotent: writing a season again (a retried advance) never duplicates
+anything, and dropping seasons beyond a committed point (session recovery) is one statement.
+
+Tables: editions (one per event played, with its classification when played and its winner), sites
+(course and layout of each site), starts (one per golfer per edition: position, total, the coach and
+caddie that week, the entry route), seasons (one per golfer per season). Indexed by person, event,
+series and course, so a profile, a tournament's history or a course's history is one query.
+"""
+from __future__ import annotations
+
+import sqlite3
+from pathlib import Path
+
+SCHEMA = 1
+DDL = """
+CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT);
+CREATE TABLE IF NOT EXISTS editions(eid INTEGER PRIMARY KEY, event_id TEXT UNIQUE, year INT, week INT, series TEXT,
+    name TEXT, tour TEXT, tier INT, category TEXT, prestige REAL, playoff INT, winner INT, field INT);
+CREATE TABLE IF NOT EXISTS sites(eid INT, site INT, year INT, course TEXT, layout TEXT, city TEXT,
+    PRIMARY KEY(eid, site));
+CREATE TABLE IF NOT EXISTS routes(rid INTEGER PRIMARY KEY, text TEXT UNIQUE);
+CREATE TABLE IF NOT EXISTS starts(person INT, eid INT, year INT, week INT, site INT, pos INT, total INT,
+    coach INT, caddie INT, rid INT);
+CREATE TABLE IF NOT EXISTS seasons(person INT, year INT, tour TEXT, status TEXT, lifestyle TEXT, events INT,
+    wins INT, prize INT, wr_end INT, am_end INT, PRIMARY KEY(person, year));
+CREATE INDEX IF NOT EXISTS starts_person ON starts(person, year, week);
+CREATE INDEX IF NOT EXISTS starts_event ON starts(eid);
+CREATE INDEX IF NOT EXISTS editions_series ON editions(series, year);
+CREATE INDEX IF NOT EXISTS editions_year ON editions(year, week);
+CREATE INDEX IF NOT EXISTS sites_course ON sites(course, year);
+"""
+
+
+class ArchiveIndex:
+    def __init__(self, path):
+        self.path = Path(path)
+        self.db = sqlite3.connect(self.path)
+        self.db.executescript(DDL)
+        self.db.execute("INSERT OR IGNORE INTO meta VALUES ('schema', ?)", (str(SCHEMA),))
+        self.db.commit()
+
+    def close(self):
+        self.db.close()
+
+    # ---- writing --------------------------------------------------------------------------------------------
+    def index_year(self, year, chunk):
+        """Index one archived season (its file's contents), replacing anything indexed for that year."""
+        with self.db:
+            self._delete(year, '=')
+            rid = dict(self.db.execute('SELECT text, rid FROM routes'))
+            site_rows, start_rows = [], []
+            for e in chunk['events']:
+                winner = next((g for site in e['finish'] for g, p, _ in site if p == 1), None)
+                field = sum(len(site) for site in e['finish'])
+                eid = self.db.execute('INSERT INTO editions VALUES (NULL,?,?,?,?,?,?,?,?,?,?,?,?)',
+                                      (e['id'], year, e['week'], e['series'], e.get('name'), e.get('tour'), e.get('tier'),
+                                       e.get('category'), e.get('prestige'), e.get('playoff'), winner, field)).lastrowid
+                for k, v in enumerate(e.get('sites', [])):
+                    site_rows.append((eid, k, year, v[0], v[1], v[2]))
+                team, routes = e.get('team', {}), e.get('routes', {})
+                for k, site in enumerate(e['finish']):
+                    for g, p, total in site:
+                        coach, caddie = team.get(str(g), team.get(g, (0, 0)))
+                        route = routes.get(str(g), routes.get(g))
+                        if route is not None and route not in rid:
+                            rid[route] = self.db.execute('INSERT INTO routes VALUES (NULL, ?)', (route,)).lastrowid
+                        start_rows.append((g, eid, year, e['week'], k, p, total, coach, caddie, rid.get(route)))
+            self.db.executemany('INSERT INTO sites VALUES (?,?,?,?,?,?)', site_rows)
+            self.db.executemany('INSERT INTO starts VALUES (?,?,?,?,?,?,?,?,?,?)', start_rows)
+            self.db.executemany('INSERT INTO seasons VALUES (?,?,?,?,?,?,?,?,?,?)', [
+                (int(g), year, r.get('tour'), r.get('status'), r.get('lifestyle'), r.get('events'), r.get('wins'),
+                 r.get('prize'), r.get('wr_end'), r.get('am_end')) for g, r in chunk['careers'].items()])
+
+    def drop_years_after(self, year):
+        with self.db:
+            self._delete(year, '>')
+
+    def _delete(self, year, op):
+        for t in ('editions', 'sites', 'starts', 'seasons'):
+            self.db.execute(f'DELETE FROM {t} WHERE year {op} ?', (year,))
+        # (the routes table is a shared dictionary of route texts; unused entries are harmless)
+
+    @classmethod
+    def rebuild(cls, archive):
+        """Build the index from an archive's season files (e.g. for an archive written before indexes)."""
+        path = archive.dir / 'index.sqlite'
+        if path.exists():
+            path.unlink()
+        idx = cls(path)
+        from .archive import _read
+        for y in archive.years:
+            idx.index_year(y, _read(archive.dir / 'years' / f'{y}.json.gz'))
+        return idx
+
+    # ---- reading ----------------------------------------------------------------------------------------------
+    def years(self):
+        return [r[0] for r in self.db.execute('SELECT DISTINCT year FROM editions ORDER BY year')]
+
+    def results(self, pid):
+        """The same rows as Archive.results, from the index."""
+        q = ('SELECT s.year, s.week, e.event_id, e.series, s.pos, s.coach, s.caddie, r.text FROM starts s '
+             'JOIN editions e USING(eid) LEFT JOIN routes r USING(rid) WHERE s.person = ? '
+             'ORDER BY s.year, s.week, e.event_id, s.site')
+        return [{'year': y, 'week': w, 'event': eid, 'series': ser, 'pos': p, 'coach': c, 'caddie': k, 'route': r}
+                for y, w, eid, ser, p, c, k, r in self.db.execute(q, (pid,))]
+
+    def editions(self, series):
+        """A tournament's history: every edition with its year, week, winner and field size."""
+        q = 'SELECT event_id, year, week, winner, field, prestige, tour, tier FROM editions WHERE series = ? ORDER BY year'
+        return [dict(zip(('event', 'year', 'week', 'winner', 'field', 'prestige', 'tour', 'tier'), r))
+                for r in self.db.execute(q, (series,))]
+
+    def course_editions(self, course_id):
+        q = ('SELECT s.year, e.event_id, s.layout, e.winner FROM sites s JOIN editions e USING(eid) '
+             'WHERE s.course = ? ORDER BY s.year, e.event_id')
+        return [{'year': y, 'event': eid, 'layout': lay, 'winner': w} for y, eid, lay, w in self.db.execute(q, (course_id,))]
+
+    def leaderboard(self, event_id):
+        q = ('SELECT s.person, s.site, s.pos, s.total, s.coach, s.caddie, r.text FROM starts s JOIN editions e USING(eid) '
+             'LEFT JOIN routes r USING(rid) WHERE e.event_id = ? ORDER BY s.site, s.pos IS NULL, s.pos')
+        return [dict(zip(('person', 'site', 'pos', 'total', 'coach', 'caddie', 'route'), r))
+                for r in self.db.execute(q, (event_id,))]
+
+    def seasons(self, pid):
+        q = 'SELECT year, tour, status, lifestyle, events, wins, prize, wr_end, am_end FROM seasons WHERE person = ? ORDER BY year'
+        return [dict(zip(('year', 'tour', 'status', 'lifestyle', 'events', 'wins', 'prize', 'wr_end', 'am_end'), r))
+                for r in self.db.execute(q, (pid,))]

@@ -87,6 +87,12 @@ years/YYYY.json.gz    one season: every edition (venues, finishers per site, eac
                       that season's narrative log lines (display text only)
 ```
 
+**The query index** (`archive/index.sqlite`, `golfsim/archive_index.py`) is derived from the season files:
+each archived season is indexed in one transaction that first removes that season's rows (so a retried
+season never duplicates), and it can be rebuilt from the files at any time. A golfer's results, a
+tournament's editions, a course's editions or an edition's leaderboard are each one indexed query
+(`Archive.results` uses it when it covers every season). Size: about 8 MB a season.
+
 Facts are stored once and referenced by id: a win lives in its edition; a coach's record is derived
 from stints and editions. The archive grows by one season file a year instead of copying data into
 every profile, so centuries stay manageable. Narrative log lines are kept for display, but nothing is

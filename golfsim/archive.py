@@ -117,6 +117,10 @@ class ArchiveWriter:
                  'staff_year': {f'{k}:{i}': v for (k, i), v in season.staff_year.get(year, {}).items()},
                  'log': {g: v for g, v in log.items() if v}}
         _write(self.dir / 'years' / f'{year}.json.gz', chunk)
+        from .archive_index import ArchiveIndex
+        idx = ArchiveIndex(self.dir / 'index.sqlite')             # idempotent: the season's rows are replaced
+        idx.index_year(year, json.loads(json.dumps(chunk)))       # indexed exactly as it reads back from disk
+        idx.close()
         if year not in self.world['years']:
             self.world['years'].append(year)
             (self.dir / 'world.json').write_text(json.dumps(self.world))
@@ -166,6 +170,11 @@ class Archive:
         self.records = _read(self.dir / 'records.json.gz')
         self.years = sorted(self.world['years'])
         self._years = {}
+        self.index = None
+        if (self.dir / 'index.sqlite').exists():
+            from .archive_index import ArchiveIndex
+            idx = ArchiveIndex(self.dir / 'index.sqlite')
+            self.index = idx if idx.years() == self.years else None  # only an index covering every season
 
     def year(self, y):
         if y not in self._years:
@@ -202,7 +211,10 @@ class Archive:
     def results(self, pid):
         """Every event they played, with the team they had that week:
         [{year, week, event, series, pos (None = missed cut), coach, caddie, route}]; route is how they
-        got in, with their status at entry (e.g. 'PREMIER CONDITIONAL', 'ORDER OF MERIT 12', 'COLLEGE LINEUP')."""
+        got in, with their status at entry (e.g. 'PREMIER CONDITIONAL', 'ORDER OF MERIT 12', 'COLLEGE LINEUP').
+        Answered from the index when there is one (one query), otherwise by reading every season."""
+        if self.index is not None:
+            return self.index.results(pid)
         out = []
         for y, e in self.events():
             for site in e['finish']:

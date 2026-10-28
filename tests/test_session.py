@@ -180,6 +180,8 @@ class SessionTests(unittest.TestCase):
         t = Session.open(self.dir, workers=1)
         self.assertEqual(json.loads((self.dir / 'archive' / 'world.json').read_text())['years'], [2027])
         self.assertFalse((self.dir / 'archive' / 'years' / '2028.json.gz').exists())
+        from golfsim.archive_index import ArchiveIndex
+        self.assertEqual(ArchiveIndex(self.dir / 'archive' / 'index.sqlite').years(), [2027])
         t.close()
 
 

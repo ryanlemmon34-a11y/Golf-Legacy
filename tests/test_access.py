@@ -251,6 +251,17 @@ class HistoryContractTests(unittest.TestCase):
             self.assertTrue(starts[0]['route'])                          # how they got into the Masters
             acc = arc.access(gid, 2027)
             self.assertEqual(sum(acc['weeks'].values()), 2)
+            # the query index answers exactly what reading every season would, and re-indexing is idempotent
+            self.assertIsNotNone(arc.index)
+            idx = arc.index
+            arc.index = None
+            scan = arc.results(gid)
+            arc.index = idx
+            self.assertEqual(arc.results(gid), scan)
+            from golfsim.archive import _read
+            idx.index_year(2027, _read(arc.dir / 'years' / '2027.json.gz'))
+            self.assertEqual(arc.results(gid), scan)
+            self.assertEqual(idx.editions('TOUR_MASTERS')[0]['winner'], s.results['2027:TOUR_MASTERS'].winner())
 
     def test_weekly_detail_is_pruned_but_finals_and_results_stay(self):
         s = fresh()
