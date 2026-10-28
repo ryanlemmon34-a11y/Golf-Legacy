@@ -87,7 +87,8 @@ def runway_years(season, g, year, tour, events, row=None, own_money=False):
     return min(10.0, funds / shortfall)
 
 
-SELF_FUNDED_SEASONS = 3          # own savings covering this many seasons of losses: no need of backers
+SELF_FUNDED_SEASONS = FIN.SELF_FUNDED_SEASONS   # own savings covering this many seasons of losses: no need of backers
+NEED_RUNWAY = 1.0                # seasons of own money below which an unbacked professional looks for backers
 
 
 def own_way(season, g, year, row):
@@ -121,6 +122,7 @@ def end_backing(season, g, year, why):
     if g.backer_funds:
         season.backer_flows[year][(g.id, 'returned')] += g.backer_funds
     g.backer, g.backer_funds, g.backer_stale = 0.0, 0.0, 0
+    season.backer_ended[g.id] = year
     if why:
         season.log(g.id, year, 53, why)
 
@@ -196,7 +198,10 @@ def p_backers_continue(season, g, row, year):
 def review_backers(season, g, row, year, rng):
     """Each winter, a full-time professional's backers decide on next season (p_backers_continue); the
     deal also ends when the golfer can pay their own way (own_way). A professional without backers can
-    attract them with a breakthrough season, the younger the likelier."""
+    attract them with a breakthrough season, the younger the likelier; or, once they need them (less
+    than NEED_RUNWAY seasons of their own money), with odds that grow with their ranking and youth --
+    but not within two winters of a deal ending (backers who have just left, or were just told they
+    were not needed, are not back at once)."""
     age = g.age(year) + 1
     progress = progress_signal(row)
     if g.backer:
@@ -218,6 +223,16 @@ def review_backers(season, g, row, year, rng):
         g.backer_stale, g.backer_patience = 0, rng.random()
         season.log(g.id, year, 53, f'Found backers after their season (${g.backer:,.0f} a season for a share of winnings)')
         return 'found backers'
+    recent = year - season.backer_ended.get(g.id, -99) < 2
+    if not paying and not recent and runway_years(season, g, year, g.tour, season.target_events(g), row,
+                                                  own_money=True) < NEED_RUNWAY:
+        standing = amateur_standing(row.get('wr_end'))
+        if rng.random() < 0.35 * (0.4 + 0.6 * standing) * FIN.backer_youth(age) / FIN.backer_youth(22):
+            g.backer = FIN.backer_deal(22, standing, 0.0, rng.random())
+            g.backer_stale, g.backer_patience = 0, rng.random()
+            season.log(g.id, year, 53, f'Found backers when their own money ran low (${g.backer:,.0f} a season '
+                       'for a share of winnings)')
+            return 'found backers'
     return None
 
 

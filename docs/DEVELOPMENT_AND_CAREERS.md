@@ -108,7 +108,9 @@ counted cautiously) and sponsors cover a season, or their sponsor contract alone
 at a level they have not proven; the history says which. A new card raises the golfer's desire to
 continue and their opportunities, but is not yet an income. A professional
 without backers can attract them with a breakthrough season (a win, promotion or a big ranking jump; the
-younger, the likelier).
+younger, the likelier), or once they need them: with less than a season of their own money, odds grow
+with their world ranking and youth (not within two winters of a deal ending). The starting world gives
+no deal to a professional whose savings already cover three seasons of losses: backers come when needed.
 Every deal, renewal and withdrawal is in the golfer's history. Club professionals' own events (section
 events, their championships and sectionals) are paid for by their club.
 
@@ -129,8 +131,9 @@ sent to (England or Japan for the USA Open's international final qualifying). A 
 paid once a week, however many events.
 
 **Debt.** The credit limit bounds what a golfer *chooses* to spend. Living costs and a contracted
-coach's fee are charged weekly whatever their funds, so a golfer with no income — above all an injured
-touring professional, who can neither play nor work while hurt — can go past their credit. That debt is
+coach's fee are charged weekly whatever their funds, so a golfer with no income can go past their
+credit. An injured touring professional who needs money does light paid work while recovering (the
+same wage as any work week; the injury heals no slower), so injury alone no longer runs up debt. Debt is
 kept exactly (never erased), nobody new pays it, it blocks every chosen cost until it is repaid, and it
 weighs smoothly on the end-of-season decision through the runway; no debt threshold forces retirement
 or a change of life, and careers change only at the end of a season. Expected prize money

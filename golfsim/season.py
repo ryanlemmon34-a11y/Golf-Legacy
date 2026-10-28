@@ -288,6 +288,7 @@ class Season:
         self.school_trips = defaultdict(Counter)             # year -> gid -> events their school paid for
         self.club_trips = defaultdict(Counter)               # year -> gid -> events their club paid for
         self.backer_flows = defaultdict(Counter)             # year -> (gid, 'put_up'|'returned') -> dollars
+        self.backer_ended = {}                               # gid -> year their last backing deal ended
         self._reserved = Counter()                           # gid -> cost of entries accepted this week, not yet paid
         self._caddie_week = set()                            # gids whose caddie's weekly fee is booked this week
         self._caddie_paid = set()                            # ... and already paid this week
@@ -1389,6 +1390,7 @@ class Season:
         state.setdefault('club_trips', defaultdict(Counter))   # saves from before payers were told apart
         state.setdefault('backer_flows', defaultdict(Counter))
         state.setdefault('support_start', {})
+        state.setdefault('backer_ended', {})
         for k in ('_caddie_week', '_caddie_paid'):           # this week's bookings (empty between weeks)
             state.setdefault(k, set())
         state.setdefault('_reserved', Counter())
@@ -2002,9 +2004,10 @@ class Season:
                 f = self.fatigue[g.id]
                 val, n, money, acts = 0.0, played0, money0, []
                 for i, w in enumerate(weeks):
-                    if now + w < inj_until:
+                    if now + w < inj_until:                  # injured: recovering, and earning if they must
                         f *= rest_rec
-                        acts.append('rest')
+                        acts.append('work' if can_work else 'rest')
+                        money += FIN.WORK_WAGE if can_work else 0.0
                         continue
                     j = slot.get(i, -1)
                     if j >= 0 and mask >> j & 1:
@@ -2038,6 +2041,12 @@ class Season:
                 best_acts = ['work' if g.status == 'pro' and g.lifestyle == 'full_time' else 'train'
                              for _ in weeks]
             self.plans[g.id] = {w: (a, cat) for w, a in zip(weeks, best_acts)}
+
+    def needs_paid_work(self, g, year):
+        """A full-time professional whose funds would not cover three months of living costs: they take
+        paid work weeks (an injured one does light work while recovering; the injury heals as fast)."""
+        return (g.status == 'pro' and g.lifestyle == 'full_time'
+                and self.spendable(g, year) < 13 * FIN.weekly_living(g)[1])
 
     def level_tier(self, g):
         """The tier of ordinary events a golfer's status is built around (club pros: none)."""
@@ -2351,8 +2360,8 @@ class Season:
             action, cat = self.plans.get(g.id, {}).get(week, ('rest', None))
             if rounds:
                 act = 'play'
-            elif g.id in self.injured:
-                act = 'rest'
+            elif g.id in self.injured:                       # light paid work while recovering, if needed
+                act = 'work' if action == 'work' or self.needs_paid_work(g, year) else 'rest'
             elif action == 'work':
                 act = 'work'
             else:

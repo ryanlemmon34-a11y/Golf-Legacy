@@ -27,7 +27,10 @@ Backers
     of their prize money (BACKER_SHARE) while it lasts. Backers' money is kept apart from family money
     (Golfer.backer_funds): when a deal ends, the undrawn part goes back to the backers along with
     their share of winnings; family money stays the golfer's. Deals come when a golfer turns professional (likelier for a better
-    amateur record) or after a breakthrough season, are renewed each winter only on results backers
+    amateur record), after a breakthrough season, or when an unbacked professional's own money runs low
+    (careers.NEED_RUNWAY: they need backers now; not within two winters of a deal ending); the
+    starting world gives none to a professional whose savings already cover SELF_FUNDED_SEASONS seasons
+    of losses (seeded_losses). Deals are renewed each winter only on results backers
     can see with bounded odds (progress, secured places, how far the losses outrun the deal, the
     backers' own patience, seasons without progress and age all count, none ends every deal), and
     end when the golfer pays their own way (careers.review_backers).
@@ -58,10 +61,11 @@ funds run short, full-time players take paid work weeks instead of training.
 Debt
     The line of credit limits what a golfer *chooses* to spend: entries, travel, a caddie, a coach
     hired. Costs they cannot choose are charged every week whatever their funds: living costs (net of
-    any salary) and a contracted coach's fee until the monthly review stops it. So a golfer with no
-    income can go deeper into debt than the credit allowance -- above all an injured touring
-    professional, who can neither play nor take paid work while hurt (an injury lasts up to 40 weeks:
-    about $25,000 of living costs). Such debt is kept, exactly, in their cash: it is never erased,
+    any salary) and a contracted coach's fee until the monthly review stops it. An injured touring
+    professional who needs money does light paid work while recovering (WORK_WAGE, the same as any work
+    week; the injury heals no slower), so an injury no longer has to run up debt; a golfer with no
+    income at all can still go deeper into debt than the credit allowance. Such debt is kept, exactly,
+    in their cash: it is never erased,
     nobody new pays it (only the family and backers' pots they already had are drawn), it blocks every
     cost they could choose until it is repaid from later income, and it weighs on the end-of-season
     decision through the runway, smoothly (no debt threshold forces any decision; careers change only
@@ -95,6 +99,18 @@ SALARY = {'part_time': 52000, 'club_pro': 65000}
 def expected_prize(overall):
     """Typical yearly prize money for a full-time professional of this ability (seeding only)."""
     return 2000 * math.exp((overall - 40) / 5.6)
+
+
+SELF_FUNDED_SEASONS = 3          # own savings covering this many seasons of losses: no backers needed
+SEED_EVENTS = 24                 # a touring professional's season, for the starting world's estimates
+
+
+def seeded_losses(g, tier):
+    """The starting world's estimate of what a season on tour costs a professional beyond what it
+    brings in (living, trips at the level, against their typical winnings): seeding only, like
+    initial_cash, so the first winter does not end deals that should never have been made."""
+    costs = LIVING + SEED_EVENTS * EVENT_COST[tier] * TRAVEL['region']
+    return max(1.0, costs - 0.75 * expected_prize(g.overall))
 
 
 def initial_cash(g, age, u):

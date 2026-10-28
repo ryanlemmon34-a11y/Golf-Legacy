@@ -7,6 +7,7 @@ from __future__ import annotations
 import copy
 import sys
 import unittest
+from unittest import mock
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -210,43 +211,108 @@ class EntryBudgetTests(unittest.TestCase):
 
 class InjuryDebtTests(unittest.TestCase):
     """The debt rule (finance.py, 'Debt'): the line of credit limits what a golfer chooses to spend;
-    living costs go on whatever their funds, so a long injury can take a touring professional past
-    their credit. The debt is neither erased nor covered by anyone new, blocks spending until repaid,
-    and weighs on the season's-end decision smoothly, with no threshold."""
+    living costs go on whatever their funds. An injured professional who needs money does light paid
+    work while recovering; one with money rests. Debt is neither erased nor covered by anyone new,
+    blocks spending until repaid, and weighs on the season's-end decision smoothly, with no threshold."""
 
-    def test_a_long_injury_runs_up_debt_that_is_kept_and_weighed_smoothly(self):
-        s = Season(generate_world(seed=13, scale=0.2), seed=13, development=True, workers=4)
+    @classmethod
+    def setUpClass(cls):
+        cls.s = s = Season(generate_world(seed=13, scale=0.2), seed=13, development=True, workers=4)
         s.start_year(2027)
-        g = next(g for g in s.active_golfers() if g.status == 'pro' and g.lifestyle == 'full_time'
-                 and not g.backer and s.staff.coach(g.id) is None and s.staff.caddie(g.id) is None)
-        g.cash, g.backing, g.backer_funds = 1000.0, 0.0, 0.0
-        s.cash_start[2027][g.id] = g.cash
-        s.injured[g.id] = (s.abs_week(2027, 1) + 31, 'back', 30)            # out for weeks 1-30
+        pros = [g for g in s.active_golfers() if g.status == 'pro' and g.lifestyle == 'full_time'
+                and not g.backer and s.staff.coach(g.id) is None and s.staff.caddie(g.id) is None]
+        cls.poor, cls.rich = pros[0], pros[1]
+        for g, cash in ((cls.poor, 1000.0), (cls.rich, 400000.0)):
+            g.cash, g.backing, g.backer_funds = cash, 0.0, 0.0
+            s.cash_start[2027][g.id] = g.cash
+            s.injured[g.id] = (s.abs_week(2027, 1) + 31, 'back', 30)    # out for weeks 1-30
         for w in range(1, 31):
             s.advance_week(2027, w)
-        led = s.ledger(2027, g.id)
-        self.assertFalse(s.played[2027].get(g.id))                           # no golf ...
-        self.assertEqual(led.work, 0.0)                                      # ... and no paid work while hurt
-        self.assertAlmostEqual(led.living, 30 * FIN.LIVING / 52, delta=0.01)  # but living costs go on
-        self.assertEqual(led.support + led.backer_support, 0.0)              # nobody new pays them
-        credit = FIN.credit_limit(0.0)
-        self.assertLess(g.cash, -credit)                                     # past the credit allowance
-        self.assertLess(s.spendable(g, 2027), 0.0)                           # nothing more can be chosen
+        cls.at30 = {g.id: (copy.deepcopy(s.ledger(2027, g.id)), g.cash) for g in (cls.poor, cls.rich)}
         for w in range(31, 53):
             s.advance_week(2027, w)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.s.close()
+
+    def test_an_injured_professional_who_needs_money_works_while_recovering(self):
+        s, g = self.s, self.poor
+        led, cash = self.at30[g.id]
+        self.assertFalse([w for w in s.played[2027].get(g.id, ()) if w <= 30])   # no golf while hurt ...
+        self.assertGreater(led.work, 0.0)                                         # ... but paid work
+        self.assertAlmostEqual(led.work % FIN.WORK_WAGE, 0.0, delta=0.01)
+        self.assertAlmostEqual(led.living, 30 * FIN.LIVING / 52, delta=0.01)     # living costs go on
+        self.assertEqual(led.support + led.backer_support, 0.0)                   # nobody new pays them
+        self.assertGreater(cash, -FIN.credit_limit(0.0))                          # injury did not sink them
+        self.assertEqual(s.injured.get(g.id), None)                               # and they healed on time
+
+    def test_an_injured_professional_with_money_rests(self):
+        led, _ = self.at30[self.rich.id]
+        self.assertEqual(led.work, 0.0)
+
+    def test_debt_is_kept_and_weighed_smoothly(self):
+        s, g = self.s, self.poor
         led = s.ledger(2027, g.id)
-        self.assertAlmostEqual(g.cash, 1000.0 + led.net, delta=0.01)        # kept, never erased
-        self.assertEqual(led.events, 0.0)                                    # no trip bought on credit beyond the limit
+        self.assertAlmostEqual(g.cash, 1000.0 + led.net, delta=0.01)             # kept, never erased
         row = s.season_snapshot(2027)[g.id]
-        p, _ = C.p_stop_chasing(s, g, row, 2027)
         cash = g.cash
-        g.cash = cash - 1000                                                 # a little more debt ...
-        p2, _ = C.p_stop_chasing(s, g, row, 2027)
+        ps = []
+        for debt in (0, 10000, 20000, 30000, 40000):
+            g.cash = -debt
+            ps.append(C.p_stop_chasing(s, g, row, 2027)[0])
         g.cash = cash
-        self.assertLess(p, 1.0)
-        self.assertGreaterEqual(p2, p)                                       # ... a little more pressure,
-        self.assertLess(p2 - p, 0.05)                                        # never a cliff
-        s.close()
+        self.assertEqual(ps, sorted(ps))                                          # more debt, more pressure
+        self.assertLess(max(ps), 1.0)
+        self.assertLess(max(b - a for a, b in zip(ps, ps[1:])), 0.25)             # never a cliff
+
+
+class BackersWhenNeededTests(unittest.TestCase):
+    """Backers come when a golfer needs them: the starting world gives no deal to a professional whose
+    own savings already cover three seasons of losses, and an unbacked professional whose own money
+    runs low can find backers (not within two winters of a deal ending)."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.s = s = Season(generate_world(seed=14, scale=0.2), seed=14, development=True, workers=1)
+        s.start_year(2027)
+        cls.snap = s.season_snapshot(2027)
+
+    def test_the_starting_world_backs_only_those_who_need_it(self):
+        tour_pros = [g for g in self.s.world.golfers if g.status == 'pro' and g.lifestyle == 'full_time'
+                     and g.tour in TOUR_BY_KEY and TOUR_BY_KEY[g.tour].tier >= 2]
+        rich = [g for g in tour_pros if g.cash >= FIN.SELF_FUNDED_SEASONS * FIN.seeded_losses(g, TOUR_BY_KEY[g.tour].tier)]
+        poor = [g for g in tour_pros if g not in rich]
+        self.assertTrue(rich and poor)
+        self.assertFalse([g.id for g in rich if g.backer])                 # savings pay for their chase
+        self.assertGreater(sum(1 for g in poor if g.backer) / len(poor), 0.2)   # many who need it are
+
+    def _unbacked(self):
+        s = self.s
+        return next(g for g in s.active_golfers() if g.status == 'pro' and g.lifestyle == 'full_time'
+                    and not g.backer and g.age(2027) <= 26 and g.id in self.snap
+                    and TOUR_BY_KEY[g.tour].tier == 4)                       # a mini-tour professional
+
+    def test_an_unbacked_professional_who_runs_low_can_find_backers(self):
+        s = self.s
+        g = copy.deepcopy(self._unbacked())
+        g.cash, g.backing = 0.0, 0.0
+        row = dict(self.snap[g.id], wins=0, promoted=False)
+        s.backer_ended.pop(g.id, None)
+        self.assertLess(C.runway_years(s, g, 2027, g.tour, s.target_events(g), row, own_money=True), C.NEED_RUNWAY)
+        lucky = mock.Mock(random=mock.Mock(return_value=0.0))
+        self.assertEqual(C.review_backers(s, g, row, 2027, lucky), 'found backers')
+        self.assertGreater(g.backer, 0)
+        rich = copy.deepcopy(self._unbacked())
+        rich.cash = 5_000_000.0                                              # does not need them
+        self.assertIsNone(C.review_backers(s, rich, row, 2027, lucky))
+        again = copy.deepcopy(self._unbacked())
+        again.cash, again.backing = 0.0, 0.0
+        s.backer_ended[again.id] = 2026                                      # a deal ended last winter
+        try:
+            self.assertIsNone(C.review_backers(s, again, row, 2027, lucky))
+        finally:
+            s.backer_ended.pop(again.id, None)
 
 
 class AmateurForecastTests(unittest.TestCase):
