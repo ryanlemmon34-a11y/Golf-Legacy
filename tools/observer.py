@@ -17,6 +17,7 @@ import argparse
 import html
 import sys
 import threading
+import uuid
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, quote, unquote, urlparse
@@ -74,6 +75,24 @@ class World:
         self.lock = threading.Lock()
         self.reload()
 
+    def submit(self, form):
+        """An Advance form: {'weeks': '1' | '4' | 'season', 'year', 'week', 'phase', 'op'} (lists, as
+        parse_qs gives them). The session refuses a form drawn at another cursor (StaleCursor: the world
+        has moved on, nothing to do) and recognises a resubmitted one by its key."""
+        from golfsim.session import StaleCursor
+        one = lambda k, d=None: (form.get(k) or [d])[0]
+        v = one('weeks', '1')
+        expected = ({'year': int(one('year')), 'week': int(one('week')), 'phase': one('phase')}
+                    if one('year') is not None else None)
+        with self.lock:
+            c = self.session.cursor
+            weeks = 53 - c['week'] if v == 'season' else int(v)
+            try:
+                self.session.advance(weeks, expected=expected, op_key=one('op'))
+            except StaleCursor:
+                pass
+            self.reload()
+
     def reload(self):
         import json
         wj = self.archive_dir / 'world.json'
@@ -111,7 +130,11 @@ def page(w, title, body):
     if w.session:
         c = w.session.cursor
         date = f'{c["year"]}, week {c["week"]}' + (' (1 January next)' if c['phase'] == 'start' else '')
-        controls = ('<form method="post" action="/advance"><button name="weeks" value="1">Advance week</button>'
+        # the form carries the cursor it was drawn at and a one-time key: a resubmitted or refreshed form
+        # (or one from a page drawn before another advance) advances nothing
+        hidden = ''.join(f'<input type="hidden" name="{k}" value="{esc(v)}">' for k, v in
+                         (('year', c['year']), ('week', c['week']), ('phase', c['phase']), ('op', uuid.uuid4().hex)))
+        controls = (f'<form method="post" action="/advance">{hidden}<button name="weeks" value="1">Advance week</button>'
                     '<button name="weeks" value="4">4 weeks</button><button name="weeks" value="season">'
                     'To end of season</button></form>')
     else:
@@ -354,13 +377,7 @@ def make_handler(w):
             if self.path != '/advance' or not w.session:
                 return self.send_error(404)
             n = int(self.headers.get('Content-Length', 0))
-            form = parse_qs(self.rfile.read(n).decode())
-            v = (form.get('weeks') or ['1'])[0]
-            with w.lock:
-                c = w.session.cursor
-                weeks = 53 - c['week'] if v == 'season' else int(v)
-                w.session.advance(weeks)
-                w.reload()
+            w.submit(parse_qs(self.rfile.read(n).decode()))
             self.send_response(303)
             self.send_header('Location', '/')
             self.end_headers()

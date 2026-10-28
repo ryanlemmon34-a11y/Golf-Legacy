@@ -54,18 +54,31 @@ week by week is the world a whole-season run produces (tested, fingerprint-equal
   week 1); after week 52 the same advance runs the end of the season and archives it; the cursor moves to
   the next year's 'start'. Year start and year end run once each.
 - **Idempotent and serialised.** A stale `expected` cursor is refused (`StaleCursor`) and changes
-  nothing; repeating the last committed `op_key` returns its stored result without simulating; advances
-  are serialised in the process (a lock) and across processes (a lock file; `Busy`). Two concurrent
-  requests for the same week commit exactly one (tested).
+  nothing; repeating any of the last 32 committed `op_key`s (one-week or longer advances) returns its
+  stored result without simulating. Keys are checked against the committed world on disk, under the lock,
+  so a retry through a second handle, or a form resubmitted after later advances, is recognised (the
+  observer's forms carry the cursor they were drawn at and a one-time key). Advances are serialised in the
+  process (a lock) and across processes (a lock file holding the owner's process id and host; `Busy`). A
+  lock left by a process that has died is taken over on POSIX, same host only. Two concurrent requests for
+  the same week commit exactly one (tested).
 - **One coherent world per checkpoint generation.** Each advance writes a new generation (the whole live
   simulation plus the session state) to a temporary directory, hashes it and reads it back, renames it
   into place, then atomically replaces the `CURRENT` pointer. A crash before the pointer moves leaves the
-  previous world; after, the new one; a failed advance also reloads the committed world in memory. The
-  last known good generation is kept; a damaged current one falls back to it. Orphaned temporary files
-  are removed on opening (all tested with simulated crashes).
-- **The archive is idempotent against the commit.** Seasons are archived only by the advance that
-  commits the season's end; each generation records which seasons the archive holds, and opening removes
-  any archived season beyond it (the retry writes it again, identically).
+  previous world; after, the new one. Any failure before the commit, one-week or multi-week, an error, an
+  interrupt or a failed save, reloads the committed world in memory, so memory never runs ahead of disk.
+  The last known good generation is kept; a damaged current one falls back to it. Orphaned temporary files
+  are removed on opening, but only when the opener can take the lock: opening a world while another
+  process advances it leaves that process's work alone (all tested with simulated crashes).
+- **History in the same transaction.** At season end the season's history (its season file, the people,
+  relationships and records tables, the list of archived seasons) is staged inside the new generation
+  (`gen_n/archive/`, hashed with it), not written to the archive. After the commit it is published to
+  `archive/` (season file and index rows first, then the tables, the list of seasons last) and
+  `archive/PUBLISHED` records the generation. A crash before the commit leaves the archive untouched; a
+  crash after it is repaired by publishing the committed generation's staged history again (on opening or
+  before the next advance; idempotent). The running world, the committed checkpoint and the visible history
+  therefore agree after any failure, in the same process or after reopening (tested: failed final commits
+  of long advances, failures at a season-end commit, a crash between commit and publication, in the first
+  and second seasons, comparing seasons, index, people, relationships and records with an uninterrupted run).
 - **Bounded checkpoints.** The live simulation keeps only this season and last of its per-season tables,
   older results reduced to their winners (`Season.prune_history`), and is saved without the standard
   course library (rebuilt from its seed), so a weekly checkpoint does not grow with the world's history.
@@ -73,9 +86,11 @@ week by week is the world a whole-season run produces (tested, fingerprint-equal
 ```
 world/
   CURRENT              {"generation": n, "dir": "gen_00000n"}  (replaced atomically: the commit)
-  gen_00000n/          state.pkl.gz (simulation + session state), meta.json (cursor, engine, sha256 ...)
+  gen_00000n/          state.pkl.gz (simulation + session state), meta.json (cursor, engine, sha256 ...),
+                       archive/ (a season end's staged history, until the next generations replace it)
   gen_00000(n-1)/      the last known good generation
-  archive/             the history archive (below)
+  lock                 present while an advance runs (process id and host)
+  archive/             the history archive (below); PUBLISHED: the generation it shows
 ```
 
 ### The archive

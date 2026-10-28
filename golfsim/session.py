@@ -15,16 +15,28 @@ refused with StaleCursor and changes nothing) and an operation key (repeating th
 returns its stored result without simulating again). Advances are serialised: a lock inside the process,
 and a lock file across processes (Busy if another advance holds it).
 
+Operation keys are remembered for the last OPS_KEPT committed advances (not only the last), and are
+checked against the committed world on disk, so a request retried through another handle or resubmitted
+after later advances is recognised.
+
 **One coherent world per generation.** Each advance writes a new checkpoint generation: the whole
 simulation and the session's state go to a temporary directory, are hashed and read back, the
 directory is renamed into place and only then is the CURRENT pointer replaced (an atomic rename). A
-crash before that leaves the previous generation current; after it, the new one. The previous generation
-is kept as the last known good one; older ones and orphaned temporary directories are removed. The
-history archive (archive.py) is written only at season end, by the advance that commits that season;
-the committed generation records which seasons the archive holds, and opening a session removes any
-archived season beyond it (written by an advance that crashed before committing; the retry rewrites it
-identically). The live simulation keeps only recent seasons (Season.prune_history), so a checkpoint
-does not carry the whole history.
+crash before that leaves the previous generation current; after it, the new one. If anything fails
+before the commit, the session goes back to the committed world, so memory never runs ahead of disk.
+The previous generation is kept as the last known good one; older ones and orphaned temporary
+directories are removed (only by whoever holds the lock: opening a session while another process is
+advancing never touches its work).
+
+**History in the same transaction.** At season end, the season's history (its season file, and the
+people, relationships and records tables, and the list of archived seasons) is staged inside the new
+checkpoint generation, not written to the archive. Only once the generation is committed is it
+published to archive/ (season file and index first, the list of seasons last) and the published
+generation recorded (archive/PUBLISHED). A crash before the commit leaves the archive exactly as it was;
+a crash after it is repaired by publishing the committed generation's staged history again (on opening,
+or before the next advance), which is idempotent. So the running world, the committed checkpoint and the
+visible history always agree. The live simulation keeps only recent seasons (Season.prune_history), so
+a checkpoint does not carry the whole history.
 """
 from __future__ import annotations
 
@@ -34,16 +46,18 @@ import json
 import os
 import pickle
 import shutil
+import socket
 import threading
 import time
 from pathlib import Path
 
-from .archive import ArchiveWriter
+from .archive import STATE_FILES, ArchiveWriter, _read, _write, index_season
 from .savegame import engine_commit, engine_id
 
 FORMAT = 'golf-legacy-session/1'
 SCHEMA = 1
 KEEP_GENERATIONS = 2                 # the current generation and the last known good one before it
+OPS_KEPT = 32                        # committed operation keys remembered (retries, resubmitted forms)
 
 
 class StaleCursor(Exception):
@@ -58,8 +72,11 @@ class Session:
     def __init__(self, directory, season, state, generation):
         self.dir = Path(directory)
         self.season = season
-        self.state = state                 # cursor, last operation, archive writer state, world id
+        self.state = state                 # cursor, recent operations, archive writer state, world id
+        state.setdefault('ops', [[state['last_op']['key'], [state['last_op']['result']]]]   # (older saves)
+                         if state.get('last_op') and state['last_op'].get('key') is not None else [])
         self.generation = generation
+        self._pending = None               # season history staged by uncommitted weeks
         self._lock = threading.Lock()
 
     # ---- creating and opening -------------------------------------------------------------------------
@@ -76,26 +93,32 @@ class Session:
         state = {'format': FORMAT, 'schema': SCHEMA, 'world_id': f'{seed}-{int(time.time())}', 'seed': seed,
                  'cursor': {'year': season.first_year, 'week': 1, 'phase': 'start'}, 'last_op': None,
                  'archive_through': None, 'archive': {'created': writer.created, 'initial': sorted(writer.initial)},
-                 'weeks_played': 0}
+                 'weeks_played': 0, 'ops': []}
         s = cls(d, season, state, 0)
         s._commit()
         return s
 
     @classmethod
     def open(cls, directory, workers=None, allow_other_engine=False):
-        """Open the committed world, recovering from an interrupted advance if there was one."""
+        """Open the committed world, recovering from an interrupted advance if there was one. Recovery
+        (removing an uncommitted advance's files, publishing committed history) needs the lock: if
+        another process is advancing, the committed world is opened as it is and its work left alone."""
         d = Path(directory)
-        for tmp in d.glob('gen_*.tmp'):                       # an advance that never committed
-            shutil.rmtree(tmp, ignore_errors=True)
-        for stray in (d / 'CURRENT.tmp',):
-            if stray.exists():
-                stray.unlink()
-        gen = _committed_generation(d)
-        season, state = _load_generation(d, gen, allow_other_engine)
+        try:
+            with _FileLock(d / 'lock'):
+                for tmp in d.glob('gen_*.tmp'):               # an advance that never committed
+                    shutil.rmtree(tmp, ignore_errors=True)
+                if (d / 'CURRENT.tmp').exists():
+                    (d / 'CURRENT.tmp').unlink()
+                gen = _committed_generation(d)
+                season, state = _load_generation(d, gen, allow_other_engine)
+                s = cls(d, season, state, gen)
+                s._recover_archive()
+        except Busy:
+            gen, season, state = _load_committed(d, allow_other_engine)
+            s = cls(d, season, state, gen)
         if workers:
-            season.workers = workers
-        s = cls(d, season, state, gen)
-        s._trim_archive()
+            s.season.workers = workers
         return s
 
     @property
@@ -107,39 +130,15 @@ class Session:
         """Play the next week (running 1 January first, or the end of the season after week 52) and commit
         the world. Returns {'completed': (year, week), 'events': [...], 'changes': {...}, 'cursor': {...},
         'generation': n}. `expected`: the cursor the caller believes is next (StaleCursor otherwise).
-        `op_key`: repeating the last committed key returns its result without simulating again."""
-        with self._lock:
-            last = self.state['last_op']
-            if op_key is not None and last and last['key'] == op_key:
-                return last['result']
-            if expected is not None and dict(expected) != self.state['cursor']:
-                raise StaleCursor(f'expected {expected}, the world is at {self.state["cursor"]}')
-            with _FileLock(self.dir / 'lock'):
-                # another process may have advanced and committed meanwhile: work from what is committed
-                gen = _committed_generation(self.dir)
-                if gen != self.generation:
-                    self.season, self.state = _load_generation(self.dir, gen, False)
-                    self.generation = gen
-                    if expected is not None and dict(expected) != self.state['cursor']:
-                        raise StaleCursor(f'expected {expected}, the world is at {self.state["cursor"]}')
-                try:
-                    result = self._step()
-                    self.state['last_op'] = {'key': op_key, 'result': result}
-                    self._commit()
-                except BaseException:
-                    # nothing was committed: go back to the committed world, so memory never runs ahead of disk
-                    self.season.close()
-                    self.season, self.state = _load_generation(self.dir, _committed_generation(self.dir), True)
-                    self.generation = _committed_generation(self.dir)
-                    raise
-                result['generation'] = self.generation
-                return result
+        `op_key`: repeating a recently committed key returns its result without simulating again."""
+        return self._advance(1, expected, op_key)[0]
 
-    def advance(self, weeks, progress=None, cancel=None, commit_every_week=False):
+    def advance(self, weeks, progress=None, cancel=None, commit_every_week=False, expected=None, op_key=None):
         """Advance several weeks with the same weekly step. By default the world is committed once, at
         the end (or when `cancel()` returns true between weeks): a skip to the end of the
         season does not pay for 52 checkpoints. `commit_every_week` commits after each week instead.
-        `progress(result)` after every week. Returns the results."""
+        `progress(result)` after every week. `expected` and `op_key` as for advance_one_week (a
+        resubmitted key returns the stored results). Returns the results."""
         if commit_every_week:
             out = []
             for _ in range(weeks):
@@ -149,29 +148,64 @@ class Session:
                 if progress:
                     progress(out[-1])
             return out
-        out = []
-        with self._lock, _FileLock(self.dir / 'lock'):
-            if _committed_generation(self.dir) != self.generation:
-                self.season, self.state = _load_generation(self.dir, _committed_generation(self.dir), False)
-                self.generation = _committed_generation(self.dir)
-            try:
-                for _ in range(weeks):
-                    if cancel and cancel():
-                        break                                # a clean stop between weeks: commit what is done
-                    out.append(self._step())
-                    if progress:
-                        progress(out[-1])
-            except BaseException:                            # mid-week (an error or an interrupt): nothing commits
-                self.season.close()
-                self.season, self.state = _load_generation(self.dir, _committed_generation(self.dir), True)
-                self.generation = _committed_generation(self.dir)
-                raise
-            if out:
-                self.state['last_op'] = {'key': None, 'result': out[-1]}
-                self._commit()
-                for r in out:
-                    r['generation'] = self.generation
-        return out
+        return self._advance(weeks, expected, op_key, progress, cancel)
+
+    def _advance(self, weeks, expected, op_key, progress=None, cancel=None):
+        with self._lock:
+            done = self._done(op_key)
+            if done is not None:
+                return done
+            with _FileLock(self.dir / 'lock'):
+                self._sync()                                 # another process may have committed meanwhile
+                done = self._done(op_key)
+                if done is not None:
+                    return done
+                if expected is not None and dict(expected) != self.state['cursor']:
+                    raise StaleCursor(f'expected {expected}, the world is at {self.state["cursor"]}')
+                out = []
+                try:
+                    for _ in range(weeks):
+                        if cancel and cancel():
+                            break                            # a clean stop between weeks: commit what is done
+                        out.append(self._step())
+                        if progress:
+                            progress(out[-1])
+                    if out:
+                        for r in out:
+                            r['generation'] = self.generation + 1
+                        if op_key is not None:
+                            self.state['ops'] = (self.state['ops'] + [[op_key, out]])[-OPS_KEPT:]
+                        self.state['last_op'] = {'key': op_key, 'result': out[-1]}
+                        self._commit()
+                except BaseException:
+                    # an error, an interrupt or a failed commit: go back to what is committed, so memory
+                    # never runs ahead of disk (a commit that succeeded but could not publish its history
+                    # is committed: reloading it is the same world, and the history is published next time)
+                    self._rollback()
+                    raise
+                return out
+
+    def _done(self, op_key):
+        if op_key is None:
+            return None
+        return next((r for k, r in reversed(self.state['ops']) if k == op_key), None)
+
+    def _sync(self):
+        """Under the lock: work from the committed world, with its history published."""
+        gen = _committed_generation(self.dir)
+        if gen != self.generation:
+            self.season.close()
+            self.season, self.state = _load_generation(self.dir, gen, False)
+            Session.__init__(self, self.dir, self.season, self.state, gen)
+        self._recover_archive()
+
+    def _rollback(self):
+        self.season.close()
+        self._pending = None
+        gen = _committed_generation(self.dir)
+        self.season, self.state = _load_generation(self.dir, gen, True)
+        self.generation = gen
+        self.state.setdefault('ops', [])
 
     def _step(self):
         s, c = self.season, self.state['cursor']
@@ -194,22 +228,32 @@ class Session:
             s.finish_year(year)
             changes['season_end'] = {'career_decisions': dict(s.career_counts.get(year, {})),
                                      'juniors': s.juniors_added.get(year + 1, 0)}
-            self._archive_year(year)
+            self._stage_archive(year)
             self.state['cursor'] = {'year': year + 1, 'week': 1, 'phase': 'start'}
         else:
             self.state['cursor'] = {'year': year, 'week': week + 1, 'phase': 'week'}
         return {'completed': (year, week), 'events': events, 'changes': changes, 'cursor': dict(self.state['cursor'])}
 
-    def _archive_year(self, year):
+    def _stage_archive(self, year):
+        """The season's history, held until the advance commits (then staged in its generation)."""
         s = self.season
-        w = ArchiveWriter(self.dir / 'archive', s)
+        w = ArchiveWriter(self.dir / 'archive', s, touch=False)
         w.created = self.state['archive']['created']
         w.initial = set(self.state['archive']['initial'])
-        w.write_year(s, year)
-        w.write_state(s)
-        self.state['archive']['created'] = w.created
+        p = self._pending or {'chunks': {}, 'world': w.world}
+        p['chunks'][year] = w.year_chunk(s, year)
+        p['tables'] = w.state_tables(s)
+        p['world']['years'] = sorted(set(p['world']['years']) | {year})
+        self._pending = p
         self.state['archive_through'] = year
         s.snapshots.pop(year, None)
+
+    def _recover_archive(self):
+        """Under the lock: publish the committed generation's history if a crash interrupted it, and
+        remove archived seasons no committed generation holds (from sessions before staged history)."""
+        if _staged(self.dir, self.generation) and _published(self.dir) != self.generation:
+            _publish_archive(self.dir, self.generation)
+        self._trim_archive()
 
     def _trim_archive(self):
         """Seasons in the archive beyond the committed generation came from an advance that crashed before
@@ -250,10 +294,21 @@ class Session:
             if pool is not None:
                 self.season._pool = pool
         digest = _sha256(tmp / 'state.pkl.gz')
+        staged = {}
+        if self._pending:                                             # the season history, staged
+            a = tmp / 'archive'
+            (a / 'years').mkdir(parents=True)
+            files = {f'years/{y}.json.gz': c for y, c in self._pending['chunks'].items()}
+            files.update(self._pending['tables'])
+            for f, obj in files.items():
+                _write(a / f, obj)
+            _write_synced(a / 'world.json', json.dumps(self._pending['world']).encode())
+            staged = {f: _sha256(a / f) for f in list(files) + ['world.json']}
         meta = {'format': FORMAT, 'schema': SCHEMA, 'generation': n, 'world_id': self.state['world_id'],
                 'cursor': self.state['cursor'], 'engine': engine_id(), 'commit': engine_commit(),
                 'archive_through': self.state['archive_through'], 'weeks_played': self.state['weeks_played'],
-                'sha256': digest, 'written': time.strftime('%Y-%m-%d %H:%M:%S')}
+                'sha256': digest, 'archive_staged': sorted(self._pending['chunks']) if self._pending else [],
+                'archive_files': staged, 'written': time.strftime('%Y-%m-%d %H:%M:%S')}
         _write_synced(tmp / 'meta.json', json.dumps(meta, indent=1).encode())
         if _sha256(tmp / 'state.pkl.gz') != digest:                    # read back: what was written is whole
             raise IOError('checkpoint did not read back intact')
@@ -264,9 +319,12 @@ class Session:
         _write_synced(self.dir / 'CURRENT.tmp', json.dumps({'generation': n, 'dir': name}).encode())
         os.replace(self.dir / 'CURRENT.tmp', self.dir / 'CURRENT')     # the commit
         self.generation = n
+        self._pending = None
         for old in sorted(self.dir.glob('gen_[0-9]*')):
             if old.is_dir() and not old.name.endswith('.tmp') and int(old.name[4:]) <= n - KEEP_GENERATIONS:
                 shutil.rmtree(old, ignore_errors=True)
+        if staged:
+            _publish_archive(self.dir, n)                               # committed: now the history shows it
 
     def close(self):
         self.season.close()
@@ -292,9 +350,54 @@ def _valid(d, name):
     g = d / name
     try:
         meta = json.loads((g / 'meta.json').read_text())
-        return meta if meta.get('format') == FORMAT and _sha256(g / 'state.pkl.gz') == meta['sha256'] else None
+        if meta.get('format') != FORMAT or _sha256(g / 'state.pkl.gz') != meta['sha256']:
+            return None
+        if any(_sha256(g / 'archive' / f) != h for f, h in meta.get('archive_files', {}).items()):
+            return None                                             # its staged history is damaged
+        return meta
     except (OSError, ValueError, KeyError):
         return None
+
+
+def _staged(d, n):
+    try:
+        return bool(json.loads((d / f'gen_{n:06d}' / 'meta.json').read_text()).get('archive_staged'))
+    except (OSError, ValueError):
+        return False
+
+
+def _published(d):
+    try:
+        return int((d / 'archive' / 'PUBLISHED').read_text())
+    except (OSError, ValueError):
+        return None
+
+
+def _copy_atomic(src, dst):
+    tmp = dst.with_name(dst.name + '.tmp')
+    shutil.copyfile(src, tmp)
+    with open(tmp, 'rb') as f:
+        os.fsync(f.fileno())
+    os.replace(tmp, dst)
+
+
+def _publish_archive(d, n):
+    """Publish a committed generation's staged season history to the archive (idempotent): season
+    files and their index rows, the people, relationships and records tables, then the list of seasons
+    (readers see the new seasons only once everything they refer to is in place), then PUBLISHED."""
+    g = d / f'gen_{n:06d}'
+    meta = json.loads((g / 'meta.json').read_text())
+    a = d / 'archive'
+    (a / 'years').mkdir(parents=True, exist_ok=True)
+    for y in meta['archive_staged']:
+        f = f'years/{y}.json.gz'
+        _copy_atomic(g / 'archive' / f, a / f)
+        index_season(a, y, _read(a / f))
+    for name in STATE_FILES:
+        _copy_atomic(g / 'archive' / name, a / name)
+    _copy_atomic(g / 'archive' / 'world.json', a / 'world.json')
+    _write_synced(a / 'PUBLISHED.tmp', str(n).encode())
+    os.replace(a / 'PUBLISHED.tmp', a / 'PUBLISHED')
 
 
 def _committed_generation(d):
@@ -314,6 +417,20 @@ def _committed_generation(d):
     raise FileNotFoundError(f'no intact checkpoint generation in {d}')
 
 
+def _load_committed(d, allow_other_engine, attempts=5):
+    """The committed world, read without the lock (another process may be committing: a generation can
+    be replaced while it is read, so try again)."""
+    for i in range(attempts):
+        try:
+            gen = _committed_generation(d)
+            season, state = _load_generation(d, gen, allow_other_engine)
+            return gen, season, state
+        except (OSError, EOFError, pickle.UnpicklingError):
+            if i == attempts - 1:
+                raise
+            time.sleep(0.2 * (i + 1))
+
+
 def _load_generation(d, n, allow_other_engine):
     name = f'gen_{n:06d}'
     meta = _valid(d, name)
@@ -326,18 +443,64 @@ def _load_generation(d, n, allow_other_engine):
     return blob['season'], blob['state']
 
 
+def _lock_owner():
+    """What a lock file holds: the advancing process's id and host."""
+    return f'{os.getpid()} {socket.gethostname()}'
+
+
+def _owner_gone(text):
+    """True only when the lock's owner certainly no longer runs: same host, POSIX, no such process.
+    (Elsewhere, or on Windows, a lock is never taken over.)"""
+    if os.name != 'posix':
+        return False
+    parts = text.split()
+    try:
+        pid = int(parts[0])
+    except (IndexError, ValueError):
+        return False
+    if len(parts) > 1 and parts[1] != socket.gethostname():
+        return False
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return True
+    except PermissionError:
+        return False                                  # it exists (another user's process)
+    return False
+
+
 class _FileLock:
-    """A lock file created exclusively (works on Windows and POSIX); Busy if it already exists."""
+    """A lock file created exclusively (works on Windows and POSIX); Busy if it is held. A lock left by
+    a process that has died (POSIX, same host) is taken over: it is renamed aside first, and given back
+    if it turns out to belong to a live advance after all."""
 
     def __init__(self, path):
         self.path = Path(path)
 
     def __enter__(self):
-        try:
-            fd = os.open(self.path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-        except FileExistsError:
-            raise Busy(f'{self.path} is held by another advance (remove it if no advance is running)') from None
-        os.write(fd, str(os.getpid()).encode())
+        for attempt in range(2):
+            try:
+                fd = os.open(self.path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+                break
+            except FileExistsError:
+                try:
+                    text = self.path.read_text()
+                except FileNotFoundError:
+                    continue                          # released meanwhile: try again
+                if attempt or not _owner_gone(text):
+                    raise Busy(f'{self.path} is held by another advance (process {text.strip()})') from None
+                aside = self.path.with_name(f'{self.path.name}.stale.{os.getpid()}')
+                try:
+                    os.rename(self.path, aside)
+                except FileNotFoundError:
+                    continue
+                if aside.read_text() != text:         # not the dead owner's lock: give it back
+                    os.rename(aside, self.path)
+                    raise Busy(f'{self.path} is held by another advance') from None
+                aside.unlink()
+        else:
+            raise Busy(f'{self.path} is held by another advance') from None
+        os.write(fd, _lock_owner().encode())
         os.close(fd)
         return self
 

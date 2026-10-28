@@ -56,9 +56,12 @@ class ArchiveWriter:
     """Writes a season's facts as it completes, and the slowly-changing tables (people, relations,
     records) whenever asked (they are rewritten whole: they hold no per-season copies)."""
 
-    def __init__(self, directory, season):
+    def __init__(self, directory, season, touch=True):
+        """`touch=False`: read the archive's state without writing anything (the session stages a
+        season's files in its checkpoint and publishes them only once the checkpoint is committed)."""
         self.dir = Path(directory)
-        (self.dir / 'years').mkdir(parents=True, exist_ok=True)
+        if touch:
+            (self.dir / 'years').mkdir(parents=True, exist_ok=True)
         self.created = {g.id: season.first_year for g in season.world.golfers}
         self.initial = {g.id for g in season.world.golfers}
         cal, lib = season.cal, season.lib
@@ -74,10 +77,20 @@ class ArchiveWriter:
         if p.exists():
             world['years'] = json.loads(p.read_text())['years']
         self.world = world
-        p.write_text(json.dumps(world))
+        if touch:
+            p.write_text(json.dumps(world))
 
     def write_year(self, season, year):
         """Call after season.run_year(year), before the season's snapshot is discarded."""
+        chunk = self.year_chunk(season, year)
+        _write(self.dir / 'years' / f'{year}.json.gz', chunk)
+        index_season(self.dir, year, chunk)
+        if year not in self.world['years']:
+            self.world['years'].append(year)
+            (self.dir / 'world.json').write_text(json.dumps(self.world))
+
+    def year_chunk(self, season, year):
+        """One season's facts, as written to years/YYYY.json.gz (nothing is written here)."""
         snap = season.snapshots.get(year, {})
         for g in season.world.golfers:
             self.created.setdefault(g.id, year + 1)
@@ -117,16 +130,14 @@ class ArchiveWriter:
                                                   ('amateur', season.ctx.amateur_rankings))},
                  'staff_year': {f'{k}:{i}': v for (k, i), v in season.staff_year.get(year, {}).items()},
                  'log': {g: v for g, v in log.items() if v}}
-        _write(self.dir / 'years' / f'{year}.json.gz', chunk)
-        from .archive_index import ArchiveIndex
-        idx = ArchiveIndex(self.dir / 'index.sqlite')             # idempotent: the season's rows are replaced
-        idx.index_year(year, json.loads(json.dumps(chunk)))       # indexed exactly as it reads back from disk
-        idx.close()
-        if year not in self.world['years']:
-            self.world['years'].append(year)
-            (self.dir / 'world.json').write_text(json.dumps(self.world))
+        return chunk
 
     def write_state(self, season):
+        for name, table in self.state_tables(season).items():
+            _write(self.dir / name, table)
+
+    def state_tables(self, season):
+        """The slowly-changing tables: {file name: contents} (nothing is written here)."""
         st = season.staff
         people = {}
         for g in season.world.golfers:
@@ -143,9 +154,19 @@ class ArchiveWriter:
             p = people.setdefault(k.id, {'name': k.name, 'country': k.country, 'born': k.born, 'hometown': None})
             p['caddie'] = {'reputation': k.reputation, 'background': k.background, 'status': k.status,
                            'earnings': round(k.earnings), 'seasons': k.seasons, 'history': k.history}
-        _write(self.dir / 'people.json.gz', people)
-        _write(self.dir / 'relations.json.gz', st.rel.export())
-        _write(self.dir / 'records.json.gz', season.records.to_dict())
+        return {'people.json.gz': people, 'relations.json.gz': st.rel.export(),
+                'records.json.gz': season.records.to_dict()}
+
+
+STATE_FILES = ('people.json.gz', 'relations.json.gz', 'records.json.gz')
+
+
+def index_season(directory, year, chunk):
+    """Index one season (idempotent: the season's rows are replaced), exactly as it reads back from disk."""
+    from .archive_index import ArchiveIndex
+    idx = ArchiveIndex(Path(directory) / 'index.sqlite')
+    idx.index_year(year, json.loads(json.dumps(chunk)))
+    idx.close()
 
 
 def write_archive(season, directory, years=None):

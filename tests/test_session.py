@@ -203,5 +203,189 @@ class SessionTests(unittest.TestCase):
         t.close()
 
 
+def archive_view(d):
+    """Everything the visible history holds: seasons listed and on disk, their contents, the index, and
+    the people, relationships and records tables."""
+    from golfsim.archive import _read
+    from golfsim.archive_index import ArchiveIndex
+    a = Path(d) / 'archive'
+    view = {'years': json.loads((a / 'world.json').read_text())['years'],
+            'seasons': {p.name: _read(p) for p in sorted((a / 'years').glob('*.json.gz'))}}
+    for f in ('people.json.gz', 'relations.json.gz', 'records.json.gz'):
+        view[f] = _read(a / f) if (a / f).exists() else None
+    if (a / 'index.sqlite').exists():
+        idx = ArchiveIndex(a / 'index.sqlite')
+        view['index'] = (idx.years(), idx.db.execute('SELECT COUNT(*) FROM starts').fetchone()[0],
+                         idx.db.execute('SELECT COUNT(*) FROM seasons').fetchone()[0])
+        idx.close()
+    return view
+
+
+def fail_publication(path_end='CURRENT'):
+    """os.replace that fails when the commit pointer would move (everything before it is written)."""
+    real = os.replace
+    def replace(src, dst):
+        if str(dst).endswith(path_end):
+            raise OSError('power cut')
+        return real(src, dst)
+    return mock.patch.object(SES.os, 'replace', replace)
+
+
+class TransactionTests(unittest.TestCase):
+    """The running world, the committed checkpoint and the visible history always agree."""
+
+    @classmethod
+    def setUpClass(cls):
+        """One uninterrupted session, kept at the last week of each of its first two seasons (copied for
+        each test), and the history and world it shows after each season end."""
+        cls.base = Path(tempfile.mkdtemp())
+        d = cls.base / 'reference'
+        s = Session.create(d, seed=11, workers=1, world=small_world())
+        cls.before_end, cls.after_end = {}, {}
+        for year, weeks in ((2027, 51), (2028, 51)):
+            s.advance(weeks)
+            s.close()
+            shutil.copytree(d, cls.base / f'at_week52_{year}')
+            s = Session.open(d, workers=1)
+            s.advance(1)
+            cls.after_end[year] = (archive_view(d), fingerprint(s.season))
+        s.close()
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls.base, ignore_errors=True)
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.dir = Path(self.tmp) / 'world'
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def new(self, d=None):
+        return Session.create(d or self.dir, seed=11, workers=1, world=small_world())
+
+    def at_season_end(self, year):
+        """A copy of the reference world about to play the last week of `year`."""
+        shutil.copytree(self.base / f'at_week52_{year}', self.dir)
+        return Session.open(self.dir, workers=1)
+
+    def test_a_failed_final_commit_of_a_long_advance_rolls_back(self):
+        s = self.new()
+        s.advance(2)
+        committed = s.cursor
+        with fail_publication(), self.assertRaises(OSError):
+            s.advance(3)
+        self.assertEqual(s.cursor, committed)                           # memory is not ahead of disk
+        self.assertEqual(fingerprint(s.season), fingerprint(direct(2)))
+        s.advance(1)                                                    # and it carries on from there
+        self.assertEqual(fingerprint(s.season), fingerprint(direct(3)))
+        s.close()
+
+    def test_a_failed_year_end_commit_leaves_the_history_as_committed(self):
+        ref_view, ref_print = self.after_end[2028]
+        s = self.at_season_end(2028)                                     # 2027 archived, 2028 about to end
+        before = archive_view(self.dir)
+        self.assertEqual(before['years'], [2027])
+        with fail_publication(), self.assertRaises(OSError):
+            s.advance_one_week()                                        # season 2028 ends, the commit fails
+        self.assertEqual(archive_view(self.dir), before)                 # history as committed, in this process
+        self.assertEqual(s.cursor, {'year': 2028, 'week': 52, 'phase': 'week'})
+        t = Session.open(self.dir, workers=1)                            # and as another process sees it
+        self.assertEqual(archive_view(self.dir), before)
+        t.close()
+        s.advance_one_week()                                            # continuing in the same process
+        self.assertEqual(archive_view(self.dir), ref_view)
+        self.assertEqual(fingerprint(s.season), ref_print)
+        s.close()
+
+    def test_a_crash_after_the_commit_but_before_the_history_is_published_is_repaired(self):
+        for year in (2027, 2028):
+            with self.subTest(year=year):
+                self._crash_before_publication(year)
+                shutil.rmtree(self.dir)
+
+    def _crash_before_publication(self, year):
+        ref_view, ref_print = self.after_end[year]
+        s = self.at_season_end(year)
+        with mock.patch.object(SES, '_publish_archive', side_effect=OSError('power cut')), \
+                self.assertRaises(OSError):
+            s.advance_one_week()                                        # committed; history not yet updated
+        s.close()
+        t = Session.open(self.dir, workers=1)                            # reopening publishes it
+        self.assertEqual(t.cursor, {'year': year + 1, 'week': 1, 'phase': 'start'})
+        self.assertEqual(archive_view(self.dir), ref_view)
+        self.assertEqual(fingerprint(t.season), ref_print)
+        t.close()
+
+    def test_a_retry_through_another_handle_is_recognised(self):
+        a = self.new()
+        b = Session.open(self.dir, workers=1)                            # a second, independently opened handle
+        ra = a.advance_one_week(op_key='submit-1')
+        rb = b.advance_one_week(op_key='submit-1')                       # the same request, retried elsewhere
+        self.assertEqual(rb['completed'], ra['completed'])
+        self.assertEqual(b.cursor['week'], 2)
+        self.assertEqual(json.loads((self.dir / 'CURRENT').read_text())['generation'], a.generation)
+        a.close()
+        b.close()
+
+    def test_repeated_submissions_are_recognised_after_later_operations(self):
+        s = self.new()
+        first = s.advance_one_week(op_key='k1')
+        s.advance_one_week(op_key='k2')
+        gen = s.generation
+        self.assertEqual(s.advance_one_week(op_key='k1')['completed'], first['completed'])   # a late resubmission
+        out = s.advance(2, op_key='skip-1')
+        self.assertEqual(s.advance(2, op_key='skip-1'), out)            # a refreshed form: no second skip
+        self.assertEqual((s.generation, s.cursor['week']), (gen + 1, 5))
+        s.close()
+
+    def test_opening_leaves_another_process_checkpoint_work_alone(self):
+        s = self.new()
+        s.advance_one_week()
+        s.close()
+        lock = self.dir / 'lock'
+        lock.write_text(str(os.getpid()))                               # a live advance elsewhere holds the lock
+        work = self.dir / 'gen_000099.tmp'
+        work.mkdir()
+        (self.dir / 'CURRENT.tmp').write_text('{}')
+        t = Session.open(self.dir, workers=1)
+        self.assertTrue(work.exists() and (self.dir / 'CURRENT.tmp').exists())
+        self.assertEqual(t.cursor['week'], 2)                           # it still reads the committed world
+        t.close()
+        lock.unlink()                                                   # the other advance finished (or died)
+        Session.open(self.dir, workers=1).close()
+        self.assertFalse(work.exists() or (self.dir / 'CURRENT.tmp').exists())
+
+    def test_observer_resubmissions_and_stale_forms_advance_nothing(self):
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
+        import observer
+        s = self.new()
+        s.close()
+        w = observer.World(self.dir)
+        form = lambda c, op, weeks='1': {'weeks': [weeks], 'year': [str(c['year'])], 'week': [str(c['week'])],
+                                         'phase': [c['phase']], 'op': [op]}
+        c0 = w.session.cursor
+        w.submit(form(c0, 'a'))
+        gen = w.session.generation
+        w.submit(form(c0, 'a'))                                         # the same form posted twice
+        w.submit(form(c0, 'b'))                                         # an old page's form, new key
+        self.assertEqual((w.session.generation, w.session.cursor['week']), (gen, 2))
+        w.submit(form(w.session.cursor, 'c', '4'))
+        self.assertEqual(w.session.cursor['week'], 6)
+        w.session.close()
+
+    @unittest.skipUnless(os.name == 'posix', 'detecting a dead process needs POSIX')
+    def test_a_lock_left_by_a_dead_process_is_released(self):
+        import subprocess
+        s = self.new()
+        p = subprocess.Popen([sys.executable, '-c', 'pass'])
+        p.wait()                                                        # a process id that no longer runs
+        (self.dir / 'lock').write_text(f'{p.pid} {SES._lock_owner().split(" ", 1)[1]}')
+        s.advance_one_week()
+        self.assertEqual(s.cursor['week'], 2)
+        s.close()
+
+
 if __name__ == '__main__':
     unittest.main()
