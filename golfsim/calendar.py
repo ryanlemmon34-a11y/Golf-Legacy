@@ -143,6 +143,7 @@ def _in_window(week, windows):
 LOCAL_RATE = {'amateur': 0.9, 'club_pro': 0.3}                       # events per unit of nation pool
 LOCAL_FLOOR = {'amateur': ((1.0, 4), (0.5, 3), (0.2, 2)), 'club_pro': ((5.0, 3), (3.0, 2))}
 LOCAL_MIN = {'amateur': 0, 'club_pro': 16}                           # events per regional circuit at least
+LOCAL_MIN_POOL = {'amateur': 0.0, 'club_pro': 3.0}                   # smaller golf countries travel
 LOCAL_PER_WEEK = 14                    # simultaneous local events a regional circuit can hold (different countries)
 
 
@@ -157,7 +158,7 @@ def local_allocation(regions, kind):
     up to the circuit's minimum (LOCAL_MIN) one event at a time, each to the country with the most golf
     per event it already has."""
     out = {}
-    countries = _local_countries(regions)
+    countries = [(c, pool) for c, pool in _local_countries(regions) if pool >= LOCAL_MIN_POOL[kind]]
     for c, pool in countries:
         floor = next((n for size, n in LOCAL_FLOOR[kind] if pool >= size), 0)
         n = max(floor, round(LOCAL_RATE[kind] * pool))
@@ -534,6 +535,14 @@ class WorldCalendar:
             weeks = [w for w in free if room[w] > 0 and any(w in season_weeks(c) for c in CITIES_BY_COUNTRY[country])]
             if not weeks:
                 continue
+            if kind == 'club_pro':
+                # the region's club pros share one circuit: a week the circuit already uses only when
+                # the country's season has no emptier ones left
+                for load in sorted({tour.per_week - room[w] for w in weeks}):
+                    spread = [w for w in weeks if tour.per_week - room[w] <= load]
+                    if len(spread) >= alloc[country]:
+                        weeks = spread
+                        break
             per = -(-alloc[country] // len(weeks))           # a busy golf country can hold several a week
             slots = [w for w in weeks for _ in range(min(room[w], per))]
             n = min(alloc[country], len(slots))
@@ -542,8 +551,12 @@ class WorldCalendar:
                 i += 1
                 holes = r.choices([h for h, _ in tour.formats], weights=[w for _, w in tour.formats])[0]
                 cut_top = tour.cut.get(holes, 0)
-                prestige = tour.prestige + {18: -6, 36: -2, 54: 3, 72: 6}[holes]
-                purse = int(tour.purse * {18: .45, 36: .7, 54: 1.0, 72: 1.35}[holes]) if tour.purse else 0
+                if kind == 'club_pro':                        # one-day pro-ams and two-day section events
+                    prestige = tour.prestige + {18: -3, 36: -2}[holes]
+                    purse = int(tour.purse * {18: .6, 36: .7}[holes])
+                else:
+                    prestige = tour.prestige + {18: -6, 36: -2, 54: 3, 72: 6}[holes]
+                    purse = int(tour.purse * {18: .45, 36: .7, 54: 1.0, 72: 1.35}[holes]) if tour.purse else 0
                 sid = f'{tour.key}_{i:03d}'
                 self._add(Series(sid, f'{tour.name} Event {i} ({country})', tour.key, tour.tier, tour.kind,
                                  'regular', holes, tour.field, week, tour.eligibility, country,
@@ -640,8 +653,12 @@ class WorldCalendar:
                 cut_top = tour.cut.get(holes, 0)
                 if tour.tier == 4 and cut_top and holes == 54:
                     cut_top = round(tour.field * 0.45)
-                prestige = tour.prestige + {18: -6, 36: -2, 54: 3, 72: 6}[holes]
-                purse = int(tour.purse * {18: .45, 36: .7, 54: 1.0, 72: 1.35}[holes]) if tour.purse else 0
+                if kind == 'club_pro':                        # one-day pro-ams and two-day section events
+                    prestige = tour.prestige + {18: -3, 36: -2}[holes]
+                    purse = int(tour.purse * {18: .6, 36: .7}[holes])
+                else:
+                    prestige = tour.prestige + {18: -6, 36: -2, 54: 3, 72: 6}[holes]
+                    purse = int(tour.purse * {18: .45, 36: .7, 54: 1.0, 72: 1.35}[holes]) if tour.purse else 0
                 self._add(Series(f'{tour.key}_{i:02d}', f'{tour.name} Event {i}', tour.key, tour.tier, tour.kind,
                                  'regular', holes, tour.field, week, tour.eligibility, country,
                                  self._cities_for(country, week, n=4, key=f'{tour.key}{i}'), 'rotating',

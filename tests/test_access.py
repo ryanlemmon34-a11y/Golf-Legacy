@@ -146,6 +146,24 @@ class LocalGolfTests(unittest.TestCase):
         self.assertFalse(s.eligible(pro, ev, ev.week))
         self.assertEqual(ev.days in ('Mon', 'Mon-Tue'), True)          # club pros work weekends
 
+    def test_club_pros_spread_over_their_sections_events(self):
+        s = SEASON
+        cp = next(g for g in s.world.golfers if g.status == 'club_pro' and ', ' in g.hometown)
+        state = cp.hometown.split(', ', 1)[1]
+        self.assertEqual(s.drive(cp, cp.hometown), -3.0)
+        self.assertLessEqual(s.drive(cp, f'Elsewhere, {state}'), -1.0)
+        far = [s.drive(cp, c) for c in ('Town A, Nowhere', 'Town B, Nowhere', 'Town C, Nowhere')]
+        self.assertTrue(all(-2.0 <= d <= 3.0 for d in far))
+        # the diary only ranks weeks: about zero on average, different golfers different weeks
+        diary = [s.club_diary(cp, 2027, w) for w in range(1, 53)]
+        self.assertLess(abs(sum(diary) / len(diary)), 1.0)
+        other = next(g for g in s.world.golfers if g.status == 'club_pro' and g.id != cp.id)
+        self.assertNotEqual(diary, [s.club_diary(other, 2027, w) for w in range(1, 53)])
+        # one section event a week per circuit, in the countries with a club-pro scene
+        for k in (k for k, t in TOUR_BY_KEY.items() if t.tier == 8):
+            weeks = Counter(x.week for x in s.cal.series if x.tour == k and x.category == 'regular')
+            self.assertEqual(max(weeks.values()), 1, k)
+
     def test_newcomers_and_college_golfers_have_open_doors(self):
         s = fresh()
         am_ev = next(x for x in s.cal.series if x.tour == 'AM_NORTH_AMERICA' and x.category == 'regular')

@@ -65,6 +65,9 @@ def _seed(*parts):
     return int.from_bytes(hashlib.blake2b(':'.join(map(str, parts)).encode(), digest_size=8).digest(), 'big')
 
 
+CLUB_PRO_DRIVING_REGIONS = ('Europe', 'North America')   # neighbouring countries' section events are a drive
+
+
 def region_of(g):
     return COUNTRIES[g.country].region
 
@@ -458,6 +461,11 @@ class Season:
 
     def bar(self, g):
         """The minimum event value worth playing for this golfer."""
+        if g.status == 'club_pro':
+            # their section events are all worth playing; the job decides how many: a bar near the
+            # events' value keeps them close to their intended pace through the year (a low bar would
+            # have every club pro play every early-season event, then sit out the rest of the year)
+            return 19.0
         if g.lifestyle == 'part_time':
             return 12.0
         home = self.home_level.get(g.tour, 20.0)
@@ -479,10 +487,31 @@ class Season:
             if venue_country == g.country:
                 v += 8
             elif g.status == 'club_pro' and ed.series.tier == 8 and COUNTRIES[venue_country].region == region_of(g):
-                v -= 2                                       # a section event over the border is a drive
+                # a section event over the border: a drive in Europe and North America, a flight elsewhere
+                v += 9 if region_of(g) in CLUB_PRO_DRIVING_REGIONS else 4
             else:
                 v -= 40
+        if g.status == 'club_pro' and ed.series.tier == 8:
+            v -= self.drive(g, self.lib.venues(ed.year)[ed.event_id][0].city) + self.club_diary(g, ed.year, ed.week)
         return v
+
+    def club_diary(self, g, year, week):
+        """How hard a week is to take off from a club professional's job (lessons, member events, the
+        shop), against a typical week: a fixed draw per golfer and week, so club pros' free Mondays
+        differ instead of the whole section choosing the same ones."""
+        return -3.0 + 6.0 * (_seed(self.seed, 'diary', g.id, year, week) % 1000 / 1000)
+
+    def drive(self, g, city):
+        """How far a club professional's club is from a section event, against the circuit's typical
+        trip (so positive is a longer drive than usual): least from their own town, little in their own
+        state or province, a fixed draw per (hometown, venue) pair otherwise, standing in for distance
+        (the geography has no coordinates). It only ranks venues: club pros near one venue favour it
+        together, and the events of a big country do not all draw the same crowd from everywhere."""
+        if city == g.hometown:
+            return -3.0
+        near = ', ' in city and city.split(', ', 1)[1] == g.hometown.split(', ', 1)[-1]
+        u = _seed(self.seed, 'drive', g.hometown, city) % 1000 / 1000
+        return -3.0 + 2.0 * u if near else -2.0 + 5.0 * u
 
     def golfer_week(self, g, year, week):
         """The parts of an event's value that depend only on the golfer and the week (worked out once
@@ -614,7 +643,8 @@ class Season:
             if self.development and self.plans.get(g.id, {}).get(week, ('play',))[0] != 'play':
                 continue                                     # a training or rest week in their plan
             key = (g.status, g.tour, g.country, self.wr_pos.get(g.id, 9999) <= 500,
-                   self.am_pos.get(g.id, 9999) <= 25, self.am_pos.get(g.id, 9999) <= 300)
+                   self.am_pos.get(g.id, 9999) <= 25, self.am_pos.get(g.id, 9999) <= 300,
+                   g.id if g.status == 'club_pro' else 0)      # club pros: their own diary and drives
             evs = open_to.get(key)
             if evs is None:
                 evs = open_to[key] = [ed for ed in regular if self.eligible(g, ed.series, week)]
@@ -638,7 +668,7 @@ class Season:
                 cost = fee + caddie_fee                      # = trip_cost: the can_afford rule
                 if not (cost <= 0 or cost <= money):
                     continue                                 # cannot pay for the trip (school-paid trips cost 0)
-                bk = (g.country, g.lifestyle, eid)
+                bk = (g.country, g.lifestyle, eid, g.id if g.status == 'club_pro' else 0)
                 base = bases.get(bk)
                 if base is None:
                     base = bases[bk] = self.base_value(g, ed, country[eid])
@@ -1760,7 +1790,8 @@ class Season:
             if g.lifestyle == 'retired':
                 continue
             key = (g.tour, g.country, g.status, g.lifestyle, self.wr_pos.get(g.id, 9999) <= 500,
-                   self.am_pos.get(g.id, 9999) <= 25, self.am_pos.get(g.id, 9999) <= 300)
+                   self.am_pos.get(g.id, 9999) <= 25, self.am_pos.get(g.id, 9999) <= 300,
+                   g.id if g.status == 'club_pro' else 0)      # club pros: their own diary and drives
             if key not in cache:                             # every eligible event, best first
                 cache[key] = [sorted(((self.base_value(g, e, CITY_BY_NAME[city[e.event_id]].country), e.event_id, e)
                                       for e in by_week[w] if self.eligible(g, e.series, w)), reverse=True)

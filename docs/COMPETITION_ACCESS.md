@@ -80,17 +80,31 @@ grow without limit.
 - **Challenger tours** 22–26 events each, **Regional tours** 14–26 (as their real counterparts run).
 - **Mini tours** run most weeks in their seasons, the US circuits two events a week (they are paid for by
   entry fees, so money, not the calendar, is what limits most mini-tour players).
-- **Local golf in every golfing country.** Amateur series and the new club-professional circuits play in
-  every golfing country of their region with events in proportion to the size of its golf scene (its
-  starting nation pool) and a floor, so no country depends on one national championship
-  (`calendar.local_allocation`). Club professionals' events are one-day section events and pro-ams on
+- **Local golf in every golfing country.** Amateur series play in every golfing country of their region
+  with events in proportion to the size of its golf scene (its starting nation pool) and a floor, so no
+  country depends on one national championship (`calendar.local_allocation`); club-professional circuits
+  cover every golfing country of their region too, as below. Club professionals' events are one-day section events and pro-ams on
   Mondays and Tuesdays. Club pros are far fewer than amateurs (about one per unit of nation pool, ~350
-  in the starting world), so their circuits hold fewer, bigger events: 0.3 per unit of pool, in the
-  countries with a club-pro scene (pool 3 or more), and at least 16 a season in every region; club pros
-  from smaller golf countries cross a border in their region to play (a section event over the border
-  counts as a drive, not a flight). About 150 events a season, against ~470 when every country had
-  its own: fields of a few dozen club pros rather than a dozen, so a win means beating a real field,
-  while every club pro still has more events within reach than the ~12 they want to play.
+  in the starting world), so their circuits hold fewer, bigger events (about 140 a season, against ~340
+  when every golfing country had its own):
+  - **Where:** 0.3 events per unit of pool, only in countries with a club-pro scene (pool 3 or more),
+    at least 16 a season in every region. Club pros from smaller golf countries cross a border to play:
+    a drive in Europe and North America, a flight elsewhere.
+  - **When:** one section event a week per circuit, so a region's club pros meet instead of splitting
+    across countries the same Monday.
+  - **Who goes:** each club pro weighs an event by how far it is from their club (`Season.drive`: their
+    own town and state first, a fixed draw per hometown and venue otherwise, as the geography has no
+    coordinates) and how hard that week is to take off work (`Season.club_diary`: a fixed draw per
+    golfer and week). Both average zero: they only decide *which* events, so a big country's events do
+    not all draw the same crowd on the same weeks. Club pros play when an event is worth at least 19
+    (other golfers with a job: 12), which keeps them near their intended ~12 starts through the
+    season instead of playing every early event and sitting out the rest.
+
+  Season one, two seeds, before → after: median field 5 → 18–21 (mean 11 → 28–29); club pros with
+  three or more wins 46 → 10–11; club pros among the 20 most frequent winners of any event 15 → 4–6;
+  median starts 14 → 13 with 99% reaching three quarters of their intended schedule (87% before).
+  Small fields remain where there are few club pros (Latin America ~10, Africa and Oceania ~20) and in
+  the weeks of the club-pro sectionals and Open qualifying, which club pros play instead.
 - **College.** More college events, and college golfers can play amateur events around their college
   schedule (in the USA, the country they study in). Not making a lineup is recorded as such
   (`not selected for the college lineup`), separately from a shortage of golf.
