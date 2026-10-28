@@ -107,6 +107,28 @@ earlier cohort report predated the debt-trap fix and coaches/caddies and was rem
   monthly plan does not learn from being shut out; the 10% Premier visitor share and full-status size are
   owner decisions to confirm.
 
+## Correctness and realism pass (owner review of commit 0a98843)
+
+Status words: **implemented** (in the code), **tested** (regression tests that failed before the fix
+pass after it, plus the full suite), **integration-checked** (short multi-seed runs), **unverified**
+(not yet measured at the scale or duration that would prove it).
+
+1. **Arrival experience** — implemented, tested, integration-checked (4c0ff7a). Assumed pre-entry
+   experience is `Season.prior_rounds`, a previous season that fades through the first; `season_rounds`
+   holds only rounds played; year-end maturing follows them. Old saves migrate on loading. Unverified: the
+   effect on arrivals' development over decades (needs a long run).
+2. **Saves and history in one transaction** — implemented, tested, integration-checked (892d148).
+   Rollback on every failed commit; season-end history staged in the checkpoint and published after the
+   commit (repaired on opening); recent operation keys checked against the committed world; recovery only
+   under the lock; dead-process locks taken over on POSIX. Unverified: behaviour on Windows file systems
+   (renames over open files) and on network drives; a real power cut (simulated by failing writes).
+3. Championship field selection — pending.
+4. Records and backing decisions — pending.
+5. Rigid career behaviour (backer cliffs, part-time retirement odds) — pending.
+6. Performance without deleting golf or history — pending. The 120 s Skip-to-end-of-Season target is
+   **unverified** at season 1 and season 100 on the intended hardware (only engine timings on this
+   4-core container exist).
+
 ## V1 observer UI (owner baseline, `docs/UI_REQUIREMENTS_V1.md`)
 
 The V1 interface is an interactive golf encyclopedia over a world the player only advances: linked
