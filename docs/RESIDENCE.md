@@ -42,7 +42,8 @@ their tour's events (where they have a legitimate route to play: their membershi
 
 - **Value** of living in a country (event-value points, `move_value`): the travel to their tour's events
   over `STAY_YEARS` (3) seasons from there, plus the cost of moving there (`MOVE_COST` $6,000, paid from
-  their own funds; a move they cannot pay for is not made and is counted in `move_blocked`), both divided
+  their own money — savings, family and backers', after the usual four weeks' reserve — never on credit; a
+  move they cannot pay for is not made and is counted in `move_blocked`), both divided
   by what a dollar means to them (`finance.money_unit`: a broke player feels every flight, a wealthy one
   hardly notices); minus the pull of their own country, `HOME_PULL` (60) × (1.6 − 1.2 × adaptability/100)
   points when they live abroad. Adaptability is an existing personality trait.

@@ -23,7 +23,8 @@ Moves
                   next STAY_YEARS seasons against what money means to them (finance.money_unit: a broke
                   player feels every flight, a wealthy one hardly notices), the pull of their own country
                   (stronger the less adaptable they are), and the cost of the move (MOVE_COST, paid from
-                  their own funds; a move they cannot pay for is not made). The odds are smooth; after a
+                  their own money -- savings, family and backers', after the usual reserve -- never on
+                  credit; a move they cannot pay for is not made). The odds are smooth; after a
                   move they stay at least MIN_STAY seasons (no back-and-forth). Graduates and golfers
                   changing their life this winter decide at once, from wherever they live: graduation
                   does not send anyone home automatically.
@@ -38,6 +39,7 @@ from __future__ import annotations
 import math
 import random
 
+from . import finance as FIN
 from .geography import CITIES_BY_COUNTRY, CITY_BY_NAME, COUNTRIES
 
 # State, province or equivalent of every city outside the USA and Canada (whose city names carry it).
@@ -356,8 +358,9 @@ def review_moves(season, year, snap):
         if best == current or rng.random() >= p:
             continue
         cost = MOVE_COST
-        if season.spendable(g, year) < cost:
-            season.move_blocked[year] = season.move_blocked.get(year, 0) + 1
+        own = g.cash + g.backing + g.backer_funds - FIN.RESERVE_WEEKS * season.committed_weekly(g)
+        if own < cost:                               # paid from their own money (family and backers'
+            season.move_blocked[year] = season.move_blocked.get(year, 0) + 1   # included), never on credit
             continue                                 # cannot pay for the move: they stay
         season.spend(g, year, 'moving', cost)
         saved = (season.tour_trip_cost(g, g.tour, home=current, caddie=False)
@@ -372,6 +375,10 @@ def review_moves(season, year, snap):
                    f'travel; the move cost ${cost:,.0f})')
         if changed and row['tour'].startswith('CO_'):
             why += '; after college'
+        elif changed and g.lifestyle != row['lifestyle']:
+            why += '; after giving up the chase for a job' if g.lifestyle == 'part_time' else '; a new start'
+        elif changed:
+            why += '; after a change of status'
         _record(season, g.id, year, 53, to, why)
 
 
