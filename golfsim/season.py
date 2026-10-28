@@ -202,6 +202,10 @@ class Season:
         self._teams = {}                                     # event id -> {gid: (coach, caddie)} this week
         self.entry_misses = defaultdict(Counter)             # year -> gid -> weeks shut out of full fields
         self.entry_wants = defaultdict(Counter)              # year -> gid -> weeks they wanted to play
+        self.season_rounds = defaultdict(Counter)            # year -> gid -> competitive rounds played
+        for g in world.golfers:                              # the world starts mid-history: assume the season
+            if g.lifestyle != 'retired':                     # before it was a typical one for their lifestyle
+                self.season_rounds[self.first_year - 1][g.id] = D.EXPERIENCE_ROUNDS * (1.0 if g.lifestyle == 'full_time' else 0.5)
         self.entry_stats = defaultdict(_dd_counter)          # year -> first-choice tour -> wanted/placed/shut out
         self.transitions = {}                                # year -> [career decisions with their reasons]
         self.activity_counts = defaultdict(_dd_counter)      # year -> gid -> weeks per activity
@@ -948,6 +952,7 @@ class Season:
                 if k is not None:
                     k.familiarity[fk] = k.familiarity.get(fk, 0) + n / 18
             for gid, n in rounds.items():
+                self.season_rounds[year][gid] += n                   # competitive experience
                 k = self.staff.caddie(gid)
                 if k is not None:
                     k.rounds_worked += n
@@ -1144,7 +1149,7 @@ class Season:
             rng = random.Random(_seed(self.seed, year, 'aging'))
             for g in self.world.golfers:
                 if g.lifestyle != 'retired':
-                    D.age_year(g, g.age(year + 1), rng)
+                    D.age_year(g, g.age(year + 1), rng, D.experience_factor(self.season_rounds[year][g.id]))
             self.juniors_added[year + 1] = careers.add_juniors(self, year + 1)
             for g in self.world.golfers:
                 self.fatigue[g.id] = g.fatigue = 0.0         # the off-season rests everyone
@@ -1301,7 +1306,8 @@ class Season:
             work_scale = 0.3 if g.lifestyle == 'part_time' else 1.0
             gamma = 60.0
             dp = gamma * D.development_value(g, 'play', age, insight=insight)
-            dt = gamma * D.development_value(g, 'train', age, cat, insight, self.staff.coaching(g, cat, age, year)) * work_scale
+            dt = gamma * D.development_value(g, 'train', age, cat, insight, self.staff.coaching(g, cat, age, year),
+                                             self.experience(g.id, year, week0)) * work_scale
             bar = self.bar(g)
             target = self.target_events(g)
             played0 = len(self.played[year][g.id])
@@ -1489,6 +1495,11 @@ class Season:
                 g.backing -= draw
                 self.earn(g, year, 'support', draw)
 
+    def experience(self, gid, year, week):
+        """Competitive experience over the last 52 weeks (0-1), from rounds actually played."""
+        rounds = self.season_rounds[year][gid] + self.season_rounds.get(year - 1, {}).get(gid, 0) * max(0, 52 - week) / 52
+        return D.experience_factor(rounds)
+
     def develop_week(self, year, week):
         """What each golfer did this week, and how it changed their game."""
         for g in self.world.golfers:
@@ -1509,6 +1520,7 @@ class Season:
             if self.development and g.ceilings:
                 scale = 0.3 if g.lifestyle == 'part_time' and act == 'train' else 1.0
                 D.develop_week(g, 'rest' if act == 'work' else act, g.age(year), cat, rounds,
-                               coach=self.staff.coaching(g, cat, g.age(year), year), scale=scale)
+                               coach=self.staff.coaching(g, cat, g.age(year), year), scale=scale,
+                               experience=self.experience(g.id, year, week))
             if act in ('train', 'play') and g.id in self.staff.coach_of:
                 self.staff.rel.add_work('coach', g.id, 1.0, year)        # a week actually worked together

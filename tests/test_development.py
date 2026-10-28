@@ -80,6 +80,53 @@ class DevelopmentTests(unittest.TestCase):
         self.assertLess(g.attrs['power'], p0 - 5)               # strength fades
         self.assertGreater(g.attrs['composure'], c0 + 2)        # experience grows
 
+    def test_pressure_skills_need_competition(self):
+        """Practice builds technique; composure, management and tournament consistency need recent
+        competitive rounds, and the mental game matures each year only with the rounds played."""
+        self.assertEqual(D.experience_factor(0), 0.0)
+        self.assertEqual(D.experience_factor(D.EXPERIENCE_ROUNDS * 2), 1.0)
+        fresh, seasoned = golfer(20, 12), golfer(20, 12)
+        b = dict(fresh.attrs)
+        for _ in range(10):
+            D.develop_week(fresh, 'train', 20, 'mental', experience=0.0)
+            D.develop_week(seasoned, 'train', 20, 'mental', experience=1.0)
+        self.assertEqual({k: fresh.attrs[k] for k in D.CATEGORIES['mental']}, {k: b[k] for k in D.CATEGORIES['mental']})
+        self.assertTrue(all(seasoned.attrs[k] > b[k] for k in D.CATEGORIES['mental']))
+        fresh, seasoned = golfer(20, 12), golfer(20, 12)
+        for _ in range(10):
+            for g, e in ((fresh, 0.0), (seasoned, 1.0)):
+                for cat in ('long_game', 'putting'):
+                    D.develop_week(g, 'train', 20, cat, experience=e)
+        for k in ('driving_accuracy', 'mid_irons', 'short_putting', 'lag_putting'):   # technique: the same
+            self.assertAlmostEqual(fresh.attrs[k], seasoned.attrs[k])
+        for k in ('striking_consistency', 'putting_consistency'):        # practice alone: a little
+            self.assertGreater(fresh.attrs[k], b[k])
+            self.assertLess(fresh.attrs[k] - b[k], 0.3 * (seasoned.attrs[k] - b[k]))
+        idle, active = golfer(25, 5), golfer(25, 5)
+        m0 = S.mean(idle.attrs[k] for k in D.CATEGORIES['mental'])
+        D.age_year(idle, 26, random.Random(3), experience=0.0)
+        D.age_year(active, 26, random.Random(3), experience=1.0)
+        self.assertEqual(S.mean(idle.attrs[k] for k in D.CATEGORIES['mental']), m0)
+        self.assertGreater(S.mean(active.attrs[k] for k in D.CATEGORIES['mental']), m0)
+
+    def test_balanced_schedules_develop_best(self):
+        """18 to 30: a mix of training and competition beats either alone, and a golfer with no events
+        (blocked or by choice: development only sees what they did) falls well short."""
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
+        from development_audit import path_years
+        end = {}
+        for name, events, train in (('balanced', 20, 26), ('tournaments', 25, 0), ('training', 0, 46), ('none', 0, 0)):
+            xs = []
+            for i in range(8):
+                g = golfer(18, 15)
+                path_years(g, 18, 12, events, train, random.Random(i))
+                xs.append(g.overall)
+            end[name] = S.mean(xs)
+        self.assertGreater(end['balanced'], end['tournaments'])
+        self.assertGreater(end['balanced'], end['training'] + 2)
+        self.assertGreater(end['training'], end['none'])
+        self.assertGreater(end['tournaments'], end['none'])
+
     def test_serious_injuries_leave_a_mark(self):
         g = golfer(28, 5)
         p = g.attrs['power']

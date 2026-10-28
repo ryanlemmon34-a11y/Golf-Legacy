@@ -22,6 +22,18 @@ golfer does one thing:
 | **Rest** | No skill growth; fatigue recovers fully. |
 | **Work** | A paid work week (only for full-time pros who are genuinely short of money): earns a wage, no skill growth. |
 
+**Competition teaches what practice cannot.** Composure, resilience, course management, focus and
+tournament consistency (striking and putting) train only as far as a golfer's **competitive experience**
+supports: their competitive rounds over the last 52 weeks, full at 40 rounds. With no recent competition,
+practice builds a little consistency (15%) and no pressure skills at all; technique, the short game and
+physical work train the same either way. Tournaments still teach every skill directly. So a golfer who
+only trains falls short of their potential, one who only plays leaves technique on the table, and a mix
+develops best — measured in `reports/DEVELOPMENT_AUDIT.md` (section 4: 18 to 30, the same golfers on
+balanced, light, tournament-only, training-only and no-event schedules). Development sees what a golfer
+did, not why: a season without events costs the same whether the fields were full or they chose to stay
+home. (The starting world assumes everyone's season before it was typical for their lifestyle; new
+juniors arrive with a junior season of competition behind them.)
+
 A **coach** (see `docs/COACHES_AND_CADDIES.md`) makes training count for more — most in their
 speciality, and for young players if that is their gift — and helps the golfer see what to work on.
 
@@ -37,7 +49,8 @@ outcome always follows the true ceilings.
 
 **Aging (yearly):** strength, stamina and recovery fade from about 3 years after a golfer's prime
 (faster with a high aging rate), technique from about 8 years after; the **mental game keeps maturing
-with experience into the late forties** — which is how a journeyman can be a better competitor at 34
+with competitive experience into the late forties** — each year in proportion to the competitive rounds
+actually played (none without competition; green reading half of it regardless) — which is how a journeyman can be a better competitor at 34
 than at 24. Long injuries (10+ weeks) can take some power, stamina and injury resistance away for good —
 the longer the injury, the likelier (about 15% at 10 weeks, 60% at 20, 85% at 30).
 

@@ -29,7 +29,7 @@ import random
 
 from .calendar import TOUR_BY_KEY
 from .cards import home_challenger, home_lower, home_mini
-from .development import init_ceilings
+from .development import EXPERIENCE_ROUNDS, init_ceilings
 from . import finance as FIN
 from . import prestige as PR
 from . import staff as ST
@@ -317,6 +317,7 @@ def add_juniors(season, year):
         g.backing = initial_backing(18, rng.random(), rng.random())
         season.world.golfers.append(g)
         season.g[g.id] = g
+        season.season_rounds[year][g.id] = EXPERIENCE_ROUNDS     # a junior season of competition behind them
         where = TOUR_BY_KEY[g.tour].name if g.tour in TOUR_BY_KEY else 'amateur golf'
         season.log(g.id, year, 1, f'Arrived on the scene at 18 ({where})')
     season.world.by_id = season.g

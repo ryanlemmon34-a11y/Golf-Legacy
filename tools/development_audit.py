@@ -131,7 +131,7 @@ def lifecycle(world):
             if rng.random() < 0.04:
                 injuries += 1
                 lasting += bool(D.serious_injury(g, rng.choice((6, 12, 20)), rng))
-            D.age_year(g, age + 1, rng)
+            D.age_year(g, age + 1, rng, D.experience_factor(21 * 4))
             over_ceiling += sum(1 for k in g.attrs if g.attrs[k] > g.ceilings[k] + 1e-9)
             over_99 += sum(1 for k in g.attrs if g.attrs[k] > 99.0 + 1e-9)
             by_age.setdefault(age, []).append(g.overall - start)
@@ -164,6 +164,67 @@ def lifecycle(world):
     return out
 
 
+PATHS = (('Balanced (20 events, 26 training weeks)', 20, 26),
+         ('Light competition (8 events, 38 training weeks)', 8, 38),
+         ('Tournament-only (25 events, no training)', 25, 0),
+         ('Training-only (no events, 46 training weeks)', 0, 46),
+         ('Zero events, no training (rest or work)', 0, 0))
+
+
+def path_years(g, age0, years, events, train, rng, competition_rules=True):
+    """Run a golfer through `years` seasons of one schedule; 4 rounds per event, the rest of the year
+    rest. Returns {age: overall at the start of that age}."""
+    out = {}
+    for y in range(years):
+        age = age0 + y
+        out[age] = g.overall
+        weeks = ['play'] * events + ['train'] * train
+        weeks += ['rest'] * (52 - len(weeks))
+        rng.shuffle(weeks)
+        rounds = 0.0
+        exp = D.experience_factor(4.0 * events) if competition_rules else 1.0   # a steady schedule
+        for act in weeks:
+            if act == 'play':
+                D.develop_week(g, 'play', age, rounds=4, experience=exp)
+                rounds += 4
+            elif act == 'train':
+                D.develop_week(g, 'train', age, D.choose_category(g, rng), experience=exp)
+            else:
+                D.develop_week(g, 'rest', age)
+        D.age_year(g, age + 1, rng, D.experience_factor(rounds) if competition_rules else 1.0)
+    out[age0 + years] = g.overall
+    return out
+
+
+def paths_table(world):
+    golfers = sample(world, 18, 15, 40, 18_15)
+    out = ['', '## 4. Training and competition: development paths from 18 to 30', '',
+           'The same 40 golfers (18, 15 points below potential), uncoached, run from 18 to 30 through one fixed '
+           'schedule each year. "Now" applies the competition rules (composure, resilience, course management, '
+           'focus and tournament consistency only train as far as recent competitive rounds support; the mental '
+           'game matures each year with the rounds played); "before" is the same schedule without them. Whether '
+           'the events were missed by choice or because every field was full makes no difference to development: '
+           'the engine develops what a golfer did, not why.', '',
+           '| Schedule | Overall at 22 (before / now) | at 26 | at 30 | Mental at 30 | Left below potential at 30 |',
+           '|---|---|---|---|---|---|']
+    for name, events, train in PATHS:
+        row = {}
+        for rules in (False, True):
+            ages, mental, left = [], [], []
+            for g in golfers:
+                g = copy.deepcopy(g)
+                ages.append(path_years(g, 18, 12, events, train, random.Random(g.id), rules))
+                mental.append(S.mean(g.attrs[k] for k in D.CATEGORIES['mental']))
+                left.append(max(0.0, g.potential - g.overall))
+            row[rules] = ({a: S.mean(x[a] for x in ages) for a in (22, 26, 30)}, S.mean(mental), S.mean(left))
+        (b, bm, bl), (n, nm, nl) = row[False], row[True]
+        out.append(f'| {name} | {b[22]:.1f} / {n[22]:.1f} | {b[26]:.1f} / {n[26]:.1f} | {b[30]:.1f} / {n[30]:.1f} '
+                   f'| {bm:.1f} / {nm:.1f} | {bl:.1f} / {nl:.1f} |')
+    start = S.mean(g.overall for g in golfers)
+    out += ['', f'Starting overall {start:.1f}; average potential {S.mean(g.potential for g in golfers):.1f}.']
+    return out
+
+
 def main():
     world = generate_world()
     out = ['# Golf Legacy — Development and Caddie Audit', '',
@@ -171,6 +232,7 @@ def main():
     out += coaching_table(world)
     out += caddie_table()
     out += lifecycle(world)
+    out += paths_table(world)
     out += ['', '## Where hidden values are still used', '',
             '- **Training choices** (what to work on, and the planner\'s value of training vs playing) use each '
             'attribute\'s true room to its ceiling seen through a persistent personal misreading (wider for poor '

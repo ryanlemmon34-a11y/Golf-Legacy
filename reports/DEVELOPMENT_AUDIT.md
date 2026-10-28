@@ -8,21 +8,21 @@ Average overall gained in one season (20 events, 26 training weeks, 6 rest) by 2
 
 | Age | Gap | No coach (prev / now) | Ordinary coach (teaching 50) (prev / now) | Strong specialist (teaching 80, their weakest area) (prev / now) | Youth specialist (teaching 60) (prev / now) |
 |---|---|---|---|---|---|
-| 18 | 15 | +4.34 / +4.51 | +4.58 / +4.71 | +4.97 / +5.06 | +4.83 / +4.92 |
-| 18 | 7 | +2.03 / +2.11 | +2.15 / +2.20 | +2.32 / +2.36 | +2.25 / +2.30 |
-| 18 | 2 | +0.56 / +0.58 | +0.59 / +0.60 | +0.63 / +0.64 | +0.61 / +0.63 |
-| 21 | 15 | +4.17 / +4.34 | +4.40 / +4.53 | +4.75 / +4.83 | +4.62 / +4.71 |
-| 21 | 7 | +1.95 / +2.02 | +2.05 / +2.10 | +2.21 / +2.25 | +2.15 / +2.19 |
-| 21 | 2 | +0.52 / +0.54 | +0.54 / +0.56 | +0.58 / +0.59 | +0.57 / +0.58 |
-| 25 | 15 | +3.01 / +3.16 | +3.23 / +3.34 | +3.59 / +3.66 | +3.32 / +3.42 |
-| 25 | 7 | +1.35 / +1.42 | +1.44 / +1.49 | +1.60 / +1.63 | +1.49 / +1.53 |
-| 25 | 2 | +0.38 / +0.40 | +0.40 / +0.42 | +0.44 / +0.45 | +0.42 / +0.43 |
-| 30 | 15 | +1.99 / +2.10 | +2.14 / +2.22 | +2.37 / +2.43 | +2.21 / +2.28 |
-| 30 | 7 | +0.90 / +0.94 | +0.96 / +1.00 | +1.06 / +1.08 | +0.99 / +1.02 |
-| 30 | 2 | +0.26 / +0.28 | +0.28 / +0.29 | +0.31 / +0.32 | +0.29 / +0.30 |
-| 35 | 15 | +1.43 / +1.51 | +1.54 / +1.60 | +1.72 / +1.76 | +1.58 / +1.64 |
-| 35 | 7 | +0.67 / +0.71 | +0.73 / +0.76 | +0.82 / +0.83 | +0.75 / +0.78 |
-| 35 | 2 | +0.17 / +0.18 | +0.18 / +0.19 | +0.20 / +0.21 | +0.19 / +0.19 |
+| 18 | 15 | +4.45 / +4.60 | +4.52 / +4.66 | +4.75 / +4.85 | +4.68 / +4.79 |
+| 18 | 7 | +2.09 / +2.15 | +2.12 / +2.18 | +2.22 / +2.27 | +2.19 / +2.24 |
+| 18 | 2 | +0.57 / +0.59 | +0.58 / +0.60 | +0.61 / +0.62 | +0.60 / +0.61 |
+| 21 | 15 | +4.29 / +4.44 | +4.35 / +4.48 | +4.54 / +4.64 | +4.50 / +4.60 |
+| 21 | 7 | +2.01 / +2.07 | +2.03 / +2.09 | +2.11 / +2.16 | +2.09 / +2.14 |
+| 21 | 2 | +0.53 / +0.55 | +0.54 / +0.55 | +0.56 / +0.57 | +0.56 / +0.57 |
+| 25 | 15 | +3.01 / +3.16 | +3.17 / +3.29 | +3.36 / +3.46 | +3.23 / +3.34 |
+| 25 | 7 | +1.35 / +1.42 | +1.42 / +1.47 | +1.50 / +1.55 | +1.45 / +1.49 |
+| 25 | 2 | +0.38 / +0.40 | +0.40 / +0.41 | +0.42 / +0.43 | +0.40 / +0.42 |
+| 30 | 15 | +1.99 / +2.10 | +2.10 / +2.19 | +2.24 / +2.30 | +2.14 / +2.22 |
+| 30 | 7 | +0.90 / +0.94 | +0.95 / +0.98 | +1.00 / +1.03 | +0.96 / +1.00 |
+| 30 | 2 | +0.26 / +0.28 | +0.28 / +0.29 | +0.29 / +0.30 | +0.28 / +0.29 |
+| 35 | 15 | +1.43 / +1.51 | +1.51 / +1.57 | +1.60 / +1.65 | +1.54 / +1.60 |
+| 35 | 7 | +0.67 / +0.71 | +0.71 / +0.74 | +0.76 / +0.78 | +0.73 / +0.76 |
+| 35 | 2 | +0.17 / +0.18 | +0.18 / +0.19 | +0.19 / +0.20 | +0.18 / +0.19 |
 
 ## 2. Caddies in actual scoring
 
@@ -51,6 +51,20 @@ Mean score of an all-70 golfer over 600 rounds on Ashford Ridge (par 72), common
 | 42-48 | 520 | -0.95 |
 
 - A year of only rest or work: 18-year-olds gained +3.01 physical, +0.00 skill; 28-year-olds +0.00 physical, +0.00 skill (maturation is physical only and stops at 23).
+
+## 4. Training and competition: development paths from 18 to 30
+
+The same 40 golfers (18, 15 points below potential), uncoached, run from 18 to 30 through one fixed schedule each year. "Now" applies the competition rules (composure, resilience, course management, focus and tournament consistency only train as far as recent competitive rounds support; the mental game matures each year with the rounds played); "before" is the same schedule without them. Whether the events were missed by choice or because every field was full makes no difference to development: the engine develops what a golfer did, not why.
+
+| Schedule | Overall at 22 (before / now) | at 26 | at 30 | Mental at 30 | Left below potential at 30 |
+|---|---|---|---|---|---|
+| Balanced (20 events, 26 training weeks) | 56.5 / 56.5 | 59.2 / 59.2 | 60.0 / 60.0 | 65.6 / 65.6 | 0.5 / 0.5 |
+| Light competition (8 events, 38 training weeks) | 55.4 / 55.3 | 58.2 / 58.1 | 59.2 / 59.1 | 62.8 / 61.7 | 1.3 / 1.4 |
+| Tournament-only (25 events, no training) | 55.1 / 55.1 | 57.9 / 57.9 | 58.7 / 58.7 | 65.9 / 65.9 | 1.8 / 1.8 |
+| Training-only (no events, 46 training weeks) | 54.3 / 53.3 | 57.0 / 55.2 | 58.1 / 55.9 | 57.7 / 43.0 | 2.4 / 4.6 |
+| Zero events, no training (rest or work) | 47.9 / 47.7 | 48.4 / 48.0 | 48.4 / 47.9 | 47.2 / 43.0 | 12.1 / 12.6 |
+
+Starting overall 45.5; average potential 60.5.
 
 ## Where hidden values are still used
 

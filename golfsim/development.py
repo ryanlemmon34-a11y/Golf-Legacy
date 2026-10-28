@@ -13,6 +13,10 @@ Growth is proportional to the gap to the ceiling, times a learning rate that is 
 teens and falls with age, times work ethic. Young golfers also mature physically on their own, every
 week, whatever they are doing (resting and working included): growing up does not need golf.
 
+Competition teaches what practice cannot: composure, resilience, course management, focus and tournament
+consistency grow in training only as far as recent competitive experience supports, and the mental game's
+yearly maturing follows the competitive rounds actually played (see COMPETITIVE).
+
 Golfers do not know their ceilings. Their decisions (what to train, whether a tournament or a training
 week helps them more) use a *perceived* gap: the real gap seen through a persistent personal misreading
 that is larger for golfers with poor judgement of their own game (management and coachability).
@@ -45,6 +49,26 @@ BASE_PLAY = 0.008           # per tournament (four rounds), on every non-physica
 MENTAL_PLAY = 1.6           # competition teaches the mental game most
 MENTAL_TRAIN = 0.6          # the mental game is harder to train away from competition
 MATURING = 0.004            # physical growth per week for teenagers, without training
+
+# What only competition can really teach: pressure handling, judgement on the course and tournament
+# consistency. Training these works only as far as a golfer's recent competitive experience supports
+# (practice can build a little consistency, no pressure skills), and the yearly maturing of the mental
+# game follows the competitive rounds actually played, not the calendar.
+COMPETITIVE = ('composure', 'resilience', 'management', 'focus', 'striking_consistency', 'putting_consistency')
+PRACTICE_SHARE = {'striking_consistency': 0.15, 'putting_consistency': 0.15}   # what practice alone builds
+EXPERIENCE_ROUNDS = 40.0    # competitive rounds in a year for full competitive experience
+
+
+def experience_factor(rounds):
+    """0 (no competitive rounds in the last year) .. 1 (EXPERIENCE_ROUNDS or more)."""
+    return max(0.0, min(1.0, rounds / EXPERIENCE_ROUNDS))
+
+
+def _train_mult(k, experience):
+    if k not in COMPETITIVE:
+        return 1.0
+    p = PRACTICE_SHARE.get(k, 0.0)
+    return p + (1 - p) * experience
 
 
 def learning_rate(age):
@@ -85,9 +109,11 @@ def coach_multiplier(quality):
     return 1.0 + 0.5 * max(0.0, quality - 0.3)
 
 
-def develop_week(g, activity, age, category=None, rounds=0.0, coach=0.3, scale=1.0):
+def develop_week(g, activity, age, category=None, rounds=0.0, coach=0.3, scale=1.0, experience=1.0):
     """Apply one week of development. activity: 'train', 'play' or 'rest' (a paid work week counts as
-    rest). `scale` shrinks training for golfers with a full-time job. Returns overall gained."""
+    rest). `scale` shrinks training for golfers with a full-time job; `experience` (0-1, from recent
+    competitive rounds) limits what training can do for the competitive attributes. Returns overall
+    gained."""
     before = g.overall
     a, c = g.attrs, g.ceilings
     if age < 23:                                  # still growing into their body, whatever the week
@@ -105,7 +131,7 @@ def develop_week(g, activity, age, category=None, rounds=0.0, coach=0.3, scale=1
         for k in CATEGORIES[category]:
             gap = c[k] - a[k]
             if gap > 0:
-                a[k] = min(99.0, a[k] + k_train * gap)
+                a[k] = min(99.0, a[k] + k_train * gap * _train_mult(k, experience))
     elif activity == 'play' and rounds:
         k_play = BASE_PLAY * lr * min(1.0, rounds / 4)
         for k, cat in CATEGORY_OF.items():
@@ -136,7 +162,7 @@ def perceived_gap(g, k, insight=0.0):
     return max(0.0, g.ceilings[k] - g.attrs[k] + sd * z)
 
 
-def development_value(g, activity, age, category=None, insight=0.0, coach=0.3):
+def development_value(g, activity, age, category=None, insight=0.0, coach=0.3, experience=1.0):
     """Overall a golfer expects to gain this week from an activity, from their own (imperfect) view of
     their game (used by the planner)."""
     lr = learning_rate(age) * (0.5 + g.personality['work_ethic'] / 100)
@@ -147,7 +173,7 @@ def development_value(g, activity, age, category=None, insight=0.0, coach=0.3):
         if category == 'mental':
             k_train *= MENTAL_TRAIN
         for k in CATEGORIES[category]:
-            gain += OVERALL_WEIGHTS[k] * k_train * perceived_gap(g, k, insight)
+            gain += OVERALL_WEIGHTS[k] * k_train * perceived_gap(g, k, insight) * _train_mult(k, experience)
     elif activity == 'play':
         k_play = BASE_PLAY * lr
         for k, cat in CATEGORY_OF.items():
@@ -171,8 +197,10 @@ def choose_category(g, rng, insight=0.0):
     return max(scores, key=lambda c: scores[c] / top + rng.gauss(0, noise))
 
 
-def age_year(g, age, rng):
-    """One year older: physical decline after the prime, then technique; mental growth with experience."""
+def age_year(g, age, rng, experience=1.0):
+    """One year older: physical decline after the prime, then technique; the mental game matures with
+    competitive experience (`experience`, 0-1, from the season's competitive rounds) — a year without
+    competition matures nothing."""
     a, c = g.attrs, g.ceilings
     rate = g.aging_rate
     x_phys = age - (g.peak_age + 3)
@@ -185,7 +213,8 @@ def age_year(g, age, rng):
             d = -0.15 * rate * x_tech ** 0.7
         elif cat == 'mental' or k == 'green_reading':
             if age < 48:
-                d = 0.35 * (0.6 + 0.8 * rng.random()) * (1.0 if cat == 'mental' else 0.5)
+                d = 0.35 * (0.6 + 0.8 * rng.random()) * (1.0 if cat == 'mental' else 0.5) * \
+                    (experience if cat == 'mental' else 0.5 + 0.5 * experience)
             elif age > 55:
                 d = -0.2 * (age - 55) ** 0.7
         if d:
