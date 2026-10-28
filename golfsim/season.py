@@ -477,32 +477,43 @@ class Season:
             v += 8 if venue_country == g.country else -40
         return v
 
-    def event_value(self, g, ed, week, rng, venue_country, cost=None):
-        s = ed.series
-        v = self.base_value(g, ed, venue_country)
-        weeks = self.played[ed.year][g.id]
+    def golfer_week(self, g, year, week):
+        """The parts of an event's value that depend only on the golfer and the week (worked out once
+        per golfer, not once per event)."""
+        weeks = self.played[year][g.id]
         streak = 0
         w = week - 1
         while w in weeks:
             streak += 1
             w -= 1
-        if streak >= 2:
-            v -= 5 * (streak - 1) ** 1.4
         # catching up or easing off against the season plan
         pace = self.target_events(g) * week / 52 - len(weeks)
-        v += max(-25.0, min(6.0, 3.5 * pace))
-        if week + 1 in MAJOR_WEEKS and self.wr_pos.get(g.id, 9999) <= 100:
+        return {'streak': 5 * (streak - 1) ** 1.4 if streak >= 2 else None,
+                'pace': max(-25.0, min(6.0, 3.5 * pace)),
+                'before_major': week + 1 in MAJOR_WEEKS and self.wr_pos.get(g.id, 9999) <= 100,
+                'after_major': week - 1 in MAJOR_WEEKS and week - 1 in weeks,
+                # tired golfers rest; good course managers plan their rest better
+                'tired': (8 + 10 * g.attrs["management"] / 100) * 2 * max(0.0, self.fatigue[g.id] - 0.1),
+                'kept': self.prize_kept(g), 'unit': FIN.money_unit(self.funds(g, year))}
+
+    def event_value(self, g, ed, week, rng, venue_country, cost=None, gw=None, base=None):
+        s = ed.series
+        gw = gw or self.golfer_week(g, ed.year, week)
+        v = self.base_value(g, ed, venue_country) if base is None else base
+        if gw['streak'] is not None:
+            v -= gw['streak']
+        v += gw['pace']
+        if gw['before_major']:
             v -= 6                                           # resting before a major
-        if week - 1 in MAJOR_WEEKS and week - 1 in weeks:
+        if gw['after_major']:
             v -= 8                                           # resting after a major
-        # tired golfers rest; good course managers plan their rest better
-        v -= (8 + 10 * g.attrs["management"] / 100) * 2 * max(0.0, self.fatigue[g.id] - 0.1)
+        v -= gw['tired']
         champs = self.champions.get(s.series_id)
         if champs and champs[-1][1] == g.id:
             v += 5                                           # defending champion
         if cost is None:
             cost = self.trip_cost(g, s, self.lib.venues(ed.year)[ed.event_id][0].city)
-        v -= (cost - self.expected_kept(g, s)) / FIN.money_unit(self.funds(g, ed.year))
+        v -= (cost - self.expected_prize(g, s) * gw['kept']) / gw['unit']
         return v + rng.gauss(0, 3)
 
     # ---- the week ------------------------------------------------------------------------------
@@ -589,6 +600,7 @@ class Season:
         prefs = {}
         open_to = {}                                         # who may enter which events this week (by kind)
         fees = {}                                            # (paid by school?, home country, event) -> cost
+        bases = {}                                           # (home country, lifestyle, event) -> base value
         for g in self.world.golfers:
             if (not g.tour and g.status != 'club_pro') or g.id in self.injured or g.lifestyle == 'retired':
                 continue
@@ -607,6 +619,7 @@ class Season:
             days = busy[g.id]
             k = self.staff.caddie(g.id)
             caddie_fee = k.weekly_fee if k is not None else 0.0
+            gw = self.golfer_week(g, year, week)
             for ed in evs:
                 if days & ed.series.day_set:
                     continue
@@ -618,7 +631,11 @@ class Season:
                 cost = fee + caddie_fee                      # = trip_cost: the can_afford rule
                 if not (cost <= 0 or cost <= money):
                     continue                                 # cannot pay for the trip (school-paid trips cost 0)
-                v = self.event_value(g, ed, week, rng, country[eid], cost)
+                bk = (g.country, g.lifestyle, eid)
+                base = bases.get(bk)
+                if base is None:
+                    base = bases[bk] = self.base_value(g, ed, country[eid])
+                v = self.event_value(g, ed, week, rng, country[eid], cost, gw, base)
                 opts.append((v, eid))
             if not opts:
                 continue
@@ -1745,12 +1762,13 @@ class Season:
             self.staff_midseason(g, year, week0, money0)
             age = g.age(year)
             insight = self.staff.insight(g, year)
-            cat = D.choose_category(g, rng, insight)
+            gaps = D.perceived_gaps(g, insight)
+            cat = D.choose_category(g, rng, insight, gaps)
             work_scale = 0.3 if g.lifestyle == 'part_time' else 1.0
             gamma = 60.0
-            dp = gamma * D.development_value(g, 'play', age, insight=insight)
+            dp = gamma * D.development_value(g, 'play', age, insight=insight, gaps=gaps)
             dt = gamma * D.development_value(g, 'train', age, cat, insight, self.staff.coaching(g, cat, age, year),
-                                             self.experience(g.id, year, week0)) * work_scale
+                                             self.experience(g.id, year, week0), gaps) * work_scale
             bar = self.bar(g)
             target = self.target_events(g)
             played0 = len(self.played[year][g.id])
@@ -1772,6 +1790,7 @@ class Season:
             if can_work and stuck:
                 work_v = 40.0
             playable = [i for i, w in enumerate(weeks) if base[i] is not None and now + w >= inj_until]
+            slot = {i: j for j, i in enumerate(playable)}
             best_val, best_acts = None, None
             for mask in range(1 << len(playable)):
                 f = self.fatigue[g.id]
@@ -1781,7 +1800,7 @@ class Season:
                         f *= rest_rec
                         acts.append('rest')
                         continue
-                    j = playable.index(i) if i in playable else -1
+                    j = slot.get(i, -1)
                     if j >= 0 and mask >> j & 1:
                         if costs[i] > 0 and costs[i] > money:
                             val = None                       # they cannot pay for this trip (school-paid: free)

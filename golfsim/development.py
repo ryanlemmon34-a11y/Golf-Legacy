@@ -113,16 +113,17 @@ def develop_week(g, activity, age, category=None, rounds=0.0, coach=0.3, scale=1
     """Apply one week of development. activity: 'train', 'play' or 'rest' (a paid work week counts as
     rest). `scale` shrinks training for golfers with a full-time job; `experience` (0-1, from recent
     competitive rounds) limits what training can do for the competitive attributes. Returns overall
-    gained."""
-    before = g.overall
+    gained (from the attributes that changed: a week touches only a few)."""
     a, c = g.attrs, g.ceilings
+    old = {}
     if age < 23:                                  # still growing into their body, whatever the week
         for k in CATEGORIES['physical']:
             gap = c[k] - a[k]
             if gap > 0:
+                old[k] = a[k]
                 a[k] = min(99.0, a[k] + MATURING * gap)
     if activity == 'rest':
-        return g.overall - before
+        return _gain(a, old)
     lr = learning_rate(age) * (0.5 + g.personality['work_ethic'] / 100) * scale
     if activity == 'train' and category:
         k_train = BASE_TRAIN * lr * (0.6 + 0.8 * g.personality['coachability'] / 100) * coach_multiplier(coach)
@@ -131,6 +132,7 @@ def develop_week(g, activity, age, category=None, rounds=0.0, coach=0.3, scale=1
         for k in CATEGORIES[category]:
             gap = c[k] - a[k]
             if gap > 0:
+                old.setdefault(k, a[k])
                 a[k] = min(99.0, a[k] + k_train * gap * _train_mult(k, experience))
     elif activity == 'play' and rounds:
         k_play = BASE_PLAY * lr * min(1.0, rounds / 4)
@@ -139,8 +141,16 @@ def develop_week(g, activity, age, category=None, rounds=0.0, coach=0.3, scale=1
                 continue
             gap = c[k] - a[k]
             if gap > 0:
+                old.setdefault(k, a[k])
                 a[k] = min(99.0, a[k] + k_play * gap * (MENTAL_PLAY if cat == 'mental' else 1.0))
-    return g.overall - before
+    return _gain(a, old)
+
+
+_TOTAL_W = sum(OVERALL_WEIGHTS.values())
+
+
+def _gain(a, old):
+    return sum(OVERALL_WEIGHTS[k] * (a[k] - v) for k, v in old.items()) / _TOTAL_W
 
 
 def judgement(g):
@@ -162,7 +172,12 @@ def perceived_gap(g, k, insight=0.0):
     return max(0.0, g.ceilings[k] - g.attrs[k] + sd * z)
 
 
-def development_value(g, activity, age, category=None, insight=0.0, coach=0.3, experience=1.0):
+def perceived_gaps(g, insight=0.0):
+    """perceived_gap for every attribute at once (the planner reads them several times a month)."""
+    return {k: perceived_gap(g, k, insight) for k in g.attrs}
+
+
+def development_value(g, activity, age, category=None, insight=0.0, coach=0.3, experience=1.0, gaps=None):
     """Overall a golfer expects to gain this week from an activity, from their own (imperfect) view of
     their game (used by the planner)."""
     lr = learning_rate(age) * (0.5 + g.personality['work_ethic'] / 100)
@@ -173,22 +188,23 @@ def development_value(g, activity, age, category=None, insight=0.0, coach=0.3, e
         if category == 'mental':
             k_train *= MENTAL_TRAIN
         for k in CATEGORIES[category]:
-            gain += OVERALL_WEIGHTS[k] * k_train * perceived_gap(g, k, insight) * _train_mult(k, experience)
+            gap = gaps[k] if gaps is not None else perceived_gap(g, k, insight)
+            gain += OVERALL_WEIGHTS[k] * k_train * gap * _train_mult(k, experience)
     elif activity == 'play':
         k_play = BASE_PLAY * lr
         for k, cat in CATEGORY_OF.items():
             if cat != 'physical':
-                gain += OVERALL_WEIGHTS[k] * k_play * perceived_gap(g, k, insight) * (
-                    MENTAL_PLAY if cat == 'mental' else 1.0)
+                gap = gaps[k] if gaps is not None else perceived_gap(g, k, insight)
+                gain += OVERALL_WEIGHTS[k] * k_play * gap * (MENTAL_PLAY if cat == 'mental' else 1.0)
     return gain / total_w
 
 
-def choose_category(g, rng, insight=0.0):
+def choose_category(g, rng, insight=0.0, gaps=None):
     """What to train: the category with the most to gain (weighted by what matters for scoring).
     Good course managers and coachable golfers read their game better; others guess more."""
     scores = {}
     for cat, ks in CATEGORIES.items():
-        gain = sum(OVERALL_WEIGHTS[k] * perceived_gap(g, k, insight) for k in ks)
+        gain = sum(OVERALL_WEIGHTS[k] * (gaps[k] if gaps is not None else perceived_gap(g, k, insight)) for k in ks)
         if cat == 'mental':
             gain *= MENTAL_TRAIN
         scores[cat] = gain

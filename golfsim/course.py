@@ -11,6 +11,7 @@ punish them far more than they punish strong players.
 from __future__ import annotations
 
 from dataclasses import dataclass, replace, field
+from functools import cached_property
 
 HAZARDS = ('open', 'trees', 'water', 'ob')
 GREEN_WATER = ('', 'front', 'left', 'right', 'back')
@@ -81,11 +82,11 @@ class Course:
         if len(self.holes) != 18:
             raise ValueError('a course needs 18 holes')
 
-    @property
+    @cached_property
     def par(self):
         return sum(h.par for h in self.holes)
 
-    @property
+    @cached_property
     def yards(self):
         return sum(h.yards for h in self.holes)
 
