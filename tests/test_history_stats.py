@@ -43,8 +43,8 @@ class FakeArchive:
         self.rel = Relations()
         self.rel.begin('coach', 9, 2, (2027, 1), 'fee', 'golfer')
 
-    def events(self):
-        for y in self.years:
+    def events(self, years=None):
+        for y in (self.years if years is None else years):
             for e in self._ev[y]:
                 yield y, e
 

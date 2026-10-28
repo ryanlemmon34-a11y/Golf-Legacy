@@ -208,8 +208,9 @@ class Archive:
             self._years[y] = d
         return self._years[y]
 
-    def events(self):
-        for y in self.years:
+    def events(self, years=None):
+        """(year, edition) for every edition, or only those of `years` (only those seasons are read)."""
+        for y in (self.years if years is None else years):
             for e in self.year(y)['events']:
                 yield y, e
 

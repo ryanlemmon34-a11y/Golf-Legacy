@@ -366,6 +366,8 @@ class Season:
         def table(entries, lo, hi):
             out = {}
             for gid, rows in entries.items():
+                if not rows:
+                    continue                                 # every point expired: no average
                 tot, n = 0.0, 0
                 keep = []
                 for aw, pts in rows:
@@ -393,6 +395,8 @@ class Season:
     def update_fame(self, year, week):
         now = self.abs_week(year, week)
         for gid, rows in self.fame_log.items():
+            if not rows:
+                continue                                     # long expired (fame already 0)
             rows[:] = [(aw, pts) for aw, pts in rows if now - aw < PR.FAME_WEEKS]
             self.fame[gid] = sum(pts for _, pts in rows)
 
@@ -612,8 +616,20 @@ class Season:
     # ---- the week ------------------------------------------------------------------------------
     # The season's three steps. A whole season (run_year) and the weekly session (session.py) both use
     # exactly these, so a world advanced week by week is the same world as one run a season at a time.
+    def active_golfers(self):
+        """Everyone still competing, in the world's order: the weekly work walks this list, not every
+        person who has ever lived in the world (retired golfers keep their identity and history in
+        world.golfers and the archive). Retirement happens only at the end of a season, so the list is
+        rebuilt at each season boundary (and after loading)."""
+        n = len(self.world.golfers)
+        if self.__dict__.get('_active') is None or self._active_n != n:   # (or golfers were added)
+            self._active = [g for g in self.world.golfers if g.lifestyle != 'retired']
+            self._active_n = n
+        return self._active
+
     def start_year(self, year):
         """1 January: people refreshed, sponsor contracts, the staff market, playing rights."""
+        self._active = None
         self.year = year
         self.refresh_people(year)
         self.start_finances(year)
@@ -694,7 +710,7 @@ class Season:
         open_to = {}                                         # who may enter which events this week (by kind)
         fees = {}                                            # (paid by school?, home country, event) -> cost
         bases = {}                                           # (home country, lifestyle, event) -> base value
-        for g in self.world.golfers:
+        for g in self.active_golfers():
             if (not g.tour and g.status != 'club_pro') or g.id in self.injured or g.lifestyle == 'retired':
                 continue
             if self.development and self.plans.get(g.id, {}).get(week, ('play',))[0] != 'play':
@@ -892,7 +908,7 @@ class Season:
         return vs / rounds if rounds else 99.0
 
     def ranked_amateurs(self, pred):
-        ams = [g for g in self.world.golfers if g.status == 'amateur' and pred(g)]
+        ams = [g for g in self.active_golfers() if g.status == 'amateur' and pred(g)]
         return sorted(ams, key=lambda g: (self.am_pos.get(g.id, 99999), self.observed_form(g.id), g.id))
 
     def special_field(self, ed, year, week, rng, busy):
@@ -976,16 +992,16 @@ class Season:
         over for the next on the list (declines recorded). Each entrant's route is recorded."""
         s = ed.series
         if s.tier == 6:                                      # the series' amateurs, as for its ordinary events
-            pool = [g for g in self.world.golfers if g.lifestyle != 'retired' and self.series_amateur(g, s.tour)
+            pool = [g for g in self.active_golfers() if g.lifestyle != 'retired' and self.series_amateur(g, s.tour)
                     and free(g)]
         elif s.tier == 8:
-            pool = [g for g in self.world.golfers if g.lifestyle != 'retired' and self.eligible(g, s, week) and free(g)]
+            pool = [g for g in self.active_golfers() if g.lifestyle != 'retired' and self.eligible(g, s, week) and free(g)]
         elif s.tier == 4:                                    # open circuits: members and everyone who played them
             played = self.circuit_players(s.tour, year)
-            pool = [g for g in self.world.golfers if g.lifestyle != 'retired' and g.status == 'pro' and free(g)
+            pool = [g for g in self.active_golfers() if g.lifestyle != 'retired' and g.status == 'pro' and free(g)
                     and (g.tour == s.tour or g.id in played)]
         else:
-            pool = [g for g in self.world.golfers if g.tour == s.tour and g.lifestyle != 'retired' and free(g)]
+            pool = [g for g in self.active_golfers() if g.tour == s.tour and g.lifestyle != 'retired' and free(g)]
         in_pool = {g.id for g in pool}
         past = [gid for y, gid, _ in reversed(self.champions.get(s.series_id, []))
                 if y >= year - self.CHAMPION_YEARS and gid in in_pool]
@@ -1016,7 +1032,7 @@ class Season:
         for gid, pos in self.ctx.finishers('USA_AMATEUR', year - 1):
             if pos == 2 and self.g[gid].status == 'amateur':
                 out.setdefault(gid, f'RUNNER-UP {year - 1}')
-        ranked = [g for g in self.world.golfers if g.status == 'amateur' and g.lifestyle != 'retired'
+        ranked = [g for g in self.active_golfers() if g.status == 'amateur' and g.lifestyle != 'retired'
                   and g.id in self.am_pos]
         ranked.sort(key=lambda g: (self.am_pos[g.id], g.id))
         for g in ranked[:self.USA_AMATEUR_EXEMPT]:
@@ -1031,7 +1047,7 @@ class Season:
         round the sites."""
         s = ed.series
         exempt = self.usa_amateur_exempt(year)
-        pool = [g for g in self.world.golfers if g.status == 'amateur' and g.lifestyle != 'retired'
+        pool = [g for g in self.active_golfers() if g.status == 'amateur' and g.lifestyle != 'retired'
                 and g.id not in exempt and free(g) and len(self.played[year][g.id]) >= self.USA_AMATEUR_ENTRY_STARTS
                 and (self.series_amateur(g, 'AM_NORTH_AMERICA') or self.am_pos.get(g.id, 99999) <= 300)]
         pool.sort(key=lambda g: self.entry_ticket(g, s))
@@ -1123,7 +1139,7 @@ class Season:
         most home-country club pros do, a few from abroad travel. Played and recorded like any event."""
         s = ed.series
         keen = lambda g: 0.9 if g.country == s.host_country else 0.4 if region_of(g) in QS_AMERICAS else 0.08
-        ids = [g.id for g in sorted(self.world.golfers, key=lambda x: x.id)
+        ids = [g.id for g in sorted(self.active_golfers(), key=lambda x: x.id)
                if g.status == 'club_pro' and free(g) and rng.random() < keen(g)]
         rng.shuffle(ids)
         ids = ids[:s.field * s.sites]
@@ -1154,7 +1170,7 @@ class Season:
     def college_postseason(self, ed, year, free):
         s = ed.series
         sid = s.series_id
-        d1 = [g for g in self.world.golfers if g.tour == 'CO_US_D1' and free(g)]
+        d1 = [g for g in self.active_golfers() if g.tour == 'CO_US_D1' and free(g)]
         rank = lambda gs: sorted(gs, key=lambda g: (self.am_pos.get(g.id, 99999), self.observed_form(g.id), g.id))
         if sid.startswith('CONFERENCE_CHAMPIONSHIP_'):
             k = int(sid.rsplit('_', 1)[1]) - 1
@@ -1170,20 +1186,20 @@ class Season:
                 ids += [gid for gid, pos in self.ctx.finishers(f'COLLEGE_REGIONAL_{k}', year) if pos is not None][:39]
             return [ids[:s.field]]
         if sid == 'SMALL_COLLEGE_CHAMPIONSHIP':
-            return [[g.id for g in rank([g for g in self.world.golfers if g.tour == 'CO_US_SMALL' and free(g)])[:s.field]]]
+            return [[g.id for g in rank([g for g in self.active_golfers() if g.tour == 'CO_US_SMALL' and free(g)])[:s.field]]]
         if sid == 'INTL_UNIVERSITY_CHAMPIONSHIP':
-            return [[g.id for g in rank([g for g in self.world.golfers if g.tour == 'CO_INTL' and free(g)])[:s.field]]]
+            return [[g.id for g in rank([g for g in self.active_golfers() if g.tour == 'CO_INTL' and free(g)])[:s.field]]]
         return None
 
     # ---- Q-School ----------------------------------------------------------------------------------
     def _money_rank(self, tour, year):
         m = self.money[(tour, year)]
-        members = [g for g in self.world.golfers if g.tour == tour]
+        members = [g for g in self.active_golfers() if g.tour == tour]
         members.sort(key=lambda g: self.standing_key(m, g.id))
         return [g.id for g in members]
 
     def _qs_pool(self, regions, exclude, year, free):
-        pool = [g for g in self.world.golfers if g.status == 'pro' and free(g) and g.id not in exclude
+        pool = [g for g in self.active_golfers() if g.status == 'pro' and free(g) and g.id not in exclude
                 and g.tour not in PREMIER_TOURS and region_of(g) in regions and g.lifestyle == 'full_time']
         pool.sort(key=lambda g: self.wr_pos.get(g.id, 99999))
         return pool
@@ -1241,7 +1257,7 @@ class Season:
 
     def _money_rank_premier(self, year):
         m = self.money[('PREMIER', year)]
-        members = [g for g in self.world.golfers if g.tour in PREMIER_TOURS]
+        members = [g for g in self.active_golfers() if g.tour in PREMIER_TOURS]
         members.sort(key=lambda g: self.standing_key(m, g.id))
         return [g.id for g in members]
 
@@ -1257,11 +1273,11 @@ class Season:
             limit = 250 if major == 'USA_OPEN' else 300
             tiers_ok = PREMIER_TOURS if major == 'USA_OPEN' else PREMIER_TOURS + tuple(
                 k for k, t in TOUR_BY_KEY.items() if t.tier == 2)
-            direct = {g.id for g in self.world.golfers if g.id not in exempt and g.status != 'club_pro' and
+            direct = {g.id for g in self.active_golfers() if g.id not in exempt and g.status != 'club_pro' and
                       g.lifestyle != 'retired' and (self.wr_pos.get(g.id, 9999) <= limit or g.tour in tiers_ok)}
             home = QS_AMERICAS if major == 'USA_OPEN' else QS_EUROPE
             pool = []
-            for g in self.world.golfers:
+            for g in self.active_golfers():
                 if g.id in exempt or g.id in direct or g.status == 'club_pro' and major == 'BRITANNIA_OPEN' \
                         or g.lifestyle == 'retired':
                     continue
@@ -1344,6 +1360,7 @@ class Season:
         from its seed on loading; 40% of a fresh save)."""
         state = self.__dict__.copy()
         state.pop('_pool', None)
+        state.pop('_active', None)                           # rebuilt from world.golfers
         if state.get('lib') is default_library():
             state['lib'] = 'default'
             state.pop('cal', None)
@@ -1518,7 +1535,7 @@ class Season:
         for gid in [gid for gid, (back, _, _) in self.injured.items() if back <= now]:
             del self.injured[gid]
         played = set(self._week_load)
-        for g in self.world.golfers:
+        for g in self.active_golfers():                      # (retired golfers' fatigue was reset to 0)
             f = self.fatigue[g.id]
             if g.id in played:
                 load = self._week_load[g.id]
@@ -1688,6 +1705,7 @@ class Season:
             for g in self.world.golfers:
                 self.fatigue[g.id] = g.fatigue = 0.0         # the off-season rests everyone
         ST.end_of_season(self, year, snap)                   # coaches' and caddies' year
+        self._active = None                                  # retirements and arrivals: rebuilt when next needed
 
     def start_finances(self, year):
         """Sponsor contracts for the season, from each professional's prestige at its start
@@ -1769,7 +1787,7 @@ class Season:
         rank), world / amateur ranking at the start and end of the season, injury weeks, and the
         year's money (net). Promotion is added after the cards, as a separate fact."""
         snap = {}
-        for g in self.world.golfers:
+        for g in self.active_golfers():
             if g.lifestyle == 'retired':
                 continue
             led = self.ledgers[year].get(g.id)
@@ -1868,7 +1886,7 @@ class Season:
         # (region, tier) pairs with a regular event in each week: 'no suitable event' vs 'not eligible'
         level_weeks = {w: {(COUNTRIES[CITY_BY_NAME[city[e.event_id]].country].region, e.series.tier)
                            for e in by_week[w]} for w in weeks}
-        for g in self.world.golfers:
+        for g in self.active_golfers():
             if g.lifestyle == 'retired':
                 continue
             key = (g.tour, g.country, g.status, g.lifestyle, self.wr_pos.get(g.id, 9999) <= 500,
@@ -1986,7 +2004,7 @@ class Season:
     def record_access(self, year, week):
         """Classify every active golfer's week (see ACCESS): what they played, or why they did not."""
         acc = self.week_access[year]
-        for g in self.world.golfers:
+        for g in self.active_golfers():
             if g.lifestyle == 'retired':
                 continue
             gid = g.id
@@ -2144,7 +2162,7 @@ class Season:
 
     def weekly_finances(self, year, week):
         """Salaries, living costs, sponsor contracts and paid work for the week; backers cover shortfalls."""
-        for g in self.world.golfers:
+        for g in self.active_golfers():
             if g.lifestyle == 'retired':
                 continue
             salary, living = FIN.weekly_living(g)
@@ -2185,7 +2203,7 @@ class Season:
 
     def develop_week(self, year, week):
         """What each golfer did this week, and how it changed their game."""
-        for g in self.world.golfers:
+        for g in self.active_golfers():
             if g.lifestyle == 'retired':
                 continue
             rounds = self.week_rounds.get(g.id, 0.0)

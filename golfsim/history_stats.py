@@ -50,7 +50,16 @@ class HistoryStats:
     def __init__(self, archive):
         self.a = archive
         self.starts = defaultdict(list)          # pid -> [(year, week, event id, tour, tier, kind, pos)], in order
-        for y, e in archive.events():
+        self.seen = set()                        # seasons already read
+        self.extend(archive)
+
+    def extend(self, archive):
+        """Bring the statistics up to date with `archive` (a newer reading of the same world): only the
+        seasons not seen before are read, and people, relationships and records come from it."""
+        self.a = archive
+        new = [y for y in archive.years if y not in self.seen]
+        touched = set()
+        for y, e in archive.events(new):
             meta = archive.world['series'].get(e['series'], {})
             tier = e.get('tier', meta.get('tier'))
             tour = e.get('tour', meta.get('tour'))
@@ -60,8 +69,11 @@ class HistoryStats:
             for site in e['finish']:
                 for gid, pos, _ in site:
                     self.starts[gid].append((y, e['week'], e['id'], tour, tier, kind, pos))
-        for rows in self.starts.values():
-            rows.sort()
+                    touched.add(gid)
+        for gid in touched:
+            self.starts[gid].sort()
+        self.seen.update(new)
+        return new
 
     # ---- the shared vocabulary ------------------------------------------------------------------------
     @staticmethod

@@ -122,12 +122,21 @@ pass after it, plus the full suite), **integration-checked** (short multi-seed r
    commit (repaired on opening); recent operation keys checked against the committed world; recovery only
    under the lock; dead-process locks taken over on POSIX. Unverified: behaviour on Windows file systems
    (renames over open files) and on network drives; a real power cut (simulated by failing writes).
-3. Championship field selection — pending.
-4. Records and backing decisions — pending.
-5. Rigid career behaviour (backer cliffs, part-time retirement odds) — pending.
-6. Performance without deleting golf or history — pending. The 120 s Skip-to-end-of-Season target is
-   **unverified** at season 1 and season 100 on the intended hardware (only engine timings on this
-   4-core container exist).
+3. **Championship field selection** — implemented, tested (0f3f62f). Exact USA Amateur places with a
+   fair remainder draw; one amateur-series rule for ordinary events, flagships and USA Amateur residency;
+   mini championships open to everyone recorded as playing. Integration-checked (3 seasons, 2 seeds).
+4. **Records and backing** — implemented, tested (c1f8a9a). Debuts only for careers that began in the
+   archive; independence judged without the support being withdrawn; backers' money kept apart and
+   returned when a deal ends. Integration-checked.
+5. **Bounded career decisions** — implemented, tested (e04f50f). No backer age cliff or universal
+   two-season rule; part-timers and club pros stop for their own reasons (drift vs being shut out).
+   The weights are **uncalibrated assumptions** (labelled). Integration-checked: active golfers now grow
+   ~450-500 a season early on (they are not tuned out); whether that settles needs a long run.
+6. **Performance without deleting golf or history** — implemented, tested (this pass). Weekly work over
+   active golfers only (identical results), observer reads only new history. Measured (container, see
+   `docs/ENGINE_DESIGN.md`): Skip to end of Season 109-118 s in season 1, 126 s in season 2, 118 s with
+   50,000 synthetic retired people. **Unverified:** season 100 (needs a long run) and the intended
+   hardware (`tools/benchmark_skip.py`). Season time grows with the active population.
 
 ## V1 observer UI (owner baseline, `docs/UI_REQUIREMENTS_V1.md`)
 

@@ -28,6 +28,31 @@ Current speed: roughly 35-50 microseconds per hole for professionals (about 9 mi
 in plain Python on one core. Weaker golfers take more shots per hole, so lower-tier events cost more
 per hole.
 
+**Skip to end of Season (owner target: within 120 s in season 1 and season 100, on the intended
+hardware, including saving and the observer being usable again).** `tools/benchmark_skip.py` measures
+it end to end through the session and the observer, part by part, and prints the machine. Measured on
+the development container (Intel Xeon @ 2.10 GHz, 4 logical CPUs, Python 3.13, Linux):
+
+| World | Total | Simulate | Save | Publish history | Observer | First Records page |
+|---|---|---|---|---|---|---|
+| Season 1 (7,176 people) | 109-118 s | 102-111 s | 4.6-5.1 s | 1.4-1.5 s | 0.4-0.5 s | 0.4-0.5 s |
+| Season 2 (7,940 people) | 126 s | 117 s | 5.8 s | 2.1 s | 1.4 s | 0.1 s |
+| Synthetic: season 1 plus 50,000 retired people | 118 s | 106 s | 7.8 s | 3.1 s | 0.7 s | 0.2 s |
+
+- Retired people keep their identity and history (in `world.golfers`, the archive and the index), but the
+  weekly work walks only the active golfers (`Season.active_golfers`, rebuilt at each season boundary);
+  expired ranking and fame entries are skipped. Results are identical to walking everyone (fingerprint
+  tests: two full-scale seasons, and `tests/test_active_golfers.py`). With 50,000 retired people the weekly
+  work cost ~15% more before this and costs nothing measurable now; the save still grows with them
+  (85 MB in memory, 22 MB on disk at 57,000 people).
+- The observer re-reads the archive only when a season has been published, and its records extend with
+  the new season instead of re-reading every season (and are built only when first opened).
+- **Not yet proven:** season 100 itself (the active population after a century, the archive and index
+  after 100 seasons, the save with a century of people) needs a long run; the synthetic row covers only
+  the cost of retired people. Season time grows with the *active* population (about +500 a season at
+  the start, see `docs/DEVELOPMENT_AND_CAREERS.md`), which is the main open risk for the target. The
+  intended hardware has not been measured: run `python tools/benchmark_skip.py --seasons 2` on it.
+
 ## 1. Rating scale
 
 Every attribute uses one 0–100 scale anchored to real playing levels (set by the owner):

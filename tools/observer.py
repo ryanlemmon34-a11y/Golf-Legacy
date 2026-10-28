@@ -94,11 +94,28 @@ class World:
             self.reload()
 
     def reload(self):
+        """Read the history again only if what is published has changed (a season was archived): the
+        archive's season list and published generation. Records are then brought up to date with the
+        new seasons only (HistoryStats.extend); they are built at all only when first asked for."""
         import json
         wj = self.archive_dir / 'world.json'
         seasons = json.loads(wj.read_text()).get('years') if wj.exists() else None
+        pub = self.archive_dir / 'PUBLISHED'
+        stamp = (tuple(seasons or ()), pub.read_text() if pub.exists() else None)
+        if stamp == getattr(self, '_stamp', None):
+            return
+        self._stamp = stamp
         self.a = Archive(self.archive_dir) if seasons else None     # nothing archived before the first season ends
-        self.stats = HistoryStats(self.a) if self.a else None
+        if getattr(self, '_stats', None) is not None and self.a:
+            self._stats.extend(self.a)
+        elif not self.a:
+            self._stats = None
+
+    @property
+    def stats(self):
+        if getattr(self, '_stats', None) is None and self.a:
+            self._stats = HistoryStats(self.a)
+        return getattr(self, '_stats', None)
 
     def name(self, pid):
         if self.a and pid in self.a.people:

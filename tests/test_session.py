@@ -375,6 +375,38 @@ class TransactionTests(unittest.TestCase):
         self.assertEqual(w.session.cursor['week'], 6)
         w.session.close()
 
+    def test_observer_reads_only_new_history_after_an_advance(self):
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
+        import observer
+        from golfsim import archive as A
+        from golfsim.history_stats import HistoryStats
+        s = self.at_season_end(2028)                                     # 2027 archived, 2028 about to end
+        s.close()
+        w = observer.World(self.dir)
+        before = w.stats.most_wins()
+        reads = []
+        real = A._read
+        def counting(path):
+            reads.append(Path(path).name)
+            return real(path)
+        with mock.patch.object(A, '_read', counting):
+            w.session.advance_one_week()                                 # season end: 2028 published
+            w.reload()
+            stats = w.stats
+            self.assertNotIn('2027.json.gz', reads)                       # unchanged history is not reread
+            self.assertIn('2028.json.gz', reads)
+            self.assertEqual(sorted(stats.seen), [2027, 2028])
+            fresh = HistoryStats(A.Archive(self.dir / 'archive'))
+            self.assertEqual(stats.most_wins(), fresh.most_wins())       # the same answers as a full rebuild
+            self.assertNotEqual(stats.most_wins(), before)
+            reads.clear()
+            a = w.a
+            w.session.advance_one_week()                                 # 1 January 2029 and week 1: nothing new
+            w.reload()
+            self.assertIs(w.a, a)
+            self.assertEqual(reads, [])
+        w.session.close()
+
     @unittest.skipUnless(os.name == 'posix', 'detecting a dead process needs POSIX')
     def test_a_lock_left_by_a_dead_process_is_released(self):
         import subprocess
