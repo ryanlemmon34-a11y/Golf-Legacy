@@ -65,6 +65,19 @@ def region_of(g):
     return COUNTRIES[g.country].region
 
 
+# named factories (not lambdas) so a Season can be saved and resumed (savegame.py)
+def _dd_float():
+    return defaultdict(float)
+
+
+def _dd_list():
+    return defaultdict(list)
+
+
+def _dd_counter():
+    return defaultdict(Counter)
+
+
 # ---------------------------------------------------------------------------------------------
 # Worker: plays one event site. Top-level so it can run in another process.
 # ---------------------------------------------------------------------------------------------
@@ -119,6 +132,7 @@ class EventResult:
     prestige: float
     field_strength: float = 0.0
     playoff: int = 0
+    team: dict = field(default_factory=dict)   # gid -> (coach id, caddie id) that week (0 = none)
 
     def winner(self, site=0):
         rows = self.finish[site] if self.finish else []
@@ -156,14 +170,14 @@ class Season:
         self.wr = defaultdict(list)                          # gid -> [(abs_week, points)]
         self.am = defaultdict(list)
         self.wr_pos, self.am_pos = {}, {}
-        self.money = defaultdict(lambda: defaultdict(float))  # (tour key, year) -> gid -> $
-        self.earnings = defaultdict(lambda: defaultdict(float))  # year -> gid -> $ prize money
-        self.played = defaultdict(lambda: defaultdict(list))     # year -> gid -> [weeks]
+        self.money = defaultdict(_dd_float)                  # (tour key, year) -> gid -> $
+        self.earnings = defaultdict(_dd_float)               # year -> gid -> $ prize money
+        self.played = defaultdict(_dd_list)                  # year -> gid -> [weeks]
         self.stage_log = defaultdict(list)
         self.card_log = defaultdict(list)                    # year -> [(gid, from, to, reason)]
         self.holes_played = Counter()                        # year -> holes
         self.stats = defaultdict(Counter)
-        self.pstats = defaultdict(lambda: defaultdict(Counter))  # year -> gid -> summed round stats
+        self.pstats = defaultdict(_dd_counter)               # year -> gid -> summed round stats
         self.plans = {}                                      # gid -> {week: (action, training category)}
         self.week_rounds = defaultdict(float)                # gid -> rounds played this week
         self.week_activity = {}                              # gid -> 'play' / 'train' / 'rest' this week
@@ -181,13 +195,14 @@ class Season:
         self.staff = ST.initial_staff(world, seed)           # coaches and caddies
         self.staff_receipts = defaultdict(Counter)            # year -> ('coach'|'caddie', id) -> $ received
         self.overall_start = {}                              # year -> gid -> overall on 1 January
+        self._teams = {}                                     # event id -> {gid: (coach, caddie)} this week
         self.entry_misses = defaultdict(Counter)             # year -> gid -> weeks shut out of full fields
         self.transitions = {}                                # year -> [career decisions with their reasons]
-        self.activity_counts = defaultdict(lambda: defaultdict(Counter))  # year -> gid -> weeks per activity
+        self.activity_counts = defaultdict(_dd_counter)      # year -> gid -> weeks per activity
         self.assignments = {}                                # year -> staff assignments at the season's start
         self.staff_year = {}                                 # year -> staff id -> that season's work
         self.stuck_blocks = Counter()                        # gid -> consecutive months unable to afford a trip
-        self.block_flags = defaultdict(lambda: defaultdict(Counter))  # year -> gid -> monthly money state
+        self.block_flags = defaultdict(_dd_counter)          # year -> gid -> monthly money state
         self.year = self.first_year
         from .cards import tour_target
         for k, t in TOUR_BY_KEY.items():
@@ -479,8 +494,9 @@ class Season:
             for ed in regular:
                 if busy[g.id] & ed.series.day_set or not self.eligible(g, ed.series, week):
                     continue
-                if self.trip_cost(g, ed.series, venues[ed.event_id][0].city) > money:
-                    continue                                 # cannot pay for the trip
+                cost = self.trip_cost(g, ed.series, venues[ed.event_id][0].city)
+                if cost > 0 and cost > money:
+                    continue                                 # cannot pay for the trip (school-paid trips cost 0)
                 v = self.event_value(g, ed, week, rng, country[ed.event_id])
                 opts.append((v, ed.event_id))
             if not opts:
@@ -825,11 +841,14 @@ class Season:
         tasks = []
         for ed in eds:
             s = ed.series
+            # who was in each golfer's team this week (kept with the result: history never relies on
+            # later assignments)
+            self._teams[ed.event_id] = {gid: self.staff.team(gid) for ids in fields[ed.event_id] for gid in ids}
             for site, ids in enumerate(fields[ed.event_id]):
                 v = venues[ed.event_id][min(site, len(venues[ed.event_id]) - 1)]
                 tasks.append({'event_id': ed.event_id, 'site': site, 'course': self.lib.course(v),
                               'golfers': [self.g[gid] for gid in ids], 'match_play': s.match_play,
-                              'caddies': [self.staff.bag(self.g[gid]) for gid in ids],
+                              'caddies': [self.staff.bag(self.g[gid], year) for gid in ids],
                               'rounds': s.rounds, 'cut_top': s.cut_top,
                               'prestige': self.event_prestige[s.series_id],
                               'seed': _seed(self.seed, ed.event_id, site)})
@@ -858,7 +877,8 @@ class Season:
         sid = s.series_id
         p = self.event_prestige[sid]
         res = EventResult(ed.event_id, sid, year, week,
-                          [(v.course_id, v.layout, v.city) for v in venue_list], [], p)
+                          [(v.course_id, v.layout, v.city) for v in venue_list], [], p,
+                          team=self._teams.pop(ed.event_id, {}))
         amateur_event = s.tier >= 5
         all_ids = []
         for site in sorted(site_out):
@@ -883,7 +903,7 @@ class Season:
                 ps['vs_field'] += score - round_avg[rd]
                 for k, val in zip(STAT_KEYS, st):
                     ps[k] += val
-                rec.add_round(Mark(score, score - course.par, self.g[gid].name, ed.event_id, year, week, rd, s.tier),
+                rec.add_round(Mark(score, score - course.par, self.g[gid].name, ed.event_id, year, week, rd, s.tier, gid),
                               holes, pars)
                 self.holes_played[year] += len(holes)
                 self.g[gid].familiarity[course.familiarity_key] = self.g[gid].familiarity.get(course.familiarity_key, 0) + 1
@@ -891,7 +911,7 @@ class Season:
                 if k is not None:                            # caddies learn the course too
                     k.familiarity[course.familiarity_key] = k.familiarity.get(course.familiarity_key, 0) + 1
             for gid, idx, strokes, stage in o['holes']:
-                rec.add_hole(idx, strokes, pars[idx], self.g[gid].name, ed.event_id, year, stage)
+                rec.add_hole(idx, strokes, pars[idx], self.g[gid].name, ed.event_id, year, stage, gid)
                 self.holes_played[year] += 1
             rounds = Counter(gid for gid, *_ in o['rounds'])
             fk = course.familiarity_key
@@ -907,6 +927,7 @@ class Season:
                 k = self.staff.caddie(gid)
                 if k is not None:
                     k.rounds_worked += n
+                    self.staff.rel.add_work('caddie', gid, n, year)     # time on the bag together
             host_region = COUNTRIES[CITY_BY_NAME[v.city].country].region
             for gid, n in rounds.items():
                 self._week_load[gid] += self.load(self.g[gid], n, region_of(self.g[gid]) != host_region, year)
@@ -1246,17 +1267,17 @@ class Season:
                 base.append(pick[0] if pick else None)
                 costs.append(pick[1] if pick else 0.0)
             eligible_any = any(options)
-            stuck = money0 < 0 or (eligible_any and not any(base))
+            stuck = (money0 < 0 and self.committed_weekly(g) > 0) or (eligible_any and not any(base))
             self.stuck_blocks[g.id] = self.stuck_blocks[g.id] + 1 if stuck else 0
             self.block_flags[year][g.id]['stuck' if stuck else 'no event' if not eligible_any else 'ok'] += 1
             self.staff_midseason(g, year, week0, money0)
             age = g.age(year)
-            insight = self.staff.insight(g)
+            insight = self.staff.insight(g, year)
             cat = D.choose_category(g, rng, insight)
             work_scale = 0.3 if g.lifestyle == 'part_time' else 1.0
             gamma = 60.0
             dp = gamma * D.development_value(g, 'play', age, insight=insight)
-            dt = gamma * D.development_value(g, 'train', age, cat, insight, self.staff.coaching(g, cat, age)) * work_scale
+            dt = gamma * D.development_value(g, 'train', age, cat, insight, self.staff.coaching(g, cat, age, year)) * work_scale
             bar = self.bar(g)
             target = self.target_events(g)
             played0 = len(self.played[year][g.id])
@@ -1289,8 +1310,8 @@ class Season:
                         continue
                     j = playable.index(i) if i in playable else -1
                     if j >= 0 and mask >> j & 1:
-                        if costs[i] > money:
-                            val = None                       # they cannot pay for this trip
+                        if costs[i] > 0 and costs[i] > money:
+                            val = None                       # they cannot pay for this trip (school-paid: free)
                             break
                         money -= costs[i]
                         pace = target * w / 52 - n
@@ -1325,7 +1346,7 @@ class Season:
         pay for: ((value, edition), trip cost), or None."""
         for v, _, e in opts:
             c = self.trip_cost(g, e.series, city[e.event_id])
-            if c <= money:
+            if c <= money or c == 0:                          # a school-paid event is never out of reach
                 return (v, e), c
         return None
 
@@ -1336,14 +1357,10 @@ class Season:
         st = self.staff
         c = st.coach(g.id)
         if c is not None and st.deal.get(g.id) == 'fee' and money0 < 0:
-            del st.coach_of[g.id], st.deal[g.id]
-            c.history.append((year, f'Stopped coaching {g.name} (could no longer pay)'))
-            self.log(g.id, year, week, f'Could no longer pay coach {c.name}; carried on alone')
+            st.end_coach(self, g.id, (year, week), 'could no longer pay the fee', 'golfer')
         k = st.caddie(g.id)
         if k is not None and self.stuck_blocks[g.id] >= 2:
-            del st.caddie_of[g.id]
-            k.history.append((year, f'Left the bag of {g.name} (no events to work)'))
-            self.log(g.id, year, week, f'Caddie {k.name} left: no events they could afford')
+            st.end_caddie(self, g.id, (year, week), 'no events the golfer could afford', 'staff')
 
     # ---- money --------------------------------------------------------------------------------
     def earn(self, g, year, field, amount):
@@ -1465,4 +1482,6 @@ class Season:
             if self.development and g.ceilings:
                 scale = 0.3 if g.lifestyle == 'part_time' and act == 'train' else 1.0
                 D.develop_week(g, 'rest' if act == 'work' else act, g.age(year), cat, rounds,
-                               coach=self.staff.coaching(g, cat, g.age(year)), scale=scale)
+                               coach=self.staff.coaching(g, cat, g.age(year), year), scale=scale)
+            if act in ('train', 'play') and g.id in self.staff.coach_of:
+                self.staff.rel.add_work('coach', g.id, 1.0, year)        # a week actually worked together

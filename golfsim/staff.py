@@ -1,38 +1,52 @@
-"""Coaches and caddies: the people around the players.
+"""Coaches and caddies: the people around the players, and their working relationships.
+
+People and identity
+    Coaches and caddies are people with world-wide person ids (the same id space as golfers). A golfer
+    who becomes a coach or caddie keeps their id: their playing career and their staff career are two
+    views of one person. Retirement never deletes anyone.
+
+Relationships (see history.py)
+    Every coaching, caddying or school-team arrangement is a dated stint shared by both profiles, with
+    who started it, who ended it and why. Current assignments are an index kept only by opening and
+    closing stints (`assign_coach`, `end_coach`, `assign_caddie`, `end_caddie`). Every event result
+    records the coach and caddie each golfer had that week.
 
 Coaches
-    Every coach has a **speciality** (physical, long game, short game, putting or mental — the training
-    categories), a **teaching** skill, a **scouting** skill and a **reputation** (what golfers can see:
-    it grows with their students' success). Some coaches specialise in **young players** (22 and under).
-    A golfer has at most one coach at a time. A coach makes training count for more (most in their
-    speciality, and for young players if that is their gift) and helps the golfer read their own game
-    (what to work on). Without a coach a golfer teaches themselves.
+    Speciality (physical, long game, short game, putting or mental), hidden teaching and scouting
+    skills, a visible reputation that follows their students, and a client capacity (how many players
+    they can coach individually: about 6, from 4 to 8, by their availability and how intensively they
+    work — separate from how well they teach). A golfer has one coach at a time. Coaching quality
+    (teaching, plus their speciality or young players if that is their gift) reaches the golfer through
+    their working relationship (history.Relations.effectiveness): new pairings take time to work well,
+    a long one works best, time apart wears it down; it only scales the coach's ability.
+    Without a personal coach a golfer teaches themselves; young amateurs have some local or school
+    instruction, and college golfers their team's coaching. A private coach does not stack with these:
+    the better of the two applies.
 
-    Golfers get a coach in one of two ways:
-      * they hire one they can afford (a yearly fee that grows with the coach's reputation) — so many
-        college players and amateurs have none;
-      * a coach approaches them. Coaches scout young, raw players near them; they judge where a player
-        is heading from what can be watched (current level, typical growth for their age, last year's
-        improvement) through the noise of their own scouting skill — not hidden potential — and approach
-        those they believe in, coaching for free in return for a share of future prize money.
+    Golfers get a coach by hiring one they can afford, or by being approached: coaches scout young, raw
+    players near them, judging from what can be watched (current level, typical growth for their age,
+    last year's improvement) through their own scouting error — never hidden potential — and back the
+    ones they believe can reach about Challenger standard, for a share of future prize money.
 
 Caddies
-    A caddie has the six caddie skills the shot engine uses (strategy and yardage help course management,
-    mental support helps composure and recovering from bad holes, green reading helps putts,
-    communication decides how much of it reaches the player) and builds **familiarity with every course
-    they work**, like a player does. Professionals on the bigger tours hire a caddie they can afford —
-    the best players attract the best caddies — and pay a weekly fee plus a share of winnings. Everyone
-    else carries their own bag (or brings a friend): weaker help than any professional caddie.
+    The six skills the shot engine uses (strategy, yardage, mental support, green reading, course
+    knowledge, communication), familiarity with every course they work, and a working relationship
+    with each player (it scales how much of their skill reaches the player). One touring golfer per
+    caddie. Premier and Challenger professionals hire the best caddie they can afford; others carry
+    their own bag.
+
+Changes
+    In the off-season either side may end a relationship, from smooth odds: the golfer's observed
+    progress during it (professional and amateur results and rankings, and observed development; a
+    season with few events or a long injury counts as weak evidence), their working relationship and
+    fit, affordability and better options; a coach who backed a prospect weighs the evidence over an
+    observation period, not a birthday. Mid-season changes happen only when someone retires or genuinely
+    cannot continue (cannot pay a coach; a caddie with no events to work). Staff retire gradually with
+    age (and leave the profession after long spells without work), which closes their stints.
 
 Where they come from
-    Former golfers. When a golfer gives up the chase or retires they may become a coach (a teaching mind:
-    course management, green reading, coachability, work ethic) or a caddie (management, composure,
-    green reading), younger more often for caddies. Golfers who have made a fortune rarely do — they do
-    not need the money. The starting world's coaches and caddies, and any outside hires needed when
-    demand outgrows the profession, are generated with a short background (club caddies, teaching
-    professionals) and labelled as such.
-
-Every coach and caddie has a history (hired, let go, retired), and their golfers' histories record them.
+    Former golfers (by aptitude and age; rarely anyone who made a fortune), plus generated starting
+    staff and outside recruits for unmet paying demand, labelled as such.
 """
 from __future__ import annotations
 
@@ -44,15 +58,19 @@ from .calendar import TOUR_BY_KEY
 from .development import CATEGORIES, perceived_gap
 from .geography import COUNTRIES
 from .golfer import CADDIE_SKILLS, Caddie
+from .history import Relations
 from .names import make_name
 
 SPECIALITIES = tuple(CATEGORIES)                  # physical, long_game, short_game, putting, mental
-SELF_TEACHING = 0.3                               # coaching quality of a golfer with no coach
+SELF_TEACHING = 0.3                               # coaching quality of a golfer who teaches themselves
+LOCAL_INSTRUCTION = 0.38                          # young amateurs: local club / school instruction
+COLLEGE_TEAM = 0.48                               # college golfers: the school team's coaching
 YOUTH_AGE = 22
 SCOUT_AGE = 23                                    # coaches scout players this age and younger
 SCOUT_SHARE = 0.05                                # of prize money, for a coach who approached the player
 SHARE_BAR = 66.0                                  # the projected level a scouting coach must believe in
 INITIAL_COACHES = 480                             # sized so the first season's paying demand finds room
+CLIENTS_MEAN, CLIENTS_MIN, CLIENTS_MAX = 6, 4, 8  # individual clients a coach takes on (tuning assumption)
 CADDIE_TIERS = 2                                  # tour tiers whose members hire professional caddies
 SELF_CADDIE = 40.0                                # skills of carrying your own bag / a friend on the bag
 COACH_RETIRE_AGE, CADDIE_RETIRE_AGE = 68.0, 60.0
@@ -69,24 +87,26 @@ def _sig(x):
 # ---- the people -------------------------------------------------------------------------------------
 @dataclass
 class Coach:
-    id: int
+    id: int                            # person id (a former golfer keeps theirs)
     name: str
     country: str
     born: int
     speciality: str                    # a training category
     youth: bool                        # specialises in developing young players
     teaching: float                    # 0-100: how much their coaching helps (hidden)
-    scouting: float                    # 0-100: how well they judge a young player's potential (hidden)
+    scouting: float                    # 0-100: how well they judge a young player's prospects (hidden)
     reputation: float                  # 0-100: what golfers see; grows with their students' success
     background: str = ''
-    former_golfer: int = 0             # golfer id if they were a golfer in this world
+    former_golfer: int = 0             # = id if this person played in this world
     status: str = 'active'             # 'active' / 'retired'
     earnings: float = 0.0
-    history: list = field(default_factory=list)      # [(year, text)]
+    clients: int = CLIENTS_MEAN        # individual clients they take on (availability, intensity)
+    idle_years: int = 0
+    history: list = field(default_factory=list)      # [(year, text)]: staff-career events only
 
     @property
     def capacity(self):
-        return 3 + int(self.teaching / 12)
+        return self.clients
 
     @property
     def fee(self):
@@ -99,7 +119,7 @@ class Coach:
 
 @dataclass
 class TourCaddie(Caddie):
-    id: int = 0
+    id: int = 0                        # person id
     country: str = ''
     born: int = 0
     reputation: float = 50.0           # what players see; grows with their employers' success
@@ -159,38 +179,47 @@ def strongest_category(g):
     return max(SPECIALITIES, key=lambda c: (sum(g.attrs[k] for k in CATEGORIES[c]) / len(CATEGORIES[c]) - over, c))
 
 
+class _Counter:
+    """Fallback person-id allocator for staff built outside a world (tests, tools)."""
+
+    def __init__(self, start=10_000_000):
+        self.next = start
+
+    def __call__(self):
+        self.next += 1
+        return self.next - 1
+
+
 # ---- the staff of the world -------------------------------------------------------------------------
 class Staff:
-    """All coaches and caddies, and who works with whom."""
+    """All coaches and caddies, their relationships, and who works with whom now."""
 
-    def __init__(self):
-        self.coaches = {}              # id -> Coach
-        self.caddies = {}              # id -> TourCaddie
-        self.coach_of = {}             # golfer id -> coach id
-        self.deal = {}                 # golfer id -> 'fee' or 'share'
-        self.caddie_of = {}            # golfer id -> caddie id
-        self.taken = set()             # names in use
+    def __init__(self, new_id=None, seed=0):
+        self.new_id = new_id or _Counter()
+        self.coaches = {}              # person id -> Coach
+        self.caddies = {}              # person id -> TourCaddie
+        self.rel = Relations(seed)     # every stint, and each pair's working relationship
+        self.coach_of = {}             # golfer -> coach (index of open coaching stints)
+        self.deal = {}                 # golfer -> 'fee' or 'share'
+        self.caddie_of = {}            # golfer -> caddie (index of open caddying stints)
+        self.taken = set()             # names in use (for generating new names only)
         self.unserved = {}             # year -> country -> golfers who could pay but found no coach with room
-        self._next = 1
-
-    def _id(self):
-        self._next += 1
-        return self._next - 1
 
     # -- creating people --------------------------------------------------------------------------
     def new_coach(self, rng, country, year, age, teaching, scouting, speciality, youth, reputation, background,
-                  former=0, name=None):
-        c = Coach(self._id(), name or make_name(country, rng, self.taken), country, year - age, speciality, youth,
-                  round(_clip(teaching), 1), round(_clip(scouting), 1), round(_clip(reputation, 1.0), 1),
-                  background, former)
+                  former=0, name=None, pid=None):
+        clients = int(max(CLIENTS_MIN, min(CLIENTS_MAX, round(rng.gauss(CLIENTS_MEAN, 1.2)))))
+        c = Coach(pid or self.new_id(), name or make_name(country, rng, self.taken), country, year - age, speciality,
+                  youth, round(_clip(teaching), 1), round(_clip(scouting), 1), round(_clip(reputation, 1.0), 1),
+                  background, former, clients=clients)
         self.taken.add(c.name)
         self.coaches[c.id] = c
         return c
 
-    def new_caddie(self, rng, country, year, age, skills, reputation, background, former=0, name=None):
+    def new_caddie(self, rng, country, year, age, skills, reputation, background, former=0, name=None, pid=None):
         k = TourCaddie(name or make_name(country, rng, self.taken), {s: round(_clip(v), 1) for s, v in skills.items()},
-                       id=self._id(), country=country, born=year - age, reputation=round(_clip(reputation, 1.0), 1),
-                       background=background, former_golfer=former)
+                       id=pid or self.new_id(), country=country, born=year - age,
+                       reputation=round(_clip(reputation, 1.0), 1), background=background, former_golfer=former)
         self.taken.add(k.name)
         self.caddies[k.id] = k
         return k
@@ -209,7 +238,7 @@ class Staff:
         return self.new_caddie(rng, country, year, age, skills, sum(skills.values()) / 6 + rng.gauss(0, 8), background)
 
     def from_golfer(self, g, year, role, rng, level):
-        """A former golfer becomes a coach or a caddie; their game shapes their skills."""
+        """A former golfer becomes a coach or a caddie: the same person (same id), a new career."""
         a, p = g.attrs, g.personality
         age = g.age(year)
         where = f'former {level} golfer'
@@ -218,7 +247,7 @@ class Staff:
             scouting = 0.4 * a['management'] + 0.3 * p['adaptability'] + 15 + rng.gauss(0, 10)
             c = self.new_coach(rng, g.country, year, age, teaching, scouting, strongest_category(g),
                                rng.random() < 0.15 + 0.3 * p['coachability'] / 100,
-                               20 + 0.35 * (g.overall - 40) + rng.gauss(0, 6), where, g.id, g.name)
+                               20 + 0.35 * (g.overall - 40) + rng.gauss(0, 6), where, g.id, g.name, pid=g.id)
             c.history.append((year, f'Became a coach ({c.speciality.replace("_", " ")} specialist'
                                     f'{", young players" if c.youth else ""}) after a career as a {level} golfer'))
             return c
@@ -226,9 +255,48 @@ class Staff:
                   'yardage': (a['focus'] + a['management']) / 2, 'course_knowledge': 0.5 * a['management'] + 25,
                   'mental_support': (a['composure'] + a['resilience']) / 2, 'communication': p['adaptability']}
         skills = {s: v + rng.gauss(0, 6) for s, v in skills.items()}
-        k = self.new_caddie(rng, g.country, year, age, skills, sum(skills.values()) / 6 - 5, where, g.id, g.name)
+        k = self.new_caddie(rng, g.country, year, age, skills, sum(skills.values()) / 6 - 5, where, g.id, g.name,
+                            pid=g.id)
         k.history.append((year, f'Became a caddie after a career as a {level} golfer'))
         return k
+
+    # -- relationships (the only way assignments change) --------------------------------------------
+    def assign_coach(self, season, g, c, arrangement, when, started_by, reason):
+        self.rel.begin('coach', c.id, g.id, when, arrangement, started_by, reason)
+        self.coach_of[g.id], self.deal[g.id] = c.id, arrangement
+        if season:
+            season.log(g.id, when[0], when[1], f'{"Approached by" if started_by == "coach" else "Hired"} coach {c.name} '
+                       f'({c.speciality.replace("_", " ")} specialist{", young players" if c.youth else ""}; {reason})')
+
+    def end_coach(self, season, gid, when, reason, ended_by):
+        cid = self.coach_of.pop(gid, None)
+        self.deal.pop(gid, None)
+        if cid is None:
+            return None
+        s = self.rel.finish('coach', gid, when, reason, ended_by)
+        if season:
+            season.log(gid, when[0], when[1], f'Coaching with {self.coaches[cid].name} ended ({reason})')
+        return s
+
+    def assign_caddie(self, season, g, k, when, reason='hired for the season'):
+        if k.id in self._bags():
+            raise ValueError(f'caddie {k.id} already has a bag')
+        self.rel.begin('caddie', k.id, g.id, when, 'tour bag', 'golfer', reason)
+        self.caddie_of[g.id] = k.id
+        if season:
+            season.log(g.id, when[0], when[1], f'Hired caddie {k.name}')
+
+    def end_caddie(self, season, gid, when, reason, ended_by):
+        kid = self.caddie_of.pop(gid, None)
+        if kid is None:
+            return None
+        s = self.rel.finish('caddie', gid, when, reason, ended_by)
+        if season:
+            season.log(gid, when[0], when[1], f'Caddie {self.caddies[kid].name} off the bag ({reason})')
+        return s
+
+    def _bags(self):
+        return set(self.caddie_of.values())
 
     # -- effects --------------------------------------------------------------------------------------
     def coach(self, gid):
@@ -239,32 +307,51 @@ class Staff:
         kid = self.caddie_of.get(gid)
         return self.caddies.get(kid) if kid else None
 
-    def coaching(self, g, category, age):
-        """Coaching quality (0-1) for this golfer training this category this week."""
+    def baseline(self, g, age):
+        """Instruction a golfer gets without a personal coach."""
+        if g.tour.startswith('CO_'):
+            return COLLEGE_TEAM
+        if g.status == 'amateur' and age <= YOUTH_AGE:
+            return LOCAL_INSTRUCTION
+        return SELF_TEACHING
+
+    def coaching(self, g, category, age, year=0):
+        """Coaching quality (0-1) for this golfer training this category this week: the coach's quality
+        as it reaches this golfer through their working relationship, or their baseline instruction if
+        that is better (the two never stack)."""
+        base = self.baseline(g, age)
         c = self.coach(g.id)
         if c is None:
-            return SELF_TEACHING
-        q = c.teaching / 100
-        if category == c.speciality:
-            q += 0.15
-        if c.youth and age <= YOUTH_AGE:
-            q += 0.15
-        return min(1.0, q)
+            return base
+        q = c.teaching / 100 + (0.15 if category == c.speciality else 0) + (0.15 if c.youth and age <= YOUTH_AGE else 0)
+        q = min(1.0, q)
+        eff = self.rel.effectiveness('coach', c.id, g.id, year)
+        return max(base, SELF_TEACHING + max(0.0, q - SELF_TEACHING) * eff)
 
-    def insight(self, g):
+    def insight(self, g, year=0):
         """How well the golfer's coach reads their game (0 without a coach)."""
         c = self.coach(g.id)
-        return c.teaching / 100 if c else 0.0
+        return c.teaching / 100 * min(1.0, self.rel.effectiveness('coach', c.id, g.id, year)) if c else 0.0
 
-    def bag(self, g):
-        """The caddie on this golfer's bag this week (their own bag if they have no caddie)."""
-        return self.caddie(g.id) or SELF_CADDIE_OBJ
+    def bag(self, g, year=0):
+        """The caddie on this golfer's bag this week, as they work together: each skill's difference from
+        an average caddie is scaled by their working relationship (course familiarity is the caddie's
+        own). Their own bag if they have no caddie."""
+        k = self.caddie(g.id)
+        if k is None:
+            return SELF_CADDIE_OBJ
+        eff = self.rel.effectiveness('caddie', k.id, g.id, year)
+        return Caddie(k.name, {s: 50 + (v - 50) * eff for s, v in k.skills.items()}, k.familiarity)
+
+    def team(self, gid):
+        """(coach, caddie) person ids for a golfer right now (0 = none): kept with every event result."""
+        return self.coach_of.get(gid, 0), self.caddie_of.get(gid, 0)
 
 
 def initial_staff(world, seed):
     """The starting world's coaches and caddies (generated: the world has no recorded past)."""
     rng = random.Random(f'{seed}:staff')
-    st = Staff()
+    st = Staff(getattr(world, 'new_id', None), seed)
     st.taken = {g.name for g in world.golfers}
     year = world.year
     pool = {c: p.pool for c, p in world.nations.items()}
@@ -331,44 +418,43 @@ def scouting_estimate(season, g, year, rng, sd, coach_id=0):
     return seen + age_deficit(age, 27.0) + 1.5 * (recent - typical) + view + rng.gauss(0, 0.3 * sd)
 
 
+def sync_school(season, year, week, closing=False):
+    """School-team support follows college membership: a stint opens when a golfer is on a college
+    team and closes, as an ordinary recorded transition, when they leave it (graduating, turning
+    professional, or retiring) — their development is untouched."""
+    st = season.staff
+    for g in season.world.golfers:
+        open_ = st.rel.current('school', g.id)
+        on_team = g.tour.startswith('CO_') and g.lifestyle != 'retired'
+        if open_ and not on_team:
+            why = ('retired from competition' if g.lifestyle == 'retired' else 'turned professional' if g.status == 'pro'
+                   else 'college eligibility ended')
+            st.rel.finish('school', g.id, (year, week), why, 'school')
+        elif on_team and not open_ and not closing:
+            st.rel.begin('school', 0, g.id, (year, week), f'school team: {g.tour}', 'school', 'college programme')
+        elif on_team and open_ and open_.arrangement != f'school team: {g.tour}':
+            st.rel.finish('school', g.id, (year, week), 'moved programme', 'school')
+            st.rel.begin('school', 0, g.id, (year, week), f'school team: {g.tour}', 'school', 'college programme')
+
+
 def start_of_season(season, year):
-    """Coaches scout, golfers hire and drop coaches, and caddies are hired for the season."""
+    """School teams, coaches scouting, golfers hiring coaches, and caddies hired for the season."""
     st = season.staff
     rng = random.Random(f'{season.seed}:staff-market:{year}')
-    log = season.log
+    when = (year, 1)
     active = [g for g in sorted(season.world.golfers, key=lambda x: x.id) if g.lifestyle != 'retired']
-    students = {}
+    release_departed(season, year, 1)
+    sync_school(season, year, 1)
+    for g in active:                                  # a contracted fee they can no longer meet
+        c = st.coach(g.id)
+        if c is not None and st.deal.get(g.id) == 'fee' and c.fee > 1.5 * coach_budget(season, g, year):
+            st.end_coach(season, g.id, when, 'could no longer afford the fee', 'golfer')
+    students, shares = {}, {}
     for gid, cid in st.coach_of.items():
         students[cid] = students.get(cid, 0) + 1
-
-    def leave_coach(g, why):
-        cid = st.coach_of.pop(g.id)
-        st.deal.pop(g.id, None)
-        students[cid] -= 1
-        c = st.coaches[cid]
-        c.history.append((year, f'Stopped coaching {g.name} ({why})'))
-        log(g.id, year, 1, f'Left coach {c.name} ({why})')
-
-    def take_coach(g, c, deal, why):
-        st.coach_of[g.id] = c.id
-        st.deal[g.id] = deal
-        students[c.id] = students.get(c.id, 0) + 1
-        c.history.append((year, f'Began coaching {g.name} ({why})'))
-        log(g.id, year, 1, f'{"Approached by" if deal == "share" else "Hired"} coach {c.name} '
-                           f'({c.speciality.replace("_", " ")} specialist{", young players" if c.youth else ""}; {why})')
-
-    # golfers who can no longer pay their coach, or retired, leave them
-    for g in season.world.golfers:
-        if g.id in st.coach_of:
-            if g.lifestyle == 'retired' or st.coaches[st.coach_of[g.id]].status != 'active':
-                leave_coach(g, 'coach retired' if g.lifestyle != 'retired' else 'retired from golf')
-            elif st.deal.get(g.id) == 'fee' and st.coaches[st.coach_of[g.id]].fee > 1.5 * coach_budget(season, g, year):
-                leave_coach(g, 'could no longer afford the fee')
-    coaches = [c for c in st.coaches.values() if c.status == 'active']
-    shares = {}
-    for gid, cid in st.coach_of.items():
         if st.deal.get(gid) == 'share':
             shares[cid] = shares.get(cid, 0) + 1
+    coaches = [c for c in st.coaches.values() if c.status == 'active']
     by_region = {}
     for c in coaches:
         by_region.setdefault(region(c.country), []).append(c)
@@ -406,8 +492,12 @@ def start_of_season(season, year):
                 continue
             if crng.random() < 0.85:
                 if cur is not None:
-                    leave_coach(g, f'joined {c.name}')
-                take_coach(g, c, 'share', 'saw their potential')
+                    students[cur.id] -= 1
+                    if st.deal.get(g.id) == 'share':
+                        shares[cur.id] -= 1
+                    st.end_coach(season, g.id, when, f'joined {c.name}', 'golfer')
+                st.assign_coach(season, g, c, 'share', when, 'coach', 'saw their potential')
+                students[c.id] = students.get(c.id, 0) + 1
                 shares[c.id] = shares.get(c.id, 0) + 1
     # 2. golfers looking for a coach they can pay
     st.unserved[year] = {}
@@ -435,47 +525,109 @@ def start_of_season(season, year):
             affordable = True
             if students.get(c.id, 0) >= c.capacity:
                 continue
+            past = st.rel.pairs.get(('coach', c.id, g.id))
             v = c.reputation + (12 if c.speciality == weak else 0) + (10 if c.youth and g.age(year) <= YOUTH_AGE else 0) \
-                + (5 if c.country == g.country else 0) + rng.gauss(0, 4)
+                + (5 if c.country == g.country else 0) + (4 * past.fit if past else 0) + rng.gauss(0, 4)
             if best is None or v > best[0]:
                 best = (v, c)
         if best:
-            take_coach(g, best[1], 'fee', f'${best[1].fee:,.0f} a year')
+            st.assign_coach(season, g, best[1], 'fee', when, 'golfer', f'${best[1].fee:,.0f} a year')
+            students[best[1].id] = students.get(best[1].id, 0) + 1
         elif affordable:                              # could pay, but every coach they could afford was full
             st.unserved[year][g.country] = st.unserved[year].get(g.country, 0) + 1
-    # 3. caddies
-    cads = [k for k in st.caddies.values() if k.status == 'active']
-    employed = {kid for kid in st.caddie_of.values()}
-    for g in season.world.golfers:
-        kid = st.caddie_of.get(g.id)
-        if kid is None:
-            continue
-        k = st.caddies[kid]
-        if g.lifestyle == 'retired' or k.status != 'active' or not wants_caddie(g) \
-                or k.weekly_fee * season.target_events(g) > 1.5 * caddie_budget(season, g, year):
-            st.caddie_of.pop(g.id)
-            employed.discard(kid)
-            k.history.append((year, f'Left the bag of {g.name}'))
-            log(g.id, year, 1, f'Parted with caddie {k.name}')
-    free_cads = sorted((k for k in cads if k.id not in employed), key=lambda k: (-k.reputation - rng.gauss(0, 8), k.id))
+    # 3. caddies (one touring golfer each)
+    for g in active:
+        k = st.caddie(g.id)
+        if k is not None and (not wants_caddie(g)
+                              or k.weekly_fee * season.target_events(g) > 1.5 * caddie_budget(season, g, year)):
+            st.end_caddie(season, g.id, when, 'no longer on a tour that needs one' if not wants_caddie(g)
+                          else 'could no longer afford them', 'golfer')
+    bags = st._bags()
+    free_cads = sorted((k for k in st.caddies.values() if k.status == 'active' and k.id not in bags),
+                       key=lambda k: (-k.reputation - rng.gauss(0, 8), k.id))
     for g in sorted((g for g in active if wants_caddie(g) and g.id not in st.caddie_of), key=priority):
         budget = caddie_budget(season, g, year)
         events = max(1, season.target_events(g))
         for i, k in enumerate(free_cads):
             if k.weekly_fee * events <= budget:
-                st.caddie_of[g.id] = k.id
+                st.assign_caddie(season, g, k, when)
                 free_cads.pop(i)
-                k.history.append((year, f'Began caddying for {g.name}'))
-                log(g.id, year, 1, f'Hired caddie {k.name}')
                 break
 
 
+def observed_progress(season, g, row, year):
+    """What a season showed about a golfer's progress, and how much it showed.
+
+    Progress: professional results and ranking movement (careers.progress_signal), amateur ranking
+    movement, and observed development (their level against the typical change at their age).
+    Evidence: weak when they played few events or lost much of the season to injury."""
+    from .careers import progress_signal
+    from .population import age_deficit
+    p = progress_signal(row)
+    a0, a1 = row.get('am_start'), row.get('am_end')
+    if a0 and a1:
+        p += max(-0.6, min(0.6, 0.35 * math.log(a0 / a1)))
+    elif a1 and not a0:
+        p += 0.3
+    ov0 = season.overall_start.get(year, {}).get(g.id)
+    if ov0 is not None:
+        age = g.age(year)
+        typical = age_deficit(age, 27.0) - age_deficit(age + 1, 27.0)
+        p += 0.25 * max(-3.0, min(3.0, (g.overall - ov0) - typical))
+    weight = min(1.0, row.get('events', 0) / 6) * (0.3 if row.get('injury_weeks', 0) > 20 else 1.0)
+    return max(-1.5, min(2.5, p)), weight
+
+
+def trend(stint):
+    """Evidence-weighted progress over a stint's recent seasons (latest counts most), and its weight."""
+    num = den = 0.0
+    for i, (_, p, w) in enumerate(reversed(stint.seasons if stint else ())):
+        k = 0.6 ** i * w
+        num += k * p
+        den += k
+    return (num / den if den else 0.0), den
+
+
+# ---- who ends a relationship (smooth odds; each term is something the people involved can see) ----------
+def p_golfer_leaves_coach(trend_, evidence, rapport, fit, afford_pressure):
+    """A golfer's chance of changing coach this winter: a poor run of observed progress (weighted by
+    how much evidence there is), little rapport, a poor fit, or a fee that has outgrown their means."""
+    return _sig(-3.6 - 1.2 * trend_ * min(1.0, evidence) - 1.0 * rapport - 0.4 * fit + 1.2 * min(2.0, afford_pressure))
+
+
+def p_coach_moves_on(deal, trend_, evidence, fit):
+    """A coach's chance of ending a relationship. One who backed a prospect for a share of future
+    winnings weighs the evidence over an observation period (more evidence of stagnation, more likely;
+    a single season, or seasons with little play or long injuries, count for little). A paying client
+    is rarely dropped (a poor fit)."""
+    if deal == 'share':
+        return _sig(-4.5 + 1.0 * min(evidence, 4.0) - 2.5 * trend_) if evidence >= 1.0 else 0.0
+    return _sig(-5.0 - 1.5 * fit - 1.0 * trend_)
+
+
+def p_golfer_changes_caddie(trend_, evidence, rapport, fit):
+    return _sig(-3.2 - 1.3 * trend_ * min(1.0, evidence) - 1.0 * rapport - 0.4 * fit)
+
+
+def p_caddie_moves_on(season_pay, reputation, rapport, fit):
+    """A caddie whose bag paid them little this season (against what their reputation could earn) may
+    look for another; a strong working relationship keeps them."""
+    return _sig(-3.8 + 1.5 * (1 - min(1.0, season_pay / 40000)) * (reputation / 60) - 1.0 * rapport - 0.3 * fit)
+
+
 def end_of_season(season, year, snap):
-    """Reputations follow results; disappointing seasons cost jobs; coaches and caddies age, retire, and
-    the profession recruits from outside when it runs short."""
+    """Reputations follow results; either side may end a relationship; staff gain experience, age and
+    retire; the profession recruits from outside for unmet paying demand."""
     st = season.staff
     rng = random.Random(f'{season.seed}:staff-year:{year}')
+    when = (year, 53)
     from .careers import progress_signal
+    # what this season showed, kept with each open stint
+    for (kind, gid), sid in list(st.rel.open.items()):
+        if kind in ('coach', 'caddie'):
+            s = st.rel.stints[sid]
+            p, w = observed_progress(season, season.g[gid], snap.get(gid, {}), year)
+            s.seasons.append((year, round(p, 3), round(w, 3)))
     pupils = {}
     for gid, cid in st.coach_of.items():
         pupils.setdefault(cid, []).append(gid)
@@ -486,9 +638,7 @@ def end_of_season(season, year, snap):
         progress = sum(progress_signal(snap.get(gid, {})) for gid in pupils.get(c.id, ()))
         target = 100 * (1 - math.exp(-fame / 150)) + 4 * progress
         c.reputation = round(_clip(0.8 * c.reputation + 0.2 * target, 1.0), 1)
-        if rng.random() < _sig((c.age(year) - COACH_RETIRE_AGE) / 3) or (not pupils.get(c.id) and rng.random() < 0.15):
-            c.status = 'retired'
-            c.history.append((year, f'Retired from coaching at {c.age(year)}'))
+        c.idle_years = 0 if pupils.get(c.id) else c.idle_years + 1
     record = season.staff_year.setdefault(year, {})   # this season's work, before the counters reset
     for k in st.caddies.values():
         if k.status == 'active':
@@ -505,38 +655,63 @@ def end_of_season(season, year, snap):
                 for s in ('strategy', 'green_reading', 'yardage', 'course_knowledge'):
                     if k.skills[s] < 95.0:                # growth stops at 95; higher skills are kept
                         k.skills[s] = round(min(95.0, k.skills[s] + gain), 2)
-        k.weeks_worked, k.rounds_worked = 0, 0.0
+    receipts = season.staff_receipts.get(year, {})
     for gid, kid in list(st.caddie_of.items()):
         k = st.caddies[kid]
         row = snap.get(gid, {})
         k.reputation = round(_clip(0.8 * k.reputation + 0.2 * min(100.0, 20 * math.log10(1 + row.get('prize', 0) / 1000)), 1.0), 1)
-        if progress_signal(row) < -0.3 and rng.random() < 0.3:          # a bad year: a new caddie
-            st.caddie_of.pop(gid)
-            k.history.append((year, f'Let go by {season.g[gid].name} after a difficult season'))
-            season.log(gid, year, 53, f'Let caddie {k.name} go after a difficult season')
+        s = st.rel.current('caddie', gid)
+        tr, ev = trend(s)
+        rap = st.rel.rapport('caddie', kid, gid, year)
+        fit = st.rel.pair('caddie', kid, gid).fit
+        # the golfer may want a change after a poor run; the caddie may want a bag that pays better
+        p_golfer = p_golfer_changes_caddie(tr, ev, rap, fit)
+        p_caddie = p_caddie_moves_on(receipts.get(('caddie', kid), 0.0), k.reputation, rap, fit)
+        r = rng.random()
+        if r < p_golfer:
+            st.end_caddie(season, gid, when, 'the golfer wanted a change after a difficult run' if tr < 0
+                          else 'the golfer wanted a change', 'golfer')
+        elif r < p_golfer + p_caddie:
+            st.end_caddie(season, gid, when, 'the caddie moved on looking for a better-paying bag', 'staff')
+        k.weeks_worked, k.rounds_worked = 0, 0.0
+    for k in st.caddies.values():
+        k.weeks_worked, k.rounds_worked = 0, 0.0
     for gid in list(st.coach_of):
-        row = snap.get(gid, {})
-        if st.deal.get(gid) == 'share' and season.g[gid].age(year) > SCOUT_AGE + 2 and not row.get('prize') \
-                and progress_signal(row) <= 0 and rng.random() < 0.4:
-            c = st.coaches[st.coach_of.pop(gid)]               # the coach stops believing
-            st.deal.pop(gid, None)
-            c.history.append((year, f'Stopped coaching {season.g[gid].name} (the promise had not come through)'))
-            season.log(gid, year, 53, f'Coach {c.name} moved on: the promise they saw had not come through')
+        cid, deal = st.coach_of[gid], st.deal.get(gid)
+        s = st.rel.current('coach', gid)
+        tr, ev = trend(s)
+        rap = st.rel.rapport('coach', cid, gid, year)
+        fit = st.rel.pair('coach', cid, gid).fit
+        c = st.coaches[cid]
+        g = season.g[gid]
+        afford = max(0.0, c.fee / max(1.0, coach_budget(season, g, year + 1)) - 1) if deal == 'fee' else 0.0
+        p_golfer = p_golfer_leaves_coach(tr, ev, rap, fit, afford)
+        p_coach = p_coach_moves_on(deal, tr, ev, fit)
+        why = 'the promise they saw had not come through' if deal == 'share' else 'the coach felt they were not the right fit'
+        r = rng.random()
+        if r < p_golfer:
+            st.end_coach(season, gid, when, 'the golfer wanted a change after a difficult run' if tr < 0
+                         else 'could no longer afford the fee' if afford > 0.3 else 'the golfer wanted a change', 'golfer')
+        elif r < p_golfer + p_coach:
+            st.end_coach(season, gid, when, why, 'staff')
+    for c in st.coaches.values():                     # retirement is a career decision, not a client one
+        if c.status != 'active' or (c.history and c.history[0][0] == year and c.former_golfer):
             continue
-        if progress_signal(row) < -0.3 and rng.random() < 0.2:
-            c = st.coaches[st.coach_of.pop(gid)]
-            st.deal.pop(gid, None)
-            c.history.append((year, f'Let go by {season.g[gid].name} after a difficult season'))
-            season.log(gid, year, 53, f'Parted with coach {c.name} after a difficult season')
-    employed = set(st.caddie_of.values())
+        if rng.random() < _sig((c.age(year) - COACH_RETIRE_AGE) / 3) or rng.random() < 0.08 * min(3, c.idle_years):
+            c.status = 'retired'
+            c.history.append((year, f'Retired from coaching at {c.age(year)}'
+                                    + (' after a spell without clients' if c.idle_years else '')))
+    bags = st._bags()
     for k in st.caddies.values():
         if k.status != 'active' or (k.history and k.history[0][0] == year and k.former_golfer):
             continue
-        idle = k.id not in employed
+        idle = k.id not in bags
         if rng.random() < _sig((k.age(year) - CADDIE_RETIRE_AGE) / 3) or (idle and rng.random() < 0.25):
             k.status = 'retired'
             k.history.append((year, f'Stopped caddying at {k.age(year)}'))
-    # outside recruits when demand outgrows the profession (labelled as such)
+    release_departed(season, year, 53)
+    sync_school(season, year, 53, closing=True)
+    # outside recruits for unmet demand (labelled as such)
     demand = {}
     for g in season.world.golfers:
         if wants_caddie(g) and g.lifestyle != 'retired':
@@ -548,7 +723,6 @@ def end_of_season(season, year, snap):
     for country, n in sorted(demand.items()):
         for _ in range(max(0, round(1.1 * n) - supply.get(country, 0))):
             st.generated_caddie(rng, country, year + 1, 'a club caddie (outside recruit)')
-    release_departed(season, year)
     # new coaches come in where golfers wanted to pay for coaching and found every coach they could
     # afford full (scouting demand alone does not create coaches)
     for country, n in sorted(st.unserved.get(year, {}).items()):
@@ -556,27 +730,22 @@ def end_of_season(season, year, snap):
             st.generated_coach(rng, country, year + 1, 'a teaching professional (outside recruit)')
 
 
-def release_departed(season, year):
-    """Golfers who retired from competition (or joined the staff) leave their coach and caddie, and
-    coaches and caddies who retired leave their players — at once, not at the next hiring market."""
+def release_departed(season, year, week):
+    """Golfers who retired from competition (or joined the staff) and staff who retired leave their
+    relationships at once, recorded with the reason; nothing is deleted."""
     st = season.staff
     for gid, cid in list(st.coach_of.items()):
         g, c = season.g[gid], st.coaches[cid]
-        if g.lifestyle == 'retired' or c.status != 'active':
-            del st.coach_of[gid]
-            st.deal.pop(gid, None)
-            if g.lifestyle == 'retired':
-                c.history.append((year, f'Stopped coaching {g.name} (retired from competition)'))
-            else:
-                season.log(gid, year, 53, f'Coach {c.name} retired')
+        if g.lifestyle == 'retired':
+            st.end_coach(season, gid, (year, week), 'retired from competition', 'retirement')
+        elif c.status != 'active':
+            st.end_coach(season, gid, (year, week), 'coach retired', 'retirement')
     for gid, kid in list(st.caddie_of.items()):
         g, k = season.g[gid], st.caddies[kid]
-        if g.lifestyle == 'retired' or k.status != 'active':
-            del st.caddie_of[gid]
-            if g.lifestyle == 'retired':
-                k.history.append((year, f'Left the bag of {g.name} (retired from competition)'))
-            else:
-                season.log(gid, year, 53, f'Caddie {k.name} retired')
+        if g.lifestyle == 'retired':
+            st.end_caddie(season, gid, (year, week), 'retired from competition', 'retirement')
+        elif k.status != 'active':
+            st.end_caddie(season, gid, (year, week), 'caddie retired', 'retirement')
 
 
 def former_golfer_role(season, g, year, rng, level):

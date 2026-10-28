@@ -158,7 +158,7 @@ class RecordTests(unittest.TestCase):
         self.assertGreater(rec.holes_played, 40 * 18)            # plus every match-play hole
         # an ace in the final is a memorable moment, not a round
         book.hole_recorder(course, '2027:USA_AMATEUR', 2027)(field[0], 2, 1, 'final')
-        self.assertEqual(rec.aces[-1], (3, 'A0', '2027:USA_AMATEUR', 2027, 'final'))
+        self.assertEqual(rec.aces[-1], (3, 'A0', '2027:USA_AMATEUR', 2027, 'final', field[0].id))
         self.assertEqual(rec.rounds, 40)
         self.assertEqual(rec.hole_best[2][0], 1)
 

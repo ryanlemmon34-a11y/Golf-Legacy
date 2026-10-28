@@ -306,9 +306,10 @@ def turn_pro(season, g, year, am_rank, how):
 def add_juniors(season, year):
     """A new class of 18-year-olds joins the world."""
     from .population import junior_class
-    start = max(season.g) + 1
-    taken = {g.name for g in season.world.golfers}
+    start = season.world.next_id                     # ids come from the world's single person registry
+    taken = {g.name for g in season.world.golfers} | season.staff.taken
     juniors = junior_class(year, season.seed, season.world.nations, start, taken)
+    season.world.next_id = start + len(juniors)
     rng = random.Random(f'{season.seed}:juniors:{year}')
     for g in juniors:
         init_ceilings(g, 18, rng)

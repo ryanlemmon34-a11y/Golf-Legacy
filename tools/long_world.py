@@ -7,6 +7,10 @@
 Per run directory:
     manifest.json            exact engine commit (and whether the tree was dirty), configuration,
                              seeds, years requested and completed per seed, checkpoint format
+    archive_<s>/             the world's history archive (golfsim/archive.py): durable facts, one file
+                             per season — explore with tools/history_query.py
+    seed_<s>.save            a resumable simulation save (golfsim/savegame.py), every --save-every
+                             seasons; `--resume` continues an interrupted run exactly
     seed_<s>.json.gz         player-facing records (no hidden attributes), checkpointed every 5 years
     seed_<s>.debug.json.gz   hidden attributes per golfer-year and staff skills (debug only)
     REPORT.md                player-facing report: checks, annual highlights, careers, staff, majors
@@ -120,21 +124,40 @@ def year_rows(s, year, snap):
     return rows, debug
 
 
-def run_world(seed, years, workers, out):
+def run_world(seed, years, workers, out, resume=False, save_every=1):
+    """Run (or resume) one world. Each season it appends to the world's history archive
+    (archive_<seed>/) and, every `save_every` seasons, writes a resumable simulation save
+    (seed_<seed>.save) plus this tool's own running totals, so an interrupted run continues exactly."""
+    import pickle
+    from golfsim.archive import ArchiveWriter
     from golfsim.population import generate_world
+    from golfsim.savegame import load_simulation, save_simulation
     from golfsim.season import Season
     t0 = time.perf_counter()
-    world = generate_world(seed=seed)
-    s = Season(world, seed=seed, development=True, workers=workers)
-    first = s.first_year
-    created = {g.id: first for g in world.golfers}
-    initial = {g.id for g in world.golfers}
-    data = {'format': FORMAT, 'seed': seed, 'first': first, 'years': 0, 'rows': {}, 'checks': {}, 'majors': {},
-            'transitions': {}, 'routes': {}, 'unpaid': {}, 'number_one': {}}
-    debug = {'format': FORMAT, 'seed': seed, 'rows': {}}
-    for y in range(first, first + years):
+    save_path, state_path = out / f'seed_{seed}.save', out / f'seed_{seed}.state.pkl'
+    if resume and save_path.exists() and state_path.exists():
+        s, meta = load_simulation(save_path)
+        s.workers = workers or s.workers
+        with open(state_path, 'rb') as f:
+            data, debug, created, initial, arch_created = pickle.load(f)
+        print(f'seed {seed}: resumed after {data["years"]} seasons ({meta["commit"][:10]})', flush=True)
+    else:
+        world = generate_world(seed=seed)
+        s = Season(world, seed=seed, development=True, workers=workers)
+        created = {g.id: s.first_year for g in world.golfers}
+        initial = {g.id for g in world.golfers}
+        data = {'format': FORMAT, 'seed': seed, 'first': s.first_year, 'years': 0, 'rows': {}, 'checks': {},
+                'majors': {}, 'transitions': {}, 'routes': {}, 'unpaid': {}, 'number_one': {}}
+        debug = {'format': FORMAT, 'seed': seed, 'rows': {}}
+        arch_created = None
+    first = data['first']
+    archive = ArchiveWriter(out / f'archive_{seed}', s)
+    if arch_created:
+        archive.created, archive.initial = arch_created, initial
+    for y in range(first + data['years'], first + years):
         active_before = sum(1 for g in s.world.golfers if g.lifestyle != 'retired')
         s.run_year(y)
+        archive.write_year(s, y)                            # the durable history, before the snapshot goes
         snap = s.snapshots.pop(y)
         rows, dbg = year_rows(s, y, snap)
         data['rows'][y], debug['rows'][y] = rows, dbg
@@ -155,8 +178,14 @@ def run_world(seed, years, workers, out):
         print(f'seed {seed}: {y} done ({data["years"]}/{years}), {c["active_after"]} active, '
               f'reconcile errors {c["reconcile_errors"]}, staff violations {c["staff_violations"]}, '
               f'population {"ok" if c["population_ok"] else "MISMATCH"}, {time.perf_counter() - t0:.0f} s', flush=True)
-        if data['years'] % 5 == 0 or y == first + years - 1:
+        last = y == first + years - 1
+        if data['years'] % 5 == 0 or last:
             save(s, data, debug, created, initial, out, t0)
+        if data['years'] % save_every == 0 or last:
+            archive.write_state(s)
+            save_simulation(s, save_path, f'seed {seed} after {y}')
+            with open(state_path, 'wb') as f:
+                pickle.dump((data, debug, created, initial, archive.created), f)
     s.close()
 
 
@@ -519,6 +548,8 @@ def main():
     ap.add_argument('--workers', type=int, default=None)
     ap.add_argument('--out', default=str(ROOT / 'reports' / 'long_world'))
     ap.add_argument('--report-only', action='store_true')
+    ap.add_argument('--resume', action='store_true', help='continue interrupted seeds from their simulation saves')
+    ap.add_argument('--save-every', type=int, default=1, help='seasons between simulation saves')
     ap.add_argument('--strict', action='store_true', help='exit non-zero if any check fails (integration gate)')
     a = ap.parse_args()
     out = Path(a.out)
@@ -528,13 +559,15 @@ def main():
         man = load_manifest(out)
         if man and man.get('commit') != commit:
             raise SystemExit(f'{out} holds checkpoints from commit {man.get("commit")}; use a new directory')
+        if man and not a.resume and any(int(k) in a.seeds for k in man.get('seeds', {})):
+            raise SystemExit(f'{out} already holds these seeds; pass --resume to continue them or use a new directory')
         man.update({'format': FORMAT, 'commit': commit, 'dirty': dirty, 'python': platform.python_version(),
                     'started': time.strftime('%Y-%m-%d %H:%M:%S'), 'years_requested': a.years,
                     'config': config(), 'mature': a.mature})
         man.setdefault('seeds', {})
         (out / 'manifest.json').write_text(json.dumps(man, indent=1, default=str))
         for seed in a.seeds:
-            run_world(seed, a.years, a.workers, out)
+            run_world(seed, a.years, a.workers, out, a.resume, a.save_every)
     man = load_manifest(out)
     seeds = [int(s) for s in man['seeds']] if a.report_only else a.seeds
     results = []

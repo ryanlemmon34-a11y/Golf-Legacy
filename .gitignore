@@ -4,3 +4,6 @@ dist/
 reports/cohort_data/
 reports/long_world*/*.json.gz
 reports/long_world*/*.tmp
+reports/long_world*/*.save
+reports/long_world*/*.pkl
+reports/long_world*/archive_*/

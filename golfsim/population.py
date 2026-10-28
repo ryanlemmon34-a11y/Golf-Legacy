@@ -118,6 +118,13 @@ class World:
 
     def __post_init__(self):
         self.by_id = {g.id: g for g in self.golfers}
+        # one person-id space for the whole world: golfers, coaches and caddies (a golfer who becomes a
+        # coach keeps their id); ids are never reused
+        self.next_id = max((g.id for g in self.golfers), default=0) + 1
+
+    def new_id(self):
+        self.next_id += 1
+        return self.next_id - 1
 
     def pros(self):
         return [g for g in self.golfers if g.status == 'pro']

@@ -13,6 +13,9 @@ For each layout the book keeps:
     hole bests        lowest score ever made on each hole, and every hole-in-one and albatross
     scoring           rounds played and scoring average
 
+Every mark carries the golfer's person id and the event id, so a record links to the golfer and the
+edition, not just a display name.
+
 Match-play holes and playoff holes count for the hole records and the memorable moments (an ace in a
 championship final is kept), but never as an 18-hole round: a match that ends 5&4 is not a round.
 """
@@ -31,6 +34,7 @@ class Mark:
     week: int
     round_no: int = 0
     tier: int = -1
+    golfer_id: int = 0           # person id: records link to the golfer and the event, not just a name
 
     def line(self):
         tp = 'E' if self.to_par == 0 else f'{self.to_par:+d}'
@@ -47,9 +51,9 @@ class LayoutRecords:
     tier_records: dict = field(default_factory=dict)      # tier -> Mark
     lowest_totals: dict = field(default_factory=dict)     # holes -> Mark
     highest_round: Mark | None = None
-    hole_best: list = field(default_factory=lambda: [None] * 18)   # (score, golfer, event_id)
-    aces: list = field(default_factory=list)              # (hole number, golfer, event_id, year, stage)
-    albatrosses: list = field(default_factory=list)       # (hole number, golfer, event_id, year, stage)
+    hole_best: list = field(default_factory=lambda: [None] * 18)   # (score, golfer, event_id, golfer_id)
+    aces: list = field(default_factory=list)              # (hole number, golfer, event_id, year, stage, golfer_id)
+    albatrosses: list = field(default_factory=list)       # (hole number, golfer, event_id, year, stage, golfer_id)
     holes_played: int = 0                                 # every competitive hole, rounds or not
     rounds: int = 0
     strokes: int = 0
@@ -74,18 +78,18 @@ class LayoutRecords:
             self.highest_round = mark
         for i, s in enumerate(hole_scores):
             self.add_hole(i, s, hole_pars[i] if hole_pars else 0, mark.golfer, mark.event_id, mark.year,
-                          f'round {mark.round_no}' if mark.round_no else '')
+                          f'round {mark.round_no}' if mark.round_no else '', mark.golfer_id)
 
-    def add_hole(self, idx, score, par, golfer, event_id, year, stage=''):
+    def add_hole(self, idx, score, par, golfer, event_id, year, stage='', golfer_id=0):
         """One competitive hole: a round's hole, a match-play hole or a playoff hole."""
         self.holes_played += 1
         b = self.hole_best[idx]
         if b is None or score < b[0]:
-            self.hole_best[idx] = (score, golfer, event_id)
+            self.hole_best[idx] = (score, golfer, event_id, golfer_id)
         if score == 1:
-            self.aces.append((idx + 1, golfer, event_id, year, stage))
+            self.aces.append((idx + 1, golfer, event_id, year, stage, golfer_id))
         elif par and score == par - 3:
-            self.albatrosses.append((idx + 1, golfer, event_id, year, stage))
+            self.albatrosses.append((idx + 1, golfer, event_id, year, stage, golfer_id))
 
     def add_total(self, holes, mark):
         cur = self.lowest_totals.get(holes)
@@ -112,7 +116,7 @@ class RecordBook:
 
         def on_round(golfer, round_no, stats):
             rec.add_round(Mark(stats.score, stats.score - course.par, golfer.name, event_id, year, week, round_no,
-                               tier), stats.holes, pars)
+                               tier, getattr(golfer, 'id', 0)), stats.holes, pars)
         return on_round
 
     def hole_recorder(self, course, event_id, year):
@@ -121,7 +125,7 @@ class RecordBook:
         pars = [h.par for h in course.holes]
 
         def on_hole(golfer, idx, strokes, stage=''):
-            rec.add_hole(idx, strokes, pars[idx], golfer.name, event_id, year, stage)
+            rec.add_hole(idx, strokes, pars[idx], golfer.name, event_id, year, stage, getattr(golfer, 'id', 0))
         return on_hole
 
     def add_event(self, course, leaderboard, holes, event_id, year, week, tier=-1):
@@ -130,7 +134,7 @@ class RecordBook:
         for golfer, total, rounds in leaderboard:
             if len(rounds) * 18 == holes:
                 rec.add_total(holes, Mark(total, total - course.par * len(rounds), golfer.name, event_id, year,
-                                          week, 0, tier))
+                                          week, 0, tier, getattr(golfer, 'id', 0)))
 
     def to_dict(self):
         out = {}

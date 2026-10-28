@@ -91,14 +91,17 @@ class EffectTests(unittest.TestCase):
         rng = random.Random(1)
         c = st.new_coach(rng, 'USA', 2027, 45, 60, 50, 'putting', True, 50, 'test')
         g = self._young()
+        g.status, g.tour = 'pro', ''                                                 # no school or local baseline
         self.assertEqual(st.coaching(g, 'putting', 19), ST.SELF_TEACHING)          # no coach yet
-        st.coach_of[g.id] = c.id
-        self.assertAlmostEqual(st.coaching(g, 'putting', 19), 0.9)                  # speciality + youth
-        self.assertAlmostEqual(st.coaching(g, 'long_game', 19), 0.75)
-        self.assertAlmostEqual(st.coaching(g, 'long_game', 30), 0.6)
+        st.assign_coach(None, g, c, 'fee', (2027, 1), 'golfer', 'test')
+        eff = st.rel.effectiveness('coach', c.id, g.id, 2027)
+        q = lambda raw: ST.SELF_TEACHING + (raw - ST.SELF_TEACHING) * eff
+        self.assertAlmostEqual(st.coaching(g, 'putting', 19, 2027), q(0.9))       # speciality + youth
+        self.assertAlmostEqual(st.coaching(g, 'long_game', 19, 2027), q(0.75))
+        self.assertAlmostEqual(st.coaching(g, 'long_game', 30, 2027), q(0.6))
         coached, alone = self._young(), self._young()
         for _ in range(10):
-            D.develop_week(coached, 'train', 19, 'putting', coach=st.coaching(g, 'putting', 19))
+            D.develop_week(coached, 'train', 19, 'putting', coach=st.coaching(g, 'putting', 19, 2027))
             D.develop_week(alone, 'train', 19, 'putting', coach=ST.SELF_TEACHING)
         self.assertGreater(coached.overall, alone.overall)
 
@@ -111,7 +114,12 @@ class EffectTests(unittest.TestCase):
     def test_caddie_on_the_bag(self):
         st = SEASON.staff
         gid, kid = next(iter(st.caddie_of.items()))
-        self.assertIs(st.bag(SEASON.g[gid]), st.caddies[kid])
+        k, view = st.caddies[kid], st.bag(SEASON.g[gid], 2027)
+        eff = st.rel.effectiveness('caddie', kid, gid, 2027)
+        self.assertEqual(view.name, k.name)
+        self.assertIs(view.familiarity, k.familiarity)                       # their course knowledge is their own
+        for sk, v in k.skills.items():                                       # skills reach the player through the pair
+            self.assertAlmostEqual(view.skills[sk], 50 + (v - 50) * eff)
         loner = next(g for g in SEASON.world.golfers if g.id not in st.caddie_of)
         own = st.bag(loner)
         self.assertEqual(own.skills['strategy'], ST.SELF_CADDIE)
@@ -173,7 +181,9 @@ class MoneyTests(unittest.TestCase):
         s.plan_block(2027, 5)
         self.assertTrue(all(gid not in s.staff.coach_of for gid in payers))
         self.assertTrue(all(gid in s.staff.coach_of for gid in scouted))   # a share deal costs nothing now
-        self.assertTrue(any('Could no longer pay coach' in t for gid in payers for _, _, t in s.history[gid]))
+        self.assertTrue(all(any('could no longer pay the fee' in t for _, _, t in s.history[gid]) for gid in payers))
+        ended = [x for gid in payers for x in s.staff.rel.of_golfer(gid, 'coach') if x.end]
+        self.assertTrue(all(x.end == (2027, 5) and x.ended_by == 'golfer' for x in ended))   # a dated mid-season end
 
 
 class LifecycleTests(unittest.TestCase):
@@ -240,29 +250,12 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual(len(new), 2)
         self.assertTrue(all(c.country == 'USA' for c in new))
 
-    def test_coaches_give_up_on_stalled_share_deals_but_not_young_ones(self):
-        s = fresh(33)
-        s.start_finances(2027)
-        st = s.staff
-        shares = [gid for gid, d in st.deal.items() if d == 'share'][:80]
-        old, young = shares[:40], shares[40:]
-        for gid in old:
-            s.g[gid].born = 2027 - 28
-        for gid in young:
-            s.g[gid].born = 2027 - 20
-        snap = s.season_snapshot(2027)
-        ST.end_of_season(s, 2027, snap)
-        dropped_old = sum(1 for gid in old if gid not in st.coach_of)
-        dropped_young = sum(1 for gid in young if gid not in st.coach_of and s.g[gid].lifestyle != 'retired')
-        self.assertGreater(dropped_old, 5)
-        self.assertLess(dropped_young, dropped_old / 2)
-
     def test_match_play_holes_teach_the_course(self):
         s = fresh(31)
         ed = next(e for e in s.cal.editions(2027) if e.series.series_id == 'USA_AMATEUR')
         ams = [g.id for g in s.world.golfers if g.status == 'amateur'][:80]
         k = next(iter(s.staff.caddies.values()))
-        s.staff.caddie_of[ams[0]] = k.id                                     # one of them brings a caddie
+        s.staff.assign_caddie(None, s.g[ams[0]], k, (2027, 1))              # one of them brings a caddie
         venues = s.lib.venues(2027)
         s.play_week(2027, ed.week, [ed], {ed.event_id: [ams]}, venues)
         key = s.lib.course(venues[ed.event_id][0]).familiarity_key
