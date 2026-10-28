@@ -186,12 +186,15 @@ def p_retire(season, g, row, year):
     age = g.age(year)
     inj = 0.06 * row.get('injury_weeks', 0) + 0.8 * lasting_damage(season, g.id, year)
     if g.status == 'club_pro':
-        x = -6.0 + 0.25 * (age - 40) + inj                     # a club job usually runs into the sixties
+        # the club job goes on; competing winds down from their fifties (about 5% a year at 45, 15% at 55)
+        x = -4.0 + 0.15 * (age - 40) + inj
     elif g.lifestyle == 'part_time':
-        # work and family crowd competition out, least for those still playing often and well
+        # work and family crowd competition out, least for those still playing often and well: most
+        # golfers who took a job after the tour, and adult amateurs, compete for a few years (about one
+        # in five stops each year), the good and keen ones for much longer
         engaged = min(1.0, row.get('events', 0) / 6) + 0.3 * min(2, row.get('top10', 0))
         rank = row.get('am_end') if g.status == 'amateur' else row.get('wr_end')
-        x = -1.8 + 0.06 * (age - 35) - 0.8 * engaged - 1.5 * amateur_standing(rank) + inj
+        x = -0.4 + 0.06 * (age - 35) - 0.8 * engaged - 1.5 * amateur_standing(rank) + inj
     else:
         tier = TOUR_BY_KEY[g.tour].tier if g.tour in TOUR_BY_KEY else 4
         standing = 1 - row.get('money_rank_pct', 1.0) if row.get('status') == 'pro' else 0.5
