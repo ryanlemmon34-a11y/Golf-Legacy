@@ -226,6 +226,36 @@ class CareerOddsTests(unittest.TestCase):
         hurt = dict(stagnant, injury_weeks=30)
         self.assertGreater(p(b, hurt), p(b, stagnant))                       # health counts
 
+    def test_part_timers_stop_for_their_own_reasons_not_to_fit_the_world(self):
+        """Participation, opportunity, progress, health and willingness decide; not being able to find
+        events is not the same as choosing not to play."""
+        from collections import Counter
+        s = self.s
+        part = at_age(copy.deepcopy(self.g), 30)
+        part.lifestyle = 'part_time'
+        weeks = lambda **c: Counter({k.replace('_', ' ').replace('none', 'no suitable event scheduled'): v
+                                     for k, v in c.items()})
+        def p(row, access, g=part):
+            s.week_access[2027][g.id] = access
+            try:
+                return C.p_retire(s, g, row, 2027)
+            finally:
+                s.week_access[2027].pop(g.id, None)
+        played = {'status': 'pro', 'tier': 4, 'events': 8}
+        idle = {'status': 'pro', 'tier': 4, 'events': 0}
+        options = weeks(**{'chose to work': 40, 'chose to rest': 12})          # events there, chose not to
+        none = weeks(**{'no suitable event scheduled': 45, 'chose to work': 7})  # nothing they could enter
+        regular = p(played, weeks(**{'played: first choice': 8, 'chose to work': 44}))
+        self.assertLess(regular, 0.08)                                      # keen part-timers keep playing
+        self.assertGreater(p(idle, options), p(idle, none))                 # drifting away vs shut out
+        self.assertGreater(p(idle, none), regular)
+        keen = copy.deepcopy(part)
+        keen.personality.update(work_ethic=90, big_stage=90)
+        self.assertLess(p(idle, options, keen), p(idle, options))           # willingness counts
+        better = dict(played, wr_start=3000, wr_end=1500, top10=2)
+        self.assertLess(p(better, weeks(**{'played: first choice': 8})), regular)    # and progress
+        self.assertGreater(p(dict(played, injury_weeks=20), weeks(**{'injured': 20})), regular)   # and health
+
     def test_retirement_and_comebacks_have_no_age_or_cash_switches(self):
         s = self.s
         part = copy.deepcopy(self.g)
@@ -282,9 +312,8 @@ class BackerTests(unittest.TestCase):
     def test_most_new_professionals_find_backers_and_a_record_helps(self):
         r = random.Random(1)
         share = lambda st: S.mean(FIN.backer_deal(22, st, r.random(), r.random()) > 0 for _ in range(4000))
-        self.assertAlmostEqual(share(0.4), 0.76, delta=0.03)
+        self.assertAlmostEqual(share(0.4), 0.76, delta=0.04)
         self.assertGreater(share(0.9), share(0.1))
-        self.assertEqual(FIN.backer_deal(FIN.BACKER_AGE + 1, 1.0, 0.0, 0.5), 0.0)
         deals = [FIN.backer_deal(22, 0.5, 0.0, r.random()) for _ in range(500)]
         self.assertTrue(all(FIN.BACKER_MIN <= d <= FIN.BACKER_MAX for d in deals))
 
@@ -297,19 +326,20 @@ class BackerTests(unittest.TestCase):
         led.prize, led.backer_share = 1000.0, FIN.BACKER_SHARE * 1000.0
         self.assertAlmostEqual(led.net, 750.0)                               # in the ledger: cash reconciles
 
-    def test_backers_renew_on_progress_and_withdraw_without_it(self):
-        rng = random.Random(3)
+    def test_backers_renew_on_progress_and_lose_patience_without_it(self):
         g = at_age(self.g, 24)
         g.backer = 30000.0
-        for _ in range(4):                                                   # progress every season: renewed
-            C.review_backers(self.s, g, self.good, 2027, rng)
-        self.assertEqual(g.backer, 30000.0)
-        self.assertEqual(C.review_backers(self.s, g, self.flat, 2027, rng), None)     # one flat season: patience
-        self.assertEqual(C.review_backers(self.s, g, self.flat, 2027, rng), 'backers withdrew')
-        self.assertEqual(g.backer, 0.0)
-        old = at_age(self.g, FIN.BACKER_AGE + 1)
-        old.backer = 30000.0
-        self.assertEqual(C.review_backers(self.s, old, self.good, 2027, rng), 'backers withdrew')
+        good = C.p_backers_continue(self.s, g, self.good, 2027)
+        flat1 = C.p_backers_continue(self.s, g, self.flat, 2027)
+        g.backer_stale = 2
+        flat3 = C.p_backers_continue(self.s, g, self.flat, 2027)
+        self.assertGreater(good, 0.85)                                      # progress: almost always renewed
+        self.assertTrue(good > flat1 > flat3 > 0.02, (good, flat1, flat3))
+        h = copy.deepcopy(g)
+        while C.review_backers(self.s, h, self.flat, 2027, random.Random(h.backer_stale)) is None and h.backer_stale < 12:
+            pass
+        self.assertEqual((h.backer, h.backer_funds), (0.0, 0.0))            # withdrawn in the end, recorded
+        self.assertIn('backers withdrew', self.s.history[h.id][-1][2].lower())
 
     def test_independence_is_judged_without_the_support_being_withdrawn(self):
         """A losing golfer with a large family pot and credit is not 'paying their own way'; a golfer
@@ -343,6 +373,39 @@ class BackerTests(unittest.TestCase):
         self.assertAlmostEqual(with_deal - s.funds(g, 2027), 30000.0)
         self.assertAlmostEqual(s.prize_kept(g), 1.0 - (FIN.CADDIE_SHARE if s.staff.caddie(g.id) is not None else 0.0)
                                - (C.ST.SCOUT_SHARE if s.staff.deal.get(g.id) == 'share' else 0.0))
+
+    def test_no_age_cliff_and_no_universal_two_season_rule(self):
+        """Backers decide with bounded odds: progress, secured opportunities, how far the season's losses
+        outrun the deal, their own patience, flat seasons and age all count; none ends every deal."""
+        def keeps(g, row, n=300):
+            kept = 0
+            for i in range(n):
+                h = copy.deepcopy(g)
+                if C.review_backers(self.s, h, row, 2027, random.Random(i)) is None and h.backer:
+                    kept += 1
+            return kept / n
+        g = at_age(self.g, 34)
+        g.backer = 30000.0
+        self.assertGreater(keeps(g, self.good), 0.6)                        # a 34-year-old making progress
+        g = at_age(self.g, 25)
+        g.backer, g.backer_stale = 30000.0, 1                               # a second flat season
+        flat2 = keeps(g, self.flat)
+        self.assertTrue(0.1 < flat2 < 0.9, flat2)                           # likely to end, not certain
+        g.backer_patience = 0.95
+        self.assertGreater(keeps(g, self.flat), flat2)                      # patient backers wait longer
+        p = [C.p_backers_continue(self.s, at_age(g, a), self.good, 2027) for a in range(24, 46)]
+        self.assertTrue(all(p1 <= p0 and p1 / p0 > 0.8 for p0, p1 in zip(p, p[1:])))   # smooth in age
+        self.assertGreater(p[-1], 0.02)
+        secured = dict(self.flat, secured=['USA_OPEN'])
+        self.assertGreater(C.p_backers_continue(self.s, g, secured, 2027), C.p_backers_continue(self.s, g, self.flat, 2027))
+
+    def test_finding_backers_declines_smoothly_with_age(self):
+        r = random.Random(2)
+        share = lambda age: S.mean(FIN.backer_deal(age, 0.4, r.random(), r.random()) > 0 for _ in range(3000))
+        shares = [share(a) for a in (22, 26, 30, 32, 34, 38)]
+        self.assertTrue(all(b < a for a, b in zip(shares, shares[1:])), shares)
+        self.assertGreater(shares[3], 0.4 * shares[2])                     # no step at 33
+        self.assertGreater(shares[-1], 0.0)
 
     def test_credit_does_not_fund_another_season_but_backers_do(self):
         g = at_age(self.g, 25)

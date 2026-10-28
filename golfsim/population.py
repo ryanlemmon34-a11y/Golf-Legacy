@@ -271,7 +271,7 @@ def generate_world(year=2027, seed=2027, nation_profiles=None, scale=1.0):
             b = random.Random(f'{seed}:backers:{g.id}')
             g.backer = backer_deal(age, 0.4, b.random(), b.random())
             if g.backer:
-                g.backing = 0.0
+                g.backing, g.backer_patience = 0.0, b.random()
     return world
 
 

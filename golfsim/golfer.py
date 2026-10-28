@@ -50,6 +50,7 @@ class Golfer:
     backer: float = 0.0              # a professional's backing deal: what backers put up each season (0 = none)
     backer_funds: float = 0.0        # backers' money not yet drawn this season (theirs again if the deal ends)
     backer_stale: int = 0            # seasons in a row the backed golfer showed backers no progress
+    backer_patience: float = 0.5     # how long these backers wait for progress (0-1, drawn with the deal)
 
     def __post_init__(self):
         missing = set(ATTRIBUTE_KEYS) - set(self.attrs)

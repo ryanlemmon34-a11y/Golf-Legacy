@@ -94,12 +94,17 @@ any family money) for 25% of their prize money while the deal lasts. Backers' mo
 family money: when a deal ends, what is left of the backers' money goes back to them together with their
 share of winnings; family money stays the golfer's. About three in four find backers when they turn
 professional (more often with a better amateur ranking); in the starting world, professionals below the
-Premier Tour aged 32 or under are backed in the same proportion. Each winter backers look at what they
-can see — promotion, a rising world ranking, wins and top-10s: progress renews the deal; two seasons in
-a row without it ends it, as does the golfer passing 32 or paying their own way — judged without the
+Premier Tour are backed in the same proportion for their age. Backers are less willing the older the
+golfer, smoothly (half as willing at 31 as at 22, never a cut-off; an uncalibrated assumption). Each
+winter backers decide with bounded odds from what they can see (`careers.p_backers_continue`): progress
+(promotion, a rising world ranking, wins, top-10s), places already secured, how far the season's losses
+outrun the deal, their own patience (drawn with each deal), seasons in a row without progress, and age.
+Progress almost always renews a deal; flat seasons make withdrawal likelier, never certain. A deal also
+ends when the golfer pays their own way — judged without the
 support being withdrawn: their own expected winnings and sponsors cover a season, or their own savings
-(not family money, not the backers', not credit) cover three seasons of losses; the history says which. A young professional
-without backers can attract them with a breakthrough season (a win, promotion or a big ranking jump).
+(not family money, not the backers', not credit) cover three seasons of losses; the history says which. A professional
+without backers can attract them with a breakthrough season (a win, promotion or a big ranking jump; the
+younger, the likelier).
 Every deal, renewal and withdrawal is in the golfer's history. Club professionals' own events (section
 events, their championships and sectionals) are paid for by their club.
 
@@ -144,7 +149,7 @@ completed season, snapshotted **before** tour cards change (see `docs/SEASON_SYS
 | **Comebacks** | A part-timer who wins or contends — often because their mental game has matured — may quit their job for another run. The odds come from those results, how much of a year on tour they could fund, age (smoothly) and willingness. No age limit and no savings threshold. |
 | **Adult amateurs take jobs** | Amateurs outside college live at home on savings and family help, with no salary. Each year they may take a job and keep playing as part-time amateurs ($52k salary, $40k living): smooth in age (rare at 19-20, likely by the mid-twenties), likelier in debt or with a short runway, less likely with money to keep going. Recorded as a career transition ("amateur took a job"); their chance of turning professional is decided first. |
 | **Turning pro** | College eligibility ends at 22 — a **rule**, so every graduate must choose; the choice weighs their amateur ranking (observed standing), wins, means and willingness. Other amateurs turn pro on the same evidence, less often the further they are from their early twenties. |
-| **Retirement** | Smooth in age for everyone (club pros wind down their competing from their fifties; touring pros later the better their standing and card). Part-timers and adult amateurs compete for a few years after taking a job (about one in five stops each year), those who play less often and less well sooner, the ranked and keen much longer — work and family crowd competition out. This balances the yearly arrivals so the active world holds its size over centuries. |
+| **Retirement** | Smooth in age for everyone (touring pros later the better their standing and card). Golfers with a job (part-timers, adult amateurs, club pros) stop competing for their own reasons: age, health, willingness, progress, and whether they still play. Choosing not to play when events were there (drifting away) counts strongly; finding nothing they could enter counts a little (frustration), never as lost interest. *Uncalibrated assumptions*, roughly: a regular part-timer of 30 stops about 4-5% a year, one who plays nothing though events were there about 45%, one who found nothing to enter about 15%; club pros under 1% a year until their mid-forties, about 5% at 55, 12% at 60 (`careers.p_retire`, `careers.participation`). Not tuned to hold the population or runtime down. |
 | **New juniors** | Every year a class of 18-year-olds arrives from every nation (each nation's pool, development and pathway decide how many and how good), selected on what scouts can see, not on hidden potential. |
 | **New professionals** | Every year about 450 golfers aged 21-26 turn professional from outside the tracked amateur game (small colleges, academies, club and late-developing golfers, countries without college golf) and start on their home mini tour, with savings and perhaps backers (`population.new_professionals`). Each nation sends them in proportion to its golf scene, drawn exactly as the starting world draws its young professionals; golfers the junior class would have kept are left out. It is a steady flow (`NEW_PRO_SCALE`), not a top-up: real lower tours churn, and without it they empty within a decade because their players stop chasing within a few years. |
 

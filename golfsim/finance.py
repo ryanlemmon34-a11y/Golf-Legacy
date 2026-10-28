@@ -28,8 +28,9 @@ Backers
     (Golfer.backer_funds): when a deal ends, the undrawn part goes back to the backers along with
     their share of winnings; family money stays the golfer's. Deals come when a golfer turns professional (likelier for a better
     amateur record) or after a breakthrough season, are renewed each winter only on results backers
-    can see, and end after two seasons without progress, past 32, or once the golfer pays their own
-    way (careers.review_backers).
+    can see with bounded odds (progress, secured places, how far the losses outrun the deal, the
+    backers' own patience, seasons without progress and age all count, none ends every deal), and
+    end when the golfer pays their own way (careers.review_backers).
 
 Funding decisions (before money is spent)
     available funds  cash + remaining family support + backers' money for the season + a limited
@@ -55,7 +56,14 @@ QSCHOOL_FEE = 4500
 CADDIE_SHARE = 0.08              # of prize money, to a professional caddie (plus their weekly fee)
 BACKER_SHARE = 0.25              # of prize money, to a backed golfer's backers while the deal lasts
 BACKER_MIN, BACKER_MAX = 15000, 50000      # what backers put up a season
-BACKER_AGE = 32                  # backers do not take on (or keep) golfers older than this
+BACKER_AGE_MID = 31              # age at which backers are half as willing as for a young golfer
+BACKER_AGE_SPREAD = 2.0          # how quickly that willingness falls with age (smoothly: no cut-off)
+
+
+def backer_youth(age):
+    """How willing backers are to put money behind a golfer of this age (1 young .. towards 0): an
+    uncalibrated assumption shaped like real backing (mostly for golfers in their twenties)."""
+    return 1 / (1 + math.exp((age - BACKER_AGE_MID) / BACKER_AGE_SPREAD))
 LIVING = 32000                   # a full-time touring professional's yearly living costs
 LIVING_WORKING = 40000           # an adult with a job: normal life costs more than living on the road
 SALARY = {'part_time': 52000, 'club_pro': 65000}
@@ -114,10 +122,11 @@ def initial_backing(age, u1, u2):
 
 
 def backer_deal(age, standing, u1, u2):
-    """A new professional's backing deal (yearly dollars, 0 = none): about three in four find backers,
-    more often with a better record (`standing` 0-1, from the amateur or world ranking); the sum
-    varies widely and is larger for a better record."""
-    if age > BACKER_AGE or u1 >= min(0.95, 0.6 + 0.4 * standing):
+    """A new professional's backing deal (yearly dollars, 0 = none): about three in four young new
+    professionals find backers, more often with a better record (`standing` 0-1, from the amateur or
+    world ranking) and less often the older they are (backer_youth, smoothly); the sum varies widely
+    and is larger for a better record."""
+    if u1 >= min(0.95, 0.6 + 0.4 * standing) * backer_youth(age) / backer_youth(22):
         return 0.0
     return round(BACKER_MIN + (BACKER_MAX - BACKER_MIN) * (0.65 * u2 + 0.35 * standing), -2)
 

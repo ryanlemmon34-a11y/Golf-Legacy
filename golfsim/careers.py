@@ -186,11 +186,26 @@ def p_stop_chasing(season, g, row, year):
                      'secured': list(row.get('secured', ()))}
 
 
+def p_backers_continue(season, g, row, year):
+    """Chance a backed golfer's backers put up next season's money, from what they can see: progress
+    (promotion, a rising ranking, wins, top-10s), places already secured, how far the season's losses
+    outrun the deal, their own patience, seasons in a row without progress, and age (smoothly). The
+    weights are uncalibrated assumptions: no single factor ends every deal."""
+    age = g.age(year) + 1
+    progress = progress_signal(row)
+    secured = min(1, len(row.get('secured', ()))) + (0.5 if row.get('promoted') else 0.0)
+    shortfall = season_shortfall(season, g, g.tour, season.target_events(g), row.get('prize', 0.0),
+                                 without_backers=True)
+    burn = max(0.0, shortfall) / g.backer if g.backer else 0.0          # deals' worth the season loses
+    x = (1.4 + 1.5 * progress + 0.8 * secured + 2.0 * (g.backer_patience - 0.5) - 0.6 * g.backer_stale
+         - 0.12 * max(0, age - 28) - 0.4 * max(0.0, burn - 1.5))
+    return _sig(x)
+
+
 def review_backers(season, g, row, year, rng):
-    """Each winter, a full-time professional's backers decide on next season from what they can see:
-    progress (promotion, a rising ranking, wins, top-10s) renews the deal; two seasons in a row
-    without it, or the golfer passing BACKER_AGE, ends it; so does the golfer paying their own way.
-    A young professional without backers can attract them with a breakthrough season."""
+    """Each winter, a full-time professional's backers decide on next season (p_backers_continue); the
+    deal also ends when the golfer can pay their own way (own_way). A professional without backers can
+    attract them with a breakthrough season, the younger the likelier."""
     age = g.age(year) + 1
     progress = progress_signal(row)
     if g.backer:
@@ -199,15 +214,17 @@ def review_backers(season, g, row, year, rng):
             end_backing(season, g, year, f'Paying their own way now ({why}); their backers stepped aside')
             return 'backers no longer needed'
         g.backer_stale = 0 if progress > 0.1 else g.backer_stale + 1
-        if g.backer_stale >= 2 or age > FIN.BACKER_AGE:
-            end_backing(season, g, year, 'Their backers withdrew (no progress to show for two seasons)'
-                        if age <= FIN.BACKER_AGE else 'Their backers withdrew')
+        if rng.random() >= p_backers_continue(season, g, row, year):
+            end_backing(season, g, year, 'Their backers withdrew' + (
+                f' after {g.backer_stale} season{"s" if g.backer_stale > 1 else ""} without visible progress'
+                if g.backer_stale else ''))
             return 'backers withdrew'
         return None
     paying = season_shortfall(season, g, g.tour, season.target_events(g), row.get('prize', 0.0)) <= 0
-    if not paying and age <= FIN.BACKER_AGE and (row.get('wins', 0) or row.get('promoted') or progress >= 0.6) and rng.random() < 0.5:
-        g.backer = FIN.backer_deal(age, max(0.6, amateur_standing(row.get('wr_end'))), 0.0, rng.random())
-        g.backer_stale = 0
+    if (not paying and (row.get('wins', 0) or row.get('promoted') or progress >= 0.6)
+            and rng.random() < 0.5 * FIN.backer_youth(age) / FIN.backer_youth(22)):
+        g.backer = FIN.backer_deal(22, max(0.6, amateur_standing(row.get('wr_end'))), 0.0, rng.random())
+        g.backer_stale, g.backer_patience = 0, rng.random()
         season.log(g.id, year, 53, f'Found backers after their season (${g.backer:,.0f} a season for a share of winnings)')
         return 'found backers'
     return None
@@ -217,21 +234,46 @@ def p_retire(season, g, row, year):
     """Chance of retiring from competitive golf altogether."""
     age = g.age(year)
     inj = 0.06 * row.get('injury_weeks', 0) + 0.8 * lasting_damage(season, g.id, year)
-    if g.status == 'club_pro':
-        # the club job goes on; competing winds down from their fifties (about 5% a year at 45, 15% at 55)
-        x = -4.0 + 0.15 * (age - 40) + inj
-    elif g.lifestyle == 'part_time':
-        # work and family crowd competition out, least for those still playing often and well: most
-        # golfers who took a job after the tour, and adult amateurs, compete for a few years (about one
-        # in five stops each year), the good and keen ones for much longer
-        engaged = min(1.0, row.get('events', 0) / 6) + 0.3 * min(2, row.get('top10', 0))
+    if g.status == 'club_pro' or g.lifestyle == 'part_time':
+        # golfers with a job: they stop competing for their own reasons -- age, health, how keen they
+        # are, how well it is going, and whether they still play. Choosing not to play when there were
+        # events (drifting away) counts strongly; not finding events they could enter counts a little
+        # (frustration), never as lost interest. Uncalibrated assumptions, roughly: a regular part-timer
+        # of 30 stops about 5% a year, one who plays nothing though events were there about 45%, one who
+        # found nothing to enter about 15%; club pros' competing winds down from their fifties.
+        drift, blocked = participation(season, g, row, year)
+        engaged = min(1.0, row.get('events', 0) / max(1, season.target_events(g))) + 0.3 * min(2, row.get('top10', 0))
         rank = row.get('am_end') if g.status == 'amateur' else row.get('wr_end')
-        x = -0.4 + 0.06 * (age - 35) - 0.8 * engaged - 1.5 * amateur_standing(rank) + inj
+        will = (g.personality['work_ethic'] + g.personality['big_stage']) / 200
+        common = (-0.6 * engaged + 2.4 * drift + 0.8 * blocked - 1.5 * amateur_standing(rank)
+                  - 0.6 * max(0.0, progress_signal(row)) - 1.2 * (will - 0.5) + inj)
+        if g.status == 'club_pro':
+            x = -4.4 + 0.2 * max(0, age - 45) + common            # the club job usually runs into the sixties
+        else:
+            x = -2.2 + 0.06 * (age - 35) + common
     else:
         tier = TOUR_BY_KEY[g.tour].tier if g.tour in TOUR_BY_KEY else 4
         standing = 1 - row.get('money_rank_pct', 1.0) if row.get('status') == 'pro' else 0.5
         x = -6.5 + 0.22 * (age - 30) + 1.2 * (1 - standing) - 1.0 * OPPORTUNITY.get(tier, 0.15) + inj
     return _sig(x)
+
+
+def participation(season, g, row, year):
+    """How a golfer with a job fell short of their intended schedule, and why: (drift, blocked), each
+    0-1, summing to the share of the schedule not played. Drift: events were there (weeks they could
+    have entered) and they chose otherwise; blocked: there was little they could enter (no suitable
+    event, not eligible, shut out, could not afford)."""
+    target = max(1, season.target_events(g))
+    short = max(0.0, 1 - row.get('events', 0) / target)
+    if not short:
+        return 0.0, 0.0
+    acc = season.week_access.get(year, {}).get(g.id, {})
+    unable = sum(acc.get(k, 0) for k in ('no suitable event scheduled', 'not eligible for the events scheduled',
+                                         'shut out: every acceptable field full', 'could not afford any event'))
+    weeks = sum(acc.values()) - acc.get('injured', 0)
+    could = max(0, weeks - unable)                       # weeks with something they could have entered
+    chose = min(1.0, could / (2 * target))               # plenty of chances: falling short was their choice
+    return short * chose, short * (1 - chose)
 
 
 def amateur_standing(rank):
@@ -387,7 +429,7 @@ def turn_pro(season, g, year, am_rank, how):
     rng = random.Random(f'{season.seed}:backers:{year}:{g.id}')
     g.backer = FIN.backer_deal(g.age(year) + 1, amateur_standing(am_rank if am_rank < 99999 else None),
                                rng.random(), rng.random())
-    g.backer_stale = 0
+    g.backer_stale, g.backer_patience = 0, rng.random()
     if am_rank <= 15:
         g.tour = home_challenger(g)
     elif am_rank <= 60:
@@ -415,6 +457,7 @@ def add_new_professionals(season, year):
         g.cash = initial_cash(g, age, rng.random())
         g.status, g.lifestyle, g.tour = 'pro', 'full_time', home_mini(g)
         g.backer = FIN.backer_deal(age, 0.2, rng.random(), rng.random())     # no ranking to show backers
+        g.backer_patience = rng.random()
         season.world.golfers.append(g)
         season.g[g.id] = g
         season.prior_rounds[g.id] = (year, EXPERIENCE_ROUNDS)    # seasons of competition behind them (fading)
