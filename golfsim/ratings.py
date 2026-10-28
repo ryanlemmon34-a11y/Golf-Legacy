@@ -66,9 +66,15 @@ LEVELS = ((0, 'Beginner'), (10, 'High school / 12-15 handicap'), (25, 'Amateur e
           (82, 'Premier Tour star'), (88, 'World No.1 contender'), (95, 'Generational'))
 
 
+_XS = {}                        # id(table) -> (table, its x values): the anchors are constant tuples
+
+
 def interp(table, x):
     """Piecewise-linear interpolation through sorted (x, y) anchor points."""
-    xs = [p[0] for p in table]
+    hit = _XS.get(id(table))
+    if hit is None or hit[0] is not table:
+        hit = _XS[id(table)] = (table, [p[0] for p in table])
+    xs = hit[1]
     if x <= xs[0]:
         return table[0][1]
     if x >= xs[-1]:
