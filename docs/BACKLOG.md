@@ -107,6 +107,27 @@ earlier cohort report predated the debt-trap fix and coaches/caddies and was rem
   monthly plan does not learn from being shut out; the 10% Premier visitor share and full-status size are
   owner decisions to confirm.
 
+## V1 observer UI (owner baseline, `docs/UI_REQUIREMENTS_V1.md`)
+
+The V1 interface is an interactive golf encyclopedia over a world the player only advances: linked
+profiles (golfers with one identity across playing, coaching and caddying careers; reciprocal staff
+stints; courses, nations, tours, tournaments and their editions), central and contextual records from one
+set of definitions, a Frivolities section of real unusual patterns, season recaps from recorded facts,
+and eventually as-of-year views. Not built. Before it, close the archive gaps listed in that document:
+
+1. Record each edition's tour, tier and category at the time (history must not be rewritten by later
+   calendar changes).
+2. Archive the weekly No. 1 and ranking snapshots (weeks at No. 1, as-of views).
+3. A records/definitions module over the archive (start, win, major, debut, age, ties, scope, coverage of
+   careers that began before the world), used by both the Records and Frivolities views.
+4. Archive indexes for incremental, century-scale browsing.
+5. First usable slice: Overview, Golfer profile, Tournament edition, Course profile and one Records or
+   Frivolities list, tested as complete browsing journeys (see the document).
+
+Open owner decisions: framework and desktop packaging, visual design, the first record definitions and
+frivolities lists, when to deliver as-of views and a university directory, performance budgets and
+accessibility checks.
+
 ## Next (in order)
 
 1. **Historical identity and persistence** — *done in this pass*: person ids, stints, event-time teams,
