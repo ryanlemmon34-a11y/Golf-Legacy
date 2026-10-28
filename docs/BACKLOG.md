@@ -181,6 +181,43 @@ Same status words as above.
    2 (already true before this pass), mostly mini-tour professionals in their second losing season. A
    long run will show whether careers resolve that or it builds up.
 
+## Residence and finance pass (owner review of 5ecc75a)
+
+Same status words as above.
+
+1. **Owner decisions** — implemented, tested (5517c66, b335070). An injured professional who needs money
+   does light paid work while recovering. The starting world and new professionals get no backing deal
+   when their savings already cover three seasons of losses; an unbacked professional who runs low can
+   find backers (not within two winters of a deal ending). Integration-checked: in the first winter only
+   8 / 18 deals ended as "no longer needed" (339 / 284 before), and no golfer ended a season beyond their
+   own credit in the gate run.
+2. **Tier-aware earnings and evidence recency** — implemented, tested (9cc466a). A season's prize money is
+   kept by the level it was won at; lower-tour money is never Premier evidence. Evidence halves for each
+   full season away from a level.
+3. **Session retry and publication** — implemented, tested (dda1e68). A retried key is checked only after
+   syncing under the lock, so an operation recovery rolled back runs once more and never reports false
+   success. Ordinary commits no longer republish unchanged tables.
+4. **Overlapping exemptions** — implemented, tested (f7dac4b): an unconditional route is never hidden by an
+   amateur one.
+5. **Birthplace and residence** — implemented, tested, integration-checked (cbfb090, 188db30, 4dbcf03; see
+   `docs/RESIDENCE.md`). Fixed nationality; fixed birthplace; residence changed only by dated, recorded
+   moves; free college bases (initial world, arrivals, transfers); travel costs, appeal and proximity from
+   residence, eligibility and memberships from nationality (each use audited); career moves (smooth odds,
+   own money only, `MIN_STAY`), staff moves, one geography per person across roles, archive and observer.
+   Legacy saves keep unknown geography. Gate (two seasons, seeds 2027 / 3031): about 91% of foreign
+   college graduates went home and 8% stayed. **Owner decision open:** a graduate's new membership
+   follows nationality (their home mini tour or amateur series), which is why most go home; letting a
+   graduate start on a tour near where they live would be a route rule, not a residence rule.
+6. **Long-run harness** — implemented (5ea63f1): `tools/long_world.py --session` runs a world through the
+   persistent session and the observer, timing every season skip; `tools/long_run_report.py` writes the
+   long-run report.
+7. **Reviews** — the stop-chasing grid (`reports/STOP_CHASING_REVIEW.md`, b81a5e9): monotone, no cliffs,
+   improving players accept losing seasons; debt below zero adds no pressure beyond an empty account
+   (owner decision, unchanged). Second-season mini-tour money shortfalls (gate, `reports/gate_residence/`):
+   23% of full-time mini-tour seasons lose 4+ weeks to money. Mostly a losing first season with no
+   backers' money (56–65%) and new professionals (43%); living outside the tour's countries 7–8%; injury
+   2–4%. Residence is not the main cause.
+
 ## V1 observer UI (owner baseline, `docs/UI_REQUIREMENTS_V1.md`)
 
 The V1 interface is an interactive golf encyclopedia over a world the player only advances: linked
