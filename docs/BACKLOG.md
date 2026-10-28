@@ -71,8 +71,9 @@ earlier cohort report predated the debt-trap fix and coaches/caddies and was rem
 - The world is a selected sample of competitive golfers; its rates are not population-wide rates.
 - No pre-history: the first season's rankings and standings are seeded from reputation, and the first
   Tour Masters uses inaugural invitations (route `INIT`).
-- Finance is simple: one credit rule, one work wage, family backing as a single pot; no regional
-  costs of living or contract lengths; staff have no household finances.
+- Finance is simple: one credit rule, one work wage, family money and backers' money as two pots; no
+  regional costs of living or contract lengths; staff have no household finances. Debt from living
+  costs can pass the credit limit (an injured touring professional: see "Debt" in `golfsim/finance.py`).
 - Relationship continuity, capacity and departure odds are first-version tuning assumptions (e.g. ~6
   individual clients per coach), to be checked against long-run evidence.
 
@@ -137,6 +138,47 @@ pass after it, plus the full suite), **integration-checked** (short multi-seed r
    `docs/ENGINE_DESIGN.md`): Skip to end of Season 109-118 s in season 1, 126 s in season 2, 118 s with
    50,000 synthetic retired people. **Unverified:** season 100 (needs a long run) and the intended
    hardware (`tools/benchmark_skip.py`). Season time grows with the active population.
+
+## Finance and recovery pass (owner review of ad504fe)
+
+Same status words as above.
+
+1. **Forecasts match earnings** — implemented, tested (79d8c7c). Prize evidence is kept by level of
+   competition, with an event count. Other levels are translated and counted for less, and a new card is
+   not an income. Independence needs cash for the start of the season plus proven earnings, a sponsor
+   contract or three seasons of savings. Amateurs forecast no prize or sponsorship. One set of income
+   and cost definitions serves forecasts, the caddie budget, affordability and payments.
+   Integration-checked: "backers no longer needed" fell from 525 / 517 to 406 / 337 over two seasons
+   (seeds 2027 / 3031); withdrawals are about the same.
+2. **Secured places from the qualification rules** — implemented, tested (76ba17d). Every exemption
+   route applies to a no-hindsight view: earned invitations such as a USA Open top ten, and continuing
+   exemptions while they last. Ranking cut-offs still to come never count, and an amateur's place keeps
+   its condition. The places feed career and backer decisions and appear in the history.
+3. **One budget per week** — implemented, tested (68522dc). Accepted entries reserve their cost; a
+   qualifier is priced at the assigned site; the caddie fee is paid once a week. The school or club is
+   labelled as payer. Family and backers' money are kept apart, with backer flows recorded, and every pot
+   reconciles each season (`tools/long_world.py`). Integration-checked: no reconcile errors in either
+   seed; season-1 weeks with no affordable event rose about 17% (2,075 / 1,910 against 1,771 / 1,614),
+   because a golfer can no longer spend the same money twice.
+4. **Debt rule** — documented, tested (34fb8ca); no change to behaviour. Credit limits chosen spending;
+   living costs continue, so a long injury can pass the limit. The debt is kept, blocks spending and
+   weighs smoothly on the season-end decision. In the two-season check only one golfer per run (or
+   none) ended beyond their own credit, each after a long injury. **Owner decision open:** whether an
+   injured professional may do light paid work, or change their life mid-season.
+5. **Recovery** — implemented, tested (1b0c814). Each generation carries its own history: a damaged
+   season-end checkpoint falls back with the right people, relationships and records. A retried
+   committed operation repairs unfinished publication. Observer records rebuild when a season they read
+   is removed or republished. Unverified: Windows hard links on network drives (it falls back to copying).
+6. **Performance** — measured, unchanged by this pass (`tools/benchmark_skip.py --seasons 2`, the
+   development container: Intel Xeon @ 2.10 GHz, 4 logical CPUs, Python 3.13): skip to end of season
+   110.9 s in season 1 and 120.5 s in season 2, including saving, publishing and the observer. No
+   golfers, events, shots or history were removed. **Unverified:** season 100 and the intended hardware.
+   Season time still grows with the active population (6,956 → 7,469).
+7. **Still open:** the starting world gives backing deals regardless of savings, so the first winter
+   ends many deals ("savings now cover N seasons": 214 / 183 in season 1, 34 / 32 in season 2). This is
+   a seeding artifact for the owner to decide on. Weeks with no affordable event roughly double in season
+   2 (already true before this pass), mostly mini-tour professionals in their second losing season. A
+   long run will show whether careers resolve that or it builds up.
 
 ## V1 observer UI (owner baseline, `docs/UI_REQUIREMENTS_V1.md`)
 

@@ -38,6 +38,11 @@ the development container (Intel Xeon @ 2.10 GHz, 4 logical CPUs, Python 3.13, L
 | Season 1 (7,176 people) | 109-118 s | 102-111 s | 4.6-5.1 s | 1.4-1.5 s | 0.4-0.5 s | 0.4-0.5 s |
 | Season 2 (7,940 people) | 126 s | 117 s | 5.8 s | 2.1 s | 1.4 s | 0.1 s |
 | Synthetic: season 1 plus 50,000 retired people | 118 s | 106 s | 7.8 s | 3.1 s | 0.7 s | 0.2 s |
+| After the finance and recovery pass (1b0c814), season 1 | 110.9 s | 104.9 s | 4.2 s | 1.4 s | 0.1 s | 0.4 s |
+| After the finance and recovery pass (1b0c814), season 2 | 120.5 s | 112.4 s | 5.0 s | 2.1 s | 0.6 s | 0.6 s |
+
+Single runs vary by several seconds; season 2 sits at the target, not safely under it. The weekly
+budget and site pricing add no measurable time.
 
 - Retired people keep their identity and history (in `world.golfers`, the archive and the index), but the
   weekly work walks only the active golfers (`Season.active_golfers`, rebuilt at each season boundary);
