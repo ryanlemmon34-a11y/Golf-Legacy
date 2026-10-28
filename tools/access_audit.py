@@ -35,7 +35,8 @@ SHORT = {'played: first choice': 'P1', 'played: alternative': 'Palt', 'played: s
          'not eligible for the events scheduled': 'INEL', 'could not afford any event': 'AFF',
          'declined the events on offer': 'decl', 'chose to train': 'train', 'chose to rest': 'rest',
          'chose to work': 'work'}
-LEVEL = {1: 'Premier', 2: 'Challenger', 3: 'Regional', 4: 'Mini', 5: 'College', 6: 'Amateur', 7: 'Club pro'}
+LEVEL = {1: 'Premier', 2: 'Challenger', 3: 'Regional', 4: 'Mini', 5: 'College', 6: 'Amateur', 7: 'Qualifying',
+         8: 'Club pro'}
 
 
 def run(seed, years=1, workers=None):
@@ -59,6 +60,7 @@ def run(seed, years=1, workers=None):
                               level=s.level_tier(g) if r['tour'] == g.tour else r['tier'], country=g.country,
                               age=g.age(y), events=r['events'], rounds=s.season_rounds[y].get(g.id, 0.0),
                               access=dict(s.week_access[y].get(g.id, {})), maxrun=s.max_denied_run[y].get(g.id, 0),
+                              behind=s.denied_behind[y].get(g.id, 0),
                               target=targets[g.id], rights=s.rights_of(g.id, y) if hasattr(s, 'rights_of') else '',
                               new=g.id not in out.get('_ids', ()) and y > s.first_year)
         events = [r for k, r in s.results.items() if k.startswith(f'{y}:')]
@@ -87,8 +89,8 @@ def capacity(s, year, targets):
         if ser.kind == 'major':
             continue
         reg = COUNTRIES[ser.host_country].region
-        tier = 7 if ser.eligibility == 'club_pro' else ser.tier
-        if tier > 7:
+        tier = 8 if ser.eligibility == 'club_pro' else ser.tier
+        if tier == 7:                                  # other qualifying stages are not a season of golf
             continue
         places[(reg, tier)] += ser.field * ser.sites
         events[(reg, tier)] += 1
@@ -129,9 +131,9 @@ def table(rows, keyf, title, minn=20):
             groups[keyf(r)].append(r)
     cols = list(SHORT.values())
     out = [f'### {title}', '',
-           '| Group | Golfers | ' + ' | '.join(cols) + ' | Starts p10 / p25 / p50 | Intended (median) | ≥75% of intended '
-           '| Rounds p10 / p50 | Denied 3+ / 6+ weeks running |',
-           '|---|---|' + '---|' * (len(cols) + 5)]
+           '| Group | Golfers | ' + ' | '.join(cols) + ' | Denied while behind schedule | Starts p10 / p25 / p50 '
+           '| Intended (median) | ≥75% of intended | Rounds p10 / p50 | Denied 3+ / 6+ weeks running |',
+           '|---|---|' + '---|' * (len(cols) + 6)]
     for k in sorted(groups, key=str):
         gs = groups[k]
         if len(gs) < minn:
@@ -144,7 +146,8 @@ def table(rows, keyf, title, minn=20):
         st = [r['events'] for r in gs]
         rd = [r['rounds'] for r in gs]
         reach = sum(1 for r in gs if r['events'] >= 0.75 * r['target']) / len(gs)
-        out.append(f'| {k} | {len(gs)} | ' + ' | '.join(cells) + f' | {q(st, .1)} / {q(st, .25)} / {q(st, .5)} '
+        behind = 100 * sum(r.get('behind', 0) for r in gs) / n
+        out.append(f'| {k} | {len(gs)} | ' + ' | '.join(cells) + f' | {behind:.0f} | {q(st, .1)} / {q(st, .25)} / {q(st, .5)} '
                    f'| {S.median(r["target"] for r in gs):.0f} | {100 * reach:.0f}% | {q(rd, .1):.0f} / {q(rd, .5):.0f} '
                    f'| {100 * sum(r["maxrun"] >= 3 for r in gs) / len(gs):.0f}% / {100 * sum(r["maxrun"] >= 6 for r in gs) / len(gs):.0f}% |')
     return out + ['']
@@ -173,7 +176,9 @@ def report(datas, title='Golf Legacy — Competition Access Audit'):
            'the event (major, invitation, qualifier, college post-season), **inj** injured, **FULL** shut out of every acceptable '
            'field, **LINE** not selected for a college lineup, **NONE** no suitable event scheduled (nothing at their level in their '
            'region), **INEL** not eligible for what was scheduled, **AFF** could not afford any event, **decl** planned to play but '
-           'declined what was on offer, **train / rest / work** chosen. "Intended" is each golfer\'s target number of starts.', '']
+           'declined what was on offer, **train / rest / work** chosen. "Denied while behind schedule" is the share of weeks shut out '
+           '(FULL or LINE) while the golfer was behind the pace of their intended schedule — a real shortage; the rest of FULL '
+           'is extra starts wanted by golfers already on pace. "Intended" is each golfer\'s target number of starts.', '']
     for d in datas:
         for sea in d['seasons']:
             rows = sea['rows']
