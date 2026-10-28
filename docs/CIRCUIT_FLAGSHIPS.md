@@ -35,9 +35,11 @@ in `Season.declined`) and the next on the list takes the place.
 
 ## The rules, field by field
 
-- **Eligibility.** Members of the tour; for open mini circuits, any professional who played one of its
-  events this season; for amateur series, the series' amateurs (college golfers included); for club-pro
-  circuits, the region's club professionals.
+- **Eligibility.** Members of the tour; for open mini circuits, members and any professional recorded
+  as starting one of its events this season (`Season.circuit_players`), whether or not they won money;
+  for amateur series, exactly the amateurs its ordinary events take (`Season.series_amateur`: members,
+  amateurs from its countries, and college golfers studying there, so a Swede at a US college is a North
+  American amateur for the championship too); for club-pro circuits, the region's club professionals.
 - **Order of merit and cut-off.** As it stood after the previous week's events. Professional circuits rank
   by prize money on the circuit; amateur series by amateur ranking (amateur standing never depends on prize
   money).
@@ -63,12 +65,17 @@ in `Season.declined`) and the next on the list takes the place.
   amateurs, then the top 64 of the amateur ranking (`Season.USA_AMATEUR_EXEMPT`).
 - **USA Amateur Qualifying** (week 30, 36 holes in one day at eight sites, 78 per site): open to any
   amateur who is not exempt and meets the **entry standard** of three events played this season — a
-  record of play, not a ranking, so an unranked newcomer can enter — living in North America or
-  travelling from abroad with a top-300 amateur ranking; a fair draw decides entries when oversubscribed.
-- **Places.** The rest of the 156 go to qualifiers: each site's share in proportion to its entrants, to its
-  best finishers; ties for the last place go by the recorded finishing order (countback); a qualifier who
-  cannot take up the place is replaced by the next finisher at that site (route `QUALIFYING SITE n
-  (alternate)`).
+  record of play, not a ranking, so an unranked newcomer can enter — playing North American amateur golf
+  (`series_amateur`, college students there included) or travelling from abroad with a top-300 amateur
+  ranking; a fair draw decides entries when oversubscribed.
+- **Places.** The rest of the 156 go to qualifiers, exactly: the places are split between the sites in
+  proportion to their entrants by largest remainders, and equal remainders (eight equal sites sharing 91
+  or 92 places) go by a fair draw seeded by the world, year and site, never by the order the sites are
+  listed in (`season.allocate_places`). At each site the places go to its best finishers; ties for the last
+  place go by the recorded finishing order (countback). A finisher who has become exempt since qualifying
+  does not use a place; one who cannot take it up (busy, injured, unable to pay: recorded) is replaced by
+  the next finisher at that site (route `QUALIFYING SITE n (alternate)`); places a site cannot fill go to
+  the other sites by the same rule.
 
 ## Evidence and assumptions
 

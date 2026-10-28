@@ -15,7 +15,8 @@ from golfsim.calendar import (CIRCUIT_FLAGSHIP_ELSEWHERE, CIRCUIT_FLAGSHIPS, MAJ
                               local_allocation, LOCAL_MIN)
 from golfsim.geography import COUNTRIES                                  # noqa: E402
 from golfsim.population import generate_world                            # noqa: E402
-from golfsim.season import ACCESS, FULL_STATUS, PREMIER_TOURS, PREMIER_VISITOR_SHARE, Season   # noqa: E402
+from golfsim.season import (ACCESS, FULL_STATUS, PREMIER_TOURS, PREMIER_VISITOR_SHARE, EventResult, Season,  # noqa: E402
+                            region_of)
 
 
 def fresh(seed=2027):
@@ -241,6 +242,121 @@ class FlagshipTests(unittest.TestCase):
         self.assertTrue(any(v.startswith('QUALIFYING SITE') for v in routes.values()))
         self.assertTrue(any(v.startswith('AMATEUR RANKING') for v in routes.values()))
         self.assertTrue(rows)
+
+
+class ChampionshipFieldTests(unittest.TestCase):
+    """Exact, order-free USA Amateur qualifying places; one amateur-eligibility rule for ordinary events
+    and their flagship; mini-tour championships open to everyone who played the circuit."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.s = s = fresh()
+        cls.eds = {e.series.series_id: e for e in s.cal.editions(2027)}
+        for g in s.world.golfers:
+            g.cash = max(g.cash, 10 ** 5)                               # money is not under test here
+
+    def qualify(self, exempt_n, per_site=78, sites=8, busy=(), extra=None):
+        """USA Amateur field after qualifying at `sites` equal sites (`extra`: {site: [gid, ...]} put
+        first at that site). Returns (field, routes, places per site)."""
+        s, ed = self.s, self.eds['USA_AMATEUR']
+        s.USA_AMATEUR_EXEMPT = exempt_n
+        exempt = s.usa_amateur_exempt(2027)
+        others = [g.id for g in s.world.golfers if g.status == 'amateur' and g.lifestyle != 'retired'
+                  and g.id not in exempt and g.id not in s.injured]
+        s.ctx.results.pop(('USA_AMATEUR_QUALIFYING', 2027), None)
+        for k in range(sites):
+            rows = (extra or {}).get(k, []) + others[k * per_site:(k + 1) * per_site]
+            s.ctx.add_result('USA_AMATEUR_QUALIFYING', 2027, [(gid, i + 1) for i, gid in enumerate(rows)], site=k)
+        b = defaultdict(set)
+        for gid in busy:
+            b[gid] = set(ed.series.day_set)
+        field = s.special_field(ed, 2027, ed.week, random.Random(1), b)[0]
+        routes = s.entry_routes[(2027, 'USA_AMATEUR')]
+        per = Counter(int(v.split()[2]) for v in routes.values() if v.startswith('QUALIFYING SITE'))
+        del s.USA_AMATEUR_EXEMPT
+        return field, routes, per
+
+    def test_usa_amateur_places_are_allocated_exactly(self):
+        field_n = self.eds['USA_AMATEUR'].series.field
+        for exempt_n in (64, 65):
+            field, routes, per = self.qualify(exempt_n)
+            exempt = sum(1 for v in routes.values() if not v.startswith('QUALIFYING SITE'))
+            self.assertEqual(len(field), field_n, exempt_n)                       # never short, never cut
+            self.assertEqual(sum(per.values()), field_n - exempt, exempt_n)
+            self.assertLessEqual(max(per.values()) - min(per.values()), 1, (exempt_n, per))
+
+    def test_withdrawals_duplicates_and_alternates(self):
+        s = self.s
+        _, routes, per0 = self.qualify(64)
+        site0 = [gid for gid, _ in s.ctx.finishers('USA_AMATEUR_QUALIFYING', 2027, site=0)]
+        withdrawn = site0[0]
+        exempt_player = next(gid for gid, v in routes.items() if v.startswith('AMATEUR RANKING'))
+        field, routes, per = self.qualify(64, busy=[withdrawn], extra={0: [exempt_player]})
+        self.assertNotIn(withdrawn, field)
+        self.assertEqual(routes[exempt_player][:15], 'AMATEUR RANKING')   # exempt: not a qualifying place
+        self.assertEqual(per[0], per0[0])                                 # site 0 still fills its places
+        self.assertEqual(len(field), len(set(field)))
+        alternates = [gid for gid, v in routes.items() if v.endswith('(alternate)')]
+        self.assertTrue(alternates and all(routes[g].startswith('QUALIFYING SITE 1 ') for g in alternates))
+
+    def test_remainder_places_go_by_a_fair_draw_not_site_order(self):
+        from golfsim.season import allocate_places
+        extra = Counter()
+        for year in range(2027, 2067):
+            q = allocate_places(92, [78] * 8, key=('test', year))
+            self.assertEqual(sum(q), 92)
+            extra.update(k for k, n in enumerate(q) if n == 12)
+        self.assertEqual(len(extra), 8)                                   # every site sometimes gets one
+        self.assertLess(max(extra.values()) - min(extra.values()), 25)
+        self.assertEqual(allocate_places(10, [5, 0, 5], key=('x',)), [5, 0, 5])     # never more than entrants
+
+    def test_us_college_students_from_abroad_keep_north_american_amateur_eligibility(self):
+        s = self.s
+        student = next(g for g in s.world.golfers if g.tour == 'CO_US_D1' and region_of(g) != 'North America')
+        flag = next(e for e in s.cal.editions(2027) if e.series.series_id == 'AM_NORTH_AMERICA_CHAMPIONSHIP')
+        ordinary = next(e for e in s.cal.editions(2027) if e.series.tour == 'AM_NORTH_AMERICA'
+                        and e.series.category == 'regular')
+        self.assertTrue(s.eligible(student, ordinary.series, ordinary.week))
+        saved = s.am_pos.get(student.id)
+        s.am_pos[student.id] = 1
+        try:
+            field = s.special_field(flag, 2027, flag.week, random.Random(1), defaultdict(set))[0]
+            self.assertIn(student.id, field)                              # the championship of the same series
+            # USA Amateur qualifying: a North American amateur by the same rule (no top-300 needed)
+            s.am_pos[student.id] = 5000
+            played = {gid: s.played[2027].pop(gid) for gid in list(s.played[2027])}
+            s.played[2027][student.id] = [1, 2, 3]
+            q = self.eds['USA_AMATEUR_QUALIFYING']
+            sites = s.special_field(q, 2027, q.week, random.Random(1), defaultdict(set))
+            self.assertIn(student.id, {gid for site in sites for gid in site})
+            s.played[2027].clear()
+            s.played[2027].update(played)
+        finally:
+            s.am_pos[student.id] = saved if saved is not None else s.am_pos.pop(student.id)
+
+    def test_mini_tour_championship_is_open_to_everyone_who_played_it(self):
+        s = self.s
+        flag = next(e for e in s.cal.editions(2027) if e.series.series_id == 'MN_US_SUNBELT_CHAMPIONSHIP')
+        visitor = next(g for g in s.world.golfers if g.status == 'pro' and g.lifestyle == 'full_time'
+                       and g.tour == 'MN_US_DESERT')
+        event = next(e for e in s.cal.editions(2027) if e.series.tour == 'MN_US_SUNBELT' and e.week < flag.week)
+        s.results[event.event_id] = EventResult(event.event_id, event.series.series_id, 2027, event.week, [],
+                                                [[(visitor.id, 60, 220)]], 1.0)
+        busy = defaultdict(set)
+        members = [g for g in s.world.golfers if g.tour == 'MN_US_SUNBELT']
+        for g in members[5:]:
+            busy[g.id] = set(flag.series.day_set)                         # most members elsewhere that week
+        m = s.money[('MN_US_SUNBELT', 2027)]
+        m[members[0].id] = 5000.0                                         # a member who has won money
+        try:
+            self.assertEqual(m.get(visitor.id, 0), 0)
+            field = s.special_field(flag, 2027, flag.week, random.Random(1), busy)[0]
+            self.assertIn(visitor.id, field)                              # played it, won nothing: eligible
+            self.assertLess(field.index(members[0].id), field.index(visitor.id))   # selection by order of merit
+            self.assertEqual(s.entry_routes[(2027, 'MN_US_SUNBELT_CHAMPIONSHIP')][members[0].id], 'ORDER OF MERIT 1')
+        finally:
+            del s.results[event.event_id]
+            del m[members[0].id]
 
 
 class AccessRecordTests(unittest.TestCase):

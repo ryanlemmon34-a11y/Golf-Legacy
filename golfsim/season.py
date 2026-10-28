@@ -68,6 +68,30 @@ def _seed(*parts):
 CLUB_PRO_DRIVING_REGIONS = ('Europe', 'North America')   # neighbouring countries' section events are a drive
 
 
+def allocate_places(total, weights, key, caps=None):
+    """Split exactly min(total, sum(caps)) places between sites in proportion to `weights` (largest
+    remainders). Equal remainders go by a fair draw keyed by `key` and the site, never by the order the
+    sites are listed in. No site gets more than its cap (default: its weight); places a site cannot use
+    go to the others by the same rule."""
+    caps = list(weights) if caps is None else list(caps)
+    q = [0] * len(weights)
+    left = min(total, sum(caps))
+    while left > 0:
+        room = [k for k in range(len(q)) if q[k] < caps[k]]
+        w = sum(weights[k] for k in room)
+        share = {k: left * (weights[k] / w if w else 1 / len(room)) for k in room}
+        base = {k: min(int(share[k]), caps[k] - q[k]) for k in room}
+        for k in room:
+            q[k] += base[k]
+        extra = left - sum(base.values())
+        for k in sorted(room, key=lambda k: (-(share[k] - int(share[k])), _seed(*key, 'place', k))):
+            if extra and q[k] < caps[k]:
+                q[k] += 1
+                extra -= 1
+        left = extra                                         # what capped sites could not take
+    return q
+
+
 ARRIVAL_LOGS = ('Arrived on the scene', 'Turned professional at ')   # history lines written on arrival
 
 
@@ -397,11 +421,19 @@ class Season:
         if tier == 5:
             return g.tour == s.tour
         if tier == 6:                                         # college golfers too, around their college events
-            return st == 'amateur' and (g.tour == s.tour or g.country in countries
-                                        or COLLEGE_AMATEUR_SERIES.get(g.tour) == s.tour)
+            return self.series_amateur(g, s.tour)
         if tier == 8:                                         # club professionals of the circuit's region
             return st == 'club_pro' and (g.country in countries or region_of(g) == COUNTRIES[s.host_country].region)
         return False
+
+    def series_amateur(self, g, tour):
+        """Whether an amateur belongs to an amateur series (tier 6) -- for its ordinary events and its
+        championship alike: its members, amateurs from its countries, and college golfers studying in
+        them (a Swede at a US college plays North American amateur golf)."""
+        if g.status != 'amateur':
+            return False
+        countries = {c for c, _ in TOUR_BY_KEY[tour].countries}
+        return g.tour == tour or g.country in countries or COLLEGE_AMATEUR_SERIES.get(g.tour) == tour
 
     def entry_ticket(self, g, s):
         """A golfer's place in the entry queue for this season's edition of an event (a fair draw: it
@@ -943,16 +975,15 @@ class Season:
         circuits: the region's club professionals) only; anyone injured, busy or unable to pay is passed
         over for the next on the list (declines recorded). Each entrant's route is recorded."""
         s = ed.series
-        if s.tier == 6:
-            countries = {c for c, _ in TOUR_BY_KEY[s.tour].countries}
-            pool = [g for g in self.world.golfers if g.status == 'amateur' and g.lifestyle != 'retired'
-                    and (g.tour == s.tour or g.country in countries) and free(g)]
+        if s.tier == 6:                                      # the series' amateurs, as for its ordinary events
+            pool = [g for g in self.world.golfers if g.lifestyle != 'retired' and self.series_amateur(g, s.tour)
+                    and free(g)]
         elif s.tier == 8:
             pool = [g for g in self.world.golfers if g.lifestyle != 'retired' and self.eligible(g, s, week) and free(g)]
-        elif s.tier == 4:                                    # open circuits: everyone who played them this season
-            m = self.money[(s.tour, year)]
+        elif s.tier == 4:                                    # open circuits: members and everyone who played them
+            played = self.circuit_players(s.tour, year)
             pool = [g for g in self.world.golfers if g.lifestyle != 'retired' and g.status == 'pro' and free(g)
-                    and (g.tour == s.tour or m.get(g.id, 0) > 0)]
+                    and (g.tour == s.tour or g.id in played)]
         else:
             pool = [g for g in self.world.golfers if g.tour == s.tour and g.lifestyle != 'retired' and free(g)]
         in_pool = {g.id for g in pool}
@@ -965,6 +996,11 @@ class Season:
         self.entry_routes[(year, s.series_id)] = {gid: 'PAST CHAMPION' if gid in past else f'ORDER OF MERIT {pos[gid]}'
                                                   for gid in take}
         return [take]
+
+    def circuit_players(self, tour, year):
+        """Everyone who started an event of the circuit this season (from the recorded results)."""
+        return {gid for r in self.results.values() if r.year == year and self.cal.by_id[r.series_id].tour == tour
+                for site in r.finish for gid, _, _ in site}
 
     # ---- the USA Amateur: exemptions, then open qualifying --------------------------------------------
     USA_AMATEUR_EXEMPT = 64          # leading amateurs exempt from qualifying (amateur ranking)
@@ -989,48 +1025,53 @@ class Season:
 
     def usa_amateur_qualifying(self, ed, year, week, free):
         """Open to any amateur who is not exempt and meets the entry standard (USA_AMATEUR_ENTRY_STARTS
-        events this season — a record of play, not a ranking, so a newcomer can enter), living in North
-        America or travelling from abroad with a world amateur ranking in the top 300; places by a fair
-        draw when oversubscribed; split round the sites."""
+        events this season — a record of play, not a ranking, so a newcomer can enter), playing North
+        American amateur golf (series_amateur: living there, or at college there) or travelling from abroad
+        with a world amateur ranking in the top 300; places by a fair draw when oversubscribed; split
+        round the sites."""
         s = ed.series
         exempt = self.usa_amateur_exempt(year)
         pool = [g for g in self.world.golfers if g.status == 'amateur' and g.lifestyle != 'retired'
                 and g.id not in exempt and free(g) and len(self.played[year][g.id]) >= self.USA_AMATEUR_ENTRY_STARTS
-                and (region_of(g) == 'North America' or self.am_pos.get(g.id, 99999) <= 300)]
+                and (self.series_amateur(g, 'AM_NORTH_AMERICA') or self.am_pos.get(g.id, 99999) <= 300)]
         pool.sort(key=lambda g: self.entry_ticket(g, s))
         ids = [g.id for g in pool[:s.field * s.sites]]
         self.entry_routes[(year, s.series_id)] = {gid: 'OPEN QUALIFYING ENTRY' for gid in ids}
         return [ids[i::s.sites] for i in range(s.sites)]
 
     def usa_amateur_field(self, ed, year, week, free, invite):
-        """Exempt players first (declines recorded), then qualifiers: each qualifying site's places in
-        proportion to its entrants, to its best finishers; ties for the last place go by the recorded
-        finishing order (countback). A qualifier who cannot take up the place is replaced by the next
-        finisher at that site (an alternate)."""
+        """Exempt players first (declines recorded), then qualifiers. The qualifying places are split
+        exactly between the sites in proportion to their entrants (allocate_places: largest remainders,
+        equal remainders by a fair draw, never by site order). At each site the places go to its best
+        finishers (ties: the recorded finishing order, i.e. countback); a finisher who has since become
+        exempt does not use one, and one who cannot take it up (busy, injured, cannot pay: recorded) is
+        replaced by the next finisher there (an alternate). Places a site cannot fill go to the others
+        by the same rule."""
         s = ed.series
         exempt = self.usa_amateur_exempt(year)
         take = invite([self.g[gid] for gid in exempt if free(self.g[gid])], s.field)
         routes = {gid: exempt[gid] for gid in take}
-        sites = [[gid for gid, pos in rows if pos is not None]
-                 for _, rows in sorted(self.ctx.results.get(('USA_AMATEUR_QUALIFYING', year), {}).items())]
-        total = sum(len(x) for x in sites)
-        spots = s.field - len(take)
-        for k, rows in enumerate(sites):
-            n = round(spots * len(rows) / total) if total else 0
-            got = skipped = 0
-            for i, gid in enumerate(rows):
-                if got >= n or len(routes) >= s.field:
-                    break
-                if gid in routes or not free(self.g[gid]):
-                    skipped += gid not in routes
+        city = self.lib.venues(year)[ed.event_id][0].city
+        sites, entrants = [], []
+        for _, rows in sorted(self.ctx.results.get(('USA_AMATEUR_QUALIFYING', year), {}).items()):
+            finishers = [gid for gid, pos in rows if pos is not None and gid not in exempt]
+            ok = []
+            for gid in finishers:
+                g = self.g[gid]
+                if not free(g):
                     continue
-                if not self.can_afford(self.g[gid], s, self.lib.venues(year)[ed.event_id][0].city,
-                                       self.spendable(self.g[gid], year)):
+                if not self.can_afford(g, s, city, self.spendable(g, year)):
                     self.declined[year][gid].append(s.series_id)
-                    skipped += 1
                     continue
-                routes[gid] = f'QUALIFYING SITE {k + 1}' + (' (alternate)' if i >= n and skipped else '')
-                got += 1
+                ok.append(gid)
+            sites.append((finishers, ok))
+            entrants.append(len(rows))
+        quota = allocate_places(s.field - len(take), entrants, (self.seed, year, s.series_id),
+                                caps=[len(ok) for _, ok in sites])
+        for k, ((finishers, ok), n) in enumerate(zip(sites, quota)):
+            place = {gid: i for i, gid in enumerate(finishers)}
+            for gid in ok[:n]:
+                routes[gid] = f'QUALIFYING SITE {k + 1}' + (' (alternate)' if place[gid] >= n else '')
         self.entry_routes[(year, s.series_id)] = routes
         return [list(routes)]
 
