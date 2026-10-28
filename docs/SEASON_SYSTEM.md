@@ -71,8 +71,14 @@ They enter events worth more than their own **bar**: the larger of (their tour's
 plays opportunity events; a star (prestige 85+) has a bar of ~80 and skips them for the bigger events.
 Events take entries in priority order: members of the event's tour, then members of other circuits or
 higher tours, then lower tours, then amateurs (limited to a few sponsor invitations), each group by
-world ranking. Golfers who miss out try their next choice (deferred acceptance), and spare places go to
-willing players who were just below their bar.
+world ranking. Within a group, mini tours (paid by entry fees) take entries by a fair draw; college and
+open amateur events rotate their lineups: golfers with fewer starts this season go first, amateur
+ranking counting for about three starts' head start, so the best still play most but a squad's depth
+gets starts too. Open amateur events (club, county, regional) take up to 1.5× their usual field when
+more want to play. Golfers who miss out try their next choice (deferred acceptance), and spare places go
+to willing players who were just below their bar. Every week records who wanted to play, who was placed
+and who was shut out of every field they tried, by tour (`entry_stats`), so blocked access is reported
+apart from choice, injury, money and having no eligible event.
 
 ## Player prestige and sponsors (owner requirement)
 

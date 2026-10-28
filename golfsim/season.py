@@ -65,6 +65,10 @@ def region_of(g):
     return COUNTRIES[g.country].region
 
 
+ROTATION_RANK_STARTS = 3          # college/amateur lineups: ranking is worth a head start of this many starts
+AMATEUR_OPEN_EXPANSION = 1.5      # open amateur events can take this many times their usual field
+
+
 # named factories (not lambdas) so a Season can be saved and resumed (savegame.py)
 def _dd_float():
     return defaultdict(float)
@@ -197,6 +201,8 @@ class Season:
         self.overall_start = {}                              # year -> gid -> overall on 1 January
         self._teams = {}                                     # event id -> {gid: (coach, caddie)} this week
         self.entry_misses = defaultdict(Counter)             # year -> gid -> weeks shut out of full fields
+        self.entry_wants = defaultdict(Counter)              # year -> gid -> weeks they wanted to play
+        self.entry_stats = defaultdict(_dd_counter)          # year -> first-choice tour -> wanted/placed/shut out
         self.transitions = {}                                # year -> [career decisions with their reasons]
         self.activity_counts = defaultdict(_dd_counter)      # year -> gid -> weeks per activity
         self.assignments = {}                                # year -> staff assignments at the season's start
@@ -353,6 +359,13 @@ class Season:
             cls = 4
         if s.tier == 4:
             strength = 0
+        elif s.tier >= 5:
+            # college and amateur fields rotate like team lineups: who has had fewest starts this
+            # season goes first, with ranking a head start of a few starts — so the best play most,
+            # and an unranked newcomer still gets starts (and with them, a ranking)
+            starts = len(self.played.get(self.year, {}).get(g.id, ()))
+            rank = self.am_pos.get(g.id)
+            strength = starts + ROTATION_RANK_STARTS * (min(1.0, rank / 1500) if rank else 1.0)
         return (cls, strength, self.entry_ticket(g, s))
 
     # ---- the AI's choice of events --------------------------------------------------------------
@@ -479,7 +492,9 @@ class Season:
                 or s.series_id == 'PT_PREMIER_TOUR_FINALS')
 
     def regular_entries(self, regular, year, week, rng, venues, busy, commit):
-        cap = {ed.event_id: ed.series.field for ed in regular}
+        # open amateur events (club, county, regional) take more entrants when more want to play
+        cap = {ed.event_id: int(ed.series.field * (AMATEUR_OPEN_EXPANSION if ed.series.tier == 6 else 1))
+               for ed in regular}
         country = {ed.event_id: CITY_BY_NAME[venues[ed.event_id][0].city].country for ed in regular}
         by_id = {ed.event_id: ed for ed in regular}
         prefs = {}
@@ -539,8 +554,17 @@ class Season:
             ids = [gid for _, gid in sorted(held[eid])]
             if ids:
                 commit(ed, [ids])
+        stats = self.entry_stats[year]
         for gid, (want, _) in prefs.items():
-            if want and gid not in placed:
+            if not want:
+                continue
+            tour = by_id[want[0]].series.tour                # where they most wanted to play
+            self.entry_wants[year][gid] += 1
+            stats[tour]['wanted'] += 1
+            if gid in placed:
+                stats[tour]['placed'] += 1
+            else:
+                stats[tour]['shut out'] += 1
                 self.entry_misses[year][gid] += 1           # wanted to play; every field they tried was full
 
     def _amateurs_over(self, rows, s):

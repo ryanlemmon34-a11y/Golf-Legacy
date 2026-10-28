@@ -210,7 +210,7 @@ TOURS = (
     Tour('CO_INTL', 'International University Golf', 5, 'college',
          (('England', 1), ('Scotland', .6), ('Spain', .6), ('France', .5), ('Japan', 1), ('South Korea', .8),
           ('Australia', .8), ('Canada', .6)), _window((10, 22), (36, 46)), 10, formats=((54, .6), (36, .4)),
-         field=72, per_week=1, prestige=24, eligibility='college'),
+         field=132, per_week=1, prestige=24, eligibility='college'),
     # Tier 6 -- Amateur regional series (state/county/club-level events; often 18 or 36 holes)
     *[Tour(k, n, 6, 'amateur', c, _window((1, 52)), e, formats=((18, .3), (36, .4), (54, .25), (72, .05)),
            field=f, per_week=pw, prestige=18, eligibility='amateur', cut={72: 50, 54: 50})

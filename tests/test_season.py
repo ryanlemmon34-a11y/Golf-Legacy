@@ -16,7 +16,7 @@ from golfsim import prestige as PR                                    # noqa: E4
 from golfsim.calendar import TOUR_BY_KEY                              # noqa: E402
 from golfsim.cards import apply_cards                                 # noqa: E402
 from golfsim.population import MEMBERS_PER_FIELD, generate_world      # noqa: E402
-from golfsim.season import PREMIER_TOURS, Season                      # noqa: E402
+from golfsim.season import AMATEUR_OPEN_EXPANSION, PREMIER_TOURS, Season  # noqa: E402
 
 WEEKS = 19
 
@@ -134,7 +134,9 @@ class SeasonTests(unittest.TestCase):
             ser = s.cal.by_id[r.series_id]
             ids = [gid for site in r.finish for gid, _, _ in site]
             self.assertEqual(len(ids), len(set(ids)), r.event_id)
-            self.assertLessEqual(len(ids), ser.field * ser.sites, r.event_id)
+            # open amateur events take up to AMATEUR_OPEN_EXPANSION times their field when more want to play
+            room = AMATEUR_OPEN_EXPANSION if ser.tier == 6 and not s.is_special(ser) else 1
+            self.assertLessEqual(len(ids), int(ser.field * room) * ser.sites, r.event_id)
             if ser.tier in (1, 2) and ser.kind != 'major':
                 self.assertLessEqual(sum(s.g[g].status == 'amateur' for g in ids), 8, r.event_id)
             for gid in ids:
