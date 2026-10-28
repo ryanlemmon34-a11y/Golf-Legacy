@@ -364,6 +364,30 @@ def turn_pro(season, g, year, am_rank, how):
                   else ', paying their own way'))
 
 
+def add_new_professionals(season, year):
+    """This year's new professionals from outside the tracked amateur game (population.new_professionals):
+    they start on their home mini tour, with savings and perhaps backers like any new professional."""
+    from .population import new_professionals
+    start = season.world.next_id
+    taken = {g.name for g in season.world.golfers} | season.staff.taken
+    arrivals = new_professionals(year, season.seed, season.world.nations, start, taken)
+    season.world.next_id = start + len(arrivals)
+    rng = random.Random(f'{season.seed}:new-pros:{year}')
+    for g in arrivals:
+        age = g.age(year)
+        init_ceilings(g, age, rng)
+        g.cash = initial_cash(g, age, rng.random())
+        g.status, g.lifestyle, g.tour = 'pro', 'full_time', home_mini(g)
+        g.backer = FIN.backer_deal(age, 0.2, rng.random(), rng.random())     # no ranking to show backers
+        season.world.golfers.append(g)
+        season.g[g.id] = g
+        season.season_rounds[year][g.id] = EXPERIENCE_ROUNDS     # seasons of competition behind them
+        season.log(g.id, year, 1, f'Turned professional at {age}, starting on the {TOUR_BY_KEY[g.tour].name}'
+                   + (f', with backers putting up ${g.backer:,.0f} a season' if g.backer else ', paying their own way'))
+    season.world.by_id = season.g
+    return len(arrivals)
+
+
 def add_juniors(season, year):
     """A new class of 18-year-olds joins the world."""
     from .population import junior_class

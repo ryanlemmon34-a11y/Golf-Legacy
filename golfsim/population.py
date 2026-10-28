@@ -305,6 +305,52 @@ def junior_class(year, seed, profiles, start_id, taken):
     return golfers
 
 
+NEW_PRO_SCALE = 5.5               # aspiring professionals a year, in birth cohorts' worth of candidates (see below)
+NEW_PRO_AGES = (21, 22, 23, 24, 25, 26)
+
+
+def new_professionals(year, seed, profiles, start_id, taken):
+    """This year's new professionals from outside the tracked amateur game.
+
+    The junior class follows one route into professional golf in detail (college and national amateur
+    golf). Real lower tours are refilled every year by a much wider base: small colleges, academies,
+    club and late-developing golfers, players from countries without college golf. Without them the
+    lower tours empty, because their players stop chasing within a few years while the starting world
+    (where every golfer at professional level is a touring pro) assumes they stay. Each nation sends
+    golfers in proportion to its golf scene, drawn exactly as the starting world draws its young
+    professionals (ability for their age, the professional status rule and the same keep rule for
+    the many weaker professionals): NEW_PRO_SCALE birth cohorts' worth of candidates aged 21-26. Golfers
+    the junior class would have kept are left out (they are already in the world). Nothing here
+    depends on how many golfers the tours hold now: it is a steady flow, not a top-up."""
+    rows = []
+    for country, prof in profiles.items():
+        n = max(0, round(prof.pool * CANDIDATES_PER_POOL * JUNIOR_SHARE * NEW_PRO_SCALE))
+        mu = BASE_POTENTIAL + DEV_EFFECT * (prof.development - 60)
+        crng = random.Random(f'{seed}:new-pros:{year}:{country}')
+        for _ in range(n):
+            pot = crng.gauss(mu, POTENTIAL_SD)
+            peak = crng.gauss(27.0, 2.0)
+            aging = math.exp(crng.gauss(0, 0.3))
+            luck = crng.gauss(0, CAREER_LUCK_SD)
+            age = crng.choice(NEW_PRO_AGES)
+            cur18 = pot - age_deficit(18, peak, aging) + luck
+            tracked = cur18 >= KEEP_OVERALL and _keep_young(cur18, 18, crng.random(), crng.gauss(0, SCOUTING_SD))
+            cur = pot - age_deficit(age, peak, aging) + luck
+            if tracked or cur < KEEP_OVERALL:
+                continue
+            cur = min(cur, 99.0)
+            pot = max(min(pot, 99.0), cur)
+            if _status(max(age, 23), cur, prof, crng.random(), crng) != 'pro':
+                continue
+            if crng.random() < _keep_probability('pro', age, cur):
+                rows.append((country, age, pot, peak, cur, 'pro', aging))
+    rows.sort(key=lambda r: -r[4])
+    golfers = [_make_golfer(start_id + i, row, year, f'{seed}:p{year}', profiles, taken) for i, row in enumerate(rows)]
+    for g in golfers:
+        g.turned_pro = year
+    return golfers
+
+
 def _college_or_series(g, prof, rng, am_series):
     region = COUNTRIES[g.country].region
     if g.overall >= 30:

@@ -94,7 +94,7 @@ def checks(s, year, snap, active_before):
                  + sum(1 for cid in st.coach_of.values() if st.coaches[cid].status != 'active')
                  + sum(1 for kid in st.caddie_of.values() if st.caddies[kid].status != 'active'))
     exits = sum(1 for t in s.transitions.get(year, ()) if t['kind'] in EXITS)
-    juniors = s.juniors_added.get(year + 1, 0)
+    juniors = s.juniors_added.get(year + 1, 0) + s.new_pros_added.get(year + 1, 0)   # every arrival
     active_after = sum(1 for g in s.world.golfers if g.lifestyle != 'retired')
     return {'reconcile_errors': recon, 'caddie_paid': round(paid_caddie, 2), 'caddie_received': round(got_caddie, 2),
             'coach_paid': round(paid_coach, 2), 'coach_received': round(got_coach, 2), 'staff_violations': staff_bad,

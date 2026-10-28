@@ -26,6 +26,22 @@ WORLD = generate_world()
 GEN_SECONDS = time.perf_counter() - T0
 
 
+class NewProfessionalTests(unittest.TestCase):
+    def test_new_professionals_arrive_every_year_like_the_starting_worlds(self):
+        from golfsim.population import NEW_PRO_AGES, new_professionals
+        a = new_professionals(2030, 2027, WORLD.nations, 10 ** 6, set())
+        b = new_professionals(2030, 2027, WORLD.nations, 10 ** 6, set())
+        self.assertEqual([(g.country, g.overall) for g in a], [(g.country, g.overall) for g in b])   # deterministic
+        self.assertTrue(300 <= len(a) <= 600, len(a))
+        self.assertTrue(all(g.status == 'pro' and g.turned_pro == 2030 and g.age(2030) in NEW_PRO_AGES for g in a))
+        # the same ability spread as the starting world's mini-tour professionals
+        minis = [g.overall for g in WORLD.golfers if g.status == 'pro' and g.tour.startswith('MN_')]
+        self.assertLess(abs(S.median(g.overall for g in a) - S.median(minis)), 3.0)
+        # every golfing nation can send them, in proportion to its golf scene
+        by = Counter(g.country for g in a)
+        self.assertGreater(by['USA'], by['England'])
+
+
 class PopulationTests(unittest.TestCase):
     def test_fast_and_deterministic(self):
         self.assertLess(GEN_SECONDS, 15)

@@ -224,6 +224,7 @@ class Season:
         self.rank_start, self.am_start = {}, {}              # year -> world / amateur ranking on 1 January
         self.unpaid = Counter()                              # year -> purse money not paid out (small fields)
         self.juniors_added = {}                              # year -> number of new golfers
+        self.new_pros_added = {}                             # year -> new professionals from outside the amateur game
         self.entry_routes = {}                               # (year, series) -> {gid: route code}
         self.staff = ST.initial_staff(world, seed)           # coaches and caddies
         self.staff_receipts = defaultdict(Counter)            # year -> ('coach'|'caddie', id) -> $ received
@@ -1284,6 +1285,7 @@ class Season:
         return state
 
     def __setstate__(self, state):
+        state.setdefault('new_pros_added', {})              # saves from before new professionals arrived
         if state.get('lib') == 'default':
             state['lib'] = default_library()
             state['cal'] = state['lib'].calendar
@@ -1561,7 +1563,7 @@ class Season:
                   self.block_flags, self.cash_start, self.overall_start, self.rank_start, self.am_start,
                   self.staff_receipts, self.injuries, self.card_log, self.career_counts, self.transitions,
                   self.assignments, self.staff_year, self.unheld, self.rights, self.card_reasons, self.snapshots,
-                  self.juniors_added, self.stats, self.moments):
+                  self.juniors_added, self.new_pros_added, self.stats, self.moments):
             for y in [y for y in d if isinstance(y, int) and old(y)]:
                 del d[y]
         for k in [k for k in self.money if old(k[1])]:
@@ -1613,6 +1615,7 @@ class Season:
                 if g.lifestyle != 'retired':
                     D.age_year(g, g.age(year + 1), rng, D.experience_factor(self.season_rounds[year][g.id]))
             self.juniors_added[year + 1] = careers.add_juniors(self, year + 1)
+            self.new_pros_added[year + 1] = careers.add_new_professionals(self, year + 1)
             for g in self.world.golfers:
                 self.fatigue[g.id] = g.fatigue = 0.0         # the off-season rests everyone
         ST.end_of_season(self, year, snap)                   # coaches' and caddies' year
