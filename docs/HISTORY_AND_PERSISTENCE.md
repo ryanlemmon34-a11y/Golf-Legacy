@@ -42,8 +42,11 @@ assignments change later. Course records carry the golfer's id and the event id,
 ### The weekly session (`golfsim/session.py`, roadmap M1)
 
 The one way the observer advances a world: `Session.create(dir, seed)` / `Session.open(dir)`, then
-`advance_one_week(expected=cursor, op_key=...)`; longer advances (`advance(n, progress, cancel)`) repeat
-the same command and can stop between any two weeks. It reuses the season's own steps
+`advance_one_week(expected=cursor, op_key=...)`, which commits every week; longer advances
+(`advance(n, progress, cancel)`) run the same weekly step and commit once, at the end or when cancelled
+between weeks (an interruption mid-week commits nothing), so skipping to the end of a season does not pay
+for 52 checkpoints. `tools/world.py` drives a world from the command line (create, status, advance,
+board). It reuses the season's own steps
 (`Season.start_year`, `advance_week`, `finish_year` — the same ones `run_year` uses), so a world advanced
 week by week is the world a whole-season run produces (tested, fingerprint-equal).
 

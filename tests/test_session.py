@@ -156,6 +156,24 @@ class SessionTests(unittest.TestCase):
         self.assertEqual(len([p for p in self.dir.glob('gen_[0-9]*') if p.is_dir()]), SES.KEEP_GENERATIONS)
         t.close()
 
+    def test_a_long_advance_commits_once_and_can_be_cancelled_between_weeks(self):
+        s = self.new()
+        g0 = s.generation
+        done = []
+        s.advance(5, progress=done.append, cancel=lambda: len(done) >= 3)
+        self.assertEqual(len(done), 3)
+        self.assertEqual(s.generation, g0 + 1)                          # one commit for the whole advance
+        self.assertEqual(s.cursor['week'], 4)
+        s.close()
+        t = Session.open(self.dir, workers=1)
+        self.assertEqual(t.cursor['week'], 4)
+        self.assertEqual(fingerprint(t.season), fingerprint(direct(3)))
+        with mock.patch.object(t.season, 'advance_week', side_effect=KeyboardInterrupt):
+            with self.assertRaises(KeyboardInterrupt):                    # interrupted mid-week: nothing commits
+                t.advance(2)
+        self.assertEqual(t.cursor['week'], 4)
+        t.close()
+
     def test_season_rollover_runs_each_step_once(self):
         s = self.new()
         s.advance(52)

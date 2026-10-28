@@ -3,7 +3,7 @@
     s = Session.create('worlds/my_world', seed=2027)      # a new world, committed at its first week
     s = Session.open('worlds/my_world')                   # or reopen one (recovering if needed)
     r = s.advance_one_week(expected=s.cursor)             # play the next week and commit it
-    s.advance(52)                                         # longer advances repeat the same command
+    s.advance(52)                                         # longer advances: the same weekly step, one commit
 
 **The cursor** says exactly what happens next: `{'year', 'week', 'phase'}` with phase 'start' (1 January
 has not run yet: the next advance runs it, then week 1), or 'week' (the next advance plays that week).
@@ -135,16 +135,42 @@ class Session:
                 result['generation'] = self.generation
                 return result
 
-    def advance(self, weeks, progress=None, cancel=None):
-        """Advance several weeks with the same weekly command (committing after each). `progress(result)`
-        after every week; `cancel()` is checked between weeks. Returns the results."""
+    def advance(self, weeks, progress=None, cancel=None, commit_every_week=False):
+        """Advance several weeks with the same weekly step. By default the world is committed once, at
+        the end (or when `cancel()` returns true between weeks): a skip to the end of the
+        season does not pay for 52 checkpoints. `commit_every_week` commits after each week instead.
+        `progress(result)` after every week. Returns the results."""
+        if commit_every_week:
+            out = []
+            for _ in range(weeks):
+                if cancel and cancel():
+                    break
+                out.append(self.advance_one_week(expected=self.cursor))
+                if progress:
+                    progress(out[-1])
+            return out
         out = []
-        for _ in range(weeks):
-            if cancel and cancel():
-                break
-            out.append(self.advance_one_week(expected=self.cursor))
-            if progress:
-                progress(out[-1])
+        with self._lock, _FileLock(self.dir / 'lock'):
+            if _committed_generation(self.dir) != self.generation:
+                self.season, self.state = _load_generation(self.dir, _committed_generation(self.dir), False)
+                self.generation = _committed_generation(self.dir)
+            try:
+                for _ in range(weeks):
+                    if cancel and cancel():
+                        break                                # a clean stop between weeks: commit what is done
+                    out.append(self._step())
+                    if progress:
+                        progress(out[-1])
+            except BaseException:                            # mid-week (an error or an interrupt): nothing commits
+                self.season.close()
+                self.season, self.state = _load_generation(self.dir, _committed_generation(self.dir), True)
+                self.generation = _committed_generation(self.dir)
+                raise
+            if out:
+                self.state['last_op'] = {'key': None, 'result': out[-1]}
+                self._commit()
+                for r in out:
+                    r['generation'] = self.generation
         return out
 
     def _step(self):
