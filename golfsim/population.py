@@ -247,7 +247,7 @@ def _make_golfer(i, row, year, seed, profiles, taken):
 def generate_world(year=2027, seed=2027, nation_profiles=None, scale=1.0):
     """Generate every competitive golfer in the world. `scale` multiplies the number of candidates."""
     from .development import init_ceilings
-    from .finance import initial_backing, initial_cash
+    from .finance import backer_deal, initial_backing, initial_cash
     profiles = nation_profiles or starting_nations()
     taken = set()
     golfers = [_make_golfer(i, row, year, seed, profiles, taken)
@@ -265,6 +265,13 @@ def generate_world(year=2027, seed=2027, nation_profiles=None, scale=1.0):
             g.lifestyle = 'part_time'                 # they have a job
         elif g.status == 'pro' and t and t.tier == 4 and age >= 28 and g.overall < 52 and rng.random() < 0.5:
             g.lifestyle = 'part_time'                 # already stopped chasing; plays a few local events
+        if g.status == 'pro' and g.lifestyle == 'full_time' and t and t.tier >= 2:
+            # professionals below the Premier Tour may already be backed (no record yet: a middling one);
+            # the deal is their backing (family money included), not an extra pot
+            b = random.Random(f'{seed}:backers:{g.id}')
+            g.backer = backer_deal(age, 0.4, b.random(), b.random())
+            if g.backer:
+                g.backing = 0.0
     return world
 
 

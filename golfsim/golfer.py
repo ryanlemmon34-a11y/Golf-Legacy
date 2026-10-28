@@ -47,6 +47,8 @@ class Golfer:
     lifestyle: str = 'full_time'     # 'full_time' (chasing it / college), 'part_time' (has a job), 'retired'
     cash: float = 0.0                # savings in dollars (can go negative: debt, within a credit limit)
     backing: float = 0.0             # family / private backers' support still available (dollars)
+    backer: float = 0.0              # a professional's backing deal: what backers put up each season (0 = none)
+    backer_stale: int = 0            # seasons in a row the backed golfer showed backers no progress
 
     def __post_init__(self):
         missing = set(ATTRIBUTE_KEYS) - set(self.attrs)

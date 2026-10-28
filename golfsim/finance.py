@@ -20,6 +20,15 @@ Money moves when it is earned or spent (weekly), never in a lump at the end of t
 dollar passes through the golfer's ledger, so savings always reconcile exactly:
     cash at the end of a year = cash at the start + ledger income - ledger costs.
 
+Backers
+    Most young professionals chasing the game are backed by family, friends or a group of investors
+    (about three in four in real life). A backing deal puts up a sum each season (topped up on
+    1 January, drawn only when the golfer's own cash runs out) for a share of their prize money
+    (BACKER_SHARE) while it lasts. Deals come when a golfer turns professional (likelier for a better
+    amateur record) or after a breakthrough season, are renewed each winter only on results backers
+    can see, and end after two seasons without progress, past 32, or once the golfer pays their own
+    way (careers.review_backers).
+
 Funding decisions (before money is spent)
     available funds  cash + remaining family/backer support + a limited line of credit
                      (credit grows with a golfer's recent income, up to a cap; nobody can borrow
@@ -41,6 +50,9 @@ EVENT_COST = {0: 5000, 1: 3500, 2: 1800, 3: 1200, 4: 600, 5: 0, 6: 350, 7: 1000,
 TRAVEL = {'home': 1.0, 'region': 1.3, 'abroad': 1.8}
 QSCHOOL_FEE = 4500
 CADDIE_SHARE = 0.08              # of prize money, to a professional caddie (plus their weekly fee)
+BACKER_SHARE = 0.25              # of prize money, to a backed golfer's backers while the deal lasts
+BACKER_MIN, BACKER_MAX = 15000, 50000      # what backers put up a season
+BACKER_AGE = 32                  # backers do not take on (or keep) golfers older than this
 LIVING = 32000                   # a full-time touring professional's yearly living costs
 LIVING_WORKING = 40000           # an adult with a job: normal life costs more than living on the road
 SALARY = {'part_time': 52000, 'club_pro': 65000}
@@ -98,6 +110,15 @@ def initial_backing(age, u1, u2):
     return round(min(150000.0, youth * 20000 * math.exp(2.0 * (u2 - 0.5))), -2)
 
 
+def backer_deal(age, standing, u1, u2):
+    """A new professional's backing deal (yearly dollars, 0 = none): about three in four find backers,
+    more often with a better record (`standing` 0-1, from the amateur or world ranking); the sum
+    varies widely and is larger for a better record."""
+    if age > BACKER_AGE or u1 >= min(0.95, 0.6 + 0.4 * standing):
+        return 0.0
+    return round(BACKER_MIN + (BACKER_MAX - BACKER_MIN) * (0.65 * u2 + 0.35 * standing), -2)
+
+
 def weekly_living(g):
     """(salary, living cost) per week for a golfer's lifestyle."""
     if g.lifestyle == 'part_time':
@@ -115,11 +136,17 @@ def money_unit(available):
 class Ledger:
     """One golfer's money for one year."""
     __slots__ = ('prize', 'sponsors', 'salary', 'work', 'support', 'events', 'caddie', 'caddie_share', 'coaching',
-                 'coach_share', 'living')
+                 'coach_share', 'living', 'backer_share')
 
     def __init__(self):
         self.prize = self.sponsors = self.salary = self.work = self.support = 0.0
         self.events = self.caddie = self.caddie_share = self.coaching = self.coach_share = self.living = 0.0
+        self.backer_share = 0.0
+
+    def __setstate__(self, state):                    # ledgers saved before backer shares existed
+        self.backer_share = 0.0
+        for k, v in (state[1] if isinstance(state, tuple) else state).items():
+            setattr(self, k, v)
 
     @property
     def income(self):
@@ -127,7 +154,8 @@ class Ledger:
 
     @property
     def costs(self):
-        return self.events + self.caddie + self.caddie_share + self.coaching + self.coach_share + self.living
+        return (self.events + self.caddie + self.caddie_share + self.coaching + self.coach_share + self.living
+                + self.backer_share)
 
     @property
     def net(self):

@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from golfsim import development as D                                   # noqa: E402
 from golfsim import finance as FIN                                     # noqa: E402
 from golfsim.calendar import TOUR_BY_KEY                               # noqa: E402
-from golfsim.careers import decide                                     # noqa: E402
+from golfsim.careers import decide, p_amateur_job                      # noqa: E402
 from golfsim.population import generate_world                          # noqa: E402
 from golfsim.season import Season                                      # noqa: E402
 
@@ -169,14 +169,15 @@ class FinanceTests(unittest.TestCase):
 
 class CareerTests(unittest.TestCase):
     def test_money_age_and_hope_decide_who_keeps_chasing(self):
-        # the same 400 mini-tour players, in debt with no results, at 22 and at 28 (a counterfactual)
+        # the same 400 mini-tour players, unbacked, with no results and $10k of their own (under half a
+        # season: fully broke, almost everyone stops whatever their age), at 22 and at 28 (a counterfactual)
         def quits(age):
             s = Season(generate_world(), seed=5, development=True, workers=1)
             minis = [g for g in s.world.golfers if g.status == 'pro' and g.lifestyle == 'full_time'
                      and TOUR_BY_KEY[g.tour].tier == 4][:400]
             for g in minis:
                 g.born = 2027 - age
-                g.cash, g.backing = -30000, 0.0
+                g.cash, g.backing, g.backer = 10000, 0.0, 0.0
                 s.prize_share[g.id] = 0.0
             decide(s, 2027, s.season_snapshot(2027))
             return s, [g for g in minis if g.lifestyle != 'full_time']
@@ -224,7 +225,16 @@ class CareerTests(unittest.TestCase):
                 self.assertTrue(any('Took a job' in txt for _, _, txt in t.history[took[0].id]))
             return len(took) / len(gs)
         self.assertLess(share(20, 5000), share(24, 5000))
-        self.assertLess(share(24, 200000), share(24, 5000))
+        # money to keep going: compared on the decision's own odds (a sampled share at 24 is too close)
+        snap = s.season_snapshot(2027)
+        def p_job(cash):
+            ps = []
+            for g in ams:
+                h = copy.deepcopy(g)
+                h.born, h.cash, h.backing = 2027 - 24, cash, 0.0
+                ps.append(p_amateur_job(s, h, snap.get(g.id, {}), 2027))
+            return sum(ps) / len(ps)
+        self.assertLess(p_job(200000), p_job(0))
         self.assertLess(share(24, 5000), share(24, -20000))
         self.assertLess(share(19, 5000), 0.2)
         self.assertGreater(share(27, -20000), 0.8)

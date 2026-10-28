@@ -177,7 +177,7 @@ class CareerOddsTests(unittest.TestCase):
     def setUp(self):
         self.s = SEASON
         self.g = copy.deepcopy(full_timers(self.s, 4)[3])
-        self.g.backing, self.g.cash = 0.0, 30000.0
+        self.g.backing, self.g.cash, self.g.backer = 0.0, 30000.0, 0.0
         self.row = {'status': 'pro', 'tier': 4, 'events': 15, 'top10': 1}
 
     def test_no_age_cliffs(self):
@@ -271,6 +271,60 @@ class CareerOddsTests(unittest.TestCase):
 
 
 # ---- 3. season-transition evidence --------------------------------------------------------------------
+class BackerTests(unittest.TestCase):
+    def setUp(self):
+        self.s = SEASON
+        self.g = copy.deepcopy(full_timers(self.s, 4)[5])
+        self.g.backing, self.g.cash, self.g.backer, self.g.backer_stale = 0.0, 0.0, 0.0, 0
+        self.flat = {'status': 'pro', 'tier': 4, 'events': 20, 'top10': 0, 'wr_start': 2000, 'wr_end': 2100}
+        self.good = dict(self.flat, wr_end=1200, top10=3)
+
+    def test_most_new_professionals_find_backers_and_a_record_helps(self):
+        r = random.Random(1)
+        share = lambda st: S.mean(FIN.backer_deal(22, st, r.random(), r.random()) > 0 for _ in range(4000))
+        self.assertAlmostEqual(share(0.4), 0.76, delta=0.03)
+        self.assertGreater(share(0.9), share(0.1))
+        self.assertEqual(FIN.backer_deal(FIN.BACKER_AGE + 1, 1.0, 0.0, 0.5), 0.0)
+        deals = [FIN.backer_deal(22, 0.5, 0.0, r.random()) for _ in range(500)]
+        self.assertTrue(all(FIN.BACKER_MIN <= d <= FIN.BACKER_MAX for d in deals))
+
+    def test_backers_take_their_share_of_winnings(self):
+        g = self.g
+        kept = self.s.prize_kept(g)
+        g.backer = 30000.0
+        self.assertAlmostEqual(self.s.prize_kept(g), kept - FIN.BACKER_SHARE)
+        led = FIN.Ledger()
+        led.prize, led.backer_share = 1000.0, FIN.BACKER_SHARE * 1000.0
+        self.assertAlmostEqual(led.net, 750.0)                               # in the ledger: cash reconciles
+
+    def test_backers_renew_on_progress_and_withdraw_without_it(self):
+        rng = random.Random(3)
+        g = at_age(self.g, 24)
+        g.backer = 30000.0
+        for _ in range(4):                                                   # progress every season: renewed
+            C.review_backers(self.s, g, self.good, 2027, rng)
+        self.assertEqual(g.backer, 30000.0)
+        self.assertEqual(C.review_backers(self.s, g, self.flat, 2027, rng), None)     # one flat season: patience
+        self.assertEqual(C.review_backers(self.s, g, self.flat, 2027, rng), 'backers withdrew')
+        self.assertEqual(g.backer, 0.0)
+        old = at_age(self.g, FIN.BACKER_AGE + 1)
+        old.backer = 30000.0
+        self.assertEqual(C.review_backers(self.s, old, self.good, 2027, rng), 'backers withdrew')
+
+    def test_credit_does_not_fund_another_season_but_backers_do(self):
+        g = at_age(self.g, 25)
+        g.cash = -5000.0
+        p_broke = C.p_stop_chasing(self.s, g, self.flat, 2027)[0]
+        led = self.s.ledger(2027, g.id)                                      # a big year: a big credit line
+        saved = led.work
+        led.work = 200000.0
+        p_credit = C.p_stop_chasing(self.s, g, self.flat, 2027)[0]
+        led.work = saved
+        self.assertAlmostEqual(p_broke, p_credit)
+        g.backer = 40000.0
+        self.assertLess(C.p_stop_chasing(self.s, g, self.flat, 2027)[0], p_broke)
+
+
 class TransitionTests(unittest.TestCase):
     def test_ties_share_a_rank_whatever_the_population_order(self):
         s = Season(generate_world(seed=14), seed=14, workers=1)

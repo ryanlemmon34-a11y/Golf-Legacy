@@ -1520,6 +1520,8 @@ class Season:
                     self.pay_staff(g, year, 'caddie_share', k, FIN.CADDIE_SHARE * each)
                 if self.staff.deal.get(gid) == 'share':      # the coach who approached them
                     self.pay_staff(g, year, 'coach_share', self.staff.coach(gid), ST.SCOUT_SHARE * each)
+                if g.backer:                                  # the backers' share
+                    self.spend(g, year, 'backer_share', FIN.BACKER_SHARE * each)
                 keys = [s.tour] if s.tour in TOUR_BY_KEY else []
                 if s.kind == 'major':
                     keys = list(PREMIER_TOURS)
@@ -1622,6 +1624,9 @@ class Season:
                           if g.status == 'pro' and g.lifestyle != 'retired'}
         self.rank_start[year] = dict(self.wr_pos)
         self.am_start[year] = dict(self.am_pos)
+        for g in self.world.golfers:                         # backers put up this season's money
+            if g.backer and g.lifestyle != 'retired':
+                g.backing = max(g.backing, g.backer)
         self.cash_start[year] = {g.id: g.cash for g in self.world.golfers}
         self.premier_rights(year)
         self.overall_start[year] = {g.id: g.overall for g in self.world.golfers if g.lifestyle != 'retired'}
@@ -2004,7 +2009,7 @@ class Season:
     #                 contracted coach's fee
     #   spendable     funds after setting aside RESERVE_WEEKS of committed costs: the money for travel
     #   trip cost     travel and fees, plus a caddie's weekly fee (paid only in weeks they play)
-    #   prize kept    expected prize money net of the caddie's share and a scouting coach's share;
+    #   prize kept    expected prize money net of the caddie's, a scouting coach's and backers' shares;
     #                 it informs decisions but is never spent before it is won
     def committed_weekly(self, g):
         salary, living = FIN.weekly_living(g)
@@ -2030,14 +2035,16 @@ class Season:
     def prize_kept(self, g):
         """Share of prize money a golfer keeps after their caddie's and a scouting coach's shares."""
         return (1.0 - (FIN.CADDIE_SHARE if self.staff.caddie(g.id) is not None else 0.0)
-                - (ST.SCOUT_SHARE if self.staff.deal.get(g.id) == 'share' else 0.0))
+                - (ST.SCOUT_SHARE if self.staff.deal.get(g.id) == 'share' else 0.0)
+                - (FIN.BACKER_SHARE if g.backer else 0.0))
 
     def earned_income(self, g, year):
         """Income earned in a year (prize money kept, sponsors, salary, work): not family support."""
         led = self.ledgers.get(year, {}).get(g.id)
         if led is None:
             return 0.0
-        return led.prize - led.caddie_share - led.coach_share + led.sponsors + led.salary + led.work
+        return (led.prize - led.caddie_share - led.coach_share - led.backer_share + led.sponsors + led.salary
+                + led.work)
 
     def means(self, g, year):
         """What a golfer can commit to staff from: spendable funds plus most of what last year's earnings

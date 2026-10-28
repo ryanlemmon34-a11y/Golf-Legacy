@@ -85,7 +85,19 @@ by stamina. The monthly plan works towards them; the calendar is sized so they a
 | Sponsors, from player prestige (paid weekly) | Mini-tour entry fees (their purses are paid by entry fees); Q-School fees |
 | A salary for part-timers ($52k) and club professionals ($65k) | A caddie: 8% of prize money on the bigger tours |
 | Paid work weeks ($900) for full-time pros who are short | Living costs: $32k a year for a touring pro, $40k for anyone with a job (none for college golfers and amateurs living at home) |
-| Family / private backing drawn when savings run out | |
+| Family help, and for professionals **backers**, drawn when savings run out | Backers' share: 25% of prize money while a backing deal lasts |
+
+**Backers.** As in real life (about three in four players trying to make it are backed by family,
+friends or investors), professionals chasing the game can have a backing deal: backers put up
+$15k–50k a season (topped up each 1 January, drawn only when the golfer's own cash runs out) for 25%
+of their prize money while the deal lasts. About three in four find backers when they turn
+professional (more often with a better amateur ranking); in the starting world, professionals below the
+Premier Tour aged 32 or under are backed in the same proportion. Each winter backers look at what they
+can see — promotion, a rising world ranking, wins and top-10s: progress renews the deal; two seasons in
+a row without it ends it, as does the golfer passing 32 or paying their own way. A young professional
+without backers can attract them with a breakthrough season (a win, promotion or a big ranking jump).
+Every deal, renewal and withdrawal is in the golfer's history. Club professionals' own events (section
+events, their championships and sectionals) are paid for by their club.
 
 Money moves weekly when it is earned or spent, and every dollar passes through the golfer's ledger:
 **cash at the end of a year = cash at the start + income − costs**, exactly.
@@ -123,7 +135,7 @@ completed season, snapshotted **before** tour cards change (see `docs/SEASON_SYS
 
 | Decision | How it works |
 |---|---|
-| **Giving up the chase** (any tour) | Money pressure (1 / (1 + runway)) weighed against their **desire to continue** — progress, the card earned, a secured event, health, willingness and life stage. Desire is kept separate from funds: an improving golfer may willingly accept another losing season, but desire creates no money — what they can actually enter is still decided week by week by what they can afford, and their credit stays limited. Every decision is recorded with its reasons (probability, runway, progress, desire, what was secured). |
+| **Giving up the chase** (any tour) | Money pressure (1 / (1 + runway)) weighed against their **desire to continue** — progress, the card earned, a secured event, health, willingness and life stage. The runway counts only savings and backers' money (next season's deal included), not the line of credit, which pays for a few weeks, not another season: under half a season of money of their own, the pressure rises steeply (smoothly, no cliff), so a broke player without backers usually stops chasing rather than lingering unable to afford events. Desire is kept separate from funds: an improving golfer may willingly accept another losing season, but desire creates no money — what they can actually enter is still decided week by week by what they can afford, and their credit stays limited. Every decision is recorded with its reasons (probability, runway, progress, desire, what was secured). |
 | **After stopping** | Some become **coaches or caddies** (see `docs/COACHES_AND_CADDIES.md`; rarely anyone who made a fortune). The rest take a job and keep playing a few local events as part-time pros, regain amateur status (more likely for those who never earned much from golf), or (with a strong mental game, from their mid-twenties) become club professionals. |
 | **Comebacks** | A part-timer who wins or contends — often because their mental game has matured — may quit their job for another run. The odds come from those results, how much of a year on tour they could fund, age (smoothly) and willingness. No age limit and no savings threshold. |
 | **Adult amateurs take jobs** | Amateurs outside college live at home on savings and family help, with no salary. Each year they may take a job and keep playing as part-time amateurs ($52k salary, $40k living): smooth in age (rare at 19-20, likely by the mid-twenties), likelier in debt or with a short runway, less likely with money to keep going. Recorded as a career transition ("amateur took a job"); their chance of turning professional is decided first. |

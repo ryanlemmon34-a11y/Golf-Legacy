@@ -78,11 +78,13 @@ def _tour_economics(season, tour):
     return cache[tour]
 
 
-def runway_years(season, g, year, tour, events, last_prize=None):
+def runway_years(season, g, year, tour, events, last_prize=None, own_money=False):
     """Years a golfer's funds would last chasing golf on `tour`, judged from their own record:
     expected prize money (the share of purses they have been winning, weighed equally with what
     they actually won in the season just played, so a season spent unable to afford events counts),
-    their sponsor contract and living costs. 10 = self-funding."""
+    their sponsor contract and living costs. 10 = self-funding. `own_money`: count only savings and
+    backers' money (next season's deal included), not what a lender would advance -- a line of credit
+    pays for a few weeks, not for another season."""
     purse, cost = _tour_economics(season, tour)
     income = season.prize_share.get(g.id, FIN.PRIOR_PRIZE_SHARE) * purse * events
     if last_prize is not None:
@@ -95,7 +97,7 @@ def runway_years(season, g, year, tour, events, last_prize=None):
     shortfall = costs - income
     if shortfall <= 0:
         return 10.0
-    funds = max(0.0, season.funds(g, year + 1))
+    funds = max(0.0, g.cash + max(g.backing, g.backer) if own_money else season.funds(g, year + 1))
     return min(10.0, funds / shortfall)
 
 
@@ -140,13 +142,43 @@ def desire_to_continue(season, g, row, year):
 
 def p_stop_chasing(season, g, row, year):
     """Chance a full-time professional gives up the chase this winter (every tier): money pressure
-    (1 / (1 + runway)) against their desire to continue."""
-    runway = runway_years(season, g, year, g.tour, season.target_events(g), row.get('prize', 0.0))
+    (1 / (1 + runway)) against their desire to continue. Under half a season of money of their own
+    (savings and backers), wanting to continue is not enough: the season cannot be paid for, so the
+    pressure rises steeply (smoothly) as the runway runs out."""
+    runway = runway_years(season, g, year, g.tour, season.target_events(g), row.get('prize', 0.0), own_money=True)
     pressure = 1 / (1 + runway)                    # 1 = broke and losing money, ~0 = self-funding
     desire = desire_to_continue(season, g, row, year)
-    x = -4.5 + 4.0 * pressure - desire
+    x = -4.5 + 4.0 * pressure + 2.2 * max(0.0, 1 - 2 * runway) - desire
     return _sig(x), {'runway': runway, 'progress': progress_signal(row), 'desire': desire,
                      'secured': list(row.get('secured', ()))}
+
+
+def review_backers(season, g, row, year, rng):
+    """Each winter, a full-time professional's backers decide on next season from what they can see:
+    progress (promotion, a rising ranking, wins, top-10s) renews the deal; two seasons in a row
+    without it, or the golfer passing BACKER_AGE, ends it; so does the golfer paying their own way.
+    A young professional without backers can attract them with a breakthrough season."""
+    age = g.age(year) + 1
+    progress = progress_signal(row)
+    paying = runway_years(season, g, year, g.tour, season.target_events(g), row.get('prize', 0.0)) >= 10
+    if g.backer:
+        if paying:
+            g.backer, g.backer_stale = 0.0, 0
+            season.log(g.id, year, 53, 'Paying their own way now; their backers stepped aside')
+            return 'backers no longer needed'
+        g.backer_stale = 0 if progress > 0.1 else g.backer_stale + 1
+        if g.backer_stale >= 2 or age > FIN.BACKER_AGE:
+            g.backer, g.backer_stale = 0.0, 0
+            season.log(g.id, year, 53, 'Their backers withdrew (no progress to show for two seasons)'
+                        if age <= FIN.BACKER_AGE else 'Their backers withdrew')
+            return 'backers withdrew'
+        return None
+    if not paying and age <= FIN.BACKER_AGE and (row.get('wins', 0) or row.get('promoted') or progress >= 0.6) and rng.random() < 0.5:
+        g.backer = FIN.backer_deal(age, max(0.6, amateur_standing(row.get('wr_end'))), 0.0, rng.random())
+        g.backer_stale = 0
+        season.log(g.id, year, 53, f'Found backers after their season (${g.backer:,.0f} a season for a share of winnings)')
+        return 'found backers'
+    return None
 
 
 def p_retire(season, g, row, year):
@@ -276,7 +308,10 @@ def decide(season, year, snap):
                 log(g.id, year, 53, f'Quit their job to make another run at it, aged {age}')
                 note('comeback', g, p=round(p_cb, 4), wins=row.get('wins', 0), top3=row.get('top3', 0))
             continue
-        # ---- full-time professionals (every tier): keep chasing, or stop? ------------------------
+        # ---- full-time professionals (every tier): backers decide first, then keep chasing or stop --
+        change = review_backers(season, g, row, year, rng)
+        if change:
+            note(change, g, backer=round(g.backer), progress=round(progress_signal(row), 2))
         p, why = p_stop_chasing(season, g, row, year)
         if rng.random() < p:
             why = dict(p=round(p, 4), runway=round(why['runway'], 2), progress=round(why['progress'], 2),
@@ -305,11 +340,18 @@ def decide(season, year, snap):
                 g.lifestyle, g.tour = 'part_time', home_mini(g)
                 log(g.id, year, 53, f'Stopped chasing the tour at {age}; took a job and plays a few local events ({reason})')
                 note('part-time pro', g, **why)
+    for g in season.world.golfers:                   # backers fund only a full-time chase
+        if g.backer and not (g.status == 'pro' and g.lifestyle == 'full_time'):
+            g.backer, g.backer_stale = 0.0, 0
     return counts
 
 
 def turn_pro(season, g, year, am_rank, how):
     g.status, g.lifestyle, g.turned_pro = 'pro', 'full_time', year + 1
+    rng = random.Random(f'{season.seed}:backers:{year}:{g.id}')
+    g.backer = FIN.backer_deal(g.age(year) + 1, amateur_standing(am_rank if am_rank < 99999 else None),
+                               rng.random(), rng.random())
+    g.backer_stale = 0
     if am_rank <= 15:
         g.tour = home_challenger(g)
     elif am_rank <= 60:
@@ -317,7 +359,9 @@ def turn_pro(season, g, year, am_rank, how):
     else:
         g.tour = home_mini(g)
     season.log(g.id, year, 53, f'Turned professional {how} (amateur ranking {am_rank if am_rank < 99999 else "unranked"}), '
-               f'starting on the {TOUR_BY_KEY[g.tour].name}')
+               f'starting on the {TOUR_BY_KEY[g.tour].name}'
+               + (f', with backers putting up ${g.backer:,.0f} a season for a share of winnings' if g.backer
+                  else ', paying their own way'))
 
 
 def add_juniors(season, year):
