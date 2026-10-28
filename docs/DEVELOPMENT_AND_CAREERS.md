@@ -140,7 +140,12 @@ or a change of life, and careers change only at the end of a season. Expected pr
 comes from their own record, kept by level of competition (the share of purses they have actually won
 against Premier, Challenger, regional or mini-tour fields, and in how many events): at a level they have
 not played, their record elsewhere is translated (half the share one level up, twice one level down) and
-counts for less, so a promotion forecast is uncertain until they have played there. Never from hidden
+counts for less, so a promotion forecast is uncertain until they have played there. A season's
+prize money is kept by the level it was won at: a Premier member's winnings on a Challenger tour are
+Challenger evidence, never proof of what they earn on the Premier Tour. **Evidence recency:** a
+level's evidence halves for every full season the golfer has not played there, so after years away an
+old record (however many events) no longer counts as proven, and on a comeback the recent events decide
+(the share they win is mostly the last five events' anyway). Never from hidden
 ability, never for amateurs (who take no prize money and have no sponsor contracts), and never spent
 before it is won. Forecasts, the caddie budget, affordability and payments use the same definitions
 (`Season.season_forecast`, `sponsor_income`, `tour_trip_cost` over `finance.event_cost`, which knows

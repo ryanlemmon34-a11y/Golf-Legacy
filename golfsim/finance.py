@@ -43,7 +43,11 @@ Funding decisions (before money is spent)
     committed        the next few weeks of living costs are set aside before any trip is booked
     expected prize   estimated from the golfer's own results so far, by level of competition (the
                      share of purses they have actually won there, Season.prize_forecast), not from
-                     their hidden ability; it is never spent before it is won
+                     their hidden ability; it is never spent before it is won. A season's money is
+                     kept by the level it was won at (Season.level_earnings): money won below a
+                     golfer's card is never evidence of what they earn at the card's level. Evidence
+                     fades by EVIDENCE_DECAY for each full season away from a level (a comeback is
+                     judged mostly on what they do now, not on a large old event count)
     week's budget    every entry accepted in a week books its cost at once (Season.reserve), so a Monday
                      qualifier and that weekend's tournament are paid from one budget, not each from the
                      same funds; a qualifier's site is priced where the golfer is sent to play it
@@ -158,6 +162,7 @@ LEVEL_STEP = 0.5                 # share of the purse one level of competition u
 MAX_PRIZE_SHARE = 0.25           # no forecast expects more than this share of a purse
 PROVEN_EVENTS = 8                # events at a level by which earnings there count as fairly proven
 UPFRONT_SHARE = 0.25             # of a season's costs that must be paid before winnings come in
+EVIDENCE_DECAY = 0.5             # prize evidence at a level fades by half for each full season away from it
 
 
 def credit_limit(last_income):

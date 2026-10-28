@@ -15,7 +15,7 @@ from golfsim import careers as C                                      # noqa: E4
 from golfsim import finance as FIN                                    # noqa: E402
 from golfsim.calendar import TOUR_BY_KEY                              # noqa: E402
 from golfsim.population import generate_world                         # noqa: E402
-from golfsim.season import Season                                     # noqa: E402
+from golfsim.season import PREMIER_TOURS, Season                                     # noqa: E402
 
 
 class PromotionTests(unittest.TestCase):
@@ -52,7 +52,8 @@ class PromotionTests(unittest.TestCase):
             # cash for the start of the season, then savings for several seasons or proven earnings
             g2 = copy.deepcopy(g)
             g2.backer = 0.0                                                    # judged without the backers
-            income, costs = s.season_forecast(g, g.tour, s.target_events(g), without_backers=True, cautious=True)
+            last = s.snapshots[2027][gid]                                     # the evidence own_way judges
+            income, costs = s.season_forecast(g, g.tour, s.target_events(g), last, without_backers=True, cautious=True)
             self.assertGreaterEqual(g.cash, FIN.UPFRONT_SHARE * costs, (gid, why))
             if 'savings' in why:
                 self.assertGreaterEqual(g.cash, C.SELF_FUNDED_SEASONS * (costs - income) - 1e-6, (gid, why))
@@ -313,6 +314,56 @@ class BackersWhenNeededTests(unittest.TestCase):
             self.assertIsNone(C.review_backers(s, again, row, 2027, lucky))
         finally:
             s.backer_ended.pop(again.id, None)
+
+
+class EarningsEvidenceTests(unittest.TestCase):
+    """Earnings are evidence only at the level they were won, and only while they are recent."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.s = s = Season(generate_world(seed=15, scale=0.2), seed=15, development=True, workers=1)
+        s.start_year(2027)
+        s.year = 2027
+
+    def test_lower_tour_winnings_do_not_prove_premier_earnings(self):
+        """A Premier member with eight unsuccessful Premier starts and $300,000 won below: the season
+        keeps the money by level, and only Premier money is Premier evidence."""
+        s = self.s
+        g = min((g for g in s.active_golfers() if g.tour in PREMIER_TOURS and g.status == 'pro'
+                 and g.lifestyle == 'full_time'), key=s.sponsor_income)         # sponsors do not pay for it
+        g.backer, g.backer_funds = 30000.0, 0.0
+        s.prize_record[g.id] = {1: [0.0, 8, 2027], 2: [0.02, 15, 2027]}
+        s.level_earnings[2027][g.id] = {1: [0.0, 8], 2: [300000.0, 15]}
+        s.ledger(2027, g.id).prize = 300000.0
+        row = s.season_snapshot(2027)[g.id]
+        self.assertEqual((row['tier'], row['prize']), (1, 300000.0))
+        self.assertEqual(row['prize_by_tier'], {1: (0.0, 8), 2: (300000.0, 15)})
+        events = s.target_events(g)
+        income, costs = s.season_forecast(g, g.tour, events, row, without_backers=True, cautious=True)
+        self.assertLess(income - s.sponsor_income(g), 1.0)                  # nothing counted on at Premier level
+        g.cash = FIN.UPFRONT_SHARE * costs + 1.0                             # can start the season, not much more
+        why = C.own_way(s, g, 2027, row)
+        self.assertTrue(why is None or 'winnings' not in why, why)
+        premier = dict(row, prize_by_tier={1: (300000.0, 8)})                # had it been won against Premier fields
+        self.assertGreater(s.season_forecast(g, g.tour, events, premier, without_backers=True, cautious=True)[0],
+                           income + 30000)
+
+    def test_old_evidence_fades_and_a_comeback_is_judged_on_new_results(self):
+        s = self.s
+        g = next(g for g in s.active_golfers() if g.status == 'pro')
+        s.prize_record[g.id] = {2: [0.03, 30, 2026]}                         # played that level last season
+        self.assertEqual(s.events_at_level(g.id, 2), 30)
+        s.prize_record[g.id] = {2: [0.03, 30, 2021]}                         # five full seasons away
+        self.assertLess(s.events_at_level(g.id, 2), FIN.PROVEN_EVENTS)      # no longer proven by its size
+        before = s.prize_forecast(g, 2, cautious=True)
+        self.assertLess(before, 0.03 * 0.2)
+        for _ in range(4):                                                   # back: four events, nothing won
+            s.learn_prize(g.id, 2, 0.0, 2027)
+        share, n, last = s.prize_record[g.id][2]
+        self.assertEqual(last, 2027)
+        self.assertLess(n, 5.0)                                              # the old 30 count for under one
+        self.assertLess(share, 0.03 * 0.25)                                  # the recent results decide
+        s.prize_record.pop(g.id)
 
 
 class AmateurForecastTests(unittest.TestCase):

@@ -69,8 +69,7 @@ def season_shortfall(season, g, tour, events, row=None, without_backers=False, c
     (Season.season_forecast: the same income and cost definitions the season pays out and charges);
     `row`: the season just played (what they actually won, and at what level). 0 or less: the season
     pays for itself."""
-    last = (row.get('prize', 0.0), row.get('tier')) if row else None
-    income, costs = season.season_forecast(g, tour, events, last, without_backers, cautious)
+    income, costs = season.season_forecast(g, tour, events, row, without_backers, cautious)
     return costs - income
 
 
@@ -99,7 +98,7 @@ def own_way(season, g, year, row):
     an income) and sponsors cover the season, or their savings cover SELF_FUNDED_SEASONS seasons of
     losses. None if not."""
     events = season.target_events(g)
-    income, costs = season.season_forecast(g, g.tour, events, (row.get('prize', 0.0), row.get('tier')),
+    income, costs = season.season_forecast(g, g.tour, events, row,
                                            without_backers=True, cautious=True)
     if g.cash < FIN.UPFRONT_SHARE * costs:
         return None

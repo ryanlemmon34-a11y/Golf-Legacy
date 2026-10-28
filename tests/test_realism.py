@@ -110,8 +110,9 @@ class FundingTests(unittest.TestCase):
         purse = sum(x.purse for x in ss) / len(ss)
         share = 1.2 * costs / (20 * purse * s.prize_kept(g))                 # a record that pays its way
         set_record(s, g, share)
-        played = C.runway_years(s, g, 2027, g.tour, 20, {'prize': share * 20 * purse, 'tier': tier(g)})
-        idle = C.runway_years(s, g, 2027, g.tour, 20, {'prize': 0.0, 'tier': tier(g)})
+        played = C.runway_years(s, g, 2027, g.tour, 20, {'prize_by_tier': {tier(g): (share * 20 * purse, 20)},
+                                                            'tier': tier(g)})
+        idle = C.runway_years(s, g, 2027, g.tour, 20, {'prize_by_tier': {}, 'tier': tier(g)})
         del s.prize_record[g.id]
         self.assertLess(idle, played)
 

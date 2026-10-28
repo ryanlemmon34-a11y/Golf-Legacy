@@ -112,6 +112,14 @@ def _migrate_prior_rounds(state):
     return prior
 
 
+def _faded(rec, year):
+    """Events of prize evidence at a level, faded by FIN.EVIDENCE_DECAY for every full season since they
+    last played at that level (records from before evidence was dated count as current)."""
+    if len(rec) < 3 or year is None:
+        return rec[1]
+    return rec[1] * FIN.EVIDENCE_DECAY ** max(0, year - rec[2] - 1)
+
+
 def region_of(g):
     return COUNTRIES[g.country].region
 
@@ -248,6 +256,7 @@ class Season:
         self.wr_pos, self.am_pos = {}, {}
         self.money = defaultdict(_dd_float)                  # (tour key, year) -> gid -> $
         self.earnings = defaultdict(_dd_float)               # year -> gid -> $ prize money
+        self.level_earnings = defaultdict(dict)              # year -> gid -> {tier: [prize, events]} (professionals)
         self.career_prize = Counter()                        # gid -> $ prize money over the whole career
         self.played = defaultdict(_dd_list)                  # year -> gid -> [weeks]
         self.stage_log = defaultdict(list)
@@ -1391,6 +1400,7 @@ class Season:
         state.setdefault('backer_flows', defaultdict(Counter))
         state.setdefault('support_start', {})
         state.setdefault('backer_ended', {})
+        state.setdefault('level_earnings', defaultdict(dict))   # older saves: earnings by level unknown
         for k in ('_caddie_week', '_caddie_paid'):           # this week's bookings (empty between weeks)
             state.setdefault(k, set())
         state.setdefault('_reserved', Counter())
@@ -1403,6 +1413,10 @@ class Season:
         if state.get('lib') == 'default':
             state['lib'] = default_library()
             state['cal'] = state['lib'].calendar
+        now = state.get('year') or state.get('first_year')
+        for rec in (r for tiers in state['prize_record'].values() for r in tiers.values()):
+            if len(rec) == 2:                                # evidence from before it was dated: as of now
+                rec.append(now)
         self.__dict__.update(state)
 
     def close(self):
@@ -1524,7 +1538,10 @@ class Season:
                     if self.g[gid].status == 'pro':           # learn what this player tends to win
                         old = self.prize_share.get(gid, FIN.PRIOR_PRIZE_SHARE)
                         self.prize_share[gid] = 0.8 * old + 0.2 * won.get(gid, 0.0) / s.purse
-                        self.learn_prize(gid, s.tier, won.get(gid, 0.0) / s.purse)
+                        self.learn_prize(gid, s.tier, won.get(gid, 0.0) / s.purse, year)
+                        lv = self.level_earnings[year].setdefault(gid, {}).setdefault(s.tier, [0.0, 0])
+                        lv[0] += won.get(gid, 0.0)
+                        lv[1] += 1
             for gid, pos, _ in finish:
                 all_ids.append(gid)
                 self.played[year][gid].append(week)
@@ -1681,7 +1698,7 @@ class Season:
         old = lambda y: y < year - 1
         for gid in [gid for gid, (y, _) in self.prior_rounds.items() if y < year]:
             del self.prior_rounds[gid]                       # their first season is over
-        for d in (self.earnings, self.played, self.pstats, self.ledgers, self.season_rounds, self.entry_wants,
+        for d in (self.earnings, self.level_earnings, self.played, self.pstats, self.ledgers, self.season_rounds, self.entry_wants,
                   self.entry_misses, self.entry_stats, self.declined, self.school_trips, self.club_trips,
                   self.backer_flows, self.activity_counts,
                   self.block_flags, self.cash_start, self.support_start, self.overall_start, self.rank_start, self.am_start,
@@ -1841,6 +1858,7 @@ class Season:
                           'wins': 0, 'top3': 0, 'top10': 0, 'cuts': 0, 'wins_by_tier': {}, 'majors': 0,
                           'secured': [],
                           'prize': led.prize if led else 0.0, 'net': led.net if led else 0.0,
+                          'prize_by_tier': {t: tuple(v) for t, v in self.level_earnings[year].get(g.id, {}).items()},
                           'wr_start': self.rank_start.get(year, {}).get(g.id), 'wr_end': self.wr_pos.get(g.id),
                           'am_start': self.am_start.get(year, {}).get(g.id), 'am_end': self.am_pos.get(g.id),
                           'injury_weeks': 0}
@@ -2234,11 +2252,17 @@ class Season:
         return max(0.0, self.spendable(g, year)) + 0.8 * max(0.0, disposable)
 
     # ---- what a golfer can expect to earn and spend (one set of definitions for every decision) ----
-    def learn_prize(self, gid, tier, share):
+    def learn_prize(self, gid, tier, share, year=None):
         """Record a professional's share of an event's purse, with the level of competition it was won
-        against (a share won on a mini tour says little about a Challenger Tour field)."""
-        rec = self.prize_record.setdefault(gid, {}).setdefault(tier, [FIN.PRIOR_PRIZE_SHARE, 0])
-        rec[1] += 1
+        against (a share won on a mini tour says little about a Challenger Tour field) and when: evidence
+        from seasons away from that level has faded first (evidence_events), so a comeback is judged
+        mostly on what they do now."""
+        year = self.year if year is None else year
+        rec = self.prize_record.setdefault(gid, {}).setdefault(tier, [FIN.PRIOR_PRIZE_SHARE, 0, year])
+        if len(rec) == 2:
+            rec.append(year)
+        rec[1] = _faded(rec, year) + 1
+        rec[2] = year
         rec[0] += (share - rec[0]) / min(rec[1], 5)          # running mean, then mostly the recent events
 
     def prize_forecast(self, g, tier, cautious=False):
@@ -2251,10 +2275,14 @@ class Season:
             return 0.0
         rec = self.prize_record.get(g.id, {})
         if cautious:                                         # only what they have shown at this level
-            share, n = rec.get(tier, (0.0, 0))
-            return share * n / (n + FIN.PROVEN_EVENTS)
+            r = rec.get(tier)
+            if r is None:
+                return 0.0
+            n = _faded(r, self.year)
+            return r[0] * n / (n + FIN.PROVEN_EVENTS)
         num, den = FIN.PRIOR_PRIZE_SHARE * FIN.PRIOR_EVENTS, float(FIN.PRIOR_EVENTS)
-        for t, (share, n) in rec.items():
+        for t, r in rec.items():
+            share, n = r[0], _faded(r, self.year)
             gap = t - tier                                   # > 0: earned against weaker fields
             w = n * 0.5 ** abs(gap)
             num += min(FIN.MAX_PRIZE_SHARE, share * FIN.LEVEL_STEP ** gap) * w
@@ -2262,8 +2290,10 @@ class Season:
         return num / den
 
     def events_at_level(self, gid, tier):
-        """Events with a prize record at a level of competition (how proven their earnings there are)."""
-        return self.prize_record.get(gid, {}).get(tier, (0.0, 0))[1]
+        """Events with a prize record at a level of competition (how proven their earnings there are),
+        faded for seasons away from it (evidence_events)."""
+        r = self.prize_record.get(gid, {}).get(tier)
+        return _faded(r, self.year) if r else 0.0
 
     def expected_prize(self, g, series):
         """The prize a golfer expects from an event: their forecast share at the event's level."""
@@ -2290,18 +2320,27 @@ class Season:
         return cache[key] + (k.weekly_fee if k is not None else 0.0)
 
     def season_forecast(self, g, tour, events, last=None, without_backers=False, cautious=False):
-        """(income, costs) of a season on `tour`: expected prize money at the tour's level (blended
-        equally with what they actually won last season when that was at the same level: `last` =
-        (prize, tier)), net of the caddie's, a scouting coach's and (unless `without_backers`) the
-        backers' shares, plus their sponsor contract; against the tour's trips and committed weekly
-        costs."""
+        """(income, costs) of a season on `tour`: expected prize money at the tour's level, blended
+        equally with what they actually won *at that level* last season (`last`: the season's row, with
+        its earnings by level of competition `prize_by_tier` {tier: (prize, events)} and the level of
+        their card `tier`). If that was their own level, the season's total there counts (a season they
+        could not afford to play counts against them); at a level above or below their card, what they
+        won per event there, if they played it. Money won at other levels never counts as this level's.
+        `cautious` shrinks it by how few events it is. Net of the caddie's, a scouting coach's and
+        (unless `without_backers`) the backers' shares, plus their sponsor contract; against the tour's
+        trips and committed weekly costs."""
         t = TOUR_BY_KEY.get(tour)
         tier = t.tier if t else 4
         ss = [x for x in self.cal.series if x.tour == tour and x.purse]
         purse = sum(x.purse for x in ss) / len(ss) if ss else 0.0
         prize = self.prize_forecast(g, tier, cautious) * purse * events
-        if last is not None and last[1] == tier and g.status != 'amateur':
-            prize = 0.5 * prize + 0.5 * last[0]
+        if last is not None and g.status != 'amateur':
+            won, n = (last.get('prize_by_tier') or {}).get(tier, (0.0, 0))
+            seen = won if last.get('tier') == tier else won / n * events if n else None
+            if seen is not None:
+                if cautious:                                 # counted on only as far as it is proven
+                    seen *= n / (n + FIN.PROVEN_EVENTS)
+                prize = 0.5 * prize + 0.5 * seen
         kept = self.prize_kept(g) + (FIN.BACKER_SHARE if without_backers and g.backer else 0.0)
         income = prize * kept + self.sponsor_income(g)
         costs = events * self.tour_trip_cost(g, tour) + 52 * self.committed_weekly(g)
