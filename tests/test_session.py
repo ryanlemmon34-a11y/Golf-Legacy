@@ -377,6 +377,44 @@ class TransactionTests(unittest.TestCase):
         self.assertEqual(w.stats.most_wins(), HistoryStats(A.Archive(self.dir / 'archive')).most_wins())
         w.session.close()
 
+    def test_a_retry_after_recovery_rolled_the_operation_back_applies_it_once(self):
+        """The season-end advance commits, then its generation is damaged. Retried through the same live
+        handle, the operation is not reported as done from memory: the committed world (the generation
+        before) is loaded first, the operation is no longer in it, so it runs again -- once."""
+        ref_view, ref_print = self.after_end[2028]
+        s = self.at_season_end(2028)
+        first = s.advance_one_week(op_key='end-2028')
+        gen = s.generation
+        (self.dir / f'gen_{gen:06d}' / 'state.pkl.gz').write_bytes(b'damaged')
+        again = s.advance_one_week(op_key='end-2028')                   # the same handle, the same key
+        self.assertEqual(again['completed'], first['completed'])
+        self.assertEqual(s.cursor, {'year': 2029, 'week': 1, 'phase': 'start'})
+        t = Session.open(self.dir, workers=1)                            # what is really committed
+        self.assertEqual(t.cursor, {'year': 2029, 'week': 1, 'phase': 'start'})
+        self.assertEqual(fingerprint(t.season), ref_print)              # applied exactly once
+        self.assertEqual(archive_view(self.dir), ref_view)
+        self.assertEqual(t.advance_one_week(op_key='end-2028')['completed'], (2028, 52))   # now recognised
+        self.assertEqual(t.cursor, {'year': 2029, 'week': 1, 'phase': 'start'})
+        t.close()
+        s.close()
+
+    def test_ordinary_advances_leave_published_history_untouched(self):
+        """Weeks that add no season do not rewrite the published tables; a publication left unfinished
+        is still repaired by the next advance."""
+        s = self.at_season_end(2027)
+        s.advance_one_week()                                            # 2027 published
+        a = self.dir / 'archive'
+        names = ('people.json.gz', 'relations.json.gz', 'records.json.gz', 'world.json', 'PUBLISHED')
+        stamp = lambda: {f: ((a / f).stat().st_mtime_ns, (a / f).stat().st_ino) for f in names}
+        before, view = stamp(), archive_view(self.dir)
+        s.advance(3)                                                    # 1 January and two weeks
+        self.assertEqual(stamp(), before)
+        (a / 'people.json.gz').unlink()                                 # an interrupted publication
+        (a / 'PUBLISHED').write_text('-1')
+        s.advance_one_week()
+        self.assertEqual(archive_view(self.dir), view)                  # repaired, exactly
+        s.close()
+
     def test_a_retry_through_another_handle_is_recognised(self):
         a = self.new()
         b = Session.open(self.dir, workers=1)                            # a second, independently opened handle

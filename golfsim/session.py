@@ -11,8 +11,10 @@ After week 52 the same advance runs the end of the season and archives it, and t
 next year's 'start'. Year start and year end therefore run exactly once, in order, whatever the calls.
 
 **Idempotent, serialised advances.** An advance may name the cursor it expects (a stale request is
-refused with StaleCursor and changes nothing) and an operation key (repeating the last committed key
-returns its stored result without simulating again). Advances are serialised: a lock inside the process,
+refused with StaleCursor and changes nothing) and an operation key (repeating a committed key returns
+its stored result without simulating again). The key is looked up only after the committed world has
+been synchronised under the lock, so an operation that recovery rolled back (its generation was
+damaged) is applied again rather than reported as done. Advances are serialised: a lock inside the process,
 and a lock file across processes (Busy if another advance holds it).
 
 Operation keys are remembered for the last OPS_KEPT committed advances (not only the last), and are
@@ -158,18 +160,11 @@ class Session:
 
     def _advance(self, weeks, expected, op_key, progress=None, cancel=None):
         with self._lock:
-            done = self._done(op_key)
-            if done is not None:
-                # already committed: return its result, but first repair the history if publishing it
-                # was interrupted (whoever holds the lock does that before advancing)
-                try:
-                    with _FileLock(self.dir / 'lock'):
-                        self._sync()
-                except Busy:
-                    pass
-                return done
             with _FileLock(self.dir / 'lock'):
-                self._sync()                                 # another process may have committed meanwhile
+                # first the committed world (another process may have committed meanwhile, or recovery
+                # may fall back to an earlier generation) with its history repaired; only then is an
+                # operation recognised as done -- if it is still in what is committed
+                self._sync()
                 done = self._done(op_key)
                 if done is not None:
                     return done
@@ -316,6 +311,7 @@ class Session:
                 self.season._pool = pool
         digest = _sha256(tmp / 'state.pkl.gz')
         staged = {}
+        new_history = bool(self._pending)
         if self._pending:                                             # the season history, staged
             a = tmp / 'archive'
             (a / 'years').mkdir(parents=True)
@@ -347,8 +343,10 @@ class Session:
         for old in sorted(self.dir.glob('gen_[0-9]*')):
             if old.is_dir() and not old.name.endswith('.tmp') and int(old.name[4:]) <= n - KEEP_GENERATIONS:
                 shutil.rmtree(old, ignore_errors=True)
-        if staged:
+        if new_history:
             _publish_archive(self.dir, n)                               # committed: now the history shows it
+        # (a generation that only carries the history it stands on publishes nothing: what is published
+        # is already its history; recovery republishes only when PUBLISHED names another)
 
     def _carry_history(self, tmp):
         """A generation with no new season carries the committed generation's history files (hard links:
