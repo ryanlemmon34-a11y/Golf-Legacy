@@ -558,11 +558,13 @@ def main():
     if not a.report_only:
         commit, dirty = git_state()
         man = load_manifest(out)
-        if man and man.get('commit') != commit:
-            raise SystemExit(f'{out} holds checkpoints from commit {man.get("commit")}; use a new directory')
+        from golfsim.savegame import engine_id
+        if man and (man.get('engine') or engine_id(man['commit'])) != engine_id():
+            raise SystemExit(f'{out} holds checkpoints from another engine (commit {man.get("commit")}); use a new directory')
         if man and not a.resume and any(int(k) in a.seeds for k in man.get('seeds', {})):
             raise SystemExit(f'{out} already holds these seeds; pass --resume to continue them or use a new directory')
-        man.update({'format': FORMAT, 'commit': commit, 'dirty': dirty, 'python': platform.python_version(),
+        from golfsim.savegame import engine_id as _eid
+        man.update({'format': FORMAT, 'commit': commit, 'engine': _eid(), 'dirty': dirty, 'python': platform.python_version(),
                     'started': time.strftime('%Y-%m-%d %H:%M:%S'), 'years_requested': a.years,
                     'config': config(), 'mature': a.mature})
         man.setdefault('seeds', {})
