@@ -11,6 +11,10 @@ Per run directory:
                              per season — explore with tools/history_query.py
     seed_<s>.save            a resumable simulation save (golfsim/savegame.py), every --save-every
                              seasons; `--resume` continues an interrupted run exactly
+    world_<s>/               --session: the persistent session itself (checkpoint generations, the
+                             archive in world_<s>/archive, opened by tools/observer.py); every season is
+                             skipped through the observer and timed (seed_<s>.json.gz 'perf');
+                             seed_<s>.state.pkl and .pending.pkl let --resume continue exactly
     seed_<s>.json.gz         player-facing records (no hidden attributes), checkpointed every 5 years
     seed_<s>.debug.json.gz   hidden attributes per golfer-year and staff skills (debug only)
     REPORT.md                player-facing report: checks, annual highlights, careers, staff, majors
@@ -50,7 +54,7 @@ ROW = ('status', 'lifestyle', 'tier', 'next_tier', 'events', 'wins', 'wins_by_ti
        'prize', 'net', 'cash', 'wr', 'am', 'injury_weeks', 'zero_start', 'coach', 'deal', 'caddie',
        'coaching', 'caddie_cost', 'sponsors', 'salary', 'work', 'support', 'living', 'event_costs',
        'play_wk', 'train_wk', 'rest_wk', 'work_wk', 'rounds', 'wanted_wk', 'shut_wk', 'declined', 'school_trips',
-       'club_trips', 'backer_support')
+       'club_trips', 'backer_support', 'moving', 'home')
 EXITS = ('retired', 'became coach', 'became caddie')
 
 
@@ -64,9 +68,12 @@ def git_state():
 
 
 def config():
-    from golfsim import careers as C, finance as F, staff as ST, population as P, development as D
+    from golfsim import careers as C, finance as F, staff as ST, population as P, development as D, residence as R
     return {'finance': {k: getattr(F, k) for k in ('LIVING', 'LIVING_WORKING', 'WORK_WAGE', 'CREDIT_BASE', 'CREDIT_SHARE',
-                                                   'CREDIT_CAP', 'RESERVE_WEEKS', 'PRIOR_PRIZE_SHARE', 'CADDIE_SHARE')},
+                                                   'CREDIT_CAP', 'RESERVE_WEEKS', 'PRIOR_PRIZE_SHARE', 'CADDIE_SHARE',
+                                                   'BACKER_SHARE', 'EVIDENCE_DECAY', 'PROVEN_EVENTS', 'SELF_FUNDED_SEASONS')},
+            'residence': {k: getattr(R, k) for k in ('MOVE_COST', 'MIN_STAY', 'STAY_YEARS', 'HOME_PULL', 'MOVE_MARGIN',
+                                                     'MOVE_SCALE', 'CADDIE_FOLLOWS', 'COACH_FOLLOWS', 'HOME_STATE_COLLEGE')},
             'staff': {k: getattr(ST, k) for k in ('SELF_TEACHING', 'SCOUT_SHARE', 'SELF_CADDIE', 'CADDIE_TIERS',
                                                   'COACH_OF_MEANS', 'CADDIE_OF_MEANS')},
             'careers': {'LIFE_AGE': C.LIFE_AGE},
@@ -131,10 +138,190 @@ def year_rows(s, year, snap):
                      act.get('play', 0), act.get('train', 0), act.get('rest', 0), act.get('work', 0),
                      round(s.season_rounds[year].get(gid, 0), 1), s.entry_wants[year].get(gid, 0),
                      s.entry_misses[year].get(gid, 0), len(s.declined[year].get(gid, ())), s.school_trips[year].get(gid, 0),
-                     s.club_trips[year].get(gid, 0), round(led.backer_support) if led else 0]
+                     s.club_trips[year].get(gid, 0), round(led.backer_support) if led else 0,
+                     round(getattr(led, 'moving', 0.0)) if led else 0, s.home_country(g)]
         debug[gid] = [round(g.overall, 2), round(g.potential, 1),
                       round(sum(g.ceilings[k] - g.attrs[k] for k in g.attrs) / len(g.attrs), 2) if g.ceilings else None]
     return rows, debug
+
+
+def stage(g, row, year):
+    """A golfer's career stage for diagnostics: college, amateur, new professional (first three seasons),
+    established professional, part-time, club professional."""
+    if row['tour'].startswith('CO_'):
+        return 'college'
+    if row['status'] == 'amateur':
+        return 'amateur'
+    if row['status'] == 'club_pro':
+        return 'club pro'
+    if row['lifestyle'] == 'part_time':
+        return 'part-time pro'
+    return 'new pro' if g.turned_pro and year - g.turned_pro < 3 else 'established pro'
+
+
+def season_extras(s, year, snap):
+    """Per-season diagnostics kept beside the rows: competition access by career stage and tour (every
+    golfer-week classified, financial barriers kept apart from injury, full fields and choice), money that
+    moved, and the winter's relocations."""
+    access = Counter()
+    for gid, row in snap.items():
+        g = s.g[gid]
+        key = f'{stage(g, row, year)}|{row["tour"]}'
+        for outcome, n in s.week_access.get(year, {}).get(gid, {}).items():
+            access[f'{key}|{outcome}'] += n
+        declined = len(s.declined[year].get(gid, ()))
+        if declined:
+            access[f'{key}|declined an invitation or place for cost'] += declined
+    moves = [{'person': m['person'], 'from': list(m['from']) if m['from'] else None, 'to': list(m['to']),
+              'reason': m['reason']} for m in s.move_log.get(year, [])]
+    return {'access': dict(access), 'moves': moves, 'move_blocked': s.move_blocked.get(year, 0),
+            'flows': {f'{gid}:{k}': round(v, 2) for (gid, k), v in s.backer_flows.get(year, {}).items()},
+            'stage': {gid: stage(s.g[gid], row, year) for gid, row in snap.items()}}
+
+
+def collect(s, y, snap, active_before):
+    """Everything this tool keeps about one completed season (before its snapshot is archived)."""
+    rows, dbg = year_rows(s, y, snap)
+    out = {'rows': rows, 'debug': dbg, 'checks': checks(s, y, snap, active_before),
+           'transitions': s.transitions.get(y, []), 'unpaid': s.unpaid[y],
+           'entry_stats': {t: dict(c) for t, c in s.entry_stats[y].items()},
+           'number_one': next((gid for gid, r in snap.items() if r['wr_end'] == 1), None),
+           'majors': {}, 'routes': {}, 'extras': season_extras(s, y, snap)}
+    for m in MAJORS:
+        r = s.results.get(f'{y}:{m}')
+        if r and r.winner():
+            out['majors'][f'{y}:{m}'] = r.winner()
+        if (y, m) in s.entry_routes:
+            out['routes'][f'{y}:{m}'] = Counter(s.entry_routes[(y, m)].values())
+    return out
+
+
+def merge(data, debug, y, c):
+    data['rows'][y], debug['rows'][y] = c['rows'], c['debug']
+    for k in ('checks', 'transitions', 'unpaid', 'entry_stats', 'number_one'):
+        data[k][y] = c[k]
+    data.setdefault('extras', {})[y] = c['extras']
+    data['majors'].update(c['majors'])
+    data['routes'].update(c['routes'])
+
+
+def dir_bytes(p):
+    return sum(f.stat().st_size for f in Path(p).rglob('*') if f.is_file()) if Path(p).exists() else 0
+
+
+def run_world_session(seed, years, workers, out, resume=False, scale=1.0):
+    """Run (or resume) one world through the persistent weekly session and the observer, exactly as a
+    player skips to the end of each season: the session's checkpoint generations are the resumable saves
+    and its archive (world_<seed>/archive) the history. Each season is timed part by part (simulate, save,
+    publish, observer reload, overview, first Records page), with the archive's and checkpoint's size."""
+    import pickle
+    from unittest import mock
+    sys.path.insert(0, str(ROOT / 'tools'))
+    import observer
+    from golfsim import session as SES
+    from golfsim.session import Session
+    d = out / f'world_{seed}'
+    state_path, pending_path = out / f'seed_{seed}.state.pkl', out / f'seed_{seed}.pending.pkl'
+    t_start = time.perf_counter()
+    if resume and (d / 'CURRENT').exists() and state_path.exists():
+        with open(state_path, 'rb') as f:
+            data, debug, created, initial = pickle.load(f)
+        print(f'seed {seed}: resuming after {data["years"]} seasons', flush=True)
+    else:
+        if (d / 'CURRENT').exists():
+            raise SystemExit(f'{d} already holds a world; pass --resume or use a new directory')
+        from golfsim.population import generate_world
+        s = Session.create(d, seed=seed, workers=workers, world=generate_world(seed=seed, scale=scale))
+        created = {g.id: s.season.first_year for g in s.season.world.golfers}
+        initial = {g.id for g in s.season.world.golfers}
+        data = {'format': FORMAT, 'seed': seed, 'first': s.season.first_year, 'years': 0, 'rows': {}, 'checks': {},
+                'majors': {}, 'transitions': {}, 'routes': {}, 'unpaid': {}, 'number_one': {}, 'entry_stats': {},
+                'extras': {}, 'perf': {}, 'session': True}
+        debug = {'format': FORMAT, 'seed': seed, 'rows': {}}
+        s.close()
+    w = observer.World(d)
+    first = data['first']
+    if pending_path.exists():                       # a season captured but not yet merged when the run stopped
+        with open(pending_path, 'rb') as f:
+            y, c = pickle.load(f)
+        if y == first + data['years'] and w.session.cursor['year'] > y:      # it was committed: keep it
+            merge(data, debug, y, c)
+            data['years'] = y - first + 1
+        pending_path.unlink()
+    captured = {}
+
+    def hook(season, year):
+        c = collect(season, year, season.snapshots[year], captured['active_before'])
+        captured[year] = c
+        with open(pending_path, 'wb') as f:
+            pickle.dump((year, c), f)
+    while data['years'] < years:
+        sess = w.session
+        sess.on_season_end = hook
+        c = sess.cursor
+        y = c['year']
+        captured['active_before'] = sum(1 for g in sess.season.world.golfers if g.lifestyle != 'retired')
+        parts = {}
+        real_commit, real_publish = Session._commit, SES._publish_archive
+
+        def timed_commit(self):
+            t = time.perf_counter()
+            real_commit(self)
+            parts['save+publish'] = parts.get('save+publish', 0.0) + time.perf_counter() - t
+
+        def timed_publish(dd, gen):
+            t = time.perf_counter()
+            real_publish(dd, gen)
+            parts['publish'] = parts.get('publish', 0.0) + time.perf_counter() - t
+        form = {'weeks': ['season'], 'year': [str(y)], 'week': [str(c['week'])], 'phase': [c['phase']],
+                'op': [f'long-{seed}-{y}']}
+        t_reload = [0.0]
+        real_reload = w.reload
+
+        def timed_reload():
+            t = time.perf_counter()
+            real_reload()
+            t_reload[0] = time.perf_counter() - t
+        t0 = time.perf_counter()
+        with mock.patch.object(Session, '_commit', timed_commit), mock.patch.object(SES, '_publish_archive', timed_publish):
+            w.reload = timed_reload
+            w.submit(form)
+            w.reload = real_reload
+        t1 = time.perf_counter()
+        observer.overview(w, {})
+        t2 = time.perf_counter()
+        observer.record(w, {}, 'most-wins')
+        t3 = time.perf_counter()
+        if y not in captured:
+            raise SystemExit(f'seed {seed}: season {y} did not complete')
+        merge(data, debug, y, captured.pop(y))
+        s = w.session.season
+        for g in s.world.golfers:
+            created.setdefault(g.id, y + 1)
+        data['years'] = y - first + 1
+        total = t1 - t0 + (t2 - t1)
+        sp = parts.get('save+publish', 0.0)
+        data['perf'][y] = {'skip': round(total, 1), 'simulate': round(t1 - t0 - sp - t_reload[0], 1),
+                           'save': round(sp - parts.get('publish', 0.0), 1), 'publish': round(parts.get('publish', 0.0), 1),
+                           'reload': round(t_reload[0], 2), 'overview': round(t2 - t1, 2), 'records': round(t3 - t2, 2),
+                           'active': len(s.active_golfers()), 'people': len(s.world.golfers),
+                           'archive_mb': round(dir_bytes(d / 'archive') / 1e6, 1),
+                           'checkpoint_mb': round(dir_bytes(d / f'gen_{w.session.generation:06d}') / 1e6, 1)}
+        ch = data['checks'][y]
+        print(f'seed {seed}: {y} done ({data["years"]}/{years}), {ch["active_after"]} active, reconcile errors '
+              f'{ch["reconcile_errors"]}+{ch.get("support_errors", 0)}, staff violations {ch["staff_violations"]}, '
+              f'population {"ok" if ch["population_ok"] else "MISMATCH"}, skip {total:.0f} s '
+              f'(save {data["perf"][y]["save"]} s, publish {data["perf"][y]["publish"]} s), '
+              f'{time.perf_counter() - t_start:.0f} s', flush=True)
+        with open(str(state_path) + '.tmp', 'wb') as f:
+            pickle.dump((data, debug, created, initial), f)
+        Path(str(state_path) + '.tmp').replace(state_path)
+        if pending_path.exists():
+            pending_path.unlink()
+        last = data['years'] >= years
+        if data['years'] % 5 == 0 or last:
+            save(s, data, debug, created, initial, out, t_start)
+    w.session.close()
 
 
 def run_world(seed, years, workers, out, resume=False, save_every=1):
@@ -172,19 +359,7 @@ def run_world(seed, years, workers, out, resume=False, save_every=1):
         s.run_year(y)
         archive.write_year(s, y)                            # the durable history, before the snapshot goes
         snap = s.snapshots.pop(y)
-        rows, dbg = year_rows(s, y, snap)
-        data['rows'][y], debug['rows'][y] = rows, dbg
-        data['checks'][y] = checks(s, y, snap, active_before)
-        data['transitions'][y] = s.transitions.get(y, [])
-        data['unpaid'][y] = s.unpaid[y]
-        data['entry_stats'][y] = {t: dict(c) for t, c in s.entry_stats[y].items()}
-        data['number_one'][y] = next((gid for gid, r in snap.items() if r['wr_end'] == 1), None)
-        for m in MAJORS:
-            r = s.results.get(f'{y}:{m}')
-            if r and r.winner():
-                data['majors'][f'{y}:{m}'] = r.winner()
-            if (y, m) in s.entry_routes:
-                data['routes'][f'{y}:{m}'] = Counter(s.entry_routes[(y, m)].values())
+        merge(data, debug, y, collect(s, y, snap, active_before))
         for g in s.world.golfers:
             created.setdefault(g.id, y + 1)
         data['years'] = y - first + 1
@@ -249,6 +424,8 @@ def load(out, seed):
     d['transitions'] = {int(y): v for y, v in d['transitions'].items()}
     d['golfers'] = {int(g): v for g, v in d['golfers'].items()}
     d['number_one'] = {int(y): v for y, v in d['number_one'].items()}
+    d['extras'] = {int(y): v for y, v in d.get('extras', {}).items()}
+    d['perf'] = {int(y): v for y, v in d.get('perf', {}).items()}
     for r in (r for yr in d['rows'].values() for r in yr.values()):
         r['wins_by_tier'] = {int(t): n for t, n in r['wins_by_tier'].items()}
     return d
@@ -444,7 +621,8 @@ def interesting(d, a, n=6):
     out = []
     for label, gid in picks[:n]:
         out.append(f'- **{label} — {name(d, gid)}**, born {g[gid]["born"]}:')
-        out += [f'  - {y}: {t}' for y, t in g[gid]['history'] if not t.startswith(('Hired', 'Approached', 'Left coach', 'Parted'))][:14]
+        out += [f'  - {y}: {t}' for y, t in g[gid]['history']
+                if not t.startswith(('Hired', 'Approached', 'Left coach', 'Parted', 'Secured for next season'))][:14]
     return out
 
 
@@ -627,6 +805,10 @@ def main():
     ap.add_argument('--resume', action='store_true', help='continue interrupted seeds from their simulation saves')
     ap.add_argument('--save-every', type=int, default=1, help='seasons between simulation saves')
     ap.add_argument('--strict', action='store_true', help='exit non-zero if any check fails (integration gate)')
+    ap.add_argument('--scale', type=float, default=1.0, help='population scale (1 = the full world; smaller only '
+                    'to try the tool)')
+    ap.add_argument('--session', action='store_true', help='run through the persistent session and the observer, '
+                    'timing every season skip (the long test)')
     a = ap.parse_args()
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
@@ -639,13 +821,19 @@ def main():
         if man and not a.resume and any(int(k) in a.seeds for k in man.get('seeds', {})):
             raise SystemExit(f'{out} already holds these seeds; pass --resume to continue them or use a new directory')
         from golfsim.savegame import engine_id as _eid
+        sys.path.insert(0, str(ROOT / 'tools'))
+        from benchmark_skip import machine
         man.update({'format': FORMAT, 'commit': commit, 'engine': _eid(), 'dirty': dirty, 'python': platform.python_version(),
+                    'machine': machine(),
                     'started': time.strftime('%Y-%m-%d %H:%M:%S'), 'years_requested': a.years,
                     'config': config(), 'mature': a.mature})
         man.setdefault('seeds', {})
         (out / 'manifest.json').write_text(json.dumps(man, indent=1, default=str))
         for seed in a.seeds:
-            run_world(seed, a.years, a.workers, out, a.resume, a.save_every)
+            if a.session:
+                run_world_session(seed, a.years, a.workers, out, a.resume, a.scale)
+            else:
+                run_world(seed, a.years, a.workers, out, a.resume, a.save_every)
     man = load_manifest(out)
     seeds = [int(s) for s in man['seeds']] if a.report_only else a.seeds
     results = []

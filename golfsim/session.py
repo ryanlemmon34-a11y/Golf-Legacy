@@ -84,6 +84,9 @@ class Session:
         self.generation = generation
         self._pending = None               # season history staged by uncommitted weeks
         self._lock = threading.Lock()
+        # diagnostics only (tools/long_world.py): called as f(season, year) after a season's end-of-season
+        # step, before its snapshot is archived; it must only read the season
+        self.on_season_end = getattr(self, 'on_season_end', None)
 
     # ---- creating and opening -------------------------------------------------------------------------
     @classmethod
@@ -234,6 +237,8 @@ class Session:
         self.state['weeks_played'] += 1
         if week == 52:
             s.finish_year(year)
+            if self.on_season_end:
+                self.on_season_end(s, year)
             changes['season_end'] = {'career_decisions': dict(s.career_counts.get(year, {})),
                                      'juniors': s.juniors_added.get(year + 1, 0)}
             self._stage_archive(year)
