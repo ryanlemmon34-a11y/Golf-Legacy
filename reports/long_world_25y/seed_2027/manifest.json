@@ -1,0 +1,51 @@
+{
+ "format": "golf-legacy-long-world/2",
+ "commit": "b4b465853d19a815c7e347586171678807f4413d",
+ "dirty": false,
+ "python": "3.13.17",
+ "started": "2026-10-28 00:48:38",
+ "years_requested": 25,
+ "config": {
+  "finance": {
+   "LIVING": 32000,
+   "LIVING_WORKING": 40000,
+   "WORK_WAGE": 900,
+   "CREDIT_BASE": 8000,
+   "CREDIT_SHARE": 0.25,
+   "CREDIT_CAP": 60000,
+   "RESERVE_WEEKS": 4,
+   "PRIOR_PRIZE_SHARE": 0.004,
+   "CADDIE_SHARE": 0.08
+  },
+  "staff": {
+   "SELF_TEACHING": 0.3,
+   "SCOUT_SHARE": 0.05,
+   "SELF_CADDIE": 40.0,
+   "CADDIE_TIERS": 2,
+   "COACH_OF_MEANS": 0.1,
+   "CADDIE_OF_MEANS": 0.25
+  },
+  "careers": {
+   "LIFE_AGE": 26.0
+  },
+  "population": {
+   "POTENTIAL_SD": 13.0,
+   "CANDIDATES_PER_POOL": 900,
+   "SCOUTING_SD": 4.0
+  },
+  "development": {
+   "BASE_TRAIN": 0.016,
+   "BASE_PLAY": 0.008,
+   "MATURING": 0.004
+  }
+ },
+ "mature": 12,
+ "seeds": {
+  "2027": {
+   "years_completed": 25,
+   "minutes": 66.1,
+   "holes": 69762472,
+   "commit": "b4b465853d19a815c7e347586171678807f4413d"
+  }
+ }
+}
