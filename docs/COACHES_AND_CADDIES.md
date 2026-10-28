@@ -14,7 +14,7 @@ Tests: `tests/test_staff.py`.
 | **Teaching** (hidden) | How much their coaching helps. |
 | **Scouting** (hidden) | How well they judge a young player's potential. |
 | **Reputation** (seen) | What golfers can see when choosing; it follows their students' success (fame, progress). It sets the fee: about $15k a year at 50, $45k at 80, $70k at 95. |
-| **Capacity** | 3 + teaching / 12 students. |
+| **Clients** | How many players they coach individually: about 6 (4-8) by their availability and how intensively they work — separate from how well they teach. A tuning assumption to check against long runs, not a real-world limit. |
 
 **One coach at a time.** Coaching quality for a week of training = teaching, +0.15 in their speciality,
 +0.15 for a young player if that is their gift (at most 1). Without a coach a golfer teaches themselves
@@ -88,7 +88,42 @@ generated and labelled "(outside recruit)" only for real unmet demand: caddies w
 outnumber caddies, and coaches where golfers who could pay found every coach they could afford full
 (one recruit per six such golfers). Scouting does not create coaches.
 
-A coach drops a share-deal student over 25 who has earned nothing and made no progress (40% a year).
+
+
+## Relationships, continuity and changes
+
+Every arrangement is a dated **stint** shared by both profiles (`docs/HISTORY_AND_PERSISTENCE.md`), and
+every result keeps the coach and caddie the golfer had that week.
+
+**Working relationship.** Each pair keeps the time they actually worked together (coaching weeks used,
+rounds on the bag) and a fixed fit. It grows with real work, with diminishing returns, fades with
+years apart (a reunion keeps some), and *scales* the staff member's ability: a new pairing gets about
+75% of a coach's or caddie's edge, a long one all of it (±5% for fit). It never changes a golfer's
+attributes, so hiring or firing costs no rating — only the speed of improvement and the help on the
+course. A familiar average coach never outperforms a clearly better one.
+
+**School and local instruction.** Young amateurs (22 and under) have local or school instruction
+(quality 0.38, against 0.3 for teaching yourself); college golfers have their team's coaching (0.48),
+recorded as a school stint that ends — as an ordinary recorded transition, with no loss of ability —
+when they graduate, turn professional or retire. A private coach does not stack with it: the better
+applies. College events are school-paid, and a golfer's personal debt never blocks them.
+
+**Changes.** In the off-season either side may end a relationship, from smooth odds:
+
+| Who | More likely when | Less likely when |
+|---|---|---|
+| Golfer leaves a coach | a poor run of observed progress, a poor fit, a fee that has outgrown their means | strong rapport, real progress |
+| Coach who backed a prospect moves on | several seasons of evidence of stagnation | little evidence yet (one season, or seasons with few events or a long injury count for little), progress |
+| Coach drops a paying client | a poor fit (rare) | — |
+| Golfer changes caddie | a poor run, a poor fit | strong rapport |
+| Caddie leaves a bag | it paid them little for their reputation | strong rapport |
+
+Observed progress combines professional results and ranking movement, amateur ranking movement and
+observed development; it never reads hidden potential, and there is no birthday cut-off. Mid-season
+changes happen only when someone genuinely cannot continue (a golfer who can no longer pay a coach; a
+caddie whose player has had no affordable event for two months) or retires. Staff retirement is its own
+gradual, age-based decision (plus leaving after long spells without clients or a bag), and closes their
+stints with the reason recorded.
 
 ## Money
 
