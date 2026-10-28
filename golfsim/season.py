@@ -661,7 +661,7 @@ class Season:
                 if days & ed.series.day_set:
                     continue
                 eid = ed.event_id
-                fk = (g.tour.startswith('CO_'), g.country, eid)
+                fk = (g.tour.startswith('CO_'), g.status == 'club_pro', g.country, eid)
                 fee = fees.get(fk)
                 if fee is None:
                     fee = fees[fk] = FIN.event_cost(g, ed.series, city[eid])

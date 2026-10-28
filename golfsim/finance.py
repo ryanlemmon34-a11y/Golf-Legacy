@@ -8,7 +8,8 @@ Income
 Costs
     each event          travel and accommodation by level (more overseas), entry fees on the mini
                         tours and at Q-School, and a professional caddie if they employ one (a weekly
-                        fee plus a share of winnings)
+                        fee plus a share of winnings); a club professional's club pays for their
+                        club-professional events (section events, championships, sectionals)
     coaching            a coach's yearly fee (paid weekly), or a share of prize money to a coach who
                         approached them
     living              a full-time touring professional lives on their winnings; everyone with a job
@@ -64,6 +65,8 @@ def event_cost(g, series, city):
     """What one event costs a golfer: travel by distance, entry fees, caddie fee."""
     if g.tour.startswith('CO_') and series.tier == 5:
         return 0.0                                    # the college pays
+    if g.status == 'club_pro' and series.eligibility == 'club_pro':
+        return 0.0                                    # the club pays for its professional's section golf
     country = CITY_BY_NAME[city].country
     where = 'home' if country == g.country else 'region' if COUNTRIES[country].region == COUNTRIES[g.country].region \
         else 'abroad'
