@@ -57,8 +57,9 @@ their tour's events (where they have a legitimate route to play: their membershi
 - Part-time professionals, club professionals and amateurs living at home do not make career moves (a
   job, a club or a family home keeps them there) unless their life changed this winter.
 
-**Staff moves** (`staff_moves`): a caddie may move to where the player whose bag they carry lives
-(`CADDIE_FOLLOWS` 0.35 a winter); a coach to where at least 60% of two or more players live
+**Staff moves** (`staff_moves`): a caddie who has carried one player's bag for two seasons may move to
+where that player lives (`CADDIE_FOLLOWS` 0.15 a winter, after `MIN_STAY`; caddie hiring itself ignores
+where people live, as touring caddies travel with their player); a coach to where at least 60% of two or more players live
 (`COACH_FOLLOWS` 0.25, after `MIN_STAY`). Staff have no household finances in the model, so their moves
 cost nothing.
 

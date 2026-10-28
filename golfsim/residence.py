@@ -27,7 +27,8 @@ Moves
                   move they stay at least MIN_STAY seasons (no back-and-forth). Graduates and golfers
                   changing their life this winter decide at once, from wherever they live: graduation
                   does not send anyone home automatically.
-    staff         a caddie may move to where the player whose bag they carry lives; a coach to where
+    staff         a caddie who has carried one player's bag for two seasons may move to where that player
+                  lives (hiring itself ignores where people live: touring caddies travel); a coach to where
                   most of their players live. Staff have no household finances: their moves cost nothing.
 Nothing here grants a tour card, a membership or a qualifying right: those follow nationality and
 results, wherever a golfer lives.
@@ -126,7 +127,7 @@ MIN_STAY = 3                     # seasons in a place before another career move
 STAY_YEARS = 3                   # seasons a move's travel savings are weighed over
 HOME_PULL = 60.0                 # value points of living in one's own country, at adaptability 50
 MOVE_MARGIN, MOVE_SCALE = 15.0, 8.0   # a move is an even chance when it is worth this much more than staying
-CADDIE_FOLLOWS, COACH_FOLLOWS = 0.35, 0.25   # a season's chance a caddie / coach moves to their players
+CADDIE_FOLLOWS, COACH_FOLLOWS = 0.15, 0.25   # a season's chance a caddie / coach moves to their players
 
 
 class Places:
@@ -384,8 +385,9 @@ def staff_moves(season, year):
         k = st.caddies.get(kid)
         if k is None or k.status != 'active' or not P.known(kid) or not P.known(gid):
             continue
-        if P.home[gid][0] != P.home[kid][0] and year - P.since.get(kid, year) >= 1 \
-                and rng.random() < CADDIE_FOLLOWS:
+        settled = all(season.assignments.get(y, {}).get('caddie_of', {}).get(gid) == kid for y in (year - 1, year))
+        if settled and P.home[gid][0] != P.home[kid][0] and year - P.since.get(kid, year) >= MIN_STAY \
+                and rng.random() < CADDIE_FOLLOWS:              # two seasons on this bag: a partnership
             _record(season, kid, year, 53, P.home[gid], f'to be near {season.g[gid].name}, whose bag they carry')
     clients = {}
     for gid, cid in st.coach_of.items():
