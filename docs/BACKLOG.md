@@ -76,6 +76,23 @@ earlier cohort report predated the debt-trap fix and coaches/caddies and was rem
 - Relationship continuity, capacity and departure odds are first-version tuning assumptions (e.g. ~6
   individual clients per coach), to be checked against long-run evidence.
 
+## Done in the P0 pass (roadmap V1: competition access, development mix, amateur livelihood)
+
+- **Competition access:** college and open amateur lineups rotate by starts (ranking worth a head
+  start), open amateur fields can expand ×1.5, the International University tour's field matches its
+  membership; every week's wanted / placed / shut out is recorded and reported by level, separately
+  from injury, money, no eligible event and choice (`tools/long_world.py`, section 3b).
+- **Development needs competition:** pressure skills and tournament consistency train only with recent
+  competitive rounds; the mental game matures with rounds played (`docs/DEVELOPMENT_AND_CAREERS.md`,
+  `reports/DEVELOPMENT_AUDIT.md` section 4).
+- **Amateur livelihood:** adult non-college amateurs take jobs (a recorded, smooth transition), and every
+  invitation, qualified place and championship uses the same affordability rule as regular entries
+  (declines recorded, the next in line replaces them; school-paid events recorded with the school as
+  payer). No loans or credit system.
+- Still open: thin local amateur calendars (e.g. part-time amateurs in parts of Europe have no event
+  near home for months — a calendar gap, reported as "no event they were eligible for" or choice, not
+  as full fields).
+
 ## Next (in order)
 
 1. **Historical identity and persistence** — *done in this pass*: person ids, stints, event-time teams,

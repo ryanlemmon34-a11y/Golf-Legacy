@@ -49,7 +49,7 @@ LEVEL = {1: 'Premier', 2: 'Challenger', 3: 'Regional', 4: 'Mini', 5: 'College', 
 ROW = ('status', 'lifestyle', 'tier', 'next_tier', 'events', 'wins', 'wins_by_tier', 'majors', 'top10', 'cuts',
        'prize', 'net', 'cash', 'wr', 'am', 'injury_weeks', 'zero_start', 'coach', 'deal', 'caddie',
        'coaching', 'caddie_cost', 'sponsors', 'salary', 'work', 'support', 'living', 'event_costs',
-       'play_wk', 'train_wk', 'rest_wk', 'work_wk')
+       'play_wk', 'train_wk', 'rest_wk', 'work_wk', 'rounds', 'wanted_wk', 'shut_wk', 'declined', 'school_trips')
 EXITS = ('retired', 'became coach', 'became caddie')
 
 
@@ -119,7 +119,9 @@ def year_rows(s, year, snap):
                      round(led.coaching + led.coach_share) if led else 0, round(led.caddie + led.caddie_share) if led else 0,
                      round(led.sponsors) if led else 0, round(led.salary) if led else 0, round(led.work) if led else 0,
                      round(led.support) if led else 0, round(led.living) if led else 0, round(led.events) if led else 0,
-                     act.get('play', 0), act.get('train', 0), act.get('rest', 0), act.get('work', 0)]
+                     act.get('play', 0), act.get('train', 0), act.get('rest', 0), act.get('work', 0),
+                     round(s.season_rounds[year].get(gid, 0), 1), s.entry_wants[year].get(gid, 0),
+                     s.entry_misses[year].get(gid, 0), len(s.declined[year].get(gid, ())), s.school_trips[year].get(gid, 0)]
         debug[gid] = [round(g.overall, 2), round(g.potential, 1),
                       round(sum(g.ceilings[k] - g.attrs[k] for k in g.attrs) / len(g.attrs), 2) if g.ceilings else None]
     return rows, debug
@@ -148,7 +150,7 @@ def run_world(seed, years, workers, out, resume=False, save_every=1):
         created = {g.id: s.first_year for g in world.golfers}
         initial = {g.id for g in world.golfers}
         data = {'format': FORMAT, 'seed': seed, 'first': s.first_year, 'years': 0, 'rows': {}, 'checks': {},
-                'majors': {}, 'transitions': {}, 'routes': {}, 'unpaid': {}, 'number_one': {}}
+                'majors': {}, 'transitions': {}, 'routes': {}, 'unpaid': {}, 'number_one': {}, 'entry_stats': {}}
         debug = {'format': FORMAT, 'seed': seed, 'rows': {}}
         arch_created = None
     first = data['first']
@@ -165,6 +167,7 @@ def run_world(seed, years, workers, out, resume=False, save_every=1):
         data['checks'][y] = checks(s, y, snap, active_before)
         data['transitions'][y] = s.transitions.get(y, [])
         data['unpaid'][y] = s.unpaid[y]
+        data['entry_stats'][y] = {t: dict(c) for t, c in s.entry_stats[y].items()}
         data['number_one'][y] = next((gid for gid, r in snap.items() if r['wr_end'] == 1), None)
         for m in MAJORS:
             r = s.results.get(f'{y}:{m}')
@@ -337,6 +340,24 @@ def analyse(d, mature):
                 if r['events'] == 0:
                     zero[(r['tier'], r['zero_start'])] += 1
     a['zero'], a['ft_seasons'] = zero, seasons
+    # competition access for everyone still playing (amateurs and college too), and competitive rounds
+    access, levels, rounds = Counter(), Counter(), defaultdict(list)
+    for y in years[1:]:                                          # the first season starts from a seeded world
+        for r in d['rows'][y].values():
+            lv = LEVEL.get(r['tier'], '—') + (' (part-time)' if r['lifestyle'] == 'part_time' else '')
+            levels[lv] += 1
+            rounds[lv].append(r.get('rounds', 0))
+            if r['events'] == 0:
+                access[(lv, r['zero_start'])] += 1
+    a['access'], a['levels'], a['rounds'] = access, levels, rounds
+    shut = defaultdict(Counter)
+    from golfsim.calendar import TOUR_BY_KEY
+    for y, tours in d.get('entry_stats', {}).items():
+        for t, c in tours.items():
+            shut[LEVEL.get(TOUR_BY_KEY[t].tier if t in TOUR_BY_KEY else 9, '—')].update(c)
+    a['entry'] = shut
+    a['declined'] = sum(r.get('declined', 0) for y in years for r in d['rows'][y].values())
+    a['school_trips'] = sum(r.get('school_trips', 0) for y in years for r in d['rows'][y].values())
     # majors
     wins = Counter(d['majors'].values())
     a['majors'] = len(d['majors'])
@@ -464,6 +485,21 @@ def report(results, man, mature):
     reasons = sorted({k for a in A for k in a['zero']})
     for t, why in reasons:
         out.append(row(f'{LEVEL[t]}: {why}', lambda a, d, t=t, why=why: pct(a['zero'][(t, why)], a['ft_seasons'][t])))
+    out += ['', '## 3b. Competition access for everyone playing (season two on)', '',
+            'Seasons with no start, by level and recorded reason (blocked: full fields, no affordable trip, no '
+            'eligible event; or choice), and the weeks golfers wanted to play: share placed in a field and share '
+            'shut out of every field they tried. Competitive rounds per season: 10th / median / 90th percentile.', '',
+            head, sep]
+    lvls = sorted({lv for a in A for lv in a['levels']})
+    for lv in lvls:
+        out.append(row(f'{lv}: competitive rounds', lambda a, d, lv=lv: dist(a['rounds'].get(lv, []))))
+        for why in sorted({w for a in A for (l, w) in a['access'] if l == lv}):
+            out.append(row(f'{lv}: no start — {why}', lambda a, d, lv=lv, why=why: pct(a['access'][(lv, why)], a['levels'][lv])))
+    for lv in sorted({lv for a in A for lv in a['entry']}):
+        out.append(row(f'{lv} entries: weeks wanted / shut out',
+                       lambda a, d, lv=lv: f'{a["entry"][lv]["wanted"]:,} / {pct(a["entry"][lv]["shut out"], a["entry"][lv]["wanted"])}'))
+    out += [row('Invitations and qualified places declined for cost', lambda a, d: f'{a["declined"]:,}'),
+            row('Events paid for by a school', lambda a, d: f'{a["school_trips"]:,}')]
     out += ['', '## 4. Careers (golfers who turned pro during the run, followed ' f'{mature}+ seasons)', '',
             'Golfers already professional when a world began are left-censored and excluded. 10th / median / 90th percentile.', '',
             head, sep,
@@ -538,6 +574,28 @@ def debug_report(results, out_dir):
             out.append(f'| {band} | ' + ' | '.join(cells) + ' |')
         out += ['', '(Coached golfers are not a random sample — scouts pick fast improvers, payers are better off — '
                 'so differences mix cause and selection.)', '']
+        # development by competitive rounds played (golfers with room to grow: 3+ points below ceilings)
+        byr = defaultdict(lambda: defaultdict(list))
+        bands = ((0, 0, 'none'), (0.1, 20, '1-20'), (20.1, 40, '21-40'), (40.1, 80, '41-80'), (80.1, 1e9, '80+'))
+        for y in sorted(dbg):
+            for gid, (ov, pot, gap) in dbg[y].items():
+                prev = dbg.get(y - 1, {}).get(gid)
+                row = d['rows'][y].get(gid)
+                if prev is None or row is None or prev[2] is None or prev[2] < 3:
+                    continue
+                age = y - d['golfers'][gid]['born']
+                if not 18 <= age <= 30:
+                    continue
+                rd = row.get('rounds', 0)
+                band = next(n for lo, hi, n in bands if lo <= rd <= hi)
+                byr['18-23' if age <= 23 else '24-30'][band].append(ov - prev[0])
+        out += [f'## Seed {d["seed"]}: change in hidden overall per season by competitive rounds played (ages 18-30, '
+                '3+ points below their ceilings)', '', '| Age | ' + ' | '.join(n for _, _, n in bands) + ' |',
+                '|---|' + '---|' * len(bands)]
+        for band in ('18-23', '24-30'):
+            out.append(f'| {band} | ' + ' | '.join(f'{S.mean(byr[band][n]):+.2f} ({len(byr[band][n])})' if byr[band][n] else '—'
+                                                  for _, _, n in bands) + ' |')
+        out += ['', '(Selection again: golfers who play more are also the ones with cards, money and form.)', '']
     (out_dir / 'DEBUG.md').write_text('\n'.join(out) + '\n')
 
 
