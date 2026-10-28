@@ -147,9 +147,16 @@ class SeasonTests(unittest.TestCase):
     def test_every_event_played_and_recorded(self):
         s = SEASON
         played = {r.event_id for r in s.results.values()}
+        unheld = set(s.unheld[2027])
+        self.assertFalse(played & unheld)
         for ed in s.cal.editions(2027):
             if ed.week <= WEEKS and ed.series.kind != 'qualifying':
-                self.assertIn(ed.event_id, played)
+                self.assertIn(ed.event_id, played | unheld)
+                # only local and open events can go without entries (a club-pro Monday in a small country);
+                # the tours, college and the championships are always played
+                if ed.event_id in unheld:
+                    self.assertIn(ed.series.tier, (4, 6, 8), ed.event_id)
+        self.assertLess(len(unheld), 0.1 * len(played))
         self.assertGreater(s.holes_played[2027], 800_000)
         self.assertTrue(s.records.layouts)
         self.assertTrue(s.ctx.ranking(2027, WEEKS))

@@ -25,9 +25,10 @@ import math
 import os
 import random
 import statistics as S
+from bisect import insort
 from collections import Counter, defaultdict
 from concurrent.futures import ProcessPoolExecutor
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from . import development as D
 from . import finance as FIN
@@ -37,6 +38,7 @@ from . import qualification as Q
 from .calendar import MAJOR_WEEKS, TOUR_BY_KEY, _in_window
 from .course_library import default_library
 from .engine import Conditions
+from .golfer import Caddie
 from .geography import CITY_BY_NAME, COUNTRIES
 from .population import CHALLENGER_BY_COUNTRY, CHALLENGER_BY_REGION
 from .records import Mark, RecordBook
@@ -51,6 +53,8 @@ STAT_KEYS = ('drive_yards', 'drives', 'fairways', 'fairway_att', 'gir', 'putts',
              'sg_putt')
 AMATEUR_CAP = {1: 4, 2: 8, 3: 8, 4: 8}          # most amateurs (sponsor invitations) in a pro event
 COLLEGE_WINDOWS = {k: TOUR_BY_KEY[k].weeks for k in ('CO_US_D1', 'CO_US_SMALL', 'CO_INTL')}
+# golfers at college in the USA (wherever they are from) can play that country's amateur events
+COLLEGE_AMATEUR_SERIES = {'CO_US_D1': 'AM_NORTH_AMERICA', 'CO_US_SMALL': 'AM_NORTH_AMERICA'}
 ELITE_AMATEUR_REGIONS = {'LATIN_AMERICA_AMATEUR': ('Latin America',), 'AFRICA_AMATEUR': ('Africa',),
                          'EUROPEAN_AMATEUR': ('Europe',), 'ASIA_PACIFIC_AMATEUR': ('Asia', 'Oceania')}
 QS_AMERICAS = ('North America', 'Latin America')
@@ -70,6 +74,12 @@ ACCESS = ('played: first choice', 'played: alternative', 'played: selected field
           'shut out: every acceptable field full', 'not selected for the college lineup', 'no suitable event scheduled',
           'not eligible for the events scheduled', 'could not afford any event', 'declined the events on offer',
           'chose to train', 'chose to rest', 'chose to work')
+# Premier Tour playing rights (Season.premier_rights), in priority order for Premier events. Full status
+# is sized so every fully exempt member fits the smallest ordinary Premier field (144) in the weeks with
+# only one Premier event in the world; conditional members get the places left and look elsewhere too.
+RIGHTS = ('exempt', 'full', 'graduate', 'conditional')
+FULL_STATUS = 125                 # top of last season's Premier money list with full status
+PREMIER_VISITOR_SHARE = 0.10      # places in a Challenger event Premier members may take ahead of residents
 ROTATION_RANK_STARTS = 3          # college/amateur lineups: ranking is worth a head start of this many starts
 AMATEUR_OPEN_EXPANSION = 1.5      # open amateur events can take this many times their usual field
 
@@ -90,6 +100,15 @@ def _dd_counter():
 # ---------------------------------------------------------------------------------------------
 # Worker: plays one event site. Top-level so it can run in another process.
 # ---------------------------------------------------------------------------------------------
+def _for_course(x, fk):
+    """What a worker needs of a golfer or caddie to play one course: the same person with only that
+    course's familiarity (and no hidden ceilings), so what is sent to the worker stays small however
+    long the career."""
+    fam = x.familiarity.get(fk)
+    if isinstance(x, Caddie):
+        return x if not x.familiarity else Caddie(x.name, x.skills, {fk: fam} if fam else {})
+    return replace(x, familiarity={fk: fam} if fam else {}, ceilings={})
+
 def play_site(task):
     rng = random.Random(task['seed'])
     course, golfers = task['course'], task['golfers']
@@ -214,10 +233,16 @@ class Season:
             if g.lifestyle != 'retired':                     # before it was a typical one for their lifestyle
                 self.season_rounds[self.first_year - 1][g.id] = D.EXPERIENCE_ROUNDS * (1.0 if g.lifestyle == 'full_time' else 0.5)
         self.entry_stats = defaultdict(_dd_counter)          # year -> first-choice tour -> wanted/placed/shut out
+        self.card_reasons = {}                               # year -> gid -> why they hold that season's card
+        self.unheld = defaultdict(list)                      # year -> event ids with no entrants
+        self.rights = {}                                     # year -> gid -> (Premier playing rights, why)
         self.week_access = defaultdict(_dd_counter)          # year -> gid -> weeks by access outcome (ACCESS)
         self.denied_run = Counter()                          # gid -> consecutive weeks shut out of full fields
         self.max_denied_run = defaultdict(Counter)           # year -> gid -> longest such run
+        self.denied_behind = defaultdict(Counter)            # year -> gid -> shut-out weeks while behind schedule
         self.week_avail = {}                                 # gid -> {week: 'ok'|'none'|'inelig'|'unaff'} (plan)
+        self.access_log = defaultdict(_dd_list)              # year -> gid -> [(week, outcome, wanted, played)]
+        self.event_routes = defaultdict(dict)                # year -> event id -> {gid: entry route} (regular)
         self._week_entered = {}                              # gid -> (event id, how) this week
         self._week_first = {}                                # gid -> first-choice event id this week
         self._week_shut = set()                              # gids shut out of every field they tried
@@ -340,12 +365,11 @@ class Season:
                                     COUNTRIES[s.host_country].region)
         if tier == 5:
             return g.tour == s.tour
-        if tier == 6:
-            if st != 'amateur':
-                return False
-            if g.tour in COLLEGE_WINDOWS and _in_window(week, COLLEGE_WINDOWS[g.tour]):
-                return False                                  # in college season
-            return g.tour == s.tour or g.country in countries
+        if tier == 6:                                         # college golfers too, around their college events
+            return st == 'amateur' and (g.tour == s.tour or g.country in countries
+                                        or COLLEGE_AMATEUR_SERIES.get(g.tour) == s.tour)
+        if tier == 8:                                         # club professionals of the circuit's region
+            return st == 'club_pro' and (g.country in countries or region_of(g) == COUNTRIES[s.host_country].region)
         return False
 
     def entry_ticket(self, g, s):
@@ -362,19 +386,32 @@ class Season:
         amateur_event = s.tier >= 5
         strength = self.am_pos.get(g.id, 99999) if amateur_event or g.status == 'amateur' else self.wr_pos.get(g.id, 99999)
         if g.status == 'amateur' and s.tier <= 4:
-            return (9, strength)
+            return (19, strength)
+        if s.tier == 1 and g.tour in PREMIER_TOURS:
+            # Premier events: playing rights first, home circuit next; the conditional categories are
+            # reordered by this season's Premier money (a reshuffle), the exempt ones by world ranking
+            r = self.rights.get(self.year, {}).get(g.id, ('conditional',))[0]
+            cls = 2 * RIGHTS.index(r) + (0 if g.tour == s.tour else 1)
+            if r in ('graduate', 'conditional'):
+                m = self.money.get(('PREMIER', self.year), {})
+                strength = (-m.get(g.id, 0.0), strength)
+            else:
+                strength = (0.0, strength)
+            return (cls, strength, self.entry_ticket(g, s))
+        if self._visitor(g.id, s):
+            # a Premier member not in a Premier field: a bounded number of places alongside the residents
+            # (PREMIER_VISITOR_SHARE; _bump keeps the bound), by world ranking
+            return (10, strength, self.entry_ticket(g, s))
         if g.tour == s.tour:
-            cls = 0
-        elif s.tier == 1 and g.tour in PREMIER_TOURS:
-            cls = 1
+            cls = 10
         elif s.category == 'national_open' and g.country == s.host_country:
-            cls = 1
+            cls = 11
         elif mtier < s.tier:
-            cls = 2
+            cls = 12
         elif mtier == s.tier:
-            cls = 3
+            cls = 13
         else:
-            cls = 4
+            cls = 14
         if s.tier == 4:
             strength = 0
         elif s.tier >= 5:
@@ -384,6 +421,8 @@ class Season:
             starts = len(self.played.get(self.year, {}).get(g.id, ()))
             rank = self.am_pos.get(g.id)
             strength = starts + ROTATION_RANK_STARTS * (min(1.0, rank / 1500) if rank else 1.0)
+        if s.tier == 1:
+            strength = (0.0, strength)                      # comparable with the Premier members' keys
         return (cls, strength, self.entry_ticket(g, s))
 
     # ---- the AI's choice of events --------------------------------------------------------------
@@ -400,25 +439,28 @@ class Season:
     def target_events(self, g):
         if g.lifestyle == 'retired':
             return 0
+        # intended schedules (owner): college golfers play a lot, other amateurs a little less; club
+        # professionals have plenty of local events and choose a handful around their job
         if g.lifestyle == 'part_time' and g.status in ('pro', 'amateur'):
-            return 4 if g.status == 'pro' else 6               # a job comes first
+            return 6 if g.status == 'pro' else 8               # a job comes first
         if g.status == 'club_pro':
-            return 4
+            return 12
         if g.tour.startswith('CO_'):
-            return 15
+            return 24                                         # college events plus amateur events around them
         if g.status == 'amateur':
-            return 10
+            return 16
         if g.tour in PREMIER_TOURS:                             # Premier players pick their spots
             return 15 + 8 * g.attrs['stamina'] / 100 - (4 if self.player_prestige(g.id) >= 65 else 0)
         return 19 + 8 * g.attrs['stamina'] / 100
 
     def bar(self, g):
         """The minimum event value worth playing for this golfer."""
-        if g.status == 'club_pro':
-            return 55.0
         if g.lifestyle == 'part_time':
             return 12.0
         home = self.home_level.get(g.tour, 20.0)
+        if g.tour in PREMIER_TOURS and self.rights_of(g.id, self.year) in ('graduate', 'conditional'):
+            # uncertain access: a Challenger event is a real alternative when the Premier field is full
+            home = self.home_level.get(CHALLENGER_BY_COUNTRY.get(g.country, CHALLENGER_BY_REGION[region_of(g)])[0], home)
         return max(home - 20, 0.9 * self.player_prestige(g.id) + 3, 8.0)
 
     def base_value(self, g, ed, venue_country):
@@ -434,7 +476,7 @@ class Season:
             v += 8 if venue_country == g.country else -40
         return v
 
-    def event_value(self, g, ed, week, rng, venue_country):
+    def event_value(self, g, ed, week, rng, venue_country, cost=None):
         s = ed.series
         v = self.base_value(g, ed, venue_country)
         weeks = self.played[ed.year][g.id]
@@ -457,7 +499,8 @@ class Season:
         champs = self.champions.get(s.series_id)
         if champs and champs[-1][1] == g.id:
             v += 5                                           # defending champion
-        cost = self.trip_cost(g, s, self.lib.venues(ed.year)[ed.event_id][0].city)
+        if cost is None:
+            cost = self.trip_cost(g, s, self.lib.venues(ed.year)[ed.event_id][0].city)
         v -= (cost - self.expected_kept(g, s)) / FIN.money_unit(self.funds(g, ed.year))
         return v + rng.gauss(0, 3)
 
@@ -493,10 +536,18 @@ class Season:
         for ed in sorted(special, key=lambda e: (e.series.tier, e.series.series_id)):
             sites = self.special_field(ed, year, week, rng, busy)
             if sites is not None:
+                # never two events on the same days, whatever a selection rule produced
+                seen = set()
+                sites = [[gid for gid in site if not (busy[gid] & ed.series.day_set) and not (gid in seen or seen.add(gid))]
+                         for site in sites]
                 commit(ed, sites)
         # Regular events: golfers choose, events accept in priority order (deferred acceptance)
         if regular:
             self.regular_entries(regular, year, week, rng, venues, busy, commit)
+        for e in eds:
+            if e.event_id not in fields or not any(fields[e.event_id]):
+                fields.pop(e.event_id, None)
+                self.unheld[year].append(e.event_id)          # nobody entered: not held this year (recorded)
         self.play_week(year, week, [e for e in eds if e.event_id in fields], fields, venues)
         self.develop_week(year, week)
         self.record_access(year, week)
@@ -508,7 +559,7 @@ class Season:
 
     def is_special(self, s):
         return (s.kind in ('major', 'qualifying') or s.category in ('elite_amateur', 'national_amateur',
-                                                                    'college_postseason')
+                                                                    'college_postseason', 'circuit_championship')
                 or s.series_id == 'PT_PREMIER_TOUR_FINALS')
 
     def regular_entries(self, regular, year, week, rng, venues, busy, commit):
@@ -517,29 +568,50 @@ class Season:
                for ed in regular}
         country = {ed.event_id: CITY_BY_NAME[venues[ed.event_id][0].city].country for ed in regular}
         by_id = {ed.event_id: ed for ed in regular}
+        city = {ed.event_id: venues[ed.event_id][0].city for ed in regular}
         prefs = {}
+        open_to = {}                                         # who may enter which events this week (by kind)
+        fees = {}                                            # (paid by school?, home country, event) -> cost
         for g in self.world.golfers:
             if (not g.tour and g.status != 'club_pro') or g.id in self.injured or g.lifestyle == 'retired':
                 continue
             if self.development and self.plans.get(g.id, {}).get(week, ('play',))[0] != 'play':
                 continue                                     # a training or rest week in their plan
+            key = (g.status, g.tour, g.country, self.wr_pos.get(g.id, 9999) <= 500,
+                   self.am_pos.get(g.id, 9999) <= 25, self.am_pos.get(g.id, 9999) <= 300)
+            evs = open_to.get(key)
+            if evs is None:
+                evs = open_to[key] = [ed for ed in regular if self.eligible(g, ed.series, week)]
+            if not evs:
+                continue
             opts = []
             bar = self.bar(g)
             money = self.spendable(g, year)
-            for ed in regular:
-                if busy[g.id] & ed.series.day_set or not self.eligible(g, ed.series, week):
+            days = busy[g.id]
+            k = self.staff.caddie(g.id)
+            caddie_fee = k.weekly_fee if k is not None else 0.0
+            for ed in evs:
+                if days & ed.series.day_set:
                     continue
-                if not self.can_afford(g, ed.series, venues[ed.event_id][0].city, money):
+                eid = ed.event_id
+                fk = (g.tour.startswith('CO_'), g.country, eid)
+                fee = fees.get(fk)
+                if fee is None:
+                    fee = fees[fk] = FIN.event_cost(g, ed.series, city[eid])
+                cost = fee + caddie_fee                      # = trip_cost: the can_afford rule
+                if not (cost <= 0 or cost <= money):
                     continue                                 # cannot pay for the trip (school-paid trips cost 0)
-                v = self.event_value(g, ed, week, rng, country[ed.event_id])
-                opts.append((v, ed.event_id))
+                v = self.event_value(g, ed, week, rng, country[eid], cost)
+                opts.append((v, eid))
             if not opts:
                 continue
             opts.sort(reverse=True)
             want = [eid for v, eid in opts if v >= bar]
             spare = [eid for v, eid in opts if bar - 15 <= v < bar]   # would fill a place if asked
             prefs[g.id] = (want, spare)
-        held = defaultdict(list)                             # event_id -> [(priority, gid)]
+        held = defaultdict(list)                             # event_id -> sorted [(priority, gid)]
+        limits = {eid: self._limits(by_id[eid].series) for eid in by_id}   # (amateurs, visitors) allowed
+        counts = defaultdict(lambda: [0, 0])                 # event_id -> [amateurs, visitors] held
         nxt = {gid: 0 for gid in prefs}
         free = [gid for gid, (want, _) in prefs.items() if want]
         while free:
@@ -550,13 +622,14 @@ class Season:
             eid = want[nxt[gid]]
             nxt[gid] += 1
             s = by_id[eid].series
-            held[eid].append((self.priority(self.g[gid], s), gid))
-            if len(held[eid]) > cap[eid] or self._amateurs_over(held[eid], s):
-                held[eid].sort()
-                bumped = self._bump(held[eid], s, cap[eid])
+            insort(held[eid], (self.priority(self.g[gid], s), gid))
+            self._count(counts[eid], gid, s, 1)
+            if len(held[eid]) > cap[eid] or self._over(counts[eid], limits[eid]):
+                bumped = self._bump(held[eid], s, cap[eid], counts[eid], limits[eid])
                 if bumped is not None:
                     free.append(bumped)
         placed = {gid for v in held.values() for _, gid in v}
+        late_entries = defaultdict(list)                     # took a spare place below their own bar
         for eid, ed in by_id.items():
             s = ed.series
             if len(held[eid]) < cap[eid]:
@@ -565,14 +638,18 @@ class Season:
                 for pr, gid in extra:
                     if len(held[eid]) >= cap[eid]:
                         break
-                    held[eid].append((pr, gid))
-                    if self._amateurs_over(held[eid], s):
-                        held[eid].pop()
+                    self._count(counts[eid], gid, s, 1)
+                    if self._over(counts[eid], limits[eid]):
+                        self._count(counts[eid], gid, s, -1)
                         continue
+                    insort(held[eid], (pr, gid))
                     placed.add(gid)
+                    late_entries[eid].append(gid)
             ids = [gid for _, gid in sorted(held[eid])]
             if ids:
                 commit(ed, [ids], 'entry')
+                late = set(late_entries.get(eid, ()))
+                self.event_routes[year][eid] = {gid: self.entry_route(self.g[gid], s, gid in late) for gid in ids}
         stats = self.entry_stats[year]
         for gid, (want, _) in prefs.items():
             if not want:
@@ -588,19 +665,63 @@ class Season:
                 self.entry_misses[year][gid] += 1           # wanted to play; every field they tried was full
                 self._week_shut.add(gid)
 
-    def _amateurs_over(self, rows, s):
-        lim = AMATEUR_CAP.get(s.tier)
-        return lim is not None and sum(1 for _, gid in rows if self.g[gid].status == 'amateur') > lim
+    def entry_route(self, g, s, late=False):
+        """How a golfer got into a regular event, with their status at entry (kept in history)."""
+        if s.tier == 1 and g.tour in PREMIER_TOURS:
+            r = f'PREMIER {self.rights_of(g.id, self.year).upper() or "MEMBER"}'
+        elif self._visitor(g.id, s):
+            r = 'PREMIER MEMBER (visitor places)'
+        elif g.status == 'amateur' and s.tier <= 4:
+            r = 'AMATEUR INVITATION'
+        elif s.tier == 5:
+            r = 'COLLEGE LINEUP'
+        elif s.tier == 6:
+            r = 'OPEN AMATEUR ENTRY'
+        elif s.tier == 8:
+            r = 'CLUB PROFESSIONAL'
+        elif g.tour == s.tour:
+            r = 'MEMBER' + (' (draw)' if s.tier == 4 else '')
+        elif s.category == 'national_open' and g.country == s.host_country:
+            r = 'HOME PLAYER'
+        else:
+            r = f'{TOUR_BY_KEY[g.tour].name.upper()} MEMBER' if g.tour in TOUR_BY_KEY else 'OPEN ENTRY'
+        return r + (' — late entry' if late else '')
 
-    def _bump(self, rows, s, capacity):
-        lim = AMATEUR_CAP.get(s.tier)
-        if lim is not None:
-            ams = [i for i, (_, gid) in enumerate(rows) if self.g[gid].status == 'amateur']
-            if len(ams) > lim:
-                return rows.pop(ams[-1])[1]
-        if len(rows) > capacity:
-            return rows.pop()[1]
-        return None
+    def _visitor(self, gid, s):
+        """A Premier member in a Challenger tour's own event (national opens are open to all pros)."""
+        return s.tier == 2 and s.category != 'national_open' and self.g[gid].tour in PREMIER_TOURS
+
+    def _limits(self, s):
+        """(amateurs, Premier visitors) an event takes at most: sponsor invitations for amateurs in
+        professional events (AMATEUR_CAP) and the visitor places in Challenger events; None = no limit."""
+        visitors = int(PREMIER_VISITOR_SHARE * s.field) if s.tier == 2 and s.category != 'national_open' else None
+        return AMATEUR_CAP.get(s.tier), visitors
+
+    def _count(self, c, gid, s, d):
+        if self.g[gid].status == 'amateur':
+            c[0] += d
+        if self._visitor(gid, s):
+            c[1] += d
+
+    @staticmethod
+    def _over(c, limits):
+        return (limits[0] is not None and c[0] > limits[0]) or (limits[1] is not None and c[1] > limits[1])
+
+    def _bump(self, rows, s, capacity, c, limits):
+        """Who loses their place when an event is over a limit: the lowest-priority amateur over the
+        sponsor-invitation limit, the lowest-ranked Premier visitor over the visitor places, or else the
+        lowest priority entrant over the field size. `rows` is sorted; `c` counts amateurs and visitors."""
+        if limits[0] is not None and c[0] > limits[0]:
+            i = max(i for i, (_, gid) in enumerate(rows) if self.g[gid].status == 'amateur')
+        elif limits[1] is not None and c[1] > limits[1]:
+            i = max(i for i, (_, gid) in enumerate(rows) if self._visitor(gid, s))
+        elif len(rows) > capacity:
+            i = len(rows) - 1
+        else:
+            return None
+        gid = rows.pop(i)[1]
+        self._count(c, gid, s, -1)
+        return gid
 
     # ---- special fields --------------------------------------------------------------------------
     def available(self, gid, s, busy):
@@ -652,6 +773,10 @@ class Season:
             rows = self.ctx.standing('PREMIER', year, week - 1)
             return [invite([self.g[gid] for gid in rows if self.g[gid].status == 'pro' and gid not in self.injured],
                            s.field)]
+        if sid == 'USA_AMATEUR_QUALIFYING':
+            return self.usa_amateur_qualifying(ed, year, week, free)
+        if sid == 'USA_AMATEUR':
+            return self.usa_amateur_field(ed, year, week, free, invite)
         if s.category == 'elite_amateur':
             regions = ELITE_AMATEUR_REGIONS.get(sid)
             pred = (lambda g: free(g) and region_of(g) in regions) if regions else (lambda g: free(g))
@@ -664,6 +789,8 @@ class Season:
                                                 region_of(g) == COUNTRIES[s.host_country].region),
                            max(0, min(s.field - len(take), s.field // 4)))
             return [take]
+        if s.category == 'circuit_championship':
+            return self.circuit_championship(ed, year, week, free, invite)
         if s.category == 'college_postseason':                  # the school pays: never out of reach
             return self.college_postseason(ed, year, lambda g: free(g) and pays(g))
         if sid == 'CLUB_PRO_SECTIONALS':
@@ -675,6 +802,116 @@ class Season:
         if s.category == 'qualifier':
             return self.qualifier_field(ed, year, week, rng, free)
         return None
+
+    # ---- circuit championships ----------------------------------------------------------------------
+    CHAMPION_YEARS = 3              # a circuit champion is exempt into the next three editions
+
+    def circuit_order(self, s, year, week, pool):
+        """A circuit's order of merit as it stood after last week: prize money on the circuit (ties: world
+        ranking, then id); amateur circuits by amateur ranking (ties: observed form, then id) — amateur
+        standing never depends on prize money."""
+        if s.tier == 6:
+            return sorted(pool, key=lambda g: (self.am_pos.get(g.id, 99999), self.observed_form(g.id), g.id))
+        m = self.money[(s.tour, year)]
+        return sorted(pool, key=lambda g: self.standing_key(m, g.id))
+
+    def circuit_championship(self, ed, year, week, free, invite):
+        """A circuit's season-ending championship (see docs/CIRCUIT_FLAGSHIPS.md): the champions of its
+        last CHAMPION_YEARS editions who are still on the circuit, then its order of merit as it stood
+        after last week, to the field size. Members (amateur series: the series' amateurs; club-pro
+        circuits: the region's club professionals) only; anyone injured, busy or unable to pay is passed
+        over for the next on the list (declines recorded). Each entrant's route is recorded."""
+        s = ed.series
+        if s.tier == 6:
+            countries = {c for c, _ in TOUR_BY_KEY[s.tour].countries}
+            pool = [g for g in self.world.golfers if g.status == 'amateur' and g.lifestyle != 'retired'
+                    and (g.tour == s.tour or g.country in countries) and free(g)]
+        elif s.tier == 8:
+            pool = [g for g in self.world.golfers if g.lifestyle != 'retired' and self.eligible(g, s, week) and free(g)]
+        elif s.tier == 4:                                    # open circuits: everyone who played them this season
+            m = self.money[(s.tour, year)]
+            pool = [g for g in self.world.golfers if g.lifestyle != 'retired' and g.status == 'pro' and free(g)
+                    and (g.tour == s.tour or m.get(g.id, 0) > 0)]
+        else:
+            pool = [g for g in self.world.golfers if g.tour == s.tour and g.lifestyle != 'retired' and free(g)]
+        in_pool = {g.id for g in pool}
+        past = [gid for y, gid, _ in reversed(self.champions.get(s.series_id, []))
+                if y >= year - self.CHAMPION_YEARS and gid in in_pool]
+        order = self.circuit_order(s, year, week, pool)
+        ranked = list(dict.fromkeys(past + [g.id for g in order]))
+        take = invite([self.g[gid] for gid in ranked], s.field)
+        pos = {g.id: i + 1 for i, g in enumerate(order)}
+        self.entry_routes[(year, s.series_id)] = {gid: 'PAST CHAMPION' if gid in past else f'ORDER OF MERIT {pos[gid]}'
+                                                  for gid in take}
+        return [take]
+
+    # ---- the USA Amateur: exemptions, then open qualifying --------------------------------------------
+    USA_AMATEUR_EXEMPT = 64          # leading amateurs exempt from qualifying (amateur ranking)
+    USA_AMATEUR_ENTRY_STARTS = 3     # the entry standard: an active competitive record this season
+
+    def usa_amateur_exempt(self, year):
+        """Exempt from qualifying, deduplicated, in order: the last three champions and last year's
+        runner-up (still amateurs), then the top USA_AMATEUR_EXEMPT of the amateur ranking."""
+        out = {}
+        for y, gid, _ in reversed(self.champions.get('USA_AMATEUR', [])):
+            if y >= year - 3 and self.g[gid].status == 'amateur' and self.g[gid].lifestyle != 'retired':
+                out.setdefault(gid, f'USA AMATEUR CHAMPION {y}')
+        for gid, pos in self.ctx.finishers('USA_AMATEUR', year - 1):
+            if pos == 2 and self.g[gid].status == 'amateur':
+                out.setdefault(gid, f'RUNNER-UP {year - 1}')
+        ranked = [g for g in self.world.golfers if g.status == 'amateur' and g.lifestyle != 'retired'
+                  and g.id in self.am_pos]
+        ranked.sort(key=lambda g: (self.am_pos[g.id], g.id))
+        for g in ranked[:self.USA_AMATEUR_EXEMPT]:
+            out.setdefault(g.id, f'AMATEUR RANKING {self.am_pos[g.id]}')
+        return out
+
+    def usa_amateur_qualifying(self, ed, year, week, free):
+        """Open to any amateur who is not exempt and meets the entry standard (USA_AMATEUR_ENTRY_STARTS
+        events this season — a record of play, not a ranking, so a newcomer can enter), living in North
+        America or travelling from abroad with a world amateur ranking in the top 300; places by a fair
+        draw when oversubscribed; split round the sites."""
+        s = ed.series
+        exempt = self.usa_amateur_exempt(year)
+        pool = [g for g in self.world.golfers if g.status == 'amateur' and g.lifestyle != 'retired'
+                and g.id not in exempt and free(g) and len(self.played[year][g.id]) >= self.USA_AMATEUR_ENTRY_STARTS
+                and (region_of(g) == 'North America' or self.am_pos.get(g.id, 99999) <= 300)]
+        pool.sort(key=lambda g: self.entry_ticket(g, s))
+        ids = [g.id for g in pool[:s.field * s.sites]]
+        self.entry_routes[(year, s.series_id)] = {gid: 'OPEN QUALIFYING ENTRY' for gid in ids}
+        return [ids[i::s.sites] for i in range(s.sites)]
+
+    def usa_amateur_field(self, ed, year, week, free, invite):
+        """Exempt players first (declines recorded), then qualifiers: each qualifying site's places in
+        proportion to its entrants, to its best finishers; ties for the last place go by the recorded
+        finishing order (countback). A qualifier who cannot take up the place is replaced by the next
+        finisher at that site (an alternate)."""
+        s = ed.series
+        exempt = self.usa_amateur_exempt(year)
+        take = invite([self.g[gid] for gid in exempt if free(self.g[gid])], s.field)
+        routes = {gid: exempt[gid] for gid in take}
+        sites = [[gid for gid, pos in rows if pos is not None]
+                 for _, rows in sorted(self.ctx.results.get(('USA_AMATEUR_QUALIFYING', year), {}).items())]
+        total = sum(len(x) for x in sites)
+        spots = s.field - len(take)
+        for k, rows in enumerate(sites):
+            n = round(spots * len(rows) / total) if total else 0
+            got = skipped = 0
+            for i, gid in enumerate(rows):
+                if got >= n or len(routes) >= s.field:
+                    break
+                if gid in routes or not free(self.g[gid]):
+                    skipped += gid not in routes
+                    continue
+                if not self.can_afford(self.g[gid], s, self.lib.venues(year)[ed.event_id][0].city,
+                                       self.spendable(self.g[gid], year)):
+                    self.declined[year][gid].append(s.series_id)
+                    skipped += 1
+                    continue
+                routes[gid] = f'QUALIFYING SITE {k + 1}' + (' (alternate)' if i >= n and skipped else '')
+                got += 1
+        self.entry_routes[(year, s.series_id)] = routes
+        return [list(routes)]
 
     # ---- majors: every entrant has a recorded route ------------------------------------------------
     INAUGURAL_MASTERS = 90           # the world's first Masters has no past champions or results to draw on
@@ -836,7 +1073,7 @@ class Season:
         else:  # ASIA_QSCHOOL_FINAL (week 2: last season's standings)
             keep = set(self.ctx.standing('CH_ASIA', year - 1)[:60])
             ids = [g.id for g in self._qs_pool(('Asia', 'Oceania'), keep, year, free)]
-        ids = list(dict.fromkeys(ids))[:n]
+        ids = [gid for gid in dict.fromkeys(ids) if free(self.g[gid])][:n]   # advanced players may be elsewhere
         log[(year, sid)] = ids
         return split(ids) if s.sites > 1 else [ids]
 
@@ -917,9 +1154,11 @@ class Season:
             self._teams[ed.event_id] = {gid: self.staff.team(gid) for ids in fields[ed.event_id] for gid in ids}
             for site, ids in enumerate(fields[ed.event_id]):
                 v = venues[ed.event_id][min(site, len(venues[ed.event_id]) - 1)]
-                tasks.append({'event_id': ed.event_id, 'site': site, 'course': self.lib.course(v),
-                              'golfers': [self.g[gid] for gid in ids], 'match_play': s.match_play,
-                              'caddies': [self.staff.bag(self.g[gid], year) for gid in ids],
+                course = self.lib.course(v)
+                fk = course.familiarity_key
+                tasks.append({'event_id': ed.event_id, 'site': site, 'course': course,
+                              'golfers': [_for_course(self.g[gid], fk) for gid in ids], 'match_play': s.match_play,
+                              'caddies': [_for_course(self.staff.bag(self.g[gid], year), fk) for gid in ids],
                               'rounds': s.rounds, 'cut_top': s.cut_top,
                               'prestige': self.event_prestige[s.series_id],
                               'seed': _seed(self.seed, ed.event_id, site)})
@@ -1165,6 +1404,10 @@ class Season:
 
     # ---- end of season -----------------------------------------------------------------------------
     def end_of_season(self, year):
+        # the weekly access detail is history (the archive keeps it); the season keeps two years of it
+        for d in (self.week_access, self.max_denied_run, self.access_log, self.event_routes, self.denied_behind):
+            for y in [y for y in d if y < year - 1]:
+                del d[y]
         for (tour, y), m in list(self.money.items()):
             if y != year:
                 continue
@@ -1210,10 +1453,56 @@ class Season:
         self.rank_start[year] = dict(self.wr_pos)
         self.am_start[year] = dict(self.am_pos)
         self.cash_start[year] = {g.id: g.cash for g in self.world.golfers}
+        self.premier_rights(year)
         self.overall_start[year] = {g.id: g.overall for g in self.world.golfers if g.lifestyle != 'retired'}
         ST.start_of_season(self, year)                       # coaches scout, golfers hire coaches and caddies
         self.assignments[year] = {'coach_of': dict(self.staff.coach_of), 'deal': dict(self.staff.deal),
                                   'caddie_of': dict(self.staff.caddie_of)}
+
+    def premier_rights(self, year):
+        """Each Premier member's playing rights for the season (RIGHTS), with the reason, fixed on
+        1 January from facts already recorded: exempt = a Premier event won this season or last, or a
+        major in the last five; full = top FULL_STATUS on last season's Premier money list; graduate =
+        earned the card from a Challenger tour or a Q-School; conditional = everyone else who kept a
+        card. The world's first season has no money list: members are seeded by world ranking."""
+        rights = self.rights[year] = {}
+        members = [g for g in self.world.golfers if g.tour in PREMIER_TOURS and g.lifestyle == 'full_time']
+        exempt = {}
+        for (sid, y), _ in self.ctx.results.items():
+            s = self.cal.by_id.get(sid)
+            w = self.ctx.winner(sid, y) if s else None
+            if w is None:
+                continue
+            if s.kind == 'major' and year - 5 <= y < year:
+                exempt[w] = f'won the {y} {s.name}'
+            elif s.tier == 1 and year - 2 <= y < year and w not in exempt:
+                exempt[w] = f'won the {y} {s.name}'
+        reasons = self.card_reasons.get(year, {})
+        m = self.money.get(('PREMIER', year - 1))
+        if m is not None:
+            ranked = sorted((g.id for g in self.world.golfers if g.id in m), key=lambda gid: self.standing_key(m, gid))
+            pos = {gid: i + 1 for i, gid in enumerate(ranked)}
+        else:
+            ranked = sorted((g.id for g in members), key=lambda gid: self.wr_pos.get(gid, 10 ** 6))
+            pos = {gid: i + 1 for i, gid in enumerate(ranked)}
+        for g in members:
+            p = pos.get(g.id)
+            why = reasons.get(g.id, '')
+            if g.id in exempt:
+                rights[g.id] = ('exempt', exempt[g.id])
+            elif p is not None and p <= FULL_STATUS:
+                rights[g.id] = ('full', f'{p} on the {year - 1} Premier money list' if m is not None
+                                else f'{p} among Premier members by world ranking (first season)')
+            elif m is not None and ('Challenger' in why or 'Tour Americas' in why or 'Q-School' in why
+                                    or why.startswith('top ') and 'Premier' not in why):
+                rights[g.id] = ('graduate', why)
+            else:
+                rights[g.id] = ('conditional', f'{p} on the {year - 1} Premier money list' if m is not None and p
+                                else why or 'no money-list place')
+
+    def rights_of(self, gid, year):
+        r = self.rights.get(year, {}).get(gid)
+        return r[0] if r else ''
 
     def standing_key(self, money, gid):
         """Order on a money list: more money first; ties broken by world ranking, then by id, so the
@@ -1433,7 +1722,7 @@ class Season:
     def level_tier(self, g):
         """The tier of ordinary events a golfer's status is built around (club pros: none)."""
         if g.status == 'club_pro':
-            return 7
+            return 8
         if g.status == 'amateur':
             return 5 if g.tour.startswith('CO_') else 6
         t = TOUR_BY_KEY.get(g.tour)
@@ -1475,7 +1764,12 @@ class Season:
                 else:
                     why = {'train': 'chose to train', 'work': 'chose to work'}.get(act, 'chose to rest')
             acc[gid][why] += 1
+            if why in ('played: alternative', 'shut out: every acceptable field full', 'not selected for the college lineup'):
+                self.access_log[year][gid].append((week, why, self._week_first.get(gid),
+                                                   entered[0] if entered and why.startswith('played') else None))
             if why.startswith(('shut out', 'not selected')):
+                if len(self.played[year][gid]) < self.target_events(g) * week / 52:
+                    self.denied_behind[year][gid] += 1      # a real shortage, not an extra start wanted
                 self.denied_run[gid] += 1
                 self.max_denied_run[year][gid] = max(self.max_denied_run[year][gid], self.denied_run[gid])
             elif why.startswith('played'):

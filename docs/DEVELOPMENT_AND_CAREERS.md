@@ -71,6 +71,12 @@ A week they don't play is a **training week** (in the category with most to gain
 and coachable golfers read their game better), or a **full rest week** when they are tired. Majors,
 qualifiers and championships they are selected for are commitments and override the plan.
 
+**Intended schedules** (owner): college golfers play a lot (about 24 starts a year: college events and
+amateur events around them), other full-time amateurs a little less (16), part-time amateurs about 8
+around a job, club professionals about 12 of the many local events open to them; professionals 19–27
+by stamina. The monthly plan works towards them; the calendar is sized so they are reachable
+(`docs/COMPETITION_ACCESS.md`).
+
 ## Money
 
 | Income | Costs |

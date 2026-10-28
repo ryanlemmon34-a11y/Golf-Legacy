@@ -6,7 +6,7 @@ Owner requirements and planned work, in rough order. "Built" items link to where
 
 - Shot-by-shot engine, 21 attributes, archetypes, calibration (`docs/ENGINE_DESIGN.md`)
 - World calendar with the four fixed majors and real-life qualifying (`docs/CALENDAR_AND_QUALIFYING.md`)
-- 380-course library with layouts and per-layout records (`docs/COURSE_LIBRARY.md`)
+- 520-course library with layouts and per-layout records (`docs/COURSE_LIBRARY.md`)
 - Nations and the world population (`docs/WORLD_POPULATION.md`)
 - Season system v1 with event and player prestige (`docs/SEASON_SYSTEM.md`)
 - Development, monthly planning, money and careers v1 (`docs/DEVELOPMENT_AND_CAREERS.md`)
@@ -92,6 +92,20 @@ earlier cohort report predated the debt-trap fix and coaches/caddies and was rem
 - Still open: thin local amateur calendars (e.g. part-time amateurs in parts of Europe have no event
   near home for months — a calendar gap, reported as "no event they were eligible for" or choice, not
   as full fields).
+
+## Done in the access pass (P0 continued)
+
+- Every golfer-week classified (played, alternative, blocked by full fields / no event / eligibility /
+  money, or chosen), audited by status, circuit, region and career stage (`tools/access_audit.py`,
+  `reports/access/`).
+- Major weeks closed to Premier events only; Premier playing rights (exempt / full / graduate /
+  conditional) with Challenger alternatives and bounded visitor places; Challenger, Regional and mini
+  calendars sized to their members; local amateur and club-professional golf in every golfing country;
+  college golfers play amateur events around college; every circuit has a flagship with recorded routes
+  (`docs/COMPETITION_ACCESS.md`, `docs/CIRCUIT_FLAGSHIPS.md`). The course library grew to 520.
+- Still open: calendars follow the starting nation pools (they should follow nation evolution, M5); the
+  monthly plan does not learn from being shut out; the 10% Premier visitor share and full-status size are
+  owner decisions to confirm.
 
 ## Next (in order)
 

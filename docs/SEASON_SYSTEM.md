@@ -71,7 +71,9 @@ They enter events worth more than their own **bar**: the larger of (their tour's
 plays opportunity events; a star (prestige 85+) has a bar of ~80 and skips them for the bigger events.
 Events take entries in priority order: members of the event's tour, then members of other circuits or
 higher tours, then lower tours, then amateurs (limited to a few sponsor invitations), each group by
-world ranking. Within a group, mini tours (paid by entry fees) take entries by a fair draw; college and
+world ranking. Premier Tour events order their members by **playing rights** (exempt, full, graduate,
+conditional; the last two reshuffled by the season's Premier money) and Challenger events give Premier
+visitors at most 10% of their places (`docs/COMPETITION_ACCESS.md`). Within a group, mini tours (paid by entry fees) take entries by a fair draw; college and
 open amateur events rotate their lineups: golfers with fewer starts this season go first, amateur
 ranking counting for about three starts' head start, so the best still play most but a squad's depth
 gets starts too. Open amateur events (club, county, regional) take up to 1.5× their usual field when

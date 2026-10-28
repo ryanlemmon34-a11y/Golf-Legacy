@@ -85,20 +85,26 @@ class ArchiveWriter:
         for r in season.results.values():
             if r.year != year:
                 continue
+            routes = season.event_routes.get(year, {}).get(r.event_id) or season.entry_routes.get((year, r.series_id), {})
             events.append({'id': r.event_id, 'series': r.series_id, 'week': r.week, 'sites': r.sites,
                            'prestige': round(r.prestige, 2), 'playoff': r.playoff, 'finish': r.finish,
-                           'team': {str(g): list(t) for g, t in r.team.items()}})
+                           'team': {str(g): list(t) for g, t in r.team.items()},
+                           'routes': {str(g): v for g, v in routes.items()}})
         careers = {}
         for gid, row in snap.items():
             careers[gid] = {k: row.get(k) for k in ('tour', 'tier', 'status', 'lifestyle', 'events', 'wins', 'top10',
                                                     'cuts', 'majors', 'prize', 'net', 'wr_start', 'wr_end', 'am_start',
                                                     'am_end', 'injury_weeks', 'promoted', 'demoted', 'next_tour',
                                                     'zero_start_reason')}
+            careers[gid]['rights'] = season.rights.get(year, {}).get(gid)          # Premier status at entry, why
+            careers[gid]['access'] = dict(season.week_access.get(year, {}).get(gid, {}))
+            careers[gid]['denied'] = season.access_log.get(year, {}).get(gid, [])   # (week, outcome, wanted, played)
             careers[gid]['prize'] = round(careers[gid]['prize'] or 0)
             careers[gid]['net'] = round(careers[gid]['net'] or 0)
         log = {gid: [(w, t) for y, w, t in h if y == year] for gid, h in season.history.items()}
         chunk = {'year': year, 'events': events, 'careers': careers,
                  'transitions': season.transitions.get(year, []),
+                 'unheld': list(season.unheld.get(year, [])),          # scheduled, but nobody entered
                  'staff_year': {f'{k}:{i}': v for (k, i), v in season.staff_year.get(year, {}).items()},
                  'log': {g: v for g, v in log.items() if v}}
         _write(self.dir / 'years' / f'{year}.json.gz', chunk)
@@ -158,6 +164,7 @@ class Archive:
             d['careers'] = {int(k): v for k, v in d['careers'].items()}
             for e in d['events']:
                 e['team'] = {int(k): tuple(v) for k, v in e['team'].items()}
+                e['routes'] = {int(k): v for k, v in e.get('routes', {}).items()}
             self._years[y] = d
         return self._years[y]
 
@@ -185,7 +192,8 @@ class Archive:
 
     def results(self, pid):
         """Every event they played, with the team they had that week:
-        [{year, week, event, series, pos (None = missed cut), coach, caddie}]."""
+        [{year, week, event, series, pos (None = missed cut), coach, caddie, route}]; route is how they
+        got in, with their status at entry (e.g. 'PREMIER CONDITIONAL', 'ORDER OF MERIT 12', 'COLLEGE LINEUP')."""
         out = []
         for y, e in self.events():
             for site in e['finish']:
@@ -193,8 +201,16 @@ class Archive:
                     if gid == pid:
                         coach, caddie = e['team'].get(pid, (0, 0))
                         out.append({'year': y, 'week': e['week'], 'event': e['id'], 'series': e['series'],
-                                    'pos': pos, 'coach': coach, 'caddie': caddie})
+                                    'pos': pos, 'coach': coach, 'caddie': caddie, 'route': e['routes'].get(pid)})
         return out
+
+    def access(self, pid, year):
+        """A golfer's season of access: Premier playing rights at entry (and why), weeks by outcome, and
+        each week they were shut out, not selected or played an alternative: [(week, outcome, the event
+        they wanted most, the event they played instead)]."""
+        row = self.year(year)['careers'].get(pid, {})
+        return {'rights': row.get('rights'), 'weeks': row.get('access', {}),
+                'denied': [tuple(x) for x in row.get('denied', [])]}
 
     def golfer_staff(self, pid):
         """Everyone who coached or caddied for this golfer (and school teams), in order."""

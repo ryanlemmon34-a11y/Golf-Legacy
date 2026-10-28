@@ -185,6 +185,7 @@ def apply_cards(season, year):
         if g.id not in new:
             assign(g, home_mini(g), 'no status')
     log = season.card_log[year]
+    season.card_reasons[year + 1] = {g.id: new[g.id][2] for g in pros}     # why each holds next season's card
     for g in pros:
         tier, tour, reason = new[g.id]
         if tour != g.tour:
