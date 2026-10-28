@@ -262,7 +262,10 @@ class Staff:
 
     # -- relationships (the only way assignments change) --------------------------------------------
     def assign_coach(self, season, g, c, arrangement, when, started_by, reason):
-        self.rel.begin('coach', c.id, g.id, when, arrangement, started_by, reason)
+        # a paying client's fee is agreed when they start and holds for the stint (a coach whose
+        # reputation rises charges new clients more, not existing ones)
+        self.rel.begin('coach', c.id, g.id, when, arrangement, started_by, reason,
+                       terms=c.fee if arrangement == 'fee' else 0.0)
         self.coach_of[g.id], self.deal[g.id] = c.id, arrangement
         if season:
             season.log(g.id, when[0], when[1], f'{"Approached by" if started_by == "coach" else "Hired"} coach {c.name} '
@@ -302,6 +305,11 @@ class Staff:
     def coach(self, gid):
         cid = self.coach_of.get(gid)
         return self.coaches.get(cid) if cid else None
+
+    def agreed_fee(self, gid):
+        """The yearly fee a paying client agreed with their coach (0 if none, or a share deal)."""
+        s = self.rel.current('coach', gid)
+        return s.terms if s is not None and s.arrangement == 'fee' else 0.0
 
     def caddie(self, gid):
         kid = self.caddie_of.get(gid)
@@ -447,7 +455,7 @@ def start_of_season(season, year):
     sync_school(season, year, 1)
     for g in active:                                  # a contracted fee they can no longer meet
         c = st.coach(g.id)
-        if c is not None and st.deal.get(g.id) == 'fee' and c.fee > 1.5 * coach_budget(season, g, year):
+        if c is not None and st.deal.get(g.id) == 'fee' and st.agreed_fee(g.id) > 1.5 * coach_budget(season, g, year):
             st.end_coach(season, g.id, when, 'could no longer afford the fee', 'golfer')
     students, shares = {}, {}
     for gid, cid in st.coach_of.items():
@@ -507,6 +515,8 @@ def start_of_season(season, year):
     for g in sorted((g for g in active if g.id not in st.coach_of and g.status in ('pro', 'amateur')), key=priority):
         t = TOUR_BY_KEY.get(g.tour)
         p_want = 0.35 + 0.5 * g.personality['coachability'] / 100 + (0.3 if t and t.tier <= 2 else 0.0)
+        if g.lifestyle == 'part_time':
+            p_want *= 0.5                             # a full-time job leaves little time for individual coaching
         if rng.random() > p_want:
             continue
         budget = coach_budget(season, g, year)
@@ -684,7 +694,7 @@ def end_of_season(season, year, snap):
         fit = st.rel.pair('coach', cid, gid).fit
         c = st.coaches[cid]
         g = season.g[gid]
-        afford = max(0.0, c.fee / max(1.0, coach_budget(season, g, year + 1)) - 1) if deal == 'fee' else 0.0
+        afford = max(0.0, st.agreed_fee(gid) / max(1.0, coach_budget(season, g, year + 1)) - 1) if deal == 'fee' else 0.0
         p_golfer = p_golfer_leaves_coach(tr, ev, rap, fit, afford)
         p_coach = p_coach_moves_on(deal, tr, ev, fit)
         why = 'the promise they saw had not come through' if deal == 'share' else 'the coach felt they were not the right fit'

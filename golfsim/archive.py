@@ -256,9 +256,12 @@ class Archive:
             if no1 != prev:
                 facts.append({'fact': 'number one', 'golfer': no1[0], 'text': f'New world No.1: {self.name(no1[0])}'})
         kinds = Counter(t['kind'] for t in d['transitions'])
+        winners = {g for yy in self.years if yy <= y for e in self.year(yy)['events'] for site in e['finish']
+                   for g, p, _ in site if p == 1 and self.world['series'][e['series']]['tier'] <= 3}
         for t in d['transitions']:
-            if t['kind'] in ('became coach', 'became caddie'):
-                facts.append({'fact': t['kind'], 'golfer': t['gid'], 'text': f'{self.name(t["gid"])} {t["kind"]} at {t["age"]}'})
+            if t['kind'] in ('became coach', 'became caddie') and t['gid'] in winners:   # notable ones by name
+                facts.append({'fact': t['kind'], 'golfer': t['gid'],
+                              'text': f'{self.name(t["gid"])}, a professional tournament winner, {t["kind"]} at {t["age"]}'})
             if t['kind'] == 'comeback':
                 facts.append({'fact': 'comeback', 'golfer': t['gid'], 'text': f'{self.name(t["gid"])} came back at {t["age"]}'})
         facts.append({'fact': 'counts', 'counts': dict(kinds),

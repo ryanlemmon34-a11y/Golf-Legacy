@@ -1399,7 +1399,7 @@ class Season:
     def committed_weekly(self, g):
         salary, living = FIN.weekly_living(g)
         c = self.staff.coach(g.id)
-        coach = c.fee / 52 if c is not None and self.staff.deal.get(g.id) == 'fee' else 0.0
+        coach = self.staff.agreed_fee(g.id) / 52 if c is not None else 0.0
         return max(0.0, living - salary) + coach
 
     def spendable(self, g, year):
@@ -1424,8 +1424,11 @@ class Season:
         return led.prize - led.caddie_share - led.coach_share + led.sponsors + led.salary + led.work
 
     def means(self, g, year):
-        """What a golfer can commit to staff from: spendable funds plus most of last year's earnings."""
-        return max(0.0, self.spendable(g, year)) + 0.8 * self.earned_income(g, year - 1)
+        """What a golfer can commit to staff from: spendable funds plus most of what last year's earnings
+        left after living costs (a salary that pays the rent is not spare money)."""
+        led = self.ledgers.get(year - 1, {}).get(g.id)
+        disposable = self.earned_income(g, year - 1) - (led.living if led else 0.0)
+        return max(0.0, self.spendable(g, year)) + 0.8 * max(0.0, disposable)
 
     def expected_prize(self, g, series):
         """The prize a golfer expects from an event, from the share of purses they have actually won
@@ -1456,7 +1459,7 @@ class Season:
                 self.earn(g, year, 'work', FIN.WORK_WAGE)
             if self.staff.deal.get(g.id) == 'fee':
                 c = self.staff.coach(g.id)
-                self.pay_staff(g, year, 'coaching', c, c.fee / 52)
+                self.pay_staff(g, year, 'coaching', c, self.staff.agreed_fee(g.id) / 52)
             if g.cash < 0 and g.backing > 0:
                 draw = min(g.backing, -g.cash)
                 g.backing -= draw

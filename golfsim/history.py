@@ -45,6 +45,7 @@ class Stint:
     reason_end: str = ''
     ended_by: str = ''           # 'golfer', 'staff', 'retirement', 'school', ...
     work: float = 0.0            # coaching weeks / rounds actually worked together during this stint
+    terms: float = 0.0           # an agreed yearly fee (paying coaching clients), fixed for the stint
     seasons: list = field(default_factory=list)   # [(year, observed progress, weight of evidence)]
 
     def active_in(self, year, week=26):
@@ -70,11 +71,11 @@ class Relations:
         self.pairs = {}                          # (kind, staff, golfer) -> Pair
 
     # -- recording ------------------------------------------------------------------------------
-    def begin(self, kind, staff, golfer, when, arrangement, started_by, reason=''):
+    def begin(self, kind, staff, golfer, when, arrangement, started_by, reason='', terms=0.0):
         assert kind in KINDS
         if (kind, golfer) in self.open:
             raise ValueError(f'golfer {golfer} already has an open {kind} stint')
-        s = Stint(len(self.stints), kind, staff, golfer, tuple(when), arrangement, started_by, reason)
+        s = Stint(len(self.stints), kind, staff, golfer, tuple(when), arrangement, started_by, reason, terms=terms)
         self.stints.append(s)
         self.open[(kind, golfer)] = s.id
         self.by_golfer.setdefault(golfer, []).append(s.id)

@@ -135,6 +135,14 @@ class RelationshipTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.st.assign_caddie(None, b, self.k, (2027, 1))
 
+    def test_an_agreed_fee_holds_when_the_coach_becomes_famous(self):
+        g = self.golfers[0]
+        self.st.assign_coach(None, g, self.c, 'fee', (2027, 1), 'golfer', 'test')
+        agreed = self.st.agreed_fee(g.id)
+        self.c.reputation = 95.0                                             # their students start winning
+        self.assertEqual(self.st.agreed_fee(g.id), agreed)                   # existing clients keep their terms
+        self.assertGreater(self.c.fee, agreed)                               # new clients pay the new rate
+
     def test_departure_reunion_and_retirement_keep_everything(self):
         g = self.golfers[0]
         st = self.st
