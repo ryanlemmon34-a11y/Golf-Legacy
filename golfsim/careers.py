@@ -384,7 +384,7 @@ def add_new_professionals(season, year):
         g.backer = FIN.backer_deal(age, 0.2, rng.random(), rng.random())     # no ranking to show backers
         season.world.golfers.append(g)
         season.g[g.id] = g
-        season.season_rounds[year][g.id] = EXPERIENCE_ROUNDS     # seasons of competition behind them
+        season.prior_rounds[g.id] = (year, EXPERIENCE_ROUNDS)    # seasons of competition behind them (fading)
         season.log(g.id, year, 1, f'Turned professional at {age}, starting on the {TOUR_BY_KEY[g.tour].name}'
                    + (f', with backers putting up ${g.backer:,.0f} a season' if g.backer else ', paying their own way'))
     season.world.by_id = season.g
@@ -405,7 +405,7 @@ def add_juniors(season, year):
         g.backing = initial_backing(18, rng.random(), rng.random())
         season.world.golfers.append(g)
         season.g[g.id] = g
-        season.season_rounds[year][g.id] = EXPERIENCE_ROUNDS     # a junior season of competition behind them
+        season.prior_rounds[g.id] = (year, EXPERIENCE_ROUNDS)    # a junior season of competition behind them (fading)
         where = TOUR_BY_KEY[g.tour].name if g.tour in TOUR_BY_KEY else 'amateur golf'
         season.log(g.id, year, 1, f'Arrived on the scene at 18 ({where})')
     season.world.by_id = season.g

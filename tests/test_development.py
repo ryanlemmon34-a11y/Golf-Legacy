@@ -150,6 +150,122 @@ class DevelopmentTests(unittest.TestCase):
         self.assertGreater(picks['short_game'], 35)
 
 
+class ArrivalExperienceTests(unittest.TestCase):
+    """Juniors and new professionals arrive with assumed experience from before they entered the world.
+    It must count as a past period that fades over their first season -- never as rounds played in it,
+    so a golfer who never competes gets no competition-dependent development for the season."""
+
+    @classmethod
+    def setUpClass(cls):
+        from golfsim.careers import add_juniors, add_new_professionals
+        cls.s = s = Season(generate_world(), seed=21, development=True, workers=1)
+        n = len(s.world.golfers)
+        nj = add_juniors(s, 2028)
+        npro = add_new_professionals(s, 2028)
+        cls.juniors = s.world.golfers[n:n + nj]
+        cls.pros = s.world.golfers[n + nj:n + nj + npro]
+        assert cls.juniors and cls.pros
+
+    def arrivals(self, n=1):
+        step = lambda gs: gs[::max(1, len(gs) // n)][:n]               # spread across the arrival class
+        return [('junior', g) for g in step(self.juniors)] + [('new professional', g) for g in step(self.pros)]
+
+    def test_no_rounds_are_recorded_for_a_season_not_yet_played(self):
+        for kind, g in self.arrivals():
+            self.assertEqual(self.s.season_rounds[2028].get(g.id, 0), 0, kind)
+
+    def test_assumed_experience_fades_over_the_first_season(self):
+        s = self.s
+        for kind, g in self.arrivals():
+            self.assertGreater(s.experience(g.id, 2028, 1), 0.9, kind)         # it was real experience
+            self.assertLess(s.experience(g.id, 2028, 26), s.experience(g.id, 2028, 1), kind)
+            self.assertEqual(s.experience(g.id, 2028, 52), 0.0, kind)           # gone by the year's end
+            s.season_rounds[2028][g.id] += 12                                  # some starts: they count
+            try:
+                self.assertAlmostEqual(s.experience(g.id, 2028, 52), D.experience_factor(12), msg=kind)
+            finally:
+                s.season_rounds[2028][g.id] -= 12
+
+    def _season(self, g, rounds_played, train_only=False):
+        """A copy of `g` through the arrival season (training or playing every week, `rounds_played` in
+        all), then the year-end maturing exactly as the season applies it."""
+        s, h = self.s, copy.deepcopy(g)
+        age = h.age(2028)
+        cats = list(D.CATEGORIES)
+        start = {k: h.attrs[k] for k in D.COMPETITIVE}
+        played = 0.0
+        saved = s.season_rounds[2028].get(g.id, 0)
+        try:
+            for week in range(1, 53):
+                if not train_only and played < rounds_played:
+                    D.develop_week(h, 'play', age, rounds=4.0, experience=s.experience(g.id, 2028, week))
+                    played += 4
+                    s.season_rounds[2028][g.id] = saved + played
+                else:
+                    D.develop_week(h, 'train', age, cats[week % len(cats)], experience=s.experience(g.id, 2028, week))
+            D.age_year(h, h.age(2029), random.Random(5), D.experience_factor(s.season_rounds[2028].get(g.id, 0)))
+        finally:
+            s.season_rounds[2028][g.id] = saved
+        return {k: h.attrs[k] - start[k] for k in D.COMPETITIVE}, h
+
+    def test_year_end_mental_maturing_follows_rounds_actually_played(self):
+        for kind, g in self.arrivals(4):
+            mental = lambda gain: sum(gain[k] for k in D.CATEGORIES['mental'])
+            none, _ = self._season(g, 0, train_only=True)
+            some, _ = self._season(g, 12)
+            full, _ = self._season(g, 40)
+            # a season without competition matures the mental game only through early-season training
+            # on fading experience; competition is worth more, and more competition more again
+            self.assertLess(mental(none), mental(some), kind)
+            self.assertLess(mental(some), mental(full), kind)
+            self.assertLess(mental(none), 0.5 * mental(full), kind)
+
+    def test_training_alone_does_not_build_competitive_skills_like_competition(self):
+        checked = Counter()
+        for kind, g in self.arrivals(8):
+            trained, h = self._season(g, 0, train_only=True)
+            # the same training with the full competitive experience the old code granted all season
+            ref = copy.deepcopy(g)
+            age, cats = ref.age(2028), list(D.CATEGORIES)
+            before = {k: ref.attrs[k] for k in D.COMPETITIVE}
+            for week in range(1, 53):
+                D.develop_week(ref, 'train', age, cats[week % len(cats)], experience=1.0)
+            D.age_year(ref, ref.age(2029), random.Random(5), 1.0)
+            granted = sum(ref.attrs[k] - before[k] for k in D.COMPETITIVE)
+            self.assertLess(sum(trained.values()), 0.6 * granted, kind)
+            # and nowhere near their ceilings from training alone
+            for k in D.COMPETITIVE:
+                gap0 = g.ceilings[k] - g.attrs[k]
+                if gap0 > 3:
+                    checked[kind] += 1
+                    self.assertLess(h.attrs[k] - g.attrs[k], 0.5 * gap0, (kind, k))
+        self.assertGreater(checked['junior'], 5)
+        self.assertGreater(checked['new professional'], 5)
+
+
+class PriorRoundsSaveTests(unittest.TestCase):
+    def test_old_saves_move_assumed_experience_out_of_rounds_played(self):
+        """A save from before prior_rounds: the starting world's assumed season sits in the year before
+        the first, and an arrival's 40 assumed rounds in their first season (with real rounds on top)."""
+        import pickle
+        from golfsim.careers import add_juniors
+        s = Season(generate_world(), seed=22, development=True, workers=1)
+        n = len(s.world.golfers)
+        add_juniors(s, 2028)
+        new = s.world.golfers[n]
+        s.season_rounds[2028][new.id] += 12                                     # real rounds played since
+        old_state = s.__getstate__()
+        for gid, (y, r) in old_state.pop('prior_rounds').items():               # rebuild the old layout
+            s.season_rounds[y - 1 if y == s.first_year else y][gid] += r
+        t = Season.__new__(Season)
+        t.__setstate__(pickle.loads(pickle.dumps(old_state)))
+        self.assertEqual(t.season_rounds[2028][new.id], 12)
+        self.assertEqual(t.prior_rounds[new.id], (2028, D.EXPERIENCE_ROUNDS))
+        self.assertNotIn(s.first_year - 1, t.season_rounds)
+        veteran = next(g for g in s.world.golfers if g.lifestyle == 'full_time' and g.id < n)
+        self.assertEqual(t.prior_rounds[veteran.id], (s.first_year, D.EXPERIENCE_ROUNDS))
+
+
 class FinanceTests(unittest.TestCase):
     def test_costs(self):
         cal = __import__('golfsim.calendar', fromlist=['WorldCalendar']).WorldCalendar()

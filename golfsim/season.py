@@ -68,6 +68,26 @@ def _seed(*parts):
 CLUB_PRO_DRIVING_REGIONS = ('Europe', 'North America')   # neighbouring countries' section events are a drive
 
 
+ARRIVAL_LOGS = ('Arrived on the scene', 'Turned professional at ')   # history lines written on arrival
+
+
+def _migrate_prior_rounds(state):
+    """Saves from before prior_rounds recorded assumed experience as rounds played: the starting world's
+    in the season before the first, each arrival's (EXPERIENCE_ROUNDS) in their first season. Move both
+    out of season_rounds, leaving only rounds actually played."""
+    prior, rounds = {}, state['season_rounds']
+    first = state.get('first_year')
+    before = rounds.pop(first - 1, None) if first is not None else None
+    for gid, r in (before or {}).items():
+        prior[gid] = (first, r)
+    for gid, lines in state.get('history', {}).items():
+        for y, w, text in lines:
+            if w == 1 and text.startswith(ARRIVAL_LOGS) and rounds.get(y, {}).get(gid, 0) >= D.EXPERIENCE_ROUNDS:
+                rounds[y][gid] -= D.EXPERIENCE_ROUNDS
+                prior[gid] = (y, D.EXPERIENCE_ROUNDS)
+    return prior
+
+
 def region_of(g):
     return COUNTRIES[g.country].region
 
@@ -233,11 +253,15 @@ class Season:
         self.entry_misses = defaultdict(Counter)             # year -> gid -> weeks shut out of full fields
         self.entry_wants = defaultdict(Counter)              # year -> gid -> weeks they wanted to play
         self.season_rounds = defaultdict(Counter)            # year -> gid -> competitive rounds played
+        # assumed competitive experience from before a golfer entered the world (gid -> (year, rounds)):
+        # it stands for the season before `year` and fades through `year` like a real previous season,
+        # but it is never a round played (season_rounds and every statistic hold only real rounds)
+        self.prior_rounds = {}
         self.declined = defaultdict(_dd_list)                # year -> gid -> [series they could not pay to play]
         self.school_trips = defaultdict(Counter)             # year -> gid -> events their school paid for
         for g in world.golfers:                              # the world starts mid-history: assume the season
             if g.lifestyle != 'retired':                     # before it was a typical one for their lifestyle
-                self.season_rounds[self.first_year - 1][g.id] = D.EXPERIENCE_ROUNDS * (1.0 if g.lifestyle == 'full_time' else 0.5)
+                self.prior_rounds[g.id] = (self.first_year, D.EXPERIENCE_ROUNDS * (1.0 if g.lifestyle == 'full_time' else 0.5))
         self.entry_stats = defaultdict(_dd_counter)          # year -> first-choice tour -> wanted/placed/shut out
         self.card_reasons = {}                               # year -> gid -> why they hold that season's card
         self.unheld = defaultdict(list)                      # year -> event ids with no entrants
@@ -1286,6 +1310,8 @@ class Season:
 
     def __setstate__(self, state):
         state.setdefault('new_pros_added', {})              # saves from before new professionals arrived
+        if 'prior_rounds' not in state:
+            state['prior_rounds'] = _migrate_prior_rounds(state)
         if state.get('lib') == 'default':
             state['lib'] = default_library()
             state['cal'] = state['lib'].calendar
@@ -1558,6 +1584,8 @@ class Season:
         # archive. Results older than last season keep only their winners (champions, exemptions and the
         # Masters' lifetime winners are the only rules that look further back).
         old = lambda y: y < year - 1
+        for gid in [gid for gid, (y, _) in self.prior_rounds.items() if y < year]:
+            del self.prior_rounds[gid]                       # their first season is over
         for d in (self.earnings, self.played, self.pstats, self.ledgers, self.season_rounds, self.entry_wants,
                   self.entry_misses, self.entry_stats, self.declined, self.school_trips, self.activity_counts,
                   self.block_flags, self.cash_start, self.overall_start, self.rank_start, self.am_start,
@@ -1613,7 +1641,7 @@ class Season:
             rng = random.Random(_seed(self.seed, year, 'aging'))
             for g in self.world.golfers:
                 if g.lifestyle != 'retired':
-                    D.age_year(g, g.age(year + 1), rng, D.experience_factor(self.season_rounds[year][g.id]))
+                    D.age_year(g, g.age(year + 1), rng, self.year_experience(g.id, year))
             self.juniors_added[year + 1] = careers.add_juniors(self, year + 1)
             self.new_pros_added[year + 1] = careers.add_new_professionals(self, year + 1)
             for g in self.world.golfers:
@@ -2092,9 +2120,20 @@ class Season:
                 self.earn(g, year, 'support', draw)
 
     def experience(self, gid, year, week):
-        """Competitive experience over the last 52 weeks (0-1), from rounds actually played."""
-        rounds = self.season_rounds[year][gid] + self.season_rounds.get(year - 1, {}).get(gid, 0) * max(0, 52 - week) / 52
+        """Competitive experience over the last 52 weeks (0-1): rounds played this season, plus last
+        season's fading out week by week. For a golfer's first season in the world, last season is the
+        experience assumed when they entered (prior_rounds), unless they really played more."""
+        last = self.season_rounds.get(year - 1, {}).get(gid, 0)
+        prior = self.prior_rounds.get(gid)
+        if prior is not None and prior[0] == year:
+            last = max(last, prior[1])
+        rounds = self.season_rounds[year][gid] + last * max(0, 52 - week) / 52
         return D.experience_factor(rounds)
+
+    def year_experience(self, gid, year):
+        """Competitive experience from a season's rounds actually played (0-1): what the year-end
+        maturing of the mental game follows."""
+        return D.experience_factor(self.season_rounds[year][gid])
 
     def develop_week(self, year, week):
         """What each golfer did this week, and how it changed their game."""
