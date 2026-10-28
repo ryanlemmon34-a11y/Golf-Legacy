@@ -78,27 +78,60 @@ def _tour_economics(season, tour):
     return cache[tour]
 
 
-def runway_years(season, g, year, tour, events, last_prize=None, own_money=False):
-    """Years a golfer's funds would last chasing golf on `tour`, judged from their own record:
-    expected prize money (the share of purses they have been winning, weighed equally with what
-    they actually won in the season just played, so a season spent unable to afford events counts),
-    their sponsor contract and living costs. 10 = self-funding. `own_money`: count only savings and
-    backers' money (next season's deal included), not what a lender would advance -- a line of credit
-    pays for a few weeks, not for another season."""
+def season_shortfall(season, g, tour, events, last_prize=None, without_backers=False):
+    """What a season chasing golf on `tour` would cost a golfer beyond what it brings in, judged from
+    their own record: expected prize money (the share of purses they have been winning, weighed equally
+    with what they actually won in the season just played, so a season spent unable to afford events
+    counts) net of the caddie's and a scouting coach's shares (and the backers', unless
+    `without_backers`), their sponsor contract, against trips and committed weekly costs. 0 or less: the
+    season pays for itself."""
     purse, cost = _tour_economics(season, tour)
     income = season.prize_share.get(g.id, FIN.PRIOR_PRIZE_SHARE) * purse * events
     if last_prize is not None:
         income = 0.5 * income + 0.5 * last_prize
-    income *= season.prize_kept(g)                 # net of the caddie's and a scouting coach's shares
-    income += PR.endorsements(season.player_prestige(g.id))
-    # the same costs the season charges: trips (with a caddie's weekly fee) and committed weekly costs
+    kept = season.prize_kept(g) + (FIN.BACKER_SHARE if without_backers and g.backer else 0.0)
+    income = income * kept + PR.endorsements(season.player_prestige(g.id))
     k = season.staff.caddie(g.id)
     costs = events * (cost + (k.weekly_fee if k else 0.0)) + 52 * season.committed_weekly(g)
-    shortfall = costs - income
+    return costs - income
+
+
+def runway_years(season, g, year, tour, events, last_prize=None, own_money=False):
+    """Years a golfer's funds would last chasing golf on `tour` (season_shortfall); 10 = self-funding or
+    funds for ten seasons. `own_money`: count only savings, family money and backers' money (next
+    season's deal included), not what a lender would advance -- a line of credit pays for a few weeks,
+    not for another season."""
+    shortfall = season_shortfall(season, g, tour, events, last_prize)
     if shortfall <= 0:
         return 10.0
-    funds = max(0.0, g.cash + max(g.backing, g.backer) if own_money else season.funds(g, year + 1))
+    funds = (max(0.0, g.cash + g.backing + max(g.backer_funds, g.backer)) if own_money
+             else max(0.0, season.funds(g, year + 1)))
     return min(10.0, funds / shortfall)
+
+
+SELF_FUNDED_SEASONS = 3          # own savings covering this many seasons of losses: no need of backers
+
+
+def own_way(season, g, year, row):
+    """Whether a backed golfer could pay their own way without backers, and why: their own expected
+    winnings and sponsors cover a season (backers' share not taken), or their own savings (cash alone:
+    not family money, not the backers' money being withdrawn, not credit) cover SELF_FUNDED_SEASONS
+    seasons of losses. None if not."""
+    shortfall = season_shortfall(season, g, g.tour, season.target_events(g), row.get('prize', 0.0),
+                                 without_backers=True)
+    if shortfall <= 0:
+        return 'their winnings and sponsors now cover a season'
+    if g.cash >= SELF_FUNDED_SEASONS * shortfall:
+        return f'their own savings now cover {g.cash / shortfall:.0f} seasons'
+    return None
+
+
+def end_backing(season, g, year, why):
+    """A backing deal ends: backers stop putting up money, the undrawn part of theirs goes back to them,
+    and their share of winnings ends with it (family money stays the golfer's)."""
+    g.backer, g.backer_funds, g.backer_stale = 0.0, 0.0, 0
+    if why:
+        season.log(g.id, year, 53, why)
 
 
 def progress_signal(row):
@@ -160,19 +193,18 @@ def review_backers(season, g, row, year, rng):
     A young professional without backers can attract them with a breakthrough season."""
     age = g.age(year) + 1
     progress = progress_signal(row)
-    paying = runway_years(season, g, year, g.tour, season.target_events(g), row.get('prize', 0.0)) >= 10
     if g.backer:
-        if paying:
-            g.backer, g.backer_stale = 0.0, 0
-            season.log(g.id, year, 53, 'Paying their own way now; their backers stepped aside')
+        why = own_way(season, g, year, row)
+        if why:
+            end_backing(season, g, year, f'Paying their own way now ({why}); their backers stepped aside')
             return 'backers no longer needed'
         g.backer_stale = 0 if progress > 0.1 else g.backer_stale + 1
         if g.backer_stale >= 2 or age > FIN.BACKER_AGE:
-            g.backer, g.backer_stale = 0.0, 0
-            season.log(g.id, year, 53, 'Their backers withdrew (no progress to show for two seasons)'
+            end_backing(season, g, year, 'Their backers withdrew (no progress to show for two seasons)'
                         if age <= FIN.BACKER_AGE else 'Their backers withdrew')
             return 'backers withdrew'
         return None
+    paying = season_shortfall(season, g, g.tour, season.target_events(g), row.get('prize', 0.0)) <= 0
     if not paying and age <= FIN.BACKER_AGE and (row.get('wins', 0) or row.get('promoted') or progress >= 0.6) and rng.random() < 0.5:
         g.backer = FIN.backer_deal(age, max(0.6, amateur_standing(row.get('wr_end'))), 0.0, rng.random())
         g.backer_stale = 0
@@ -344,8 +376,9 @@ def decide(season, year, snap):
                 log(g.id, year, 53, f'Stopped chasing the tour at {age}; took a job and plays a few local events ({reason})')
                 note('part-time pro', g, **why)
     for g in season.world.golfers:                   # backers fund only a full-time chase
-        if g.backer and not (g.status == 'pro' and g.lifestyle == 'full_time'):
-            g.backer, g.backer_stale = 0.0, 0
+        if (g.backer or g.backer_funds) and not (g.status == 'pro' and g.lifestyle == 'full_time'):
+            end_backing(season, g, year, 'Their backing deal ended when they stopped chasing the tour'
+                        if g.lifestyle != 'retired' else None)
     return counts
 
 

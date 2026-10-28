@@ -20,7 +20,8 @@ Definitions (DEFINITIONS holds the wording shown to the user):
     made cut     a start with a finishing position (events without a cut count as made)
     age          the edition's year minus the birth year: the world records birth years, not dates,
                  so ages are in whole years and ties in age are broken by the earlier edition
-    debut        first start in the scope; uncertain (partial) for careers that began before the archive
+    debut        first start in the scope, for careers that began in the archive; for earlier careers the
+                 first archived start is only a "first tracked appearance" (any season, not just the first)
     scope        'all' (every tour, college and amateur event), 'professional' (tiers 0-4), 'premier'
                  (Premier Tour events and majors), 'major', or a tour key ('CH_EUROPE', ...)
 """
@@ -35,7 +36,8 @@ DEFINITIONS = {
     'major': 'An edition of the Tour Masters, Premier Tour Championship, USA Open or Britannia Open.',
     'made cut': 'A start with a finishing position; events without a cut count as made.',
     'age': 'Year of the event minus year of birth (birth dates are not recorded).',
-    'debut': 'First start in the scope. Careers that began before the archive have uncertain debuts.',
+    'debut': 'First start in the scope. For careers that began before the archive, the first start it shows is '
+             'only the first tracked appearance, not the debut.',
     'scope': 'Which events count, by their classification when played: all, professional, premier, major '
              'or one tour.',
     'active': 'Still competing: the record may still change.',
@@ -133,20 +135,23 @@ class HistoryStats:
                                            r['person']))[:n]
 
     def debuts_by_age(self, scope='premier', youngest=True, n=25, include_partial=False):
-        """First start in the scope. Careers that began before the archive are left out unless asked for
-        (their first archived start is not necessarily their debut) — and flagged when included."""
+        """First start in the scope: a career debut only for careers that began in the archive. For a
+        career that began before it, the first archived start is only the first *tracked* appearance,
+        whichever season it falls in (a veteran back in year two may have played the scope long before):
+        left out unless asked for, and then marked (kind 'first tracked appearance', uncertain)."""
         rows = []
         for pid in self.starts:
             ss = self._scoped(pid, scope)
             if not ss:
                 continue
             first = ss[0]
-            partial = self.flags(pid)['partial'] and first[0] == self.a.world.get('first_year', self.a.years[0])
+            partial = self.flags(pid)['partial']
             if partial and not include_partial:
                 continue
             a = self.age(pid, first[0])
             if a is not None:
-                rows.append(self._row(pid, a, [first[2]], year=first[0], uncertain=partial))
+                rows.append(self._row(pid, a, [first[2]], year=first[0], uncertain=partial,
+                                      kind='first tracked appearance' if partial else 'career debut'))
         return sorted(rows, key=lambda r: ((r['value'] if youngest else -r['value']), r['year'], r['person']))[:n]
 
     # ---- persistence -----------------------------------------------------------------------------------------

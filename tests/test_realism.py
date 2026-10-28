@@ -311,6 +311,39 @@ class BackerTests(unittest.TestCase):
         old.backer = 30000.0
         self.assertEqual(C.review_backers(self.s, old, self.good, 2027, rng), 'backers withdrew')
 
+    def test_independence_is_judged_without_the_support_being_withdrawn(self):
+        """A losing golfer with a large family pot and credit is not 'paying their own way'; a golfer
+        whose own expected winnings cover a season's costs is."""
+        rng = random.Random(4)
+        g = at_age(self.g, 24)
+        g.backer, g.backing = 30000.0, 10 ** 6                               # rich family, no winnings
+        self.s.prize_share[g.id] = 0.0
+        self.assertNotEqual(C.review_backers(self.s, g, self.good, 2027, rng), 'backers no longer needed')
+        self.assertEqual(g.backer, 30000.0)
+        h = at_age(self.g, 24)
+        h.backer = 30000.0
+        self.s.prize_share[h.id] = 0.1                                       # winning enough to pay the way
+        try:
+            self.assertEqual(C.review_backers(self.s, h, self.good, 2027, rng), 'backers no longer needed')
+            self.assertIn('winnings', self.s.history[h.id][-1][2])          # and the reason given is true
+        finally:
+            self.s.prize_share.pop(h.id, None)
+            self.s.prize_share.pop(g.id, None)
+
+    def test_backers_money_goes_back_when_the_deal_ends(self):
+        """Backers' money and family money are kept apart: when a deal ends the undrawn backers' money
+        goes back with it (and so does their share of winnings); family money stays the golfer's."""
+        s, g = self.s, at_age(self.g, 24)
+        g.backer, g.backing, g.cash = 30000.0, 5000.0, 0.0
+        s.start_backing(g)                                                   # 1 January: this season's money
+        self.assertEqual((g.backer_funds, g.backing), (30000.0, 5000.0))
+        with_deal = s.funds(g, 2027)
+        C.end_backing(s, g, 2027, 'Their backers withdrew')
+        self.assertEqual((g.backer, g.backer_funds, g.backing), (0.0, 0.0, 5000.0))
+        self.assertAlmostEqual(with_deal - s.funds(g, 2027), 30000.0)
+        self.assertAlmostEqual(s.prize_kept(g), 1.0 - (FIN.CADDIE_SHARE if s.staff.caddie(g.id) is not None else 0.0)
+                               - (C.ST.SCOUT_SHARE if s.staff.deal.get(g.id) == 'share' else 0.0))
+
     def test_credit_does_not_fund_another_season_but_backers_do(self):
         g = at_age(self.g, 25)
         g.cash = -5000.0

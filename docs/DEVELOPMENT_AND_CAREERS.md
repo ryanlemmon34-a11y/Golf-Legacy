@@ -89,12 +89,16 @@ by stamina. The monthly plan works towards them; the calendar is sized so they a
 
 **Backers.** As in real life (about three in four players trying to make it are backed by family,
 friends or investors), professionals chasing the game can have a backing deal: backers put up
-$15k–50k a season (topped up each 1 January, drawn only when the golfer's own cash runs out) for 25%
-of their prize money while the deal lasts. About three in four find backers when they turn
+$15k–50k a season (topped up each 1 January, drawn only when the golfer's own cash runs out, before
+any family money) for 25% of their prize money while the deal lasts. Backers' money is kept apart from
+family money: when a deal ends, what is left of the backers' money goes back to them together with their
+share of winnings; family money stays the golfer's. About three in four find backers when they turn
 professional (more often with a better amateur ranking); in the starting world, professionals below the
 Premier Tour aged 32 or under are backed in the same proportion. Each winter backers look at what they
 can see — promotion, a rising world ranking, wins and top-10s: progress renews the deal; two seasons in
-a row without it ends it, as does the golfer passing 32 or paying their own way. A young professional
+a row without it ends it, as does the golfer passing 32 or paying their own way — judged without the
+support being withdrawn: their own expected winnings and sponsors cover a season, or their own savings
+(not family money, not the backers', not credit) cover three seasons of losses; the history says which. A young professional
 without backers can attract them with a breakthrough season (a win, promotion or a big ranking jump).
 Every deal, renewal and withdrawal is in the golfer's history. Club professionals' own events (section
 events, their championships and sectionals) are paid for by their club.

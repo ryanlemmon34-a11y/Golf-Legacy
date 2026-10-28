@@ -23,14 +23,17 @@ dollar passes through the golfer's ledger, so savings always reconcile exactly:
 Backers
     Most young professionals chasing the game are backed by family, friends or a group of investors
     (about three in four in real life). A backing deal puts up a sum each season (topped up on
-    1 January, drawn only when the golfer's own cash runs out) for a share of their prize money
-    (BACKER_SHARE) while it lasts. Deals come when a golfer turns professional (likelier for a better
+    1 January, drawn only when the golfer's own cash runs out, before any family money) for a share
+    of their prize money (BACKER_SHARE) while it lasts. Backers' money is kept apart from family money
+    (Golfer.backer_funds): when a deal ends, the undrawn part goes back to the backers along with
+    their share of winnings; family money stays the golfer's. Deals come when a golfer turns professional (likelier for a better
     amateur record) or after a breakthrough season, are renewed each winter only on results backers
     can see, and end after two seasons without progress, past 32, or once the golfer pays their own
     way (careers.review_backers).
 
 Funding decisions (before money is spent)
-    available funds  cash + remaining family/backer support + a limited line of credit
+    available funds  cash + remaining family support + backers' money for the season + a limited
+                     line of credit
                      (credit grows with a golfer's recent income, up to a cap; nobody can borrow
                      without limit)
     committed        the next few weeks of living costs are set aside before any trip is booked

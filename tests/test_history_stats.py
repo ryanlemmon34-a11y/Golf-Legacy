@@ -26,6 +26,8 @@ class FakeArchive:
         self.people = {1: {'name': 'Veteran', 'born': 1990, 'initial': True, 'golfer': {'lifestyle': 'full_time'}},
                        2: {'name': 'Rookie', 'born': 2009, 'initial': False, 'golfer': {'lifestyle': 'full_time'}},
                        3: {'name': 'Grinder', 'born': 1995, 'initial': False, 'golfer': {'lifestyle': 'retired'}},
+                       4: {'name': 'Returning veteran', 'born': 1985, 'initial': True,     # in the world from the
+                           'golfer': {'lifestyle': 'full_time'}},                         # start, back in year two
                        9: {'name': 'Coach', 'born': 1970, 'initial': True}}
         self.years = [2027, 2028]
         ev = lambda y, w, s, rows, team=None: {'id': f'{y}:{s}{w}', 'series': s, 'week': w, 'finish': [rows],
@@ -35,7 +37,7 @@ class FakeArchive:
                    ev(2027, 2, 'C', [(2, 1, 0), (1, 2, 0), (3, 2, 0)]),
                    ev(2027, 3, 'Q', [(3, 1, 0)]),                                   # not a start
                    ev(2027, 18, 'M', [(2, 1, 0), (1, 3, 0)], {2: (9, 0)})],
-            2028: [ev(2028, 5, 'P', [(3, 2, 0), (1, 1, 0)]),
+            2028: [ev(2028, 5, 'P', [(3, 2, 0), (1, 1, 0), (4, 3, 0)]),
                    ev(2028, 6, 'A', [(3, 2, 0)]),
                    ev(2028, 18, 'M', [(1, 1, 0), (2, 2, 0)], {1: (9, 0)})]}
         self.rel = Relations()
@@ -79,9 +81,19 @@ class HistoryStatsTests(unittest.TestCase):
         self.assertIn(1, [r['person'] for r in self.h.debuts_by_age('premier', include_partial=True)])
         self.assertTrue(next(r for r in self.h.most_wins() if r['person'] == 1)['partial'])
 
+    def test_a_veteran_first_seen_after_the_first_season_is_not_a_debut(self):
+        """A career that began before the archive has an unknown debut, whichever archived season holds
+        its first appearance: it is a first tracked appearance, not a career debut."""
+        self.assertNotIn(4, [r['person'] for r in self.h.debuts_by_age('premier')])
+        self.assertNotIn(4, [r['person'] for r in self.h.debuts_by_age('premier', youngest=False)])
+        rows = {r['person']: r for r in self.h.debuts_by_age('premier', include_partial=True)}
+        self.assertEqual((rows[4]['kind'], rows[4]['uncertain']), ('first tracked appearance', True))
+        self.assertEqual((rows[2]['kind'], rows[2]['uncertain']), ('career debut', False))
+
     def test_unfinished_and_finished_careers_are_separate(self):
         self.assertEqual([r['person'] for r in self.h.most_starts_without_win(status='retired')], [3])
-        self.assertEqual(self.h.most_starts_without_win(status='active'), [])
+        active = self.h.most_starts_without_win(status='active')                # has not won yet (flagged:
+        self.assertEqual([(r['person'], r['partial']) for r in active], [(4, True)])   # since the archive began)
         self.assertEqual(self.h.most_runner_ups_without_win()[0]['value'], 3)    # ties for second count
         first = {r['person']: r['value'] for r in self.h.starts_before_first_win()}
         self.assertEqual(first, {2: 1})                                       # partial careers left out

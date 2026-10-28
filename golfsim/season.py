@@ -1697,14 +1697,19 @@ class Season:
         self.rank_start[year] = dict(self.wr_pos)
         self.am_start[year] = dict(self.am_pos)
         for g in self.world.golfers:                         # backers put up this season's money
-            if g.backer and g.lifestyle != 'retired':
-                g.backing = max(g.backing, g.backer)
+            self.start_backing(g)
         self.cash_start[year] = {g.id: g.cash for g in self.world.golfers}
         self.premier_rights(year)
         self.overall_start[year] = {g.id: g.overall for g in self.world.golfers if g.lifestyle != 'retired'}
         ST.start_of_season(self, year)                       # coaches scout, golfers hire coaches and caddies
         self.assignments[year] = {'coach_of': dict(self.staff.coach_of), 'deal': dict(self.staff.deal),
                                   'caddie_of': dict(self.staff.caddie_of)}
+
+    def start_backing(self, g):
+        """1 January: a backed golfer's backers put up the season's money (kept apart from family money:
+        it goes back to them if the deal ends)."""
+        if g.backer and g.lifestyle != 'retired':
+            g.backer_funds = max(g.backer_funds, g.backer)
 
     def premier_rights(self, year):
         """Each Premier member's playing rights for the season (RIGHTS), with the reason, fixed on
@@ -2073,7 +2078,7 @@ class Season:
         """What a golfer could draw on right now: savings, backers, and a limited line of credit."""
         last = self.ledgers.get(year - 1, {}).get(g.id)
         earned = last.income - last.support if last else 0.0    # lenders look at earnings, not handouts
-        return g.cash + g.backing + FIN.credit_limit(earned)
+        return g.cash + g.backing + g.backer_funds + FIN.credit_limit(earned)
 
     # The money definitions every decision shares (hiring, the monthly plan, entries, settlement and
     # career runway):
@@ -2155,10 +2160,12 @@ class Season:
             if self.staff.deal.get(g.id) == 'fee':
                 c = self.staff.coach(g.id)
                 self.pay_staff(g, year, 'coaching', c, self.staff.agreed_fee(g.id) / 52)
-            if g.cash < 0 and g.backing > 0:
-                draw = min(g.backing, -g.cash)
-                g.backing -= draw
-                self.earn(g, year, 'support', draw)
+            for pot in ('backer_funds', 'backing'):          # backers' money first, then family money
+                have = getattr(g, pot)
+                if g.cash < 0 and have > 0:
+                    draw = min(have, -g.cash)
+                    setattr(g, pot, have - draw)
+                    self.earn(g, year, 'support', draw)
 
     def experience(self, gid, year, week):
         """Competitive experience over the last 52 weeks (0-1): rounds played this season, plus last
