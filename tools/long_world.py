@@ -79,7 +79,8 @@ def checks(s, year, snap, active_before):
     led = s.ledgers[year]
     start = s.cash_start[year]                        # juniors arriving at year end start next season
     recon = sum(1 for gid, c0 in start.items()
-                if abs(s.g[gid].cash - (c0 + (led[gid].net if gid in led else 0.0))) > 1e-6)
+                if abs(s.g[gid].cash - (c0 + (led[gid].net if gid in led else 0.0)))
+                > max(0.01, 1e-12 * abs(s.g[gid].cash)))      # a cent, or float rounding on fortunes
     rec = s.staff_receipts[year]
     paid_caddie = sum(l.caddie + l.caddie_share for l in led.values())
     paid_coach = sum(l.coaching + l.coach_share for l in led.values())
