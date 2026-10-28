@@ -129,7 +129,12 @@ and eventually as-of-year views. Not built. Before it, close the archive gaps li
    course records set after a fair sample (300 earlier rounds on the layout) are archived each season with
    golfer, edition, week and layout (`Archive.moments`, indexed; boards for most holes-in-one, playoff
    wins, course records).
-6. First usable slice: Overview, Golfer profile, Tournament edition, Course profile and one Records or
+6. A throwaway observer prototype to try the browsing journeys before the framework decision:
+   `tools/observer.py` (standard library web server; Overview with Advance week / 4 weeks / to end of
+   season through the session, golfer profiles with career, team history, results with entry routes and
+   moments, tournament histories and edition leaderboards with coach and caddie, course pages, records and
+   frivolities with evidence, moments, search). Not the chosen framework.
+7. First usable slice: Overview, Golfer profile, Tournament edition, Course profile and one Records or
    Frivolities list, tested as complete browsing journeys (see the document).
 
 Open owner decisions: framework and desktop packaging, visual design, the first record definitions and
