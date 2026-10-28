@@ -51,12 +51,20 @@ class HistoryStats:
         self.a = archive
         self.starts = defaultdict(list)          # pid -> [(year, week, event id, tour, tier, kind, pos)], in order
         self.seen = set()                        # seasons already read
+        self.sig = {}                            # season -> its file's signature when read
         self.extend(archive)
 
     def extend(self, archive):
         """Bring the statistics up to date with `archive` (a newer reading of the same world): only the
-        seasons not seen before are read, and people, relationships and records come from it."""
+        seasons not seen before are read, and people, relationships and records come from it. If the
+        history did not simply grow -- a season read before is gone or was published again (a recovery
+        fell back to an earlier checkpoint) -- everything is read again, so no removed result stays."""
         self.a = archive
+        sign = getattr(archive, 'signature', lambda y: None)
+        if any(y not in archive.years or sign(y) != self.sig.get(y) for y in self.seen):
+            self.starts.clear()
+            self.seen.clear()
+            self.sig.clear()
         new = [y for y in archive.years if y not in self.seen]
         touched = set()
         for y, e in archive.events(new):
@@ -73,6 +81,7 @@ class HistoryStats:
         for gid in touched:
             self.starts[gid].sort()
         self.seen.update(new)
+        self.sig.update((y, sign(y)) for y in new)
         return new
 
     # ---- the shared vocabulary ------------------------------------------------------------------------

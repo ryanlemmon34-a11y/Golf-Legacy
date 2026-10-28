@@ -318,6 +318,65 @@ class TransactionTests(unittest.TestCase):
         self.assertEqual(fingerprint(t.season), ref_print)
         t.close()
 
+    def test_a_damaged_year_end_checkpoint_falls_back_to_its_own_history(self):
+        """The season-end generation is damaged after its history was published: the generation before it
+        becomes current, and the history goes back to exactly what that generation stands on -- the
+        later season's file and index rows and its people, relationships and records tables."""
+        s = self.at_season_end(2028)
+        s.advance_one_week()                                            # 2028 ends and is published
+        self.assertEqual(archive_view(self.dir), self.after_end[2028][0])
+        gen = s.generation
+        s.close()
+        (self.dir / f'gen_{gen:06d}' / 'state.pkl.gz').write_bytes(b'damaged')
+        t = Session.open(self.dir, workers=1)
+        self.assertEqual((t.generation, t.cursor), (gen - 1, {'year': 2028, 'week': 52, 'phase': 'week'}))
+        self.assertEqual(archive_view(self.dir), self.after_end[2027][0])   # nothing from the future
+        t.advance_one_week()                                            # the season end again, identically
+        self.assertEqual(archive_view(self.dir), self.after_end[2028][0])
+        self.assertEqual(fingerprint(t.season), self.after_end[2028][1])
+        t.close()
+
+    def test_retrying_a_committed_operation_repairs_its_unpublished_history(self):
+        s = self.at_season_end(2027)
+        with mock.patch.object(SES, '_publish_archive', side_effect=OSError('power cut')), \
+                self.assertRaises(OSError):
+            s.advance_one_week(op_key='end-2027')                       # committed; history not published
+        self.assertEqual(archive_view(self.dir)['years'], [])
+        r = s.advance_one_week(op_key='end-2027')                       # the retry: not simulated again ...
+        self.assertEqual(r['completed'], (2027, 52))
+        self.assertEqual(s.cursor, {'year': 2028, 'week': 1, 'phase': 'start'})
+        self.assertEqual(archive_view(self.dir), self.after_end[2027][0])   # ... but the history is repaired
+        s.close()
+
+    def test_the_observer_rebuilds_records_after_a_fallback_removes_a_season(self):
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
+        import observer
+        from golfsim import archive as A
+        from golfsim.history_stats import HistoryStats
+        s = self.at_season_end(2028)
+        s.close()
+        w = observer.World(self.dir)
+        w.session.advance_one_week()                                    # 2028 published ...
+        w.reload()
+        self.assertEqual(sorted(w.stats.seen), [2027, 2028])            # ... and read into the records
+        gen = w.session.generation
+        w.session.close()
+        (self.dir / f'gen_{gen:06d}' / 'state.pkl.gz').write_bytes(b'damaged')
+        w.session = Session.open(self.dir, workers=1)                   # falls back: 2028 is gone
+        w.reload()
+        a = A.Archive(self.dir / 'archive')
+        self.assertEqual(sorted(w.stats.seen), [2027])
+        for board in ('most_wins', 'most_starts'):
+            self.assertEqual(getattr(w.stats, board)(), getattr(HistoryStats(a), board)())
+        editions = {e['id'] for _, e in a.events()}
+        for row in w.stats.most_wins(n=1000):                           # every piece of evidence exists
+            self.assertTrue(set(row['evidence']) <= editions, row)
+        w.session.advance_one_week()                                    # 2028 again
+        w.reload()
+        self.assertEqual(sorted(w.stats.seen), [2027, 2028])
+        self.assertEqual(w.stats.most_wins(), HistoryStats(A.Archive(self.dir / 'archive')).most_wins())
+        w.session.close()
+
     def test_a_retry_through_another_handle_is_recognised(self):
         a = self.new()
         b = Session.open(self.dir, workers=1)                            # a second, independently opened handle

@@ -198,6 +198,12 @@ class Archive:
             idx = ArchiveIndex(self.dir / 'index.sqlite')
             self.index = idx if idx.years() == self.years else None  # only an index covering every season
 
+    def signature(self, y):
+        """What identifies a season file as written (size, modification time): a season published again
+        (after a recovery fell back to an earlier checkpoint) has a new one."""
+        st = (self.dir / 'years' / f'{y}.json.gz').stat()
+        return st.st_size, st.st_mtime_ns
+
     def year(self, y):
         if y not in self._years:
             d = _read(self.dir / 'years' / f'{y}.json.gz')

@@ -34,8 +34,12 @@ checkpoint generation, not written to the archive. Only once the generation is c
 published to archive/ (season file and index first, the list of seasons last) and the published
 generation recorded (archive/PUBLISHED). A crash before the commit leaves the archive exactly as it was;
 a crash after it is repaired by publishing the committed generation's staged history again (on opening,
-or before the next advance), which is idempotent. So the running world, the committed checkpoint and the
-visible history always agree. The live simulation keeps only recent seasons (Season.prune_history), so
+before the next advance, or when a committed operation is retried), which is idempotent. A generation
+with no new season carries the history it stands on (hard links to the files of the generation before
+it) and every generation names the one that produced that history (history_gen; archive/PUBLISHED holds
+the one published). So when a damaged generation makes an earlier one current, the earlier one's own
+history -- seasons, people, relationships and records -- is published again and the later seasons are
+removed. So the running world, the committed checkpoint and the visible history always agree. The live simulation keeps only recent seasons (Season.prune_history), so
 a checkpoint does not carry the whole history.
 """
 from __future__ import annotations
@@ -90,11 +94,13 @@ class Session:
         d.mkdir(parents=True, exist_ok=True)
         season = Season(world or generate_world(seed=seed), seed=seed, development=development, workers=workers)
         writer = ArchiveWriter(d / 'archive', season)
+        pending = {'chunks': {}, 'world': writer.world, 'tables': writer.state_tables(season)}
         state = {'format': FORMAT, 'schema': SCHEMA, 'world_id': f'{seed}-{int(time.time())}', 'seed': seed,
                  'cursor': {'year': season.first_year, 'week': 1, 'phase': 'start'}, 'last_op': None,
                  'archive_through': None, 'archive': {'created': writer.created, 'initial': sorted(writer.initial)},
                  'weeks_played': 0, 'ops': []}
         s = cls(d, season, state, 0)
+        s._pending = pending                 # the history as it begins: no seasons, everyone who exists
         s._commit()
         return s
 
@@ -154,6 +160,13 @@ class Session:
         with self._lock:
             done = self._done(op_key)
             if done is not None:
+                # already committed: return its result, but first repair the history if publishing it
+                # was interrupted (whoever holds the lock does that before advancing)
+                try:
+                    with _FileLock(self.dir / 'lock'):
+                        self._sync()
+                except Busy:
+                    pass
                 return done
             with _FileLock(self.dir / 'lock'):
                 self._sync()                                 # another process may have committed meanwhile
@@ -249,9 +262,17 @@ class Session:
         s.snapshots.pop(year, None)
 
     def _recover_archive(self):
-        """Under the lock: publish the committed generation's history if a crash interrupted it, and
-        remove archived seasons no committed generation holds (from sessions before staged history)."""
-        if _staged(self.dir, self.generation) and _published(self.dir) != self.generation:
+        """Under the lock: make the published history the committed generation's. Every generation holds
+        (or carries) the history it stands on and names the generation that produced it (history_gen):
+        if what is published is anything else -- a crash interrupted publishing, or the committed
+        generation is an earlier one because a newer one was damaged -- it is published again; then
+        seasons beyond the committed generation are removed."""
+        meta = _meta(self.dir, self.generation)
+        h = meta.get('history_gen')
+        if h is None:                                   # generations from before histories were carried
+            if meta.get('archive_staged') and _published(self.dir) != self.generation:
+                _publish_archive(self.dir, self.generation)
+        elif _published(self.dir) != h:
             _publish_archive(self.dir, self.generation)
         self._trim_archive()
 
@@ -269,12 +290,12 @@ class Session:
             idx = ArchiveIndex(idx_path)
             idx.drop_years_after(through if through is not None else -1)
             idx.close()
-        extra = [y for y in world.get('years', []) if through is None or y > through]
+        beyond = lambda y: through is None or y > through
+        for f in (self.dir / 'archive' / 'years').glob('*.json.gz'):
+            if beyond(int(f.name.split('.')[0])):          # listed or not (world.json may be republished)
+                f.unlink()
+        extra = [y for y in world.get('years', []) if beyond(y)]
         if extra:
-            for y in extra:
-                f = self.dir / 'archive' / 'years' / f'{y}.json.gz'
-                if f.exists():
-                    f.unlink()
             world['years'] = [y for y in world['years'] if y not in extra]
             p.write_text(json.dumps(world))
 
@@ -304,11 +325,14 @@ class Session:
                 _write(a / f, obj)
             _write_synced(a / 'world.json', json.dumps(self._pending['world']).encode())
             staged = {f: _sha256(a / f) for f in list(files) + ['world.json']}
+            history = n
+        else:                                                         # carry the history it stands on
+            history, staged = self._carry_history(tmp)
         meta = {'format': FORMAT, 'schema': SCHEMA, 'generation': n, 'world_id': self.state['world_id'],
                 'cursor': self.state['cursor'], 'engine': engine_id(), 'commit': engine_commit(),
                 'archive_through': self.state['archive_through'], 'weeks_played': self.state['weeks_played'],
                 'sha256': digest, 'archive_staged': sorted(self._pending['chunks']) if self._pending else [],
-                'archive_files': staged, 'written': time.strftime('%Y-%m-%d %H:%M:%S')}
+                'archive_files': staged, 'history_gen': history, 'written': time.strftime('%Y-%m-%d %H:%M:%S')}
         _write_synced(tmp / 'meta.json', json.dumps(meta, indent=1).encode())
         if _sha256(tmp / 'state.pkl.gz') != digest:                    # read back: what was written is whole
             raise IOError('checkpoint did not read back intact')
@@ -325,6 +349,23 @@ class Session:
                 shutil.rmtree(old, ignore_errors=True)
         if staged:
             _publish_archive(self.dir, n)                               # committed: now the history shows it
+
+    def _carry_history(self, tmp):
+        """A generation with no new season carries the committed generation's history files (hard links:
+        no copying), so any generation can restore exactly the history it stands on."""
+        prev = self.dir / f'gen_{self.generation:06d}'
+        meta = _meta(self.dir, self.generation) if prev.exists() else {}
+        if meta.get('history_gen') is None:
+            return None, {}
+        a = tmp / 'archive'
+        a.mkdir()
+        names = list(STATE_FILES) + ['world.json']
+        for f in names:
+            try:
+                os.link(prev / 'archive' / f, a / f)
+            except OSError:
+                shutil.copyfile(prev / 'archive' / f, a / f)
+        return meta['history_gen'], {f: meta['archive_files'][f] for f in names}
 
     def close(self):
         self.season.close()
@@ -359,11 +400,11 @@ def _valid(d, name):
         return None
 
 
-def _staged(d, n):
+def _meta(d, n):
     try:
-        return bool(json.loads((d / f'gen_{n:06d}' / 'meta.json').read_text()).get('archive_staged'))
+        return json.loads((d / f'gen_{n:06d}' / 'meta.json').read_text())
     except (OSError, ValueError):
-        return False
+        return {}
 
 
 def _published(d):
@@ -396,7 +437,8 @@ def _publish_archive(d, n):
     for name in STATE_FILES:
         _copy_atomic(g / 'archive' / name, a / name)
     _copy_atomic(g / 'archive' / 'world.json', a / 'world.json')
-    _write_synced(a / 'PUBLISHED.tmp', str(n).encode())
+    h = meta.get('history_gen')
+    _write_synced(a / 'PUBLISHED.tmp', str(n if h is None else h).encode())
     os.replace(a / 'PUBLISHED.tmp', a / 'PUBLISHED')
 
 
