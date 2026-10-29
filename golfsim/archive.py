@@ -247,6 +247,8 @@ class Archive:
             except (OSError, ValueError, EOFError):     # a table replaced or the list rewritten as it was read
                 same = False
                 if attempt == self.OPEN_ATTEMPTS - 1:
+                    if index is not None:
+                        index.close()
                     raise
             if same and (index is not None or attempt >= 3):
                 break                                   # nothing was published while it was read (an index

@@ -47,9 +47,15 @@ the development container (Intel Xeon @ 2.10 GHz, 4 logical CPUs, Python 3.13, L
 | Season 51 in a clean process (copy of the final world) | 268 s | 172 s | 21.3 s | 5.3 s | 69.3 s (overview builds the records) | — |
 | The same, old code (1f68691) re-measured the day of the next pass | 336 s | 205 s | 25.2 s | 6.9 s | 98.6 s (11.0 GB peak) | 21.7 s |
 | The same after the next pass (37d9edf and later; two runs) | 217–224 s | 190 s | 16.3–19.4 s | 6.0–8.0 s | 4.2–6.9 s (3.6 GB peak) | 26.4–28.5 s |
+| Corrected benchmark (d86a3c8), ba94d2f, 4 workers | 237.7 s | 208.6 s | 17.6 s | 7.1 s | 4.4 s (main 2.36 GB, all 3.8 GB) | 29.9 s |
+| Corrected benchmark, ea7b508, 4 workers | 239.6 s | 209.2 s | 17.2 s + 1.8 s settle | 6.7 s | 4.7 s (main 2.36 GB, all 3.8 GB) | 16.2 s |
+| Corrected benchmark, ea7b508, 3 workers | 244.2 s | 214.5 s | 16.5 s + 1.9 s settle | 6.9 s | 4.5 s | 15.1 s |
+| Corrected benchmark, ea7b508, season 1, 4 workers | 121.0 s | 114.7 s | 2.6 s | 2.8 s | 0.7 s (main 0.56 GB) | 0.3 s |
 
-Single runs vary by several seconds (about 5% on this container); season 2 sits at the target, not safely
-under it. After the history-reading work the observer is no longer the problem at season 51 (records come
+Single runs vary by several seconds (about 5% on this container; between sessions the same work has
+measured 190 s and 209 s, so compare only runs from one session); season 2 sits at the target, not safely
+under it. Rows before the corrected benchmark kept the preparation world in the measured process (memory
+figures too high) and took worker memory from exited processes; their timings ran with 4 workers. After the history-reading work the observer is no longer the problem at season 51 (records come
 from the archive index, memory bounded); simulation, about 190 s, is (see `docs/BACKLOG.md`, the
 preservation, accuracy and speed pass, for the profile and what comes next). **The 50-season run
 misses the target from season 2 on** (`reports/long_run_2027/`): simulation grows with the active population

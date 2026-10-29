@@ -68,7 +68,10 @@ week by week is the world a whole-season run produces (tested, fingerprint-equal
   interrupt or a failed save, reloads the committed world in memory, so memory never runs ahead of disk.
   The last known good generation is kept; a damaged current one falls back to it. Loading runs with the
   cyclic garbage collector paused, then freezes the loaded world out of later full collections
-  (`session.settle_heap`, repeated after each archived season; full collections found no garbage); archive JSON is written with
+  (`session.settle_heap`). Freezing is balanced, not cumulative: after each archived season, and on any
+  load after the first, everything is unfrozen and collected once (about 1 s on the 50-season world) before
+  the rest is frozen again, so nothing dropped since (a replaced observer snapshot, a world reloaded after
+  a failed advance) stays out of the collector's reach for more than a season. Archive JSON is written with
   the C encoder at gzip level 6. Both are performance only: the same simulated state (fingerprinted) and
   the same archive text. Orphaned temporary files
   are removed on opening, but only when the opener can take the lock: opening a world while another
@@ -119,7 +122,24 @@ and each golfer's season row (compressed), so records, recaps, careers, moments,
 at No. 1 never decode the season files. Every site's winner of a multi-site event is in `starts`
 (`editions.winner` is only the first site's). An index from before schema 2 is completed once by the session
 that owns the world, under its lock (about 70 s for 50 seasons); readers meanwhile fall back to the season
-files. Size: about 10 MB a season, 18 MB with schema 2 (881 MB for the 50-season world).
+files, also when the backfill was interrupted (tested). The large tables (starts, seasons, careers) are also
+indexed by season, so reading one season's starts or replacing one season touches that season's rows only
+(chosen with EXPLAIN QUERY PLAN: one season's starts 362 -> 133 ms, replacing a season 4.9 -> 3.5 s on the
+50-season index). Size: about 10 MB a season, 18 MB with schema 2, about 19.5 MB with the season indexes (881
+MB for the 50-season world before them, 972 MB after re-indexing a season with them, part of it free pages).
+
+**Consistent snapshots.** An `Archive` is one snapshot of one published generation. It reads the files, then
+holds a read transaction on the index for its lifetime (the index is in WAL mode, so the session keeps
+publishing meanwhile), and checks that the published stamp (`PUBLISHED` and the season list) did not change
+while it read, retrying if it did; an index that does not cover exactly its seasons is not used. Every index
+query is also limited to the snapshot's own seasons. A season file that recovery removed or republished after
+the snapshot was opened raises `ArchiveChanged` rather than mixing two generations. The observer re-checks
+what is published at the start of every page and advance, opens a new snapshot when it changed, closes the
+old one, redraws a page whose snapshot was rolled back mid-page, and shows which seasons and generation a page
+was drawn from. `Archive.close()` (or `with Archive(...)`) releases the connection; the session's index
+writers always close, also on errors. Without shared memory (network drives) SQLite cannot use WAL: then no
+read transaction is held (it would block the session's writes) and only the season limit applies, so a
+rollback could still mix into an open snapshot's index answers there (untested).
 
 **Memory.** `Archive.year` keeps only the `CACHE_SEASONS` (4) most recently decoded seasons (late seasons decode
 to hundreds of MB). `HistoryStats` holds every start as one integer, edition rank and position (`Starts`), not a

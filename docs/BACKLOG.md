@@ -282,7 +282,9 @@ removed.
    Fingerprint: the simulated state after 8 weeks of 2078 is the same hash before and after.
 
 **Season 51, clean process, copy of the final world** (Intel Xeon @ 2.10 GHz, 4 logical CPUs, 15 GB, Python
-3.13, Linux; both measured the same day, `tools/benchmark_skip.py --from-world`):
+3.13, Linux; both measured the same day, `tools/benchmark_skip.py --from-world`; superseded by the corrected
+benchmark in the next section: these runs kept the preparation world in the measured process and read worker
+memory from exited processes):
 
 | | Skip | Simulate | Save | Publish | Observer reload + overview | First Records page | Peak memory |
 |---|---|---|---|---|---|---|---|
@@ -308,6 +310,69 @@ verification, both benchmarks and a two-season strict integration check. Inspect
 paths. **Untested on Windows**: hard links between generations (falls back to a copy), the lock file and
 taking over a dead owner's lock (never on Windows), `os.replace` over files another process holds open, fsync
 behaviour, network drives, and `benchmark_skip.py` memory figures (no `resource` module there).
+
+## Correctness and measurement pass (owner review of ba94d2f)
+
+Same status words as above. No long simulation was started, nothing was removed from the world, and no
+gameplay rule or probability changed: two seasons (seed 2027, quarter population, strict checks) simulated by
+ba94d2f and by this pass's code give identical diagnostic data, archived seasons and people / relationship /
+records tables, every reconciliation passing.
+
+**Completed**
+1. **Observer history consistency** — reproduced (an observer's Archive listed [2027] while its index answers
+   already included a season published by another Session), fixed, tested (e2d341c). An Archive is one
+   snapshot of a published generation (files, then an index read transaction in WAL mode, a stamp check and
+   retry; every index query limited to its seasons; a removed or republished season file raises
+   `ArchiveChanged`). The observer refreshes at every page and advance and closes replaced snapshots.
+   `tests/test_history_consistency.py`: another Session publishing (profiles, starts, all boards, prize totals,
+   weeks at No. 1, moments, overview), an Archive opened mid-publication, rollback and replay, an interrupted
+   index backfill, repeated reloads.
+2. **Connections and heap freezing** — measured, fixed, tested (e2d341c). Each reload left its SQLite connection
+   open: index file descriptors 1 -> 21 over 20 reloads, held by cycles `gc.freeze` had put out of reach
+   (the old Archives themselves were freed). Now 2 at most (one close deferred by SQLite) and 0 once closed;
+   20 session reopen cycles: no growth (2), memory flat after the first few (206 -> 214 MB on a small world).
+   Freezing is balanced: unfreeze and one collection (about 1 s on the 50-season world; 1.8 s measured in the
+   benchmark) before each re-freeze. In the tests, only test code left Archives unclosed (now closed).
+3. **Benchmark** — fixed (d86a3c8): preparation in its own process, `--workers` on the measured session,
+   live-worker memory (RSS and PSS, sampled), every part separate, the user-visible skip explicit.
+4. **Majors in calendar order** — reproduced, fixed, tested (5169e9f); reports regenerated (ea7b508), marked as
+   corrected analysis of the 7334ffe world, originals kept.
+5. **Season indexes** — measured with EXPLAIN QUERY PLAN, implemented (bc77c74): reading one season's starts
+   scanned all 7.0 M rows; season indexes on starts, seasons and careers (one season 362 -> 133 ms; first
+   Records page on the 50-season world 29.9 -> 16.2 s; re-indexing a season 4.9 -> 3.5 s; index +10%).
+6. **Preservation** — the original world still matches the export's checksums; a full restore drill from the
+   two delivered parts passed (both checksums, history read, session reopened); the archive's README had a
+   `history_query.py` line without its command (corrected steps in `reports/long_run_2027/README.md`).
+
+**Corrected benchmark** (season 51 on a copy of the 50-season world, Intel Xeon @ 2.10 GHz, 4 logical CPUs, 15
+GB, Python 3.13, Linux; clean measured process; the one-time first open of the copy, about 100-120 s for index
+upgrades, done beforehand in its own process and excluded):
+
+| Code, workers | Skip (click to overview) | Simulate | Save | Publish | Settle | Reload + overview | First Records page | Peak memory (main RSS / all PSS) |
+|---|---|---|---|---|---|---|---|---|
+| ba94d2f, 4 | 237.7 s | 208.6 s | 17.6 s | 7.1 s | 0.0 s | 4.4 s | 29.9 s | 2.36 GB / 3.8 GB |
+| this pass, 4 | 239.6 s | 209.2 s | 17.2 s | 6.7 s | 1.8 s | 4.7 s | 16.2 s | 2.36 GB / 3.8 GB |
+| this pass, 3 | 244.2 s | 214.5 s | 16.5 s | 6.9 s | 1.9 s | 4.5 s | 15.1 s | 2.36 GB / 3.8 GB |
+| this pass, 4: season 1 of a new world (seed 2027) | 121.0 s | 114.7 s | 2.6 s | 2.8 s | 0.3 s | 0.7 s | 0.3 s | 0.56 GB / 0.73 GB |
+
+The earlier "3.6 GB" main-process figures included the preparation world kept alive in the same process, and
+the earlier worker figure was from exited processes; earlier timings ran with the world's saved 4 workers.
+Simulation time on this container also drifts between sessions (190 s earlier, 209 s now for the same
+work), so only same-session comparisons are meaningful.
+
+**Partial / open**
+- The two-minute target is **not met**: about 240 s at season 51 and 121 s in season 1 (4 workers; 164 s with 2).
+  Simulation is about 87% of the skip. Next, in order: send each course to the workers once rather than with
+  every site, and return only the hole data that is archived (both cut pickling and pipe traffic in the main
+  process); cache each monthly plan's event values by what they depend on; then measure on the intended
+  hardware (more cores shorten the shot simulation; the main process's weekly work is serial).
+- **Season 100 is unmeasured**: no season-100 save exists; producing one needs a long run (not started).
+
+**Untested assumptions**
+- WAL needs shared memory: on network drives SQLite cannot use it, no read transaction is held there, and a
+  rollback could still mix into an open snapshot's index answers.
+- Windows: hard links, the lock file, `os.replace` over open files, fsync, WAL files, deleting a test's
+  temporary directory while a connection is open, and the restore steps' Windows commands.
 
 ## V1 observer UI (owner baseline, `docs/UI_REQUIREMENTS_V1.md`)
 
