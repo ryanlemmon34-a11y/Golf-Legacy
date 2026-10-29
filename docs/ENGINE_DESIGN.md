@@ -41,7 +41,16 @@ the development container (Intel Xeon @ 2.10 GHz, 4 logical CPUs, Python 3.13, L
 | After the finance and recovery pass (1b0c814), season 1 | 110.9 s | 104.9 s | 4.2 s | 1.4 s | 0.1 s | 0.4 s |
 | After the finance and recovery pass (1b0c814), season 2 | 120.5 s | 112.4 s | 5.0 s | 2.1 s | 0.6 s | 0.6 s |
 
-Single runs vary by several seconds; season 2 sits at the target, not safely under it. The weekly
+| 50-season run (7334ffe), season 10 (10,576 active) | 179 s | 152 s | 12.7 s | 5.8 s | 9.0 s | 0.5 s |
+| 50-season run, season 25 (12,833 active) | 228 s | 176 s | 14.4 s | 11.3 s | 26.0 s | 2.5 s |
+| 50-season run, season 50 (13,187 active, 42,947 people) | 280 s | 201 s | 22.9 s | 4.4 s | 51.0 s | 4.4 s |
+| Season 51 in a clean process (copy of the final world) | 268 s | 172 s | 21.3 s | 5.3 s | 69.3 s (overview builds the records) | — |
+
+Single runs vary by several seconds; season 2 sits at the target, not safely under it. **The 50-season run
+misses the target from season 2 on** (`reports/long_run_2027/`): simulation grows with the active population
+(about 13,000 from season 25, where it levels off) to 170–200 s; the observer's overview builds the in-memory
+records (`HistoryStats`), which after 50 seasons takes about 70 s and 9 GB. The harness's timings are
+pessimistic (it holds 50 seasons of diagnostic rows in the same process). The weekly
 budget and site pricing add no measurable time.
 
 - Retired people keep their identity and history (in `world.golfers`, the archive and the index), but the

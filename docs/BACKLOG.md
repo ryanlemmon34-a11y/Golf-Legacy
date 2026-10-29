@@ -218,6 +218,33 @@ Same status words as above.
    backers' money (56–65%) and new professionals (43%); living outside the tour's countries 7–8%; injury
    2–4%. Residence is not the main cause.
 
+### 50-season run (seed 2027, `reports/long_run_2027/`)
+
+Engine 7334ffe (clean), full population, every shot, through the persistent session and the observer; every
+check passed in all 50 seasons (cash, family money, backers' money, staff payments, staff invariants, population).
+- **Population** levels off: about 13,000 active golfers from season 25 (6,955 at the start); 42,947 people by
+  season 50. Golfers arriving in season two or later won 131 of 200 majors; 8 became world No. 1.
+- **High-potential golfers who left before developing**: 5 of the 2,127 in the top 5% of potential (2 became
+  caddies, 2 coaches, 1 went back to amateur golf), all with no money left.
+- **Money**: no season failed to reconcile; one golfer ended a season beyond their own credit in 3 of the 50 seasons. **Open:**
+  about 40% of full-time professionals end each season in debt (median about $7,000, within credit), and 45% of
+  full-time mini-tour seasons lose 4+ weeks to money. Causes: a losing previous season (59%), beginning in debt
+  (50%), no backers' money (41%), new professionals (40%), living outside the tour's countries (13%). The mini
+  tours' economics (entry fees against purses) deserve an owner review; nothing was tuned.
+- **Residence**: moves are rare and explained. Over 50 seasons there were 920 graduates going home, 484 other
+  returns home, 143 career moves abroad (59 of them later went home), 2,626 caddies following their player and
+  272 coaches following their players. 150–190 wanted moves a season were not made for lack of money.
+- **Performance — missed.** Season skips took 108 s in season 1, then 122 s in season 2, rising to 280 s by
+  season 50. In a clean process season 51 took 268 s: simulation 172 s, save 21 s, the observer's overview 69 s.
+  - The overview builds the in-memory records, peaking at 9 GB, which probably caused one container restart
+    during this pass.
+  - **Next:** answer records from the archive index (SQLite) instead of holding every start in memory, and keep
+    the overview off them. Simulation time grows with the active population; the target needs faster weekly
+    work or the intended hardware. Season 100 is unmeasured.
+- **Untested on Windows**: hard links between generations (`os.link`, falling back to a copy), the lock file,
+  `os.replace` over files another process has open, fsync behaviour and network drives. All save and recovery
+  tests ran on Linux.
+
 ## V1 observer UI (owner baseline, `docs/UI_REQUIREMENTS_V1.md`)
 
 The V1 interface is an interactive golf encyclopedia over a world the player only advances: linked
