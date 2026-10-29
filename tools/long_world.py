@@ -596,8 +596,62 @@ def highlights(d, a):
     return out
 
 
-def interesting(d, a, n=6):
-    """Careers picked by rules on recorded results (not by hidden ability)."""
+WIN_LEVEL = {**LEVEL, 8: 'club professional (section)'}
+MILESTONE_LOGS = ('Arrived on the scene', 'Turned professional', 'Stopped chasing', 'Retired from competitive',
+                  'Took a job', 'Became a caddie', 'Became a coach', 'Became a club', 'College eligibility ended',
+                  'Reinstated', 'Returned to', 'Moved to', 'Moved back')
+
+
+def milestones(d, a, gid, best_week=None, limit=16):
+    """A career told by its milestones, in order: arrival and turning professional, each new level
+    reached, the first win, the first win at each level, majors, world No. 1, career changes and comebacks
+    (recorded results and decisions only; never the first lines of a log that may be all early travel)."""
+    tl, g = a['_tl'][gid], d['golfers'][gid]
+    out = []
+    if g['initial']:
+        out.append((d['first'], 0, 'In the starting world (career before the archive unknown)'))
+    for y, text in g['history']:
+        if text.startswith(MILESTONE_LOGS):
+            out.append((y, 1, text))
+    seen_level, won_any, won_level = set(), False, set()
+    for y in sorted(tl):
+        r = tl[y]
+        if full_time(r) and r['tier'] not in seen_level and (not seen_level or r['tier'] < min(seen_level)):
+            out.append((y, 2, f'First full-time season at {LEVEL.get(r["tier"], "?")} level'))
+        if full_time(r):
+            seen_level.add(r['tier'])
+        for tier, n in sorted(r['wins_by_tier'].items()):
+            if n and tier not in won_level and tier != 0:            # (majors, tier 0, are listed below)
+                won_level.add(tier)
+                out.append((y, 3, ('First win, at ' if not won_any else 'First win at ') + f'{WIN_LEVEL.get(tier, "?")} level'
+                            + (f' ({n} that season)' if n > 1 else '')))
+                won_any = True
+    majors = sorted((int(k.split(':')[0]), MAJOR_NAME[k.split(':')[1]]) for k, w in d['majors'].items() if w == gid)
+    for i, (y, m) in enumerate(majors):
+        out.append((y, 4, f'Won the {m} (major No. {i + 1})'))
+    no1 = sorted(y for y, w in d['number_one'].items() if w == gid)
+    if no1:
+        out.append((no1[0], 5, f'World No. 1 at a season\'s end for the first time ({len(no1)} season ends in all)'))
+    for y in sorted(d['transitions']):
+        for t in d['transitions'][y]:
+            if t['gid'] == gid and t['kind'] == 'comeback':
+                out.append((y, 6, f'Came back to full-time golf at {t.get("age", "?")}'))
+    out.sort(key=lambda x: (x[0], x[1]))
+    keep = out if len(out) <= limit else out[:limit - 1] + [out[-1]]   # the latest milestone always shown
+    wins = sum(sum(r['wins_by_tier'].values()) for r in tl.values())
+    lines = [f'  - {y}: {text}' for y, _, text in keep]
+    if len(out) > limit:
+        lines.insert(limit - 1, f'  - … {len(out) - limit} more milestones')
+    seasons = sum(1 for r in tl.values() if full_time(r))
+    lines.append(f'  - In all: {seasons} full-time professional seasons in the archive, {wins} wins at every level '
+                 f'(amateur and college included), {len(majors)} majors'
+                 + (f', best weekly world ranking {best_week[gid]}' if best_week and gid in best_week else ''))
+    return lines
+
+
+def interesting(d, a, n=6, best_week=None):
+    """Careers picked by rules on recorded results (not by hidden ability). Golfers already in the
+    starting world are not 'late bloomers' (their careers began before the archive)."""
     tl, eps, best = a['_tl'], a['_eps'], a['_best']
     g = d['golfers']
     majors = Counter(d['majors'].values())
@@ -611,9 +665,9 @@ def interesting(d, a, n=6):
     climb = [gid for gid in eps if not g[gid]['initial'] and best[gid] == 1
              and tl[gid][eps[gid][0][0]]['tier'] >= 4]
     add('From the mini tours to the Premier Tour', min(climb, key=lambda x: (eps[x][0][0], x)) if climb else None)
-    late = [gid for gid in eps if best[gid] == 1 and min(y for y in tl[gid] if full_time(tl[gid][y]) and tl[gid][y]['tier'] == 1)
-            - g[gid]['born'] >= 31]
-    add('Late bloomer (first Premier season at 31+)', min(late, key=lambda x: x) if late else None)
+    late = [gid for gid in eps if not g[gid]['initial'] and best[gid] == 1
+            and min(y for y in tl[gid] if full_time(tl[gid][y]) and tl[gid][y]['tier'] == 1) - g[gid]['born'] >= 31]
+    add('Late bloomer (arrived in the world, first Premier season at 31+)', min(late) if late else None)
     cbs = [gid for gid, e in eps.items() if len(e) > 1 and min(tl[gid][y]['tier'] for y in range(e[1][0], e[-1][1] + 1) if y in tl[gid])
            < min(tl[gid][y]['tier'] for y in range(e[0][0], e[0][1] + 1))]
     add('A comeback that went further than before', min(cbs) if cbs else None)
@@ -621,8 +675,7 @@ def interesting(d, a, n=6):
     out = []
     for label, gid in picks[:n]:
         out.append(f'- **{label} — {name(d, gid)}**, born {g[gid]["born"]}:')
-        out += [f'  - {y}: {t}' for y, t in g[gid]['history']
-                if not t.startswith(('Hired', 'Approached', 'Left coach', 'Parted', 'Secured for next season'))][:14]
+        out += milestones(d, a, gid, best_week)
     return out
 
 

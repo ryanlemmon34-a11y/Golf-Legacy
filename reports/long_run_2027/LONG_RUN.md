@@ -8,6 +8,7 @@
 ## 2. Money
 
 - **Reconciliation:** 50 seasons checked; seasons where cash, family money, backers' money or staff payments did not reconcile: 0.
+- **Flagged, not reconstructed:** in runs made before 4754eed (this one: engine 7334ffe) a season's *annual net* is the figure taken before the winter, so a winter move's $6,000 is not in it, and before 75c135f a support-funded winter move was drawn in the *next* year's ledger. Cash still reconciled every year; the per-year split of those few moves cannot be rebuilt exactly from the saved data, so annual nets are reported as recorded.
 
 **Debt at the end of each season** (full-time professionals; beyond credit = below minus their own credit limit, which grows with last season's earnings):
 
@@ -90,7 +91,7 @@ Every golfer-week of the whole run, by career stage: played; blocked by access (
 Whole run: caddie followed their player 2,626; returned home (after college) 920; returned home 484; coach followed their players 272; closer to their events 143; closer to their events (after college) 4.
 
 - Travel and entry costs per event, full-time professionals: living in their own country median $1,957 (125,176 seasons); living abroad median $1,988 (3,556 seasons).
-- Golfers who moved abroad for their career and later returned home: 59.
+- Golfers who moved abroad for their career and later returned home: 50.
   - **Alfie Bennett (South Africa)**, born 2005: 2027: North Carolina, USA → Andalusia, Spain (closer to the Challenger Tour Europe events (about $26,586 a season less travel; the move cost $6,000); after college); 2030: Andalusia, Spain → Gauteng, South Africa (returned home (travel $19,699 a season dearer, no longer a burden))
   - **Richard Henderson (Canada)**, born 2007: 2030: California, USA → Antioquia, Colombia (closer to the Latin America & Canada Tour events (about $17,030 a season less travel; the move cost $6,000)); 2033: Antioquia, Colombia → British Columbia, Canada (returned home (closer to their events too: $18,596 a season less travel))
   - **Brandon Anderson (USA)**, born 2007: 2027: Nevada, USA → Antioquia, Colombia (closer to the Latin America & Canada Tour events (about $17,017 a season less travel; the move cost $6,000)); 2030: Antioquia, Colombia → Nevada, USA (returned home (closer to their events too: $52,058 a season less travel))
@@ -112,113 +113,123 @@ Full-time mini-tour professional seasons (2028–2076): 53,030; with 4+ weeks un
 - injured 4+ weeks last season: 306 (1.3%)
 - injured 4+ weeks this season: 303 (1.3%)
 
-## 5. High-potential golfers who left before developing
+## 5. High-potential golfers: how their full-time golf ended
 
-Found with debug data (hidden potential); the simulation never uses it for decisions. "Left" = their last full-time season was before 27 and they were still at least 6 points of overall below their potential.
+**Definition.** High potential = the top 5% of hidden potential (debug data: the simulation never uses it for decisions; it only finds these golfers here). An episode is a run of consecutive full-time seasons (professional or amateur, college included). An episode **ended before developing** if it ended (the golfer was no longer full-time the next season) before they were 27 and with their best overall so far at least 6 points below their potential. Its reason is the career decision recorded at the end of *that* episode's last season. A golfer who later returned to full-time golf is a **comeback**, not a loss. These counts describe this one world; they are not the total of lost talent, and the recorded reasons (with the money and desire the decision weighed) are not proof that money alone caused a departure.
 
-Top 5% of potential (≥ 70.7): 2,127 golfers; left before developing: 5. Reasons: became caddie 2; became coach 2; back to amateur 1.
+Top 5% of potential (≥ 70.7): 2,127 golfers. Each of their full-time episodes (a golfer can have several), and those never full-time:
 
-| Golfer | Potential | Best overall | Left at | Starts | Reason (recorded) |
-|---|---|---|---|---|---|
-| Darcy Jardine (Australia) | 72 | 66.4 | 21 (2049) | 21 | back to amateur (p 0.3058, runway 0.0, progress 1.02, desire 2.52) |
-| Kaito Shimizu (Japan) | 72 | 61.7 | 21 (2031) | 7 | became coach (p 0.4759, runway 0.0, progress 0.48, desire 1.8) |
-| George Venables (England) | 72 | 60.3 | 21 (2057) | 10 | became caddie (p 0.5766, runway 0.0, progress 0.42, desire 1.39) |
-| Gavin Ross (USA) | 71 | 64.2 | 22 (2030) | 21 | became caddie (p 0.6213, runway 0.0, progress 0.3, desire 1.2) |
-| Yusaku Kimura (Japan) | 71 | 63.8 | 25 (2036) | 28 | became coach (p 0.627, runway 0.0, progress -0.2, desire 1.18) |
+- episode ended after developing or at 27+ (a completed episode): 1,654
+- still full-time at the end of the run (an unfolding episode): 655
+- ended young and undeveloped, not back by the end of the run: 20
+- never full-time in the archive: 6
+- ended young and undeveloped, then came back (comeback episode): 3
+
+Episodes that ended young and undeveloped and did not come back, by the recorded decision: part-time pro 7; back to amateur 5; became caddie 2; college to amateur 2; became coach 2; amateur took a job 2.
+
+| Golfer | Potential | Best overall then | Episode | Age at end | Starts in it | Decision (recorded) |
+|---|---|---|---|---|---|---|
+| Brady Morgan (USA) | 75 | 65.2 | ends 2043 | 22 | 19 | part-time pro (p 0.5386, runway 0.0, progress 0.6, desire 1.55) |
+| Gabriele Romano (Italy) | 74 | 67.4 | ends 2065 | 22 | 39 | part-time pro (p 0.4643, runway 0.0, progress 0.48, desire 1.84) |
+| Louis Aubert (France) | 74 | 68.3 | ends 2041 | 25 | 73 | part-time pro (p 0.2991, runway 0.34, progress -0.27, desire 0.79) |
+| Owen Fairchild (USA) | 74 | 67.2 | ends 2039 | 23 | 24 | part-time pro (p 0.6458, runway 0.0, progress 0.09, desire 1.1) |
+| Zach Taylor (USA) | 74 | 64.0 | ends 2047 | 23 | 12 | part-time pro (p 0.7132, runway 0.0, progress -0.08, desire 0.79) |
+| Chanachok F. Chaiyaporn (Thailand) | 73 | 65.6 | ends 2071 | 19 | 30 | amateur took a job (p 0.012) |
+| Logan Q. Ogden (USA) | 73 | 66.7 | ends 2066 | 23 | 32 | back to amateur (p 0.6493, runway 0.0, progress 0.15, desire 1.08) |
+| Shota Ito (Japan) | 73 | 66.5 | ends 2035 | 22 | 104 | college to amateur (p 0.598) |
+| Darcy Jardine (Australia) | 72 | 65.2 | ends 2049 | 21 | 4 | back to amateur (p 0.3058, runway 0.0, progress 1.02, desire 2.52) |
+| Baptiste Dupont (France) | 72 | 64.7 | ends 2036 | 22 | 114 | college to amateur (p 0.4458) |
+| Kaito Shimizu (Japan) | 72 | 61.7 | ends 2031 | 21 | 7 | became coach (p 0.4759, runway 0.0, progress 0.48, desire 1.8) |
+| George Venables (England) | 72 | 60.3 | ends 2057 | 21 | 10 | became caddie (p 0.5766, runway 0.0, progress 0.42, desire 1.39) |
+| Kevin K. Calloway (USA) | 72 | 63.0 | ends 2059 | 23 | 9 | part-time pro (p 0.6827, runway 0.0, progress 0.36, desire 0.93) |
+| Gavin Ross (USA) | 71 | 64.2 | ends 2030 | 22 | 21 | became caddie (p 0.6213, runway 0.0, progress 0.3, desire 1.2) |
+| Cole Campbell (USA) | 71 | 63.8 | ends 2050 | 24 | 14 | back to amateur (p 0.0744, runway 0.67, progress 0.42, desire 1.14) |
 
 ## 6. Generations
 
-- Golfers who arrived in season two or later: 36,498; of them world No. 1 at some point: 8, top 10: 53; major champions: 69.
-- Major wins by arrival: starting world 69; arrived later 131.
+Reaching No. 1 and the top ten is by **weekly world ranking**. Cohorts: the starting world's professionals and its amateurs (college included) are separate; later arrivals are 18-year-old juniors or new professionals from outside the tracked amateur game. Starting-world careers began before the archive (their early results are unknown).
+
+| Cohort | Golfers | Reached No. 1 | Reached top 10 | Major champions | Majors won |
+|---|---|---|---|---|---|
+| starting world: professional | 3,834 | 8 | 43 | 27 | 64 |
+| starting world: amateur | 2,615 | 0 | 2 | 3 | 5 |
+| later: junior (18) | 14,880 | 12 | 65 | 67 | 129 |
+| later: new professional | 21,618 | 0 | 0 | 2 | 2 |
 
 **Most major titles:**
 
-- Hyeon-jun U. Yoo (South Korea), born 2019, arrived 2037: 10 majors, 70 wins, best world ranking 1
-- Landon Long (USA), born 2027, arrived 2045: 9 majors, 43 wins, best world ranking 1
-- Calum Fraser (Scotland), born 2009, arrived 2027: 8 majors, 54 wins, best world ranking 1
-- Sam Whitaker (USA), born 2006, arrived 2027: 8 majors, 45 wins, best world ranking 1
-- Felix Moore (South Africa), born 2019, arrived 2037: 8 majors, 48 wins, best world ranking 2
-- Brian Sullivan (USA), born 2020, arrived 2038: 7 majors, 39 wins, best world ranking 2
-- Kobus Oosthuizen (South Africa), born 2000, arrived 2027: 5 majors, 19 wins, best world ranking 4
-- Jaco Venter (South Africa), born 2019, arrived 2037: 5 majors, 66 wins, best world ranking 1
+- Hyeon-jun U. Yoo (South Korea), born 2019, later: junior (18) (arrived 2037): 10 majors, 70 wins at every level (amateur and college included), best weekly world ranking 1
+- Landon Long (USA), born 2027, later: junior (18) (arrived 2045): 9 majors, 43 wins at every level (amateur and college included), best weekly world ranking 1
+- Calum Fraser (Scotland), born 2009, starting world: professional (arrived 2027): 8 majors, 54 wins at every level (amateur and college included), best weekly world ranking 1
+- Sam Whitaker (USA), born 2006, starting world: professional (arrived 2027): 8 majors, 45 wins at every level (amateur and college included), best weekly world ranking 1
+- Felix Moore (South Africa), born 2019, later: junior (18) (arrived 2037): 8 majors, 48 wins at every level (amateur and college included), best weekly world ranking 1
+- Brian Sullivan (USA), born 2020, later: junior (18) (arrived 2038): 7 majors, 39 wins at every level (amateur and college included), best weekly world ranking 1
+- Kobus Oosthuizen (South Africa), born 2000, starting world: professional (arrived 2027): 5 majors, 19 wins at every level (amateur and college included), best weekly world ranking 2
+- Jaco Venter (South Africa), born 2019, later: junior (18) (arrived 2037): 5 majors, 66 wins at every level (amateur and college included), best weekly world ranking 1
 
 **Interesting careers** (picked by rules on recorded results):
 
 - **Most majors — Hyeon-jun U. Yoo (South Korea)**, born 2019:
   - 2037: Arrived on the scene at 18 (International University Golf)
-  - 2037: Won the Asian Amateur Series Event 95 (Saudi Arabia) at -10 (Al Rimal Golf Links)
-  - 2037: Won the Singapore Amateur Championship at -8 (Sparrow Bay Golf Club)
-  - 2038: Won the Asian Amateur Series Event 54 (China) at -8 (Jinlong Xiamen International Golf Club)
-  - 2038: Won the India Amateur Championship at -3 (Kesar Bagh New Delhi Golf & Country Club)
-  - 2039: Coaching with Si-hyun Moon ended (joined Yuto Saito)
-  - 2039: Won the Asian Amateur Series Event 12 (Japan) at -9 (Hanamizuki Golf Links)
-  - 2039: Won the China Amateur Championship at +3 (Jinlong Xiamen International Golf Club)
-  - 2039: Won the Asia-Pacific Amateur Championship at -12 (Xinghai International Golf Club)
-  - 2039: Won the Asian Amateur Series Championship at -16 (Takigawa Miyazaki Golf Links)
-  - 2040: Won the Indonesia Amateur Championship at -18 (Tasik Biru Golf Club)
-  - 2040: Won the China Amateur Championship at -9 (Yunshan Lakes Golf Club)
-  - 2040: Won the Malaysia Amateur Championship at -16 (Bukit Tinggi Golf Resort)
-  - 2040: Won the India Amateur Championship at -18 (Vana Vihar Mumbai Golf & Country Club)
+  - 2037: First win, at Amateur level (2 that season)
+  - 2041: College eligibility ended; kept playing as an amateur alongside a job
+  - 2041: First win at College level (4 that season)
+  - 2042: Turned professional from the amateur ranks (amateur ranking 3), starting on the Asian Challenger Tour, with backers putting up $47,800 a season for a share of winnings
+  - 2043: First full-time season at Challenger level
+  - 2043: First win at Premier level
+  - 2043: First win at Challenger level (4 that season)
+  - 2043: Won the Britannia Open (major No. 1)
+  - 2043: Won the Premier Tour Championship (major No. 2)
+  - 2044: First full-time season at Premier level
+  - 2045: Won the Premier Tour Championship (major No. 3)
+  - 2045: Won the Tour Masters (major No. 4)
+  - 2045: World No. 1 at a season's end for the first time (4 season ends in all)
+  - 2047: Won the Britannia Open (major No. 5)
+  - … 4 more milestones
+  - 2068: Won the Premier Tour Championship (major No. 10)
+  - In all: 34 full-time professional seasons in the archive, 70 wins at every level (amateur and college included), 10 majors, best weekly world ranking 1
 - **From the mini tours to the Premier Tour — Martín García (Argentina)**, born 2004:
   - 2028: Turned professional at 24, starting on the Southern Cone Pro Series, paying their own way
-  - 2028: Southern Cone Pro Series → Latin America & Canada Tour (called up to fill the Latin America & Canada Tour)
-  - 2029: Won the Latin America & Canada Tour Event 3 at -23 (Golfe Quinta da Ribeira)
-  - 2029: Won the Latin America & Canada Tour Event 4 at -13 (Pemberly Run Golf Club)
-  - 2029: Latin America & Canada Tour → Premier Tour Americas (top 5 on Latin America & Canada Tour)
-  - 2031: Premier Tour Americas → Latin America & Canada Tour (lost Premier card)
-  - 2032: Won the Latin America & Canada Tour Event 4 at -8 (Blackwater Woods Golf Club)
-  - 2032: Latin America & Canada Tour → Premier Tour Americas (top 5 on Latin America & Canada Tour)
-  - 2034: Coaching with Rodrigo Paz ended (coach retired)
-  - 2038: Won the Chile Open at -13 (Golf La Cañada)
-  - 2040: Won the Argentina Open at -22 (Golf Las Encinas Altas)
-  - 2041: Won the Pacific Northwest Open at +6 (Heron Park Golf Club)
-  - 2044: Won the Peru Open at -17 (Club de Campo La Estancia)
-  - 2046: Won the Argentina Open at -19 (Golf Las Encinas Altas)
-- **Late bloomer (first Premier season at 31+) — Hunter Baker (USA)**, born 1992:
-  - 2027: Won the Desert Tour Championship at -15 (Al Bahr Golf Resort)
-  - 2027: Won the Australia Open at -14 (Royal Juniper Brook National)
-  - 2028: Won the Tour Masters at -11 (Georgia National Golf Club)
-  - 2031: Injured (elbow), out for 4 weeks
-  - 2031: Won the Korea Championship at -22 (Pureun Golf Club)
-  - 2031: Won the USA Open at -10 (Marten Hollow Golf Club)
-  - 2033: Won the Pacific Coast Pro-Am at -5 (Rowan Vale Club)
-  - 2033: Won the Mid-Atlantic Championship at -11 (Badgerbrook Club)
-  - 2033: Injured (ankle), out for 3 weeks
-  - 2034: Won the Desert Classic at -22 (Northcote Cove Club)
-  - 2035: Caddie Robert Rutledge off the bag (caddie retired)
-  - 2038: Won the Carolina Championship at -27 (Holly Ridge Golf Club)
-  - 2039: Caddie Nick Pruitt off the bag (the golfer wanted a change)
-  - 2043: Retired from competitive golf at 51
+  - 2028: First full-time season at Mini level
+  - 2029: First full-time season at Challenger level
+  - 2029: First win, at Challenger level (2 that season)
+  - 2030: First full-time season at Premier level
+  - 2041: First win at Premier level
+  - 2053: Retired from competitive golf at 49
+  - In all: 26 full-time professional seasons in the archive, 9 wins at every level (amateur and college included), 0 majors
+- **Late bloomer (arrived in the world, first Premier season at 31+) — Rupert Gillard (England)**, born 2010:
+  - 2028: Arrived on the scene at 18 (US College Division I)
+  - 2028: First win, at Amateur level (2 that season)
+  - 2031: First win at College level (2 that season)
+  - 2032: College eligibility ended; kept playing as an amateur alongside a job
+  - 2038: Turned professional late, after years as an amateur (amateur ranking 9), starting on the Challenger Tour Europe, paying their own way
+  - 2039: First full-time season at Challenger level
+  - 2041: First win at Challenger level
+  - 2042: First full-time season at Premier level
+  - 2061: Retired from competitive golf at 51
+  - In all: 23 full-time professional seasons in the archive, 12 wins at every level (amateur and college included), 0 majors
 - **A comeback that went further than before — Rory Holroyd (Australia)**, born 2001:
-  - 2027: Won the Philippines Open at -13 (Linden Downs Resort Course)
-  - 2027: Injured (oblique), out for 2 weeks
-  - 2028: Won the Australasia Tour Event 5 at -17 (Bramble Fields Country Club)
+  - 2027: In the starting world (career before the archive unknown)
+  - 2027: First full-time season at Challenger level
+  - 2027: First win, at Challenger level
+  - 2028: First win at Regional level
   - 2029: Stopped chasing the tour at 28; took a job and plays a few local events (runway 10.0 yrs, progress -0.1, desire +0.3)
-  - 2030: Caddie Gonzalo Rojas off the bag (no longer on a tour that needs one)
-  - 2030: Won the Australian State Pro Series Event 2 at -1 (Cedar Point Golf Club)
-  - 2030: Won the Australian State Pro Series Event 7 at -11 (Whitewater Moor Golf Resort)
-  - 2030: Won the Australasia Tour Event 13 at -19 (Marten Glen Country Club)
-  - 2030: Quit their job to make another run at it, aged 29
-  - 2031: Won the Australasia Tour Event 14 at -2 (Badger Crest Golf Club)
-  - 2031: Australian State Pro Series → Asian Challenger Tour (top 4 on Australian State Pro Series)
-  - 2032: Injured (thumb), out for 3 weeks
-  - 2034: Won the Asian Challenger Tour Event 2 at -16 (Gunung Indah Golf Club)
-  - 2034: Won the Japan Golf Tour Event 16 at -4 (Kumanodai Golf Links)
+  - 2030: First win at Mini level (2 that season)
+  - 2030: Came back to full-time golf at 29
+  - 2035: First full-time season at Premier level
+  - 2043: First win at Premier level
+  - 2052: Retired from competitive golf at 51
+  - In all: 25 full-time professional seasons in the archive, 14 wins at every level (amateur and college included), 0 majors
 - **Longest full-time career — Cédric Laurent (France)**, born 2008:
-  - 2028: Caddie Tanner James off the bag (caddie retired)
-  - 2029: Coaching with Alfred Olsson ended (joined Hugo Michel)
-  - 2029: Won the Italian Championship at -23 (Golf Club Le Querce)
-  - 2030: Injured (back), out for 3 weeks
-  - 2030: Won the Heartland Invitational at -11 (Dunmore Wood Golf Club)
-  - 2031: Won the Canada Open at -14 (Pemberly Run Golf Club)
-  - 2032: Won the German Masters at -22 (Golfpark Waldsee)
-  - 2033: Won the Texas Open at -12 (Hartwell Landing Club)
-  - 2034: Won the Island Championship at -25 (Ashcombe Harbor Golf Club)
-  - 2034: Won the Australia Open at -10 (Wolfe Crest Golf Club)
-  - 2035: Won the Pacific Coast Pro-Am at +2 (Rowan Vale Club)
-  - 2035: Won the Tour Masters at -11 (Georgia National Golf Club)
-  - 2037: Won the Carolina Championship at -13 (Hartwell Landing Club)
-  - 2037: Won the Japan Premier Championship at -10 (Suzukake Golf Club)
+  - 2027: In the starting world (career before the archive unknown)
+  - 2027: First full-time season at Premier level
+  - 2029: First win, at Premier level
+  - 2035: Won the Tour Masters (major No. 1)
+  - 2038: Won the USA Open (major No. 2)
+  - 2042: World No. 1 at a season's end for the first time (2 season ends in all)
+  - 2051: Won the USA Open (major No. 3)
+  - 2066: Retired from competitive golf at 58
+  - In all: 40 full-time professional seasons in the archive, 31 wins at every level (amateur and college included), 3 majors, best weekly world ranking 1
 
 ## 7. Population, archive and the season skip
 

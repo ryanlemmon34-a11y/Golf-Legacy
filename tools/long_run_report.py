@@ -62,13 +62,19 @@ def section_run(d, man, perf_years):
             f'- Configuration: `{json.dumps(man.get("config", {}), sort_keys=True)}`', '']
 
 
-def section_money(d):
+def section_money(d, man=None):
+    man = man or {}
     out = ['## 2. Money', '']
     ck = d['checks']
     bad = [y for y, c in ck.items() if c['reconcile_errors'] or c.get('support_errors')
            or abs(c['caddie_paid'] - c['caddie_received']) > 0.01 or abs(c['coach_paid'] - c['coach_received']) > 0.01]
     out += [f'- **Reconciliation:** {len(ck)} seasons checked; seasons where cash, family money, backers\' money or '
-            f'staff payments did not reconcile: {len(bad)}{" " + str(bad) if bad else ""}.', '']
+            f'staff payments did not reconcile: {len(bad)}{" " + str(bad) if bad else ""}.',
+            '- **Flagged, not reconstructed:** in runs made before 4754eed (this one: engine '
+            f'{str(man.get("commit", "?"))[:7]}) a season\'s *annual net* is the figure taken before the winter, '
+            'so a winter move\'s $6,000 is not in it, and before 75c135f a support-funded winter move was drawn in the '
+            '*next* year\'s ledger. Cash still reconciled every year; the per-year split of those few moves cannot be '
+            'rebuilt exactly from the saved data, so annual nets are reported as recorded.', '']
     from golfsim import finance as FIN
     out += ['**Debt at the end of each season** (full-time professionals; beyond credit = below minus their own '
             'credit limit, which grows with last season\'s earnings):', '',
@@ -211,6 +217,12 @@ def kind_of(reason):
     return 'other'
 
 
+def returned_after_abroad(moves):
+    """A career move abroad and, later in time, a return home (moves in date order)."""
+    away = next((i for i, m in enumerate(moves) if m['reason'].startswith('closer to')), None)
+    return away is not None and any(m['reason'].startswith('returned home') for m in moves[away + 1:])
+
+
 def section_residence(d, archive):
     out = ['## 4. Where people live', '']
     years = sorted(d['extras'])
@@ -237,8 +249,8 @@ def section_residence(d, archive):
     stories = []
     if archive is not None:
         for pid, p in archive.people.items():
-            ms = p.get('moves') or []
-            if any(m['reason'].startswith('closer to') for m in ms) and any(m['reason'].startswith('returned home') for m in ms):
+            ms = sorted(p.get('moves') or [], key=lambda m: (m['year'], m.get('week', 0)))
+            if returned_after_abroad(ms):
                 stories.append((pid, p, ms))
     out.append(f'- Golfers who moved abroad for their career and later returned home: {len(stories):,}.')
     for pid, p, ms in sorted(stories, key=lambda x: x[0])[:5]:
@@ -251,73 +263,147 @@ def where(x):
     return f'{x["region"]}, {x["country"]}' if x and x.get('region') else (x['country'] if x else 'unknown')
 
 
+EXITS = ('part-time pro', 'back to amateur', 'retired', 'became caddie', 'became coach', 'became club pro',
+         'amateur took a job', 'college to amateur')
+
+
+def episodes(rows_by_year, gid):
+    """A golfer's full-time golf episodes (professional or amateur, college included): [(first, last)]."""
+    out = []
+    for y in sorted(rows_by_year):
+        r = rows_by_year[y].get(gid)
+        if r and r['lifestyle'] == 'full_time' and r['status'] in ('pro', 'amateur'):
+            if out and out[-1][1] == y - 1:
+                out[-1][1] = y
+            else:
+                out.append([y, y])
+    return out
+
+
 def section_potential(d, dbg):
-    """High-potential golfers who left full-time golf young, with what they actually did."""
-    out = ['## 5. High-potential golfers who left before developing', '',
-           'Found with debug data (hidden potential); the simulation never uses it for decisions. "Left" = their last '
-           'full-time season was before 27 and they were still at least 6 points of overall below their potential.', '']
-    last_ft, starts, first_over, best_over = {}, Counter(), {}, {}
-    for y in sorted(d['rows']):
-        for gid, r in d['rows'][y].items():
-            starts[gid] += r['events']
-            ov, pot, _ = dbg[y][gid] if gid in dbg.get(y, {}) else (None, None, None)
-            if ov is not None:
-                first_over.setdefault(gid, (y, ov, pot))
-                best_over[gid] = max(best_over.get(gid, 0), ov)
-            if r['lifestyle'] == 'full_time' and r['status'] in ('pro', 'amateur'):
-                last_ft[gid] = y
+    """High-potential golfers and how their full-time episodes ended, episode by episode."""
+    out = ['## 5. High-potential golfers: how their full-time golf ended', '',
+           '**Definition.** High potential = the top 5% of hidden potential (debug data: the simulation never uses it '
+           'for decisions; it only finds these golfers here). An episode is a run of consecutive full-time seasons '
+           '(professional or amateur, college included). An episode **ended before developing** if it ended (the '
+           'golfer was no longer full-time the next season) before they were 27 and with their best overall so far at '
+           'least 6 points below their potential. Its reason is the career decision recorded at the end of *that* '
+           'episode\'s last season. A golfer who later returned to full-time golf is a **comeback**, not a loss. '
+           'These counts describe this one world; they are not the total of lost talent, and the recorded reasons '
+           '(with the money and desire the decision weighed) are not proof that money alone caused a departure.', '']
     years = sorted(d['rows'])
+    last = years[-1]
+    rows = d['rows']
+    pot, best_by_year = {}, defaultdict(dict)
+    for y in years:
+        for gid, v in dbg.get(y, {}).items():
+            if v[1] is not None:
+                pot.setdefault(gid, v[1])
+            best_by_year[gid][y] = v[0]
+    pots = sorted(pot.values())
+    cut = pots[int(0.95 * len(pots))] if pots else 99
+    high = [gid for gid, p in pot.items() if p >= cut]
     why = {}
     for y, ts in d['transitions'].items():
         for t in ts:
-            if t['kind'] in ('part-time pro', 'back to amateur', 'retired', 'became caddie', 'became coach',
-                             'became club pro', 'amateur took a job', 'college to amateur'):
-                why.setdefault(t['gid'], (y, t))
-    pots = sorted(p for _, _, p in first_over.values() if p)
-    cut = pots[int(0.95 * len(pots))] if pots else 99
-    left = []
-    for gid, (y0, ov0, pot) in first_over.items():
+            if t['kind'] in EXITS:
+                why[(t['gid'], y)] = t
+    cat = Counter()
+    cases = []
+    for gid in high:
         g = d['golfers'].get(str(gid)) or d['golfers'].get(gid)
-        if not pot or pot < cut or gid not in last_ft or last_ft[gid] >= years[-1]:
+        eps = episodes(rows, gid)
+        if not eps:
+            cat['never full-time in the archive'] += 1
             continue
-        age = last_ft[gid] - g['born']
-        if age < 27 and pot - best_over[gid] >= 6 and gid in why:
-            left.append((pot, gid, g, age, why[gid]))
-    out.append(f'Top 5% of potential (≥ {cut:.1f}): {sum(1 for p in pots if p >= cut):,} golfers; left before developing: '
-               f'{len(left):,}. Reasons: ' + '; '.join(f'{k} {n}' for k, n in Counter(w[1]['kind'] for *_, w in left).most_common()) + '.')
-    out += ['', '| Golfer | Potential | Best overall | Left at | Starts | Reason (recorded) |', '|---|---|---|---|---|---|']
-    for pot, gid, g, age, (y, t) in sorted(left, reverse=True)[:15]:
-        detail = ', '.join(f'{k} {v}' for k, v in t.items() if k in ('p', 'runway', 'progress', 'desire'))
-        out.append(f'| {g["name"]} ({g["country"]}) | {pot:.0f} | {best_over[gid]:.1f} | {age} ({y}) | {starts[gid]} | '
-                   f'{t["kind"]} ({detail}) |')
+        for k, (a, b) in enumerate(eps):
+            if b == last:
+                cat['still full-time at the end of the run (an unfolding episode)'] += 1
+                continue
+            age = b - g['born']
+            best = max(v for y, v in best_by_year[gid].items() if y <= b)
+            reason = why.get((gid, b))
+            comeback = k < len(eps) - 1
+            if age >= 27 or pot[gid] - best < 6:
+                cat['episode ended after developing or at 27+ (a completed episode)'] += 1
+            elif comeback:
+                cat['ended young and undeveloped, then came back (comeback episode)'] += 1
+            else:
+                cat['ended young and undeveloped, not back by the end of the run'] += 1
+                cases.append((pot[gid], gid, g, age, b, best, sum(rows[y][gid]['events'] for y in range(a, b + 1)), reason))
+    out.append(f'Top 5% of potential (≥ {cut:.1f}): {len(high):,} golfers. Each of their full-time episodes '
+               '(a golfer can have several), and those never full-time:')
+    out += [''] + [f'- {k}: {n:,}' for k, n in cat.most_common()] + ['']
+    reasons = Counter((c[7] or {}).get('kind', 'no departure decision recorded') for c in cases)
+    out.append('Episodes that ended young and undeveloped and did not come back, by the recorded decision: '
+               + ('; '.join(f'{k} {n}' for k, n in reasons.most_common()) or 'none') + '.')
+    out += ['', '| Golfer | Potential | Best overall then | Episode | Age at end | Starts in it | Decision (recorded) |',
+            '|---|---|---|---|---|---|---|']
+    for p_, gid, g, age, b, best, starts, t in sorted(cases, key=lambda c: (-c[0], c[1]))[:15]:
+        detail = ', '.join(f'{k} {v}' for k, v in (t or {}).items() if k in ('p', 'runway', 'progress', 'desire'))
+        out.append(f'| {g["name"]} ({g["country"]}) | {p_:.0f} | {best:.1f} | ends {b} | {age} | {starts} | '
+                   f'{(t or {}).get("kind", "none recorded")}{f" ({detail})" if detail else ""} |')
     return out + ['']
 
 
-def section_generations(d, dbg):
+def arrival(d, gid):
+    """How a golfer entered the world: starting-world professional / amateur (college included), or later
+    as an 18-year-old junior or as a new professional from outside the amateur game."""
+    g = d['golfers'].get(str(gid)) or d['golfers'].get(gid)
+    if g['initial']:
+        r = d['rows'][d['first']].get(gid) or d['rows'][d['first']].get(str(gid))
+        return 'starting world: professional' if r and r['status'] in ('pro', 'club_pro') else 'starting world: amateur'
+    first = next((t for _, t in g['history'] if t.startswith(('Arrived on the scene', 'Turned professional'))), '')
+    return 'later: new professional' if first.startswith('Turned professional') and 'Arrived' not in first \
+        else 'later: junior (18)'
+
+
+def weekly_best(archive):
+    """Each person's best weekly world ranking (top 100 kept per week) over the archive: one pass, a few
+    seasons decoded at a time."""
+    best = {}
+    for y in archive.years:
+        for w in range(1, 53):
+            for i, pid in enumerate(archive.ranking(y, w)[:10]):
+                best[pid] = min(best.get(pid, 99), i + 1)
+    return best
+
+
+def section_generations(d, dbg, archive=None, best=None):
     out = ['## 6. Generations', '']
-    first = d['first']
     majors = Counter(d['majors'].values())
     wins = Counter()
-    best_rank = {}
     for y, rows in d['rows'].items():
         for gid, r in rows.items():
             wins[gid] += sum(r['wins_by_tier'].values())
-            if r['wr'] is not None:
-                best_rank[gid] = min(best_rank.get(gid, 9999), r['wr'])
+    if best is None and archive is not None:
+        best = weekly_best(archive)
+    label = 'weekly world ranking' if best is not None else 'world ranking at a season\'s end (weekly not available)'
+    if best is None:
+        best = {}
+        for y, rows in d['rows'].items():
+            for gid, r in rows.items():
+                if r['wr'] is not None and r['wr'] <= 10:
+                    best[gid] = min(best.get(gid, 99), r['wr'])
+    groups = defaultdict(set)
+    for gid in d['golfers']:
+        groups[arrival(d, int(gid))].add(int(gid))
+    out += [f'Reaching No. 1 and the top ten is by **{label}**. Cohorts: the starting world\'s professionals and its '
+            'amateurs (college included) are separate; later arrivals are 18-year-old juniors or new professionals '
+            'from outside the tracked amateur game. Starting-world careers began before the archive (their early '
+            'results are unknown).', '',
+            '| Cohort | Golfers | Reached No. 1 | Reached top 10 | Major champions | Majors won |', '|---|---|---|---|---|---|']
+    for k in ('starting world: professional', 'starting world: amateur', 'later: junior (18)', 'later: new professional'):
+        ids = groups.get(k, set())
+        out.append(f'| {k} | {len(ids):,} | {sum(1 for x in ids if best.get(x) == 1)} | '
+                   f'{sum(1 for x in ids if best.get(x, 99) <= 10)} | {sum(1 for x in majors if x in ids)} | '
+                   f'{sum(n for x, n in majors.items() if x in ids)} |')
+    out += ['', '**Most major titles:**', '']
     g = d['golfers']
-    created = lambda gid: (g.get(str(gid)) or g.get(gid) or {}).get('created') or first
-    later = [gid for gid in best_rank if created(gid) > first]
-    out += [f'- Golfers who arrived in season two or later: {len({gid for gid in g if (g[gid].get("created") or first) > first}):,}; '
-            f'of them world No. 1 at some point: {sum(1 for x in later if best_rank[x] == 1)}, top 10: '
-            f'{sum(1 for x in later if best_rank[x] <= 10)}; major champions: {sum(1 for x in majors if created(x) > first)}.',
-            '- Major wins by arrival: ' + '; '.join(f'{label} {n}' for label, n in (
-                ('starting world', sum(n for x, n in majors.items() if created(x) == first)),
-                ('arrived later', sum(n for x, n in majors.items() if created(x) > first)))) + '.', '',
-            '**Most major titles:**', '']
     for gid, n in majors.most_common(8):
         r = g.get(str(gid)) or g.get(gid)
-        out.append(f'- {r["name"]} ({r["country"]}), born {r["born"]}, arrived {created(gid)}: {n} majors, '
-                   f'{wins[gid]} wins, best world ranking {best_rank.get(gid, "—")}')
+        out.append(f'- {r["name"]} ({r["country"]}), born {r["born"]}, {arrival(d, gid)} (arrived {r.get("created")}): '
+                   f'{n} majors, {wins[gid]} wins at every level (amateur and college included), best {label} {best.get(gid, "outside the top 10")}')
     return out + ['']
 
 
@@ -355,10 +441,11 @@ def main():
         from golfsim.archive import Archive
         arch = Archive(out / f'world_{a.seed}' / 'archive')
     tl = LW.analyse(d, min(12, d['years']))
-    lines = (section_run(d, man, d.get('perf', {})) + section_money(d) + section_access(d) + section_residence(d, arch)
+    best = weekly_best(arch) if arch is not None else None
+    lines = (section_run(d, man, d.get('perf', {})) + section_money(d, man) + section_access(d) + section_residence(d, arch)
              + ['## 3b. Mini-tour seasons cut short by money, by cause', ''] + mini_affordability(d, arch)
-             + section_potential(d, dbg) + section_generations(d, dbg)
-             + ['**Interesting careers** (picked by rules on recorded results):', ''] + LW.interesting(d, tl) + ['']
+             + section_potential(d, dbg) + section_generations(d, dbg, arch, best)
+             + ['**Interesting careers** (picked by rules on recorded results):', ''] + LW.interesting(d, tl, best_week=best) + ['']
              + section_scale(d))
     (out / 'LONG_RUN.md').write_text('\n'.join(lines) + '\n')
     print('wrote', out / 'LONG_RUN.md')

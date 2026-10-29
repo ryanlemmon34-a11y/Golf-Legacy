@@ -205,79 +205,65 @@ Last Tour Masters field by route (2076:TOUR_MASTERS): M1 15, M10 4, M11 4, M12 1
 
 - **Most majors — Hyeon-jun U. Yoo (South Korea)**, born 2019:
   - 2037: Arrived on the scene at 18 (International University Golf)
-  - 2037: Won the Asian Amateur Series Event 95 (Saudi Arabia) at -10 (Al Rimal Golf Links)
-  - 2037: Won the Singapore Amateur Championship at -8 (Sparrow Bay Golf Club)
-  - 2038: Won the Asian Amateur Series Event 54 (China) at -8 (Jinlong Xiamen International Golf Club)
-  - 2038: Won the India Amateur Championship at -3 (Kesar Bagh New Delhi Golf & Country Club)
-  - 2039: Coaching with Si-hyun Moon ended (joined Yuto Saito)
-  - 2039: Won the Asian Amateur Series Event 12 (Japan) at -9 (Hanamizuki Golf Links)
-  - 2039: Won the China Amateur Championship at +3 (Jinlong Xiamen International Golf Club)
-  - 2039: Won the Asia-Pacific Amateur Championship at -12 (Xinghai International Golf Club)
-  - 2039: Won the Asian Amateur Series Championship at -16 (Takigawa Miyazaki Golf Links)
-  - 2040: Won the Indonesia Amateur Championship at -18 (Tasik Biru Golf Club)
-  - 2040: Won the China Amateur Championship at -9 (Yunshan Lakes Golf Club)
-  - 2040: Won the Malaysia Amateur Championship at -16 (Bukit Tinggi Golf Resort)
-  - 2040: Won the India Amateur Championship at -18 (Vana Vihar Mumbai Golf & Country Club)
+  - 2037: First win, at Amateur level (2 that season)
+  - 2041: College eligibility ended; kept playing as an amateur alongside a job
+  - 2041: First win at College level (4 that season)
+  - 2042: Turned professional from the amateur ranks (amateur ranking 3), starting on the Asian Challenger Tour, with backers putting up $47,800 a season for a share of winnings
+  - 2043: First full-time season at Challenger level
+  - 2043: First win at Premier level
+  - 2043: First win at Challenger level (4 that season)
+  - 2043: Won the Britannia Open (major No. 1)
+  - 2043: Won the Premier Tour Championship (major No. 2)
+  - 2044: First full-time season at Premier level
+  - 2045: Won the Premier Tour Championship (major No. 3)
+  - 2045: Won the Tour Masters (major No. 4)
+  - 2045: World No. 1 at a season's end for the first time (4 season ends in all)
+  - 2047: Won the Britannia Open (major No. 5)
+  - … 4 more milestones
+  - 2068: Won the Premier Tour Championship (major No. 10)
+  - In all: 34 full-time professional seasons in the archive, 70 wins at every level (amateur and college included), 10 majors
 - **From the mini tours to the Premier Tour — Martín García (Argentina)**, born 2004:
   - 2028: Turned professional at 24, starting on the Southern Cone Pro Series, paying their own way
-  - 2028: Southern Cone Pro Series → Latin America & Canada Tour (called up to fill the Latin America & Canada Tour)
-  - 2029: Won the Latin America & Canada Tour Event 3 at -23 (Golfe Quinta da Ribeira)
-  - 2029: Won the Latin America & Canada Tour Event 4 at -13 (Pemberly Run Golf Club)
-  - 2029: Latin America & Canada Tour → Premier Tour Americas (top 5 on Latin America & Canada Tour)
-  - 2031: Premier Tour Americas → Latin America & Canada Tour (lost Premier card)
-  - 2032: Won the Latin America & Canada Tour Event 4 at -8 (Blackwater Woods Golf Club)
-  - 2032: Latin America & Canada Tour → Premier Tour Americas (top 5 on Latin America & Canada Tour)
-  - 2034: Coaching with Rodrigo Paz ended (coach retired)
-  - 2038: Won the Chile Open at -13 (Golf La Cañada)
-  - 2040: Won the Argentina Open at -22 (Golf Las Encinas Altas)
-  - 2041: Won the Pacific Northwest Open at +6 (Heron Park Golf Club)
-  - 2044: Won the Peru Open at -17 (Club de Campo La Estancia)
-  - 2046: Won the Argentina Open at -19 (Golf Las Encinas Altas)
-- **Late bloomer (first Premier season at 31+) — Hunter Baker (USA)**, born 1992:
-  - 2027: Won the Desert Tour Championship at -15 (Al Bahr Golf Resort)
-  - 2027: Won the Australia Open at -14 (Royal Juniper Brook National)
-  - 2028: Won the Tour Masters at -11 (Georgia National Golf Club)
-  - 2031: Injured (elbow), out for 4 weeks
-  - 2031: Won the Korea Championship at -22 (Pureun Golf Club)
-  - 2031: Won the USA Open at -10 (Marten Hollow Golf Club)
-  - 2033: Won the Pacific Coast Pro-Am at -5 (Rowan Vale Club)
-  - 2033: Won the Mid-Atlantic Championship at -11 (Badgerbrook Club)
-  - 2033: Injured (ankle), out for 3 weeks
-  - 2034: Won the Desert Classic at -22 (Northcote Cove Club)
-  - 2035: Caddie Robert Rutledge off the bag (caddie retired)
-  - 2038: Won the Carolina Championship at -27 (Holly Ridge Golf Club)
-  - 2039: Caddie Nick Pruitt off the bag (the golfer wanted a change)
-  - 2043: Retired from competitive golf at 51
+  - 2028: First full-time season at Mini level
+  - 2029: First full-time season at Challenger level
+  - 2029: First win, at Challenger level (2 that season)
+  - 2030: First full-time season at Premier level
+  - 2041: First win at Premier level
+  - 2053: Retired from competitive golf at 49
+  - In all: 26 full-time professional seasons in the archive, 9 wins at every level (amateur and college included), 0 majors
+- **Late bloomer (arrived in the world, first Premier season at 31+) — Rupert Gillard (England)**, born 2010:
+  - 2028: Arrived on the scene at 18 (US College Division I)
+  - 2028: First win, at Amateur level (2 that season)
+  - 2031: First win at College level (2 that season)
+  - 2032: College eligibility ended; kept playing as an amateur alongside a job
+  - 2038: Turned professional late, after years as an amateur (amateur ranking 9), starting on the Challenger Tour Europe, paying their own way
+  - 2039: First full-time season at Challenger level
+  - 2041: First win at Challenger level
+  - 2042: First full-time season at Premier level
+  - 2061: Retired from competitive golf at 51
+  - In all: 23 full-time professional seasons in the archive, 12 wins at every level (amateur and college included), 0 majors
 - **A comeback that went further than before — Rory Holroyd (Australia)**, born 2001:
-  - 2027: Won the Philippines Open at -13 (Linden Downs Resort Course)
-  - 2027: Injured (oblique), out for 2 weeks
-  - 2028: Won the Australasia Tour Event 5 at -17 (Bramble Fields Country Club)
+  - 2027: In the starting world (career before the archive unknown)
+  - 2027: First full-time season at Challenger level
+  - 2027: First win, at Challenger level
+  - 2028: First win at Regional level
   - 2029: Stopped chasing the tour at 28; took a job and plays a few local events (runway 10.0 yrs, progress -0.1, desire +0.3)
-  - 2030: Caddie Gonzalo Rojas off the bag (no longer on a tour that needs one)
-  - 2030: Won the Australian State Pro Series Event 2 at -1 (Cedar Point Golf Club)
-  - 2030: Won the Australian State Pro Series Event 7 at -11 (Whitewater Moor Golf Resort)
-  - 2030: Won the Australasia Tour Event 13 at -19 (Marten Glen Country Club)
-  - 2030: Quit their job to make another run at it, aged 29
-  - 2031: Won the Australasia Tour Event 14 at -2 (Badger Crest Golf Club)
-  - 2031: Australian State Pro Series → Asian Challenger Tour (top 4 on Australian State Pro Series)
-  - 2032: Injured (thumb), out for 3 weeks
-  - 2034: Won the Asian Challenger Tour Event 2 at -16 (Gunung Indah Golf Club)
-  - 2034: Won the Japan Golf Tour Event 16 at -4 (Kumanodai Golf Links)
+  - 2030: First win at Mini level (2 that season)
+  - 2030: Came back to full-time golf at 29
+  - 2035: First full-time season at Premier level
+  - 2043: First win at Premier level
+  - 2052: Retired from competitive golf at 51
+  - In all: 25 full-time professional seasons in the archive, 14 wins at every level (amateur and college included), 0 majors
 - **Longest full-time career — Cédric Laurent (France)**, born 2008:
-  - 2028: Caddie Tanner James off the bag (caddie retired)
-  - 2029: Coaching with Alfred Olsson ended (joined Hugo Michel)
-  - 2029: Won the Italian Championship at -23 (Golf Club Le Querce)
-  - 2030: Injured (back), out for 3 weeks
-  - 2030: Won the Heartland Invitational at -11 (Dunmore Wood Golf Club)
-  - 2031: Won the Canada Open at -14 (Pemberly Run Golf Club)
-  - 2032: Won the German Masters at -22 (Golfpark Waldsee)
-  - 2033: Won the Texas Open at -12 (Hartwell Landing Club)
-  - 2034: Won the Island Championship at -25 (Ashcombe Harbor Golf Club)
-  - 2034: Won the Australia Open at -10 (Wolfe Crest Golf Club)
-  - 2035: Won the Pacific Coast Pro-Am at +2 (Rowan Vale Club)
-  - 2035: Won the Tour Masters at -11 (Georgia National Golf Club)
-  - 2037: Won the Carolina Championship at -13 (Hartwell Landing Club)
-  - 2037: Won the Japan Premier Championship at -10 (Suzukake Golf Club)
+  - 2027: In the starting world (career before the archive unknown)
+  - 2027: First full-time season at Premier level
+  - 2029: First win, at Premier level
+  - 2035: Won the Tour Masters (major No. 1)
+  - 2038: Won the USA Open (major No. 2)
+  - 2042: World No. 1 at a season's end for the first time (2 season ends in all)
+  - 2051: Won the USA Open (major No. 3)
+  - 2066: Retired from competitive golf at 58
+  - In all: 40 full-time professional seasons in the archive, 31 wins at every level (amateur and college included), 3 majors
 
 ## 8. Former players on the staff
 

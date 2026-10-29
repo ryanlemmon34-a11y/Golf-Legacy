@@ -3,6 +3,8 @@
 - `LONG_RUN.md` — the long-run diagnostic (`tools/long_run_report.py`): money, access, residence, high-potential
   leavers, generations, interesting careers, population and the season skip by season.
 - `REPORT.md`, `DEBUG.md` — the standard long-world reports (`tools/long_world.py`).
+- `LONG_RUN_original.md`, `REPORT_original.md` — the reports exactly as the run wrote them (kept; see
+  *Corrections* below). `DEBUG.md` regenerated identically.
 - `manifest.json` — engine commit 7334ffe (clean tree), configuration, seed, hardware; `run.log` — per-season
   checks and timings as the run printed them.
 
@@ -22,7 +24,27 @@ people). Durable hosting on GitHub was not possible from the session: creating r
 session type, and Git LFS (`lfs.github.com`) is denied by the environment's network policy. **Keep the delivered
 files**; the run's original directory stays in the temporary container, unchanged.
 
-**Timings in the run are pessimistic:** the harness keeps 50 seasons of diagnostic rows in the same process,
+**Timings in the run are pessimistic** (before this pass's performance work; see `docs/BACKLOG.md` for the
+after figures): the harness keeps 50 seasons of diagnostic rows in the same process,
 which slows Python's garbage collection everywhere. A clean process, opened on a copy of the final world (season
 51, 13,187 active golfers), skipped a season in **267.6 s**: simulate and reload 171.6 s, save 21.3 s, publish
 5.3 s, the observer's overview 69.3 s (it builds the in-memory records: peak memory 9.1 GB).
+
+## Corrections (reports regenerated from the saved data)
+
+`LONG_RUN.md` and `REPORT.md` were regenerated from the run's saved data and archive (on a copy of the world;
+the original was not opened) with corrected diagnostics. What changed:
+
+| Claim in the original | Corrected | Why |
+|---|---|---|
+| 5 high-potential golfers "left before developing" (2 caddies, 2 coaches, 1 back to amateur) | 20 full-time episodes ended young and undeveloped and the golfer had not come back by 2076: part-time pro 7, back to amateur 5, became caddie 2, became coach 2, college to amateur 2, amateur took a job 2. A further 3 such episodes ended in a comeback; 6 of the 2,127 were never full-time in the archive; 1,654 episodes were completed (developed, or 27+); 655 episodes were still unfolding at the end (counted per episode: a golfer can have several) | The original counted only three kinds of exit and took a reason from any season; now each episode takes the decision recorded at its own last season, and comebacks, never-full-time, completed and unfolding careers are kept apart |
+| Later arrivals: world No. 1 8, top 10 53 | By **weekly** ranking: later juniors 12 No. 1 / 65 top 10, later new professionals 0 / 0; starting-world professionals 8 / 43, starting-world amateurs 0 / 2 | The original used year-end rankings and lumped cohorts. Felix Moore and Brian Sullivan were weekly No. 1 (year-end best: 2) |
+| Major wins: starting world 69, later 131 | Starting-world professionals 64, starting-world amateurs 5, later juniors 129, later new professionals 2 | Cohorts described accurately (initial amateurs apart) |
+| Starting-world golfers "arrived 2027" | "starting world: professional / amateur" | Their careers began before the archive |
+| Moved abroad for their career and later returned home: 59 | 50 | Now checked in order: the return must come after the move abroad |
+| Late bloomer: Hunter Baker (born 1992, in the starting world) | Rupert Gillard (arrived 2028 at 18, first Premier season at 32) | Starting-world golfers are no longer eligible: their first archived Premier season is not their first |
+| Career excerpts: the first 14 log lines (often all amateur wins) | Milestones: arrival, levels reached, first wins by level, majors, No. 1, career changes, comebacks, retirement, totals | |
+| Annual net per season | Reported as recorded, **flagged**: this engine (7334ffe) archived the net before winter expenses, and support-funded moves were drawn in the next year's ledger | Not reconstructable exactly from the saved data (cash reconciled every year) |
+
+Unchanged: reconciliation (0 failing seasons), debt, backing, access, mini-tour causes, residence move counts,
+population and the run's timings.
