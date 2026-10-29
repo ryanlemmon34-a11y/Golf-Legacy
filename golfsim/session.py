@@ -393,9 +393,9 @@ class Session:
         final = self.dir / name
         if final.exists():
             shutil.rmtree(final)
-        os.replace(tmp, final)
+        _replace(tmp, final)                                            # (Windows: retried while a scanner holds it)
         _write_synced(self.dir / 'CURRENT.tmp', json.dumps({'generation': n, 'dir': name}).encode())
-        os.replace(self.dir / 'CURRENT.tmp', self.dir / 'CURRENT')     # the commit
+        _replace(self.dir / 'CURRENT.tmp', self.dir / 'CURRENT')       # the commit
         keep = {n, self.generation}                                     # and the last known good one
         self.generation = n
         self._pending = None
@@ -476,12 +476,32 @@ def _published(d):
         return None
 
 
+def _copy_synced(src, tmp):
+    """Copy src to tmp and force the copy to disk through the handle that wrote it (Windows refuses to
+    flush a file opened only for reading -- EBADF, "Bad file descriptor" -- which POSIX allows)."""
+    with open(src, 'rb') as r, open(tmp, 'wb') as w:
+        shutil.copyfileobj(r, w, 1 << 20)
+        w.flush()
+        os.fsync(w.fileno())
+
+
+def _replace(src, dst, attempts=20):
+    """os.replace, retried briefly on Windows, where replacing a file fails while another process (a
+    reader of the old manifest, say) has it open; elsewhere, and after the retries, the error stands."""
+    for i in range(attempts):
+        try:
+            os.replace(src, dst)
+            return
+        except PermissionError:
+            if os.name != 'nt' or i == attempts - 1:
+                raise
+            time.sleep(0.05 * (i + 1))
+
+
 def _copy_atomic(src, dst):
     tmp = dst.with_name(dst.name + '.tmp')
-    shutil.copyfile(src, tmp)
-    with open(tmp, 'rb') as f:
-        os.fsync(f.fileno())
-    os.replace(tmp, dst)
+    _copy_synced(src, tmp)
+    _replace(tmp, dst)
 
 
 def _publication_step(name):
@@ -499,10 +519,8 @@ def _place(src, dst):
     try:
         os.link(src, tmp)
     except OSError:
-        shutil.copyfile(src, tmp)
-        with open(tmp, 'rb') as f:
-            os.fsync(f.fileno())
-    os.replace(tmp, dst)
+        _copy_synced(src, tmp)
+    _replace(tmp, dst)
 
 
 def _publish_archive(d, n):
@@ -563,7 +581,7 @@ def _publish_archive(d, n):
     if (a / MANIFEST).exists():
         _copy_atomic(a / MANIFEST, a / 'MANIFEST.prev.json')       # its files stay for readers opening it
     _write_synced(a / 'MANIFEST.tmp', json.dumps(manifest, indent=1).encode())
-    os.replace(a / 'MANIFEST.tmp', a / MANIFEST)                    # the publication
+    _replace(a / 'MANIFEST.tmp', a / MANIFEST)                      # the publication
     _publication_step('manifest')
     with ArchiveIndex(a / 'index.sqlite') as idx:                   # rows of seasons no longer published
         if set(idx.years()) - set(years):                           # (a rollback): readers of the previous
@@ -609,7 +627,10 @@ def _collect_unpublished(a):
         if p.is_dir() or rel in keep or rel.startswith(('index.sqlite', 'MANIFEST', 'lock')):
             continue
         if rel.endswith(('.json', '.json.gz', '.tmp')) or rel in ('PUBLISHED',):
-            p.unlink()
+            try:
+                p.unlink()
+            except OSError:                             # still open somewhere (Windows): removed next time
+                pass
 
 
 def _next_generation(d, current):

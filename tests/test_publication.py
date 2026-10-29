@@ -7,8 +7,10 @@ Run from the project folder:  python -m unittest discover -s tests -v
 """
 from __future__ import annotations
 
+import errno
 import gzip
 import json
+import os
 import shutil
 import sys
 import tempfile
@@ -146,6 +148,50 @@ class PublicationTests(unittest.TestCase):
         s.close()
         left = {p.name for p in d.glob('gen_[0-9]*')}
         self.assertNotIn(f'gen_{abandoned:06d}', left)                 # the damaged one is removed
+
+    def test_publication_flushes_only_what_it_wrote_as_windows_requires(self):
+        """Windows refuses to flush (fsync) a file opened only for reading -- "Bad file descriptor" -- where
+        POSIX allows it; the owner's first season end on Windows failed exactly there (copying the previous
+        manifest). Here fsync behaves as on Windows, hard links are unavailable (FAT drives, some shares:
+        published files are copied), and one file to be collected is still open (cannot be removed yet)."""
+        try:
+            import fcntl
+        except ImportError:                                            # on Windows itself: the real thing
+            fcntl = None
+        d = self.copy(self.base, 'windows')
+        real_fsync, real_unlink = os.fsync, Path.unlink
+
+        def windows_fsync(fd):
+            if fcntl is not None and fcntl.fcntl(fd, fcntl.F_GETFL) & os.O_ACCMODE == os.O_RDONLY:
+                raise OSError(errno.EBADF, 'Bad file descriptor')
+            return real_fsync(fd)
+
+        def no_link(src, dst):
+            raise OSError(errno.EPERM, 'hard links are not supported here')
+        stuck = []
+
+        def unlink(path, *a, **k):
+            if path.name.startswith('world.g') and not stuck:          # a superseded table still open
+                stuck.append(path.name)
+                raise PermissionError(errno.EACCES, 'in use')
+            return real_unlink(path, *a, **k)
+        s = Session.open(d, workers=1)
+        with mock.patch('os.fsync', windows_fsync), mock.patch('os.link', no_link), \
+                mock.patch.object(Path, 'unlink', unlink):
+            s.advance(1)                                               # 2028 ends: a second publication
+        s.close()
+        self.same(history(d), self.h28, 'windows')
+        m = A.read_manifest(d / 'archive')
+        self.assertEqual((d / 'archive' / m['files']['years'][2028]).stat().st_nlink, 1)   # copied, not linked
+        self.assertEqual(len(stuck), 1)
+        self.assertTrue((d / 'archive' / stuck[0]).exists())            # left for later, publication went on
+        with mock.patch('os.fsync', windows_fsync):                     # and the next one on top of it
+            s = Session.open(d, workers=1)
+            s.advance(1)
+            s.close()
+        with A.Archive(d / 'archive') as a:
+            self.assertEqual(a.years, [2027, 2028])
+        self.assertFalse((d / 'archive' / stuck[0]).exists())           # removed by a later publication
 
     def test_published_files_are_never_rewritten(self):
         d = self.copy(self.base, 'immutable')
