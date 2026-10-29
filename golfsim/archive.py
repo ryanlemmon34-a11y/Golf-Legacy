@@ -103,19 +103,7 @@ class ArchiveWriter:
         snap = season.snapshots.get(year, {})
         for g in season.world.golfers:
             self.created.setdefault(g.id, year + 1)
-        events = []
-        for r in season.results.values():
-            if r.year != year:
-                continue
-            routes = season.event_routes.get(year, {}).get(r.event_id) or season.entry_routes.get((year, r.series_id), {})
-            ser = season.cal.by_id[r.series_id]
-            events.append({'id': r.event_id, 'series': r.series_id, 'week': r.week, 'sites': r.sites,
-                           # classification when it was played: later calendar changes never rewrite it
-                           'name': ser.name, 'tour': ser.tour, 'tier': ser.tier, 'category': ser.category,
-                           'rounds': ser.rounds, 'match_play': bool(ser.match_play),   # its format then
-                           'prestige': round(r.prestige, 2), 'playoff': r.playoff, 'finish': r.finish,
-                           'team': {str(g): list(t) for g, t in r.team.items()},
-                           'routes': {str(g): v for g, v in routes.items()}})
+        events = [edition_record(season, r) for r in season.results.values() if r.year == year]
         careers = {}
         for gid, row in snap.items():
             careers[gid] = {k: row.get(k) for k in ('tour', 'tier', 'status', 'lifestyle', 'events', 'wins', 'top10',
@@ -187,6 +175,22 @@ class ArchiveWriter:
 
 
 STATE_FILES = ('people.json.gz', 'relations.json.gz', 'records.json.gz')
+
+
+def edition_record(season, r):
+    """One completed edition as the archive keeps it (a season file's `events` entry). The observer draws
+    the current season's editions with this same record, so an edition reads the same before and after
+    its season is archived."""
+    year = r.year
+    routes = season.event_routes.get(year, {}).get(r.event_id) or season.entry_routes.get((year, r.series_id), {})
+    ser = season.cal.by_id[r.series_id]
+    return {'id': r.event_id, 'series': r.series_id, 'week': r.week, 'sites': r.sites,
+            # classification when it was played: later calendar changes never rewrite it
+            'name': ser.name, 'tour': ser.tour, 'tier': ser.tier, 'category': ser.category,
+            'rounds': ser.rounds, 'match_play': bool(ser.match_play),   # its format then
+            'prestige': round(r.prestige, 2), 'playoff': r.playoff, 'finish': r.finish,
+            'team': {str(g): list(t) for g, t in r.team.items()},
+            'routes': {str(g): v for g, v in routes.items()}}
 
 
 def index_season(directory, year, chunk, source=None):
