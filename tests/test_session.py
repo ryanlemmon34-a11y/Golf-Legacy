@@ -231,6 +231,17 @@ def fail_publication(path_end='CURRENT'):
     return mock.patch.object(SES.os, 'replace', replace)
 
 
+class EngineIdTests(unittest.TestCase):
+    def test_a_source_copy_without_git_has_the_same_engine_id(self):
+        """An exported source tarball (no .git) fingerprints itself exactly as git would, so the worlds it
+        made reopen without overriding the engine check."""
+        from golfsim import savegame as SG
+        gid = SG.engine_id()
+        if gid in ('unknown',) or gid.endswith('+dirty'):
+            self.skipTest('needs a clean git checkout to compare against')
+        self.assertEqual(SG._files_engine_id(), gid)
+
+
 class TransactionTests(unittest.TestCase):
     """The running world, the committed checkpoint and the visible history always agree."""
 

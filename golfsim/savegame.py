@@ -35,6 +35,23 @@ def engine_commit():
 PERSISTENCE = ('golfsim/savegame.py', 'golfsim/archive.py', 'golfsim/session.py')   # how worlds are stored, not how they play
 
 
+def _files_engine_id():
+    """The same fingerprint computed from the files themselves (git's blob hash of each), for a source copy
+    without git metadata (an exported tarball): identical to engine_id() of the commit it was taken from."""
+    import hashlib
+    lines = []
+    for p in sorted((ROOT / 'golfsim').rglob('*.py')):
+        rel = p.relative_to(ROOT).as_posix()
+        if rel in PERSISTENCE or '__pycache__' in rel:
+            continue
+        data = p.read_bytes()
+        blob = hashlib.sha1(b'blob %d\0' % len(data) + data).hexdigest()
+        lines.append((f'100644 blob {blob}\t{rel}', f'{blob}\t{rel}'))
+    if not lines:
+        return 'unknown'
+    return hashlib.sha1('\n'.join(b for _, b in sorted(lines)).encode()).hexdigest()
+
+
 def engine_id(commit='HEAD'):
     """The engine's identity: a fingerprint of the simulation code in the golfsim package at a commit
     (every file's git blob except the persistence modules), so commits that only touch tools, docs or
@@ -42,7 +59,7 @@ def engine_id(commit='HEAD'):
     import hashlib
     listing = _git('ls-tree', '-r', commit, '--', 'golfsim')
     if listing == 'unknown':
-        return 'unknown'
+        return _files_engine_id() if commit == 'HEAD' else 'unknown'
     lines = sorted(l for l in listing.splitlines() if l.endswith('.py') and l.split('\t')[1] not in PERSISTENCE)
     fid = hashlib.sha1('\n'.join(l.split(None, 2)[2] for l in lines).encode()).hexdigest()
     if commit == 'HEAD':
