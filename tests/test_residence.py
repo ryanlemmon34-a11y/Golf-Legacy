@@ -233,6 +233,73 @@ class ResidenceTests(unittest.TestCase):
         self.assertFalse(old.places.moves)
 
 
+class MoveFundingTests(unittest.TestCase):
+    """A winter move is paid at once, in its own year, by the one funding order (cash, then backers' money,
+    then family money), with each pot reconcilable; a move the golfer's own money cannot cover is not made.
+    The move itself is forced (its odds set to certain for one golfer) so every case really moves."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.base = Season(generate_world(seed=18, scale=0.1), seed=18, development=True, workers=1)
+        cls.base.start_year(2027)
+
+    def _move(self, cash, backer_funds=0.0, backer=0.0, backing=0.0):
+        from unittest import mock
+        s = copy.deepcopy(self.base)
+        g = next(g for g in s.active_golfers() if g.status == 'pro' and g.lifestyle == 'full_time'
+                 and g.tour in TOUR_BY_KEY and s.places.known(g.id) and s.staff.coach(g.id) is None)
+        g.cash, g.backer_funds, g.backer, g.backing = cash, backer_funds, backer, backing
+        self.assertLess(FIN.RESERVE_WEEKS * s.committed_weekly(g), 4000)   # living costs only: the reserve
+        s.places.since[g.id] = 2000
+        here = s.places.home[g.id][0]
+        dest = 'England' if here != 'England' else 'Japan'
+        before = copy.deepcopy(s.ledger(2027, g.id))
+        odds = lambda season, x, year, changed=False: (dest, 1.0) if x.id == g.id else (season.places.home[x.id][0], 0.0)
+        with mock.patch.object(RES, 'move_odds', odds):
+            RES.review_moves(s, 2027, {})
+        return s, g, before, dest
+
+    def test_backers_money_pays_before_the_next_years_top_up(self):
+        s, g, before, dest = self._move(cash=0.0, backer_funds=10000.0, backer=20000.0)
+        self.assertEqual(s.places.home[g.id][0], dest)                      # it really moved
+        led = s.ledger(2027, g.id)
+        self.assertEqual(led.moving - before.moving, RES.MOVE_COST)
+        self.assertEqual(led.backer_support - before.backer_support, RES.MOVE_COST)   # drawn now, this year
+        self.assertEqual((g.cash, g.backer_funds), (0.0, 4000.0))           # from the pot that was left
+        s.start_backing(g, 2028)                                            # 1 January: the deal tops up
+        self.assertEqual(g.backer_funds, 20000.0)
+        self.assertEqual(s.backer_flows[2028][(g.id, 'put_up')], 16000.0)  # 2028's money did not pay for it
+
+    def test_family_money_pays_when_there_are_no_backers(self):
+        s, g, before, dest = self._move(cash=0.0, backing=10000.0)
+        self.assertEqual(s.places.home[g.id][0], dest)
+        led = s.ledger(2027, g.id)
+        self.assertEqual(led.support - before.support, RES.MOVE_COST)
+        self.assertEqual((g.cash, g.backing), (0.0, 4000.0))
+
+    def test_cash_pays_first(self):
+        s, g, before, dest = self._move(cash=20000.0, backer_funds=10000.0, backer=20000.0, backing=5000.0)
+        self.assertEqual(s.places.home[g.id][0], dest)
+        led = s.ledger(2027, g.id)
+        self.assertEqual(led.moving - before.moving, RES.MOVE_COST)
+        self.assertEqual(led.backer_support + led.support, before.backer_support + before.support)
+        self.assertEqual((g.cash, g.backer_funds, g.backing), (14000.0, 10000.0, 5000.0))
+
+    def test_cash_then_backers_then_family(self):
+        s, g, before, dest = self._move(cash=3000.0, backer_funds=2000.0, backer=20000.0, backing=10000.0)
+        self.assertEqual(s.places.home[g.id][0], dest)
+        self.assertEqual((g.cash, g.backer_funds, g.backing), (0.0, 0.0, 9000.0))
+        led = s.ledger(2027, g.id)
+        self.assertEqual((led.backer_support - before.backer_support, led.support - before.support), (2000.0, 1000.0))
+
+    def test_a_move_their_own_money_cannot_cover_is_not_made(self):
+        s, g, before, dest = self._move(cash=1000.0, backing=2000.0)
+        self.assertNotEqual(s.places.home[g.id][0], dest)
+        self.assertEqual((g.cash, g.backing), (1000.0, 2000.0))
+        self.assertEqual(s.ledger(2027, g.id).moving, before.moving)
+        self.assertEqual(s.move_blocked[2027], 1)
+
+
 def COUNTRY_REGION(country):
     from golfsim.geography import COUNTRIES
     return COUNTRIES[country].region

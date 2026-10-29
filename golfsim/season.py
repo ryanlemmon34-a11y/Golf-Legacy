@@ -2411,12 +2411,18 @@ class Season:
             if self.staff.deal.get(g.id) == 'fee':
                 c = self.staff.coach(g.id)
                 self.pay_staff(g, year, 'coaching', c, self.staff.agreed_fee(g.id) / 52)
-            for pot, field in (('backer_funds', 'backer_support'), ('backing', 'support')):   # backers'
-                have = getattr(g, pot)                                                         # money first,
-                if g.cash < 0 and have > 0:                                                    # then family's
-                    draw = min(have, -g.cash)
-                    setattr(g, pot, have - draw)
-                    self.earn(g, year, field, draw)
+            self.cover_shortfall(g, year)
+
+    def cover_shortfall(self, g, year):
+        """Support covers a golfer's negative cash, in the one funding order: backers' money first, then
+        family money, each drawn into the year's ledger (backer_support, support), never beyond what is
+        left in the pot -- what neither covers stays as debt. Weekly, and at once for a winter expense."""
+        for pot, field in (('backer_funds', 'backer_support'), ('backing', 'support')):
+            have = getattr(g, pot)
+            if g.cash < 0 and have > 0:
+                draw = min(have, -g.cash)
+                setattr(g, pot, have - draw)
+                self.earn(g, year, field, draw)
 
     def experience(self, gid, year, week):
         """Competitive experience over the last 52 weeks (0-1): rounds played this season, plus last

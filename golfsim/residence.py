@@ -363,6 +363,8 @@ def review_moves(season, year, snap):
             season.move_blocked[year] = season.move_blocked.get(year, 0) + 1   # included), never on credit
             continue                                 # cannot pay for the move: they stay
         season.spend(g, year, 'moving', cost)
+        season.cover_shortfall(g, year)              # funded now, from this year's pots, in this year's
+                                                     # ledger (not after January's backer top-up)
         saved = (season.tour_trip_cost(g, g.tour, home=current, caddie=False)
                  - season.tour_trip_cost(g, g.tour, home=best, caddie=False)) * events
         to = _destination(season, g, best, g.tour)
