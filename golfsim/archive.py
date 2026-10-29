@@ -74,7 +74,9 @@ class ArchiveWriter:
         self.created = {g.id: season.first_year for g in season.world.golfers}
         self.initial = {g.id for g in season.world.golfers}
         cal, lib = season.cal, season.lib
+        from .ratings import ATTRIBUTE_KEYS
         world = {'format': FORMAT, 'seed': season.seed, 'first_year': season.first_year, 'years': [],
+                 'rating_keys': ['overall'] + list(ATTRIBUTE_KEYS),   # the order of each season's ratings
                  'tours': {k: {'name': t.name, 'tier': t.tier} for k, t in TOUR_BY_KEY.items()},
                  'series': {s.series_id: {'name': s.name, 'tour': s.tour, 'tier': s.tier, 'kind': s.kind,
                                           'category': s.category} for s in cal.series},
@@ -105,6 +107,7 @@ class ArchiveWriter:
             self.created.setdefault(g.id, year + 1)
         events = [edition_record(season, r) for r in season.results.values() if r.year == year]
         careers = {}
+        from .ratings import ATTRIBUTE_KEYS
         for gid, row in snap.items():
             careers[gid] = {k: row.get(k) for k in ('tour', 'tier', 'status', 'lifestyle', 'events', 'wins', 'top10',
                                                     'cuts', 'majors', 'prize', 'net', 'wr_start', 'wr_end', 'am_start',
@@ -126,6 +129,10 @@ class ArchiveWriter:
                                      'moving': round(led.moving)})
             else:
                 careers[gid]['net'] = careers[gid]['net_at_decision']
+            g = season.g.get(gid)
+            if g is not None:                   # ratings as the next season starts (after this one's aging):
+                careers[gid]['ratings'] = ([round(g.overall, 1)] +              # overall, then RATING_KEYS
+                                           [round(g.attrs[k], 1) for k in ATTRIBUTE_KEYS])
         log = {gid: [(w, t) for y, w, t in h if y == year] for gid, h in season.history.items()}
         chunk = {'year': year, 'events': events, 'careers': careers,
                  'transitions': season.transitions.get(year, []),
@@ -139,7 +146,8 @@ class ArchiveWriter:
                                      if (year, w) in table}
                               for kind, table in (('world', season.ctx.world_rankings),
                                                   ('amateur', season.ctx.amateur_rankings))},
-                 'staff_year': {f'{k}:{i}': v for (k, i), v in season.staff_year.get(year, {}).items()},
+                 'staff_year': {f'{k}:{i}': dict(v, earnings_total=_staff_earnings(season, k, i))
+                                for (k, i), v in season.staff_year.get(year, {}).items()},
                  'log': {g: v for g, v in log.items() if v}}
         return chunk
 
@@ -187,10 +195,19 @@ def edition_record(season, r):
     return {'id': r.event_id, 'series': r.series_id, 'week': r.week, 'sites': r.sites,
             # classification when it was played: later calendar changes never rewrite it
             'name': ser.name, 'tour': ser.tour, 'tier': ser.tier, 'category': ser.category,
-            'rounds': ser.rounds, 'match_play': bool(ser.match_play),   # its format then
+            'kind': ser.kind, 'rounds': ser.rounds, 'match_play': bool(ser.match_play),   # its format then
+            'purse': ser.purse, 'cut_top': ser.cut_top, 'field_size': ser.field,         # its money and cut then
             'prestige': round(r.prestige, 2), 'playoff': r.playoff, 'finish': r.finish,
             'team': {str(g): list(t) for g, t in r.team.items()},
             'routes': {str(g): v for g, v in routes.items()}}
+
+
+def _staff_earnings(season, kind, pid):
+    """A coach's or caddie's career earnings when the season is archived (consecutive seasons' figures give a
+    season's earnings)."""
+    st = season.staff
+    person = (st.coaches if kind == 'coach' else st.caddies).get(pid)
+    return round(person.earnings) if person is not None else None
 
 
 def index_season(directory, year, chunk, source=None):
