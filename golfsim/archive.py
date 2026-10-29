@@ -257,7 +257,9 @@ class Archive:
         address for an earlier season."""
         p = self.people.get(pid) or {}
         first = p.get('first_residence')
-        place = first['place'] if first else None
+        if first is None or (year, week) < (first['year'], first['week']):
+            return None                                 # unknown: before their first known residence
+        place = first['place']
         for m in p.get('moves', ()):
             if (m['year'], m['week']) <= (year, week):
                 place = m['to']

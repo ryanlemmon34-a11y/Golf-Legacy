@@ -173,8 +173,12 @@ class Places:
         return rec
 
     def residence_at(self, pid, year, week=53):
-        """Where they lived at (year, week), from their record (None if unknown)."""
-        place = self.first[pid][2] if pid in self.first else None
+        """Where they lived at (year, week), from their record: None if unknown -- a legacy person, or a date
+        before their first known residence (before they entered the world)."""
+        first = self.first.get(pid)
+        if first is None or (year, week) < (first[0], first[1]):
+            return None
+        place = first[2]
         for y, w, _, to, _ in self.moves.get(pid, ()):
             if (y, w) <= (year, week):
                 place = to

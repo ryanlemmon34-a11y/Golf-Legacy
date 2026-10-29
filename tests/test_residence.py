@@ -354,6 +354,47 @@ class ArchivedFinanceTests(unittest.TestCase):
         self.assertGreaterEqual(g.cash, -1e-6)                               # nothing left as debt
 
 
+class ResidenceHistoryTests(unittest.TestCase):
+    """Where someone lived, as of a date: unknown before their first known residence; the arrival place
+    from its date; each move from its date; one history across playing and staff careers; live and
+    archived answers the same."""
+
+    def test_dated_residence_live_and_archived(self):
+        import tempfile
+        s = Season(generate_world(seed=20, scale=0.1), seed=20, development=True, workers=1)
+        P = s.places
+        g = next(g for g in s.world.golfers if g.country != 'USA' and g.status == 'amateur' and not g.tour.startswith('CO_'))
+        born = P.home[g.id]
+        P.first[g.id] = (2027, 53, born, '')                                 # arrived at the end of 2027
+        g.tour = 'CO_US_D1'
+        RES.settle(s, 2028, 53)                                              # to college, winter 2028
+        college = P.home[g.id]
+        g.tour = 'CO_US_SMALL'
+        P.college[g.id] = ('CO_US_D1', ('USA', 'Hawaii'))                    # a transfer to another base
+        RES.settle(s, 2029, 53)
+        transfer = P.home[g.id]
+        k = s.staff.from_golfer(g, 2031, 'coach', __import__('random').Random(2), 'college')
+        s.staff.coaches[k.id] = k
+        RES._record(s, k.id, 2032, 53, ('Japan', 'Tokyo'), 'to where most of their players live (2 of 3)')
+        expect = [((2026, 10), None), ((2027, 52), None), ((2027, 53), born), ((2028, 10), born),
+                  ((2028, 53), college), ((2029, 53), transfer), ((2031, 10), transfer), ((2032, 53), ('Japan', 'Tokyo')),
+                  ((2040, 1), ('Japan', 'Tokyo'))]
+        for (y, w), place in expect:
+            self.assertEqual(P.residence_at(g.id, y, w), place, (y, w))
+        self.assertEqual(g.country, k.country)                               # nationality fixed
+        self.assertEqual(P.birth[g.id], born)                                # birthplace fixed
+        d = Path(tempfile.mkdtemp())
+        ArchiveWriter(d, s).write_state(s)
+        a = Archive.__new__(Archive)
+        a.people = {int(pid): v for pid, v in __import__('golfsim.archive', fromlist=['_read'])._read(d / 'people.json.gz').items()}
+        for (y, w), place in expect:
+            got = a.residence_at(g.id, y, w)
+            self.assertEqual((got['country'], got['region']) if got else None, place, (y, w))
+        self.assertEqual(len(a.people[g.id]['moves']), 3)                    # college, transfer, coach's move
+        self.assertIn('coach', a.people[g.id])
+        s.close()
+
+
 def COUNTRY_REGION(country):
     from golfsim.geography import COUNTRIES
     return COUNTRIES[country].region
