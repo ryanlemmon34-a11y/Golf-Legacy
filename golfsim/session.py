@@ -49,6 +49,7 @@ a checkpoint does not carry the whole history.
 """
 from __future__ import annotations
 
+import contextlib
 import gc
 import gzip
 import hashlib
@@ -219,12 +220,13 @@ class Session:
                     raise StaleCursor(f'expected {expected}, the world is at {self.state["cursor"]}')
                 out = []
                 try:
-                    for _ in range(weeks):
-                        if cancel and cancel():
-                            break                            # a clean stop between weeks: commit what is done
-                        out.append(self._step())
-                        if progress:
-                            progress(out[-1])
+                    with _collector_paused():
+                        for _ in range(weeks):
+                            if cancel and cancel():
+                                break                        # a clean stop between weeks: commit what is done
+                            out.append(self._step())
+                            if progress:
+                                progress(out[-1])
                     if out:
                         for r in out:
                             r['generation'] = self.generation + 1
@@ -653,6 +655,22 @@ def _load_generation(d, n, allow_other_engine):
             gc.enable()
     settle_heap()
     return blob['season'], blob['state']
+
+
+@contextlib.contextmanager
+def _collector_paused():
+    """The cyclic garbage collector paused while weeks are simulated (restored however they end). It
+    cost about 17 s a season on the 50-season world (young collections over a high allocation rate, and
+    full ones), and full collections found no garbage: the simulation's garbage is acyclic, freed by
+    reference counting as before. Cycles are collected at the season end (settle_heap) or by the next
+    ordinary collection. Performance only: no simulated value depends on when the collector runs."""
+    was = gc.isenabled()
+    gc.disable()
+    try:
+        yield
+    finally:
+        if was:
+            gc.enable()
 
 
 def settle_heap(full=False):
