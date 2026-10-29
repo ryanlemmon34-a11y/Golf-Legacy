@@ -45,6 +45,7 @@ world library, where you create or open a world, advance it a week, four weeks o
 and explore its people, tournaments, courses, nations, tours, records and history. **Report a problem**
 packages a saved world for us. How to stop, reopen, which saves are supported and a short acceptance
 checklist: `docs/OBSERVER_ALPHA.md`. From a terminal: `python tools/observer.py --open`.
+`RUN_BENCHMARK_WINDOWS.bat` times a season skip on your computer and writes `benchmark_result.txt`.
 
 ## Running it (Windows)
 

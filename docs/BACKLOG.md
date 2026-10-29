@@ -104,6 +104,14 @@ still open (the test fails before the fix with the owner's exact error). Opening
 publishes 2027. Evidence from the same log: weeks 11-28 took 16 s and weeks 35-52 with the season end about
 19 s on the owner's computer -- much faster than this container (not a benchmark).
 
+**The target machine** (owner, 29 October 2026): ASUS ROG Zephyrus G14 (GA403UV), AMD Ryzen 9 8945HS (8
+cores, 16 logical CPUs), 16 GB RAM (15.3 GB usable; 3.0 GB available when the owner looked), Windows 11
+(10.0.26100), Python 3.15. The 120 s season target is measured on it. By default the engine starts one worker
+per logical CPU (16 here); whether 8 is as fast, and how much memory 16 Windows workers take beside a
+long world in 16 GB, is what `RUN_BENCHMARK_WINDOWS.bat` measures (season 1 with 16 and 8 workers; drag a
+world folder onto it for that world). The benchmark now also measures memory on Windows (working set and
+private memory per process; unverified until it runs there) and writes `benchmark_result.txt`.
+
 **Unverified / open**: Windows beyond the paths above (launcher, lock takeover); network drives;
 season 100 performance; as-of views; records over the current season (archived seasons only); dated
 partnerships during a season come from the archive (through the last season end).

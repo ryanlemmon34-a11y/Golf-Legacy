@@ -119,6 +119,14 @@ the failure, reproduce with the engine commit it names, and never change your or
 
 Write down anything surprising, with the world's name and date, and send the diagnostic zip.
 
+## Measuring speed on your computer
+
+Double-click **`RUN_BENCHMARK_WINDOWS.bat`** (laptop plugged in, other programs closed; about 5 minutes). It
+creates a temporary world, times "To end of season" for season 1 with all your logical CPUs as workers and
+then with half of them, measures memory, and writes `benchmark_result.txt` in the Golf Legacy folder: send
+that file. To measure a bigger world, drag its folder (for example the 50-season `world_2027`) onto the .bat:
+it works on a temporary copy and never changes the world.
+
 ## Known limits of the alpha
 
 - Performance: a season skip took 109 s for season 1 and about 190 s for season 51 on our 4-CPU test
