@@ -112,6 +112,7 @@ class ArchiveWriter:
             events.append({'id': r.event_id, 'series': r.series_id, 'week': r.week, 'sites': r.sites,
                            # classification when it was played: later calendar changes never rewrite it
                            'name': ser.name, 'tour': ser.tour, 'tier': ser.tier, 'category': ser.category,
+                           'rounds': ser.rounds, 'match_play': bool(ser.match_play),   # its format then
                            'prestige': round(r.prestige, 2), 'playoff': r.playoff, 'finish': r.finish,
                            'team': {str(g): list(t) for g, t in r.team.items()},
                            'routes': {str(g): v for g, v in routes.items()}})

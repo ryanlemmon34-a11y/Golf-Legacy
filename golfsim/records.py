@@ -8,7 +8,11 @@ For each layout the book keeps:
     course record     lowest 18-hole score (first to shoot it holds it; equalling it is noted)
     record history    every round that set or equalled the record, in order
     tier records      lowest round at each level of golf (Premier, Challenger, college, ...)
-    lowest totals     lowest 36 / 54 / 72-hole tournament totals
+    lowest totals     lowest 36 / 54 / 72-hole tournament totals: completed stroke-play events of that
+                      length on this layout, every round played (a missed cut is not a completed longer
+                      event; match play never makes a stroke-play total; playoff holes are not in a
+                      total; a one-round event is a round, kept by the course record); equalling a
+                      total does not take it (the first to post it holds it)
     highest round     the worst competitive round ever posted there
     hole bests        lowest score ever made on each hole, and every hole-in-one and albatross
     scoring           rounds played and scoring average
@@ -102,6 +106,13 @@ class RecordBook:
 
     def __init__(self):
         self.layouts = {}
+        self.totals_since = None          # the first season whose tournament totals were recorded
+
+    def note_totals(self, year):
+        """Tournament totals are recorded from this season on (a world whose earlier seasons were played
+        before totals were recorded keeps the season it began: its totals are "since" that season)."""
+        if getattr(self, 'totals_since', None) is None:
+            self.totals_since = year
 
     def get(self, course):
         lid = course.layout_id
@@ -141,5 +152,6 @@ class RecordBook:
         for lid, r in self.layouts.items():
             d = asdict(r)
             d['history'] = [(k, asdict(m)) for k, m in r.history]
+            d['totals_since'] = getattr(self, 'totals_since', None)
             out[lid] = d
         return out

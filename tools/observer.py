@@ -380,6 +380,14 @@ def course(w, q, cid):
         if cr:
             out.append(f'<p>{esc(lid.split(":")[1])} layout record: {cr["score"]} by {w.person_link(cr.get("golfer_id"))} '
                        f'({event_link(w, cr["event_id"])})</p>')
+        totals = r.get('lowest_totals') or {}
+        if totals:
+            since = r.get('totals_since')
+            out.append(f'<p class="muted">{esc(lid.split(":")[1])} lowest tournament totals'
+                       + (f' (recorded since {since})' if since else '') + ': ' + '; '.join(
+                           f'{h} holes {m["score"]} ({m["to_par"]:+d}) by {w.person_link(m.get("golfer_id"))}, '
+                           f'{event_link(w, m["event_id"])}' for h, m in sorted(totals.items(), key=lambda x: int(x[0])))
+                       + '</p>')
     out.append('<h2>Editions hosted</h2><table><tr><th>Edition</th><th>Layout</th><th>Winner</th></tr>' + ''.join(
         f'<tr><td>{event_link(w, e["event"])}</td><td>{esc(e["layout"])}</td><td>{w.person_link(e["winner"])}</td></tr>'
         for e in eds) + '</table>')

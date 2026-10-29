@@ -79,3 +79,13 @@ archive's index in place (WAL mode, season indexes, the schema-2 tables): open t
 Drill result: both checksums matched, the history read (`recap 2076`), the session reopened at generation 50,
 1 January 2077 (13,187 active golfers, 42,947 people), and the extracted original still matched every checksum
 afterwards. The run's own directory in this session also still matches the export's checksums.
+
+## Tournament totals (reconstructed, not in the world)
+
+The engine this world was simulated with (7334ffe) never recorded the lowest 36/54/72-hole tournament totals
+per layout (the record book had the field, nothing filled it): its records table has none. They are recorded
+from fa72a8e's successor on. `TOTALS_RECONSTRUCTED.md` rebuilds them from the archive with
+`tools/reconstruct_totals.py --engine-commit 7334ffe` (read-only; the world is unchanged): 1,285 totals (465 of
+36 holes, 379 of 54, 441 of 72), from every completed stroke-play total the season files keep. The archive does
+not record an edition's length, so it is taken from the standard calendar; `golfsim/calendar.py` is unchanged
+since 7334ffe, so they are exact for this world. They are a report, not records added to the world.

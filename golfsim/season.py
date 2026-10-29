@@ -1503,6 +1503,16 @@ class Season:
                 rec.add_hole(idx, strokes, pars[idx], self.g[gid].name, ed.event_id, year, stage, gid)
                 self._moments_from(rec, aces, albs, year, week, ed.event_id, course.layout_id)
                 self.holes_played[year] += 1
+            if not s.match_play and s.rounds >= 2:            # lowest completed tournament totals, per layout
+                self.records.note_totals(year)
+                played = defaultdict(list)
+                for gid, rd, score, holes, _ in o['rounds']:
+                    played[gid].append(score)
+                for gid, pos, total in finish:               # in finishing order: on a tie the first holds
+                    scores = played.get(gid, ())
+                    if total is not None and len(scores) == s.rounds and sum(scores) == total:
+                        rec.add_total(s.rounds * 18, Mark(total, total - course.par * s.rounds, self.g[gid].name,
+                                                          ed.event_id, year, week, 0, s.tier, gid))
             if o['playoff'] and finish and site == 0:
                 losers = [gid for gid, pos, total in finish if pos == 2 and total == finish[0][2]]
                 self.moments[year].append({'kind': 'playoff', 'person': finish[0][0], 'event': ed.event_id, 'week': week,
