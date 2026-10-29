@@ -728,16 +728,19 @@ def _lock_owner():
 
 
 def _owner_gone(text):
-    """True only when the lock's owner certainly no longer runs: same host, POSIX, no such process.
-    (Elsewhere, or on Windows, a lock is never taken over.)"""
-    if os.name != 'posix':
-        return False
+    """True only when the lock's owner certainly no longer runs: same host and no such process (POSIX:
+    signal 0; Windows: the process cannot be opened, or has exited). A lock from another host, or one
+    whose owner cannot be checked, is never taken over."""
     parts = text.split()
     try:
         pid = int(parts[0])
     except (IndexError, ValueError):
         return False
     if len(parts) > 1 and parts[1] != socket.gethostname():
+        return False
+    if os.name == 'nt':
+        return _windows_process_gone(pid)
+    if os.name != 'posix':
         return False
     try:
         os.kill(pid, 0)
@@ -746,6 +749,29 @@ def _owner_gone(text):
     except PermissionError:
         return False                                  # it exists (another user's process)
     return False
+
+
+def _windows_process_gone(pid):
+    """Windows: True only if no process with this id is running (it cannot be opened because it does not
+    exist, or it has exited). Never signals the process (os.kill would terminate it on Windows)."""
+    try:
+        import ctypes
+        from ctypes import wintypes
+        k32 = ctypes.WinDLL('kernel32', use_last_error=True)
+        k32.OpenProcess.restype = wintypes.HANDLE
+        k32.OpenProcess.argtypes = (wintypes.DWORD, wintypes.BOOL, wintypes.DWORD)
+        h = k32.OpenProcess(0x1000, False, pid)          # PROCESS_QUERY_LIMITED_INFORMATION
+        if not h:
+            return ctypes.get_last_error() == 87          # ERROR_INVALID_PARAMETER: no such process
+        try:
+            code = wintypes.DWORD()
+            if not k32.GetExitCodeProcess(h, ctypes.byref(code)):
+                return False
+            return code.value != 259                      # STILL_ACTIVE
+        finally:
+            k32.CloseHandle(h)
+    except Exception:
+        return False
 
 
 class _FileLock:
