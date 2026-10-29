@@ -21,6 +21,18 @@ history archive), `--worlds DIR` for another library folder, `--port`, `--worker
 
 The observer listens on 127.0.0.1 only (this computer). Worlds are folders in `worlds/` (not tracked by git).
 
+## Updating to a new version
+
+1. Quit the observer.
+2. On GitHub (Golf-Legacy, branch main) press **Code → Download ZIP** and unzip it.
+3. Open the unzipped folder (`Golf-Legacy-main`), select everything in it, and copy it into your existing Golf
+   Legacy folder, choosing **Replace the files in the destination**. Your `worlds` folder is not in the
+   download, so your worlds stay exactly as they are.
+4. Start `RUN_OBSERVER_WINDOWS.bat` again and Open your world.
+
+The library shows whether each world can still be resumed ("this engine"): updates that change only the
+observer, tools or the save code keep it so.
+
 ## What you can do
 
 - **World library** (`/worlds`): every world with its date, seed, compatibility and state; **Create** (a name

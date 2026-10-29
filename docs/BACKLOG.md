@@ -90,7 +90,21 @@ main process peak RSS 3.06 GB; a diagnostic package 282 MB required + 973 MB opt
 with the index). A one-week advance from 1 January took 33 s (the year start runs with that week, then the
 save).
 
-**Unverified / open**: Windows (launcher, lock takeover, file replacement while read); network drives;
+**The owner's first Windows playtest** (29 October 2026; diagnostic report "First Observer Try", seed 2027,
+Windows 11, Python 3.15): the first season end could not be published -- `OSError: [Errno 9] Bad file
+descriptor` from `os.fsync` on a file opened only for reading (copying the previous manifest), which Windows
+refuses and Linux allows; every later page retried the publication and failed the same way. The season itself
+was committed (the world at 2028, week 1, with 2027 staged in its checkpoint): nothing was lost, but the
+observer's message wrongly said "nothing of this advance was kept". Fixed: copies are flushed through the
+handle that wrote them (also the hard-link fallback for drives without hard links); replacing the manifest or
+CURRENT retries briefly while Windows has the old file open; collection skips files still open; the observer
+says an advance was saved when only publication failed, and pages keep working (last published history,
+labelled) until publication succeeds. Tested by emulating Windows' fsync rule, missing hard links and a file
+still open (the test fails before the fix with the owner's exact error). Opening the world with the fixed code
+publishes 2027. Evidence from the same log: weeks 11-28 took 16 s and weeks 35-52 with the season end about
+19 s on the owner's computer -- much faster than this container (not a benchmark).
+
+**Unverified / open**: Windows beyond the paths above (launcher, lock takeover); network drives;
 season 100 performance; as-of views; records over the current season (archived seasons only); dated
 partnerships during a season come from the archive (through the last season end).
 
