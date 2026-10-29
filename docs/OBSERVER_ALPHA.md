@@ -129,8 +129,9 @@ it works on a temporary copy and never changes the world.
 
 ## Known limits of the alpha
 
-- Performance: a season skip took 109 s for season 1 and about 190 s for season 51 on our 4-CPU test
-  machine; your machine will differ (see `docs/BACKLOG.md`). The first open of a world saved by older code
+- Performance: on your laptop a season-1 skip took 47.9 s (16 workers) and 49.9 s (8). Older worlds take
+  longer (season 51 took about 190 s on our slower 4-CPU test machine, not yet measured on yours; see
+  `docs/BACKLOG.md`). The first open of a world saved by older code
   can take a minute or two (its history index is upgraded once).
 - Records and frivolities use archived seasons only; the current season counts once it ends. Ages are
   season year minus birth year (birth dates are not recorded). Careers that began before the world are

@@ -110,7 +110,21 @@ cores, 16 logical CPUs), 16 GB RAM (15.3 GB usable; 3.0 GB available when the ow
 per logical CPU (16 here); whether 8 is as fast, and how much memory 16 Windows workers take beside a
 long world in 16 GB, is what `RUN_BENCHMARK_WINDOWS.bat` measures (season 1 with 16 and 8 workers; drag a
 world folder onto it for that world). The benchmark now also measures memory on Windows (working set and
-private memory per process; unverified until it runs there) and writes `benchmark_result.txt`.
+private memory per process) and writes `benchmark_result.txt`.
+
+**Measured on the target machine** (owner's run, 29 October 2026, `RUN_BENCHMARK_WINDOWS.bat`; plugged in;
+season 1 of a new full world, seed 2027, 6,449 active golfers; preparation excluded: create about 3 s):
+
+| Workers | Click to overview | Simulate | Save | Publish | Settle | Reload + overview | First Records | Memory (main peak working set / all processes private) |
+|---|---|---|---|---|---|---|---|---|
+| 16 | **47.9 s** | 44.6 s | 1.5 s | 1.0 s | 0.2 s | 0.5 s | 0.2 s | 459 MB / 817 MB (each worker 24 MB private) |
+| 8 | **49.9 s** | 46.6 s | 1.5 s | 1.0 s | 0.3 s | 0.5 s | 0.2 s | 458 MB / 625 MB |
+
+Season 1 meets the 120 s target on the target machine with room to spare (about 2.5 times faster than this
+container: 100-109 s). 8 workers are almost as fast as 16: in season 1 the main process's serial work, not
+the shot simulation in the workers, sets the time. Windows memory measurement verified by this run. **Still
+unmeasured on it: a mature world** (the 50-season world: drag `world_2027` onto the launcher) **and season
+100** (no such save exists; making one is a long run, an owner decision).
 
 **Unverified / open**: Windows beyond the paths above (launcher, lock takeover); network drives;
 season 100 performance; as-of views; records over the current season (archived seasons only); dated
