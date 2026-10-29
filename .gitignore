@@ -8,3 +8,4 @@ reports/long_world*/*.save
 reports/long_world*/*.pkl
 reports/long_world*/archive_*/
 worlds/
+benchmark_result.txt

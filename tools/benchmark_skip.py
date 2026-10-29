@@ -24,10 +24,15 @@ this session) and skips. Parts reported:
     = skip       what the player waits for: the click to the overview shown again
     records      the first Records page after it (a separate click; built lazily)
 
-Memory (Linux): sampled once a second for this process and each live worker, as resident (RSS) and
+Memory, sampled once a second for this process and each live worker. Linux: resident (RSS) and
 proportional (PSS: shared pages divided among the processes sharing them, so the PSS of all processes
-adds up to the memory really used), plus this process's exact peak RSS (ru_maxrss). Elsewhere: not
-measured.
+adds up to the memory really used), plus this process's exact peak RSS (ru_maxrss). Windows: working set
+(resident) and private memory (committed memory no other process shares; summed over the processes, the
+memory the skip holds), plus this process's exact peak working set. Elsewhere: not measured. The machine
+line gives the computer's total and available memory when the run starts.
+
+`--log FILE` also appends everything printed (and any error) to FILE: RUN_BENCHMARK_WINDOWS.bat uses it to
+leave benchmark_result.txt to send.
 
 `--retired N` adds N retired people with expired ranking and fame points to the starting world, an
 approximation of the people a world accumulates over a century: it measures what retired people cost
@@ -58,13 +63,104 @@ sys.path.insert(0, str(ROOT / 'tools'))
 def machine():
     cpu = platform.processor() or platform.machine()
     try:
-        for line in open('/proc/cpuinfo'):
-            if line.startswith('model name'):
-                cpu = line.split(':', 1)[1].strip()
-                break
+        with open('/proc/cpuinfo') as f:
+            for line in f:
+                if line.startswith('model name'):
+                    cpu = line.split(':', 1)[1].strip()
+                    break
     except OSError:
         pass
-    return f'{cpu}, {os.cpu_count()} logical CPUs, Python {platform.python_version()}, {platform.system()}'
+    mem = memory_now()
+    return (f'{cpu}, {os.cpu_count()} logical CPUs, Python {platform.python_version()}, {platform.platform()}'
+            + (f'; memory {mem[0] / 1024:.1f} GB, {mem[1] / 1024:.1f} GB available at the start' if mem else ''))
+
+
+def memory_now():
+    """(total, available) physical memory in MB, or None."""
+    try:
+        if os.name == 'nt':
+            import ctypes
+
+            class MEMORYSTATUSEX(ctypes.Structure):
+                _fields_ = [('dwLength', ctypes.c_uint32), ('dwMemoryLoad', ctypes.c_uint32)] + [
+                    (n, ctypes.c_uint64) for n in ('ullTotalPhys', 'ullAvailPhys', 'ullTotalPageFile', 'ullAvailPageFile',
+                                                   'ullTotalVirtual', 'ullAvailVirtual', 'ullAvailExtendedVirtual')]
+            m = MEMORYSTATUSEX()
+            m.dwLength = ctypes.sizeof(m)
+            if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(m)):
+                return m.ullTotalPhys // 2 ** 20, m.ullAvailPhys // 2 ** 20
+            return None
+        info = {}
+        with open('/proc/meminfo') as f:
+            for line in f:
+                k, v = line.split(':', 1)
+                info[k] = int(v.split()[0]) // 1024
+        return info['MemTotal'], info['MemAvailable']
+    except Exception:
+        return None
+
+
+class WindowsMemory:
+    """Windows: a process's working set and private memory, and the processes it started (ctypes, nothing
+    to install). Raises on any other platform."""
+
+    def __init__(self):
+        import ctypes
+        from ctypes import wintypes
+        self.ct = ctypes
+        k = self.k32 = ctypes.WinDLL('kernel32', use_last_error=True)
+
+        class PMC(ctypes.Structure):                        # PROCESS_MEMORY_COUNTERS_EX
+            _fields_ = [('cb', ctypes.c_uint32), ('PageFaultCount', ctypes.c_uint32)] + [
+                (n, ctypes.c_size_t) for n in ('PeakWorkingSetSize', 'WorkingSetSize', 'QuotaPeakPagedPoolUsage',
+                                               'QuotaPagedPoolUsage', 'QuotaPeakNonPagedPoolUsage',
+                                               'QuotaNonPagedPoolUsage', 'PagefileUsage', 'PeakPagefileUsage',
+                                               'PrivateUsage')]
+
+        class PE32(ctypes.Structure):                       # PROCESSENTRY32W
+            _fields_ = [('dwSize', ctypes.c_uint32), ('cntUsage', ctypes.c_uint32), ('th32ProcessID', ctypes.c_uint32),
+                        ('th32DefaultHeapID', ctypes.c_size_t), ('th32ModuleID', ctypes.c_uint32),
+                        ('cntThreads', ctypes.c_uint32), ('th32ParentProcessID', ctypes.c_uint32),
+                        ('pcPriClassBase', ctypes.c_int32), ('dwFlags', ctypes.c_uint32), ('szExeFile', ctypes.c_wchar * 260)]
+        self.PMC, self.PE32 = PMC, PE32
+        k.OpenProcess.restype = wintypes.HANDLE
+        k.OpenProcess.argtypes = (wintypes.DWORD, wintypes.BOOL, wintypes.DWORD)
+        k.K32GetProcessMemoryInfo.argtypes = (wintypes.HANDLE, ctypes.c_void_p, wintypes.DWORD)
+        k.CreateToolhelp32Snapshot.restype = wintypes.HANDLE
+        k.CreateToolhelp32Snapshot.argtypes = (wintypes.DWORD, wintypes.DWORD)
+        k.Process32FirstW.argtypes = (wintypes.HANDLE, ctypes.c_void_p)
+        k.Process32NextW.argtypes = (wintypes.HANDLE, ctypes.c_void_p)
+        k.CloseHandle.argtypes = (wintypes.HANDLE,)
+        if self.counters(os.getpid()) is None:
+            raise OSError('memory counters unavailable')
+
+    def counters(self, pid):
+        h = self.k32.OpenProcess(0x1000 | 0x0010, False, pid)   # QUERY_LIMITED_INFORMATION | VM_READ
+        if not h:
+            return None
+        try:
+            c = self.PMC()
+            c.cb = self.ct.sizeof(c)
+            return c if self.k32.K32GetProcessMemoryInfo(h, self.ct.byref(c), c.cb) else None
+        finally:
+            self.k32.CloseHandle(h)
+
+    def children(self, me):
+        snap = self.k32.CreateToolhelp32Snapshot(0x2, 0)       # TH32CS_SNAPPROCESS
+        if not snap or snap == self.ct.c_void_p(-1).value:
+            return []
+        out = []
+        try:
+            e = self.PE32()
+            e.dwSize = self.ct.sizeof(e)
+            ok = self.k32.Process32FirstW(snap, self.ct.byref(e))
+            while ok:
+                if e.th32ParentProcessID == me:
+                    out.append(e.th32ProcessID)
+                ok = self.k32.Process32NextW(snap, self.ct.byref(e))
+        finally:
+            self.k32.CloseHandle(snap)
+        return out
 
 
 def padded_world(seed, retired):
@@ -89,10 +185,27 @@ class MemorySampler(threading.Thread):
         super().__init__(daemon=True)
         self.every, self.stop_flag = every, threading.Event()
         self.peak = {'main_rss': 0, 'main_pss': 0, 'worker_rss': 0, 'worker_pss': 0, 'total_pss': 0, 'workers': 0}
+        self.win = None
         self.ok = os.path.exists('/proc/self/smaps_rollup')
+        if not self.ok and os.name == 'nt':
+            try:
+                self.win = WindowsMemory()
+                self.ok = True
+            except Exception:
+                self.win = None
+        self.labels = ('working set', 'private') if self.win else ('RSS', 'PSS')
 
-    @staticmethod
-    def _mem(pid):
+    def exact_peak(self, resource=None):
+        """This process's exact peak resident memory in MB (None if unknown)."""
+        if self.win:
+            c = self.win.counters(os.getpid())
+            return c.PeakWorkingSetSize // 2 ** 20 if c else None
+        return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss // 1024 if resource else None
+
+    def _mem(self, pid):
+        if self.win:
+            c = self.win.counters(pid)
+            return (c.WorkingSetSize // 2 ** 20, c.PrivateUsage // 2 ** 20) if c else (0, 0)
         rss = pss = 0
         try:
             with open(f'/proc/{pid}/smaps_rollup') as f:
@@ -105,8 +218,9 @@ class MemorySampler(threading.Thread):
             pass
         return rss, pss
 
-    @staticmethod
-    def _children():
+    def _children(self):
+        if self.win:
+            return self.win.children(os.getpid())
         me, out = os.getpid(), []
         for d in os.listdir('/proc'):
             if d.isdigit():
@@ -167,6 +281,22 @@ def prepare(a):
     print(json.dumps(out))
 
 
+class _Tee:
+    """Write to the console and to the log file."""
+
+    def __init__(self, *streams):
+        self.streams = streams
+
+    def write(self, text):
+        for x in self.streams:
+            x.write(text)
+        return len(text)
+
+    def flush(self):
+        for x in self.streams:
+            x.flush()
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--seed', type=int, default=2027)
@@ -179,9 +309,14 @@ def main():
                     'a world from another engine is opened with allow_other_engine (the copy only)')
     ap.add_argument('--profile', help='write a cProfile of the first season\'s skip (main process) to this file')
     ap.add_argument('--prepare', action='store_true', help=argparse.SUPPRESS)
+    ap.add_argument('--log', help='also append everything printed (and any error) to this file')
     a = ap.parse_args()
     if a.prepare:
         return prepare(a)
+    if a.log:
+        log = open(a.log, 'a', encoding='utf-8')
+        log.write(f'\n=== {time.strftime("%Y-%m-%d %H:%M:%S")}: benchmark_skip {" ".join(sys.argv[1:])}\n')
+        sys.stdout, sys.stderr = _Tee(sys.__stdout__, log), _Tee(sys.__stderr__, log)
     d = Path(a.dir) if a.dir else Path(tempfile.mkdtemp()) / 'world'
     w = None
     try:
@@ -280,9 +415,11 @@ def _skips(a, w, observer, Session, SES, resource):
               f'{len(w.session.season.active_golfers()):,}, people {len(w.session.season.world.golfers):,}; '
               f'workers {w.session.season.workers}', flush=True)
         if mem:
-            print(f'  memory peaks (sampled each second): this process RSS {mem["main_rss"]:,} MB / PSS '
-                  f'{mem["main_pss"]:,} MB (exact peak RSS {resource.getrusage(resource.RUSAGE_SELF).ru_maxrss // 1024:,} MB); '
-                  f'largest worker RSS {mem["worker_rss"]:,} MB / PSS {mem["worker_pss"]:,} MB; all processes PSS '
+            r, q = sampler.labels
+            exact = sampler.exact_peak(resource)
+            print(f'  memory peaks (sampled each second): this process {r} {mem["main_rss"]:,} MB / {q} '
+                  f'{mem["main_pss"]:,} MB (exact peak {r} {exact if exact is not None else "?":,} MB); '
+                  f'largest worker {r} {mem["worker_rss"]:,} MB / {q} {mem["worker_pss"]:,} MB; all processes {q} '
                   f'{mem["total_pss"]:,} MB; live workers seen {mem["workers"]}', flush=True)
         else:
             print('  memory: not measured on this platform', flush=True)
