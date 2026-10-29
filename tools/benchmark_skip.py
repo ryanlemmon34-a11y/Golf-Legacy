@@ -95,11 +95,12 @@ class MemorySampler(threading.Thread):
     def _mem(pid):
         rss = pss = 0
         try:
-            for line in open(f'/proc/{pid}/smaps_rollup'):
-                if line.startswith('Rss:'):
-                    rss = int(line.split()[1]) // 1024
-                elif line.startswith('Pss:'):
-                    pss = int(line.split()[1]) // 1024
+            with open(f'/proc/{pid}/smaps_rollup') as f:
+                for line in f:
+                    if line.startswith('Rss:'):
+                        rss = int(line.split()[1]) // 1024
+                    elif line.startswith('Pss:'):
+                        pss = int(line.split()[1]) // 1024
         except OSError:
             pass
         return rss, pss
@@ -110,7 +111,9 @@ class MemorySampler(threading.Thread):
         for d in os.listdir('/proc'):
             if d.isdigit():
                 try:
-                    if int(open(f'/proc/{d}/stat').read().rsplit(')', 1)[1].split()[1]) == me:
+                    with open(f'/proc/{d}/stat') as f:
+                        stat = f.read()
+                    if int(stat.rsplit(')', 1)[1].split()[1]) == me:
                         out.append(int(d))
                 except (OSError, IndexError, ValueError):
                     pass
