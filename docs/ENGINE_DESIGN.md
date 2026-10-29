@@ -45,8 +45,13 @@ the development container (Intel Xeon @ 2.10 GHz, 4 logical CPUs, Python 3.13, L
 | 50-season run, season 25 (12,833 active) | 228 s | 176 s | 14.4 s | 11.3 s | 26.0 s | 2.5 s |
 | 50-season run, season 50 (13,187 active, 42,947 people) | 280 s | 201 s | 22.9 s | 4.4 s | 51.0 s | 4.4 s |
 | Season 51 in a clean process (copy of the final world) | 268 s | 172 s | 21.3 s | 5.3 s | 69.3 s (overview builds the records) | — |
+| The same, old code (1f68691) re-measured the day of the next pass | 336 s | 205 s | 25.2 s | 6.9 s | 98.6 s (11.0 GB peak) | 21.7 s |
+| The same after the next pass (37d9edf and later; two runs) | 217–224 s | 190 s | 16.3–19.4 s | 6.0–8.0 s | 4.2–6.9 s (3.6 GB peak) | 26.4–28.5 s |
 
-Single runs vary by several seconds; season 2 sits at the target, not safely under it. **The 50-season run
+Single runs vary by several seconds (about 5% on this container); season 2 sits at the target, not safely
+under it. After the history-reading work the observer is no longer the problem at season 51 (records come
+from the archive index, memory bounded); simulation, about 190 s, is (see `docs/BACKLOG.md`, the
+preservation, accuracy and speed pass, for the profile and what comes next). **The 50-season run
 misses the target from season 2 on** (`reports/long_run_2027/`): simulation grows with the active population
 (about 13,000 from season 25, where it levels off) to 170–200 s; the observer's overview builds the in-memory
 records (`HistoryStats`), which after 50 seasons takes about 70 s and 9 GB. The harness's timings are

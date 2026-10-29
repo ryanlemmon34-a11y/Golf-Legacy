@@ -67,8 +67,8 @@ week by week is the world a whole-season run produces (tested, fingerprint-equal
   previous world; after, the new one. Any failure before the commit, one-week or multi-week, an error, an
   interrupt or a failed save, reloads the committed world in memory, so memory never runs ahead of disk.
   The last known good generation is kept; a damaged current one falls back to it. Loading runs with the
-  cyclic garbage collector paused, then collects once and freezes the loaded world out of later full
-  collections (`session.settle_heap`, repeated after each archived season); archive JSON is written with
+  cyclic garbage collector paused, then freezes the loaded world out of later full collections
+  (`session.settle_heap`, repeated after each archived season; full collections found no garbage); archive JSON is written with
   the C encoder at gzip level 6. Both are performance only: the same simulated state (fingerprinted) and
   the same archive text. Orphaned temporary files
   are removed on opening, but only when the opener can take the lock: opening a world while another

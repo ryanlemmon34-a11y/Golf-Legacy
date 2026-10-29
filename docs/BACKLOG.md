@@ -223,16 +223,17 @@ Same status words as above.
 Engine 7334ffe (clean), full population, every shot, through the persistent session and the observer; every
 check passed in all 50 seasons (cash, family money, backers' money, staff payments, staff invariants, population).
 - **Population** levels off: about 13,000 active golfers from season 25 (6,955 at the start); 42,947 people by
-  season 50. Golfers arriving in season two or later won 131 of 200 majors; 8 became world No. 1.
-- **High-potential golfers who left before developing**: 5 of the 2,127 in the top 5% of potential (2 became
-  caddies, 2 coaches, 1 went back to amateur golf), all with no money left.
+  season 50. Golfers arriving in season two or later won 131 of 200 majors; 12 reached world No. 1 in the weekly
+  ranking (originally reported as 8, by year-end ranking).
+- **High-potential golfers who left before developing**: originally reported as 5; corrected (see the next
+  section): 20 full-time episodes ended young and undeveloped without a return, 3 more ended in a comeback.
 - **Money**: no season failed to reconcile; one golfer ended a season beyond their own credit in 3 of the 50 seasons. **Open:**
   about 40% of full-time professionals end each season in debt (median about $7,000, within credit), and 45% of
   full-time mini-tour seasons lose 4+ weeks to money. Causes: a losing previous season (59%), beginning in debt
   (50%), no backers' money (41%), new professionals (40%), living outside the tour's countries (13%). The mini
   tours' economics (entry fees against purses) deserve an owner review; nothing was tuned.
 - **Residence**: moves are rare and explained. Over 50 seasons there were 920 graduates going home, 484 other
-  returns home, 143 career moves abroad (59 of them later went home), 2,626 caddies following their player and
+  returns home, 143 career moves abroad (50 of those golfers later went home, counted in date order; originally 59), 2,626 caddies following their player and
   272 coaches following their players. 150–190 wanted moves a season were not made for lack of money.
 - **Performance — missed.** Season skips took 108 s in season 1, then 122 s in season 2, rising to 280 s by
   season 50. In a clean process season 51 took 268 s: simulation 172 s, save 21 s, the observer's overview 69 s.
@@ -244,6 +245,69 @@ check passed in all 50 seasons (cash, family money, backers' money, staff paymen
 - **Untested on Windows**: hard links between generations (`os.link`, falling back to a copy), the lock file,
   `os.replace` over files another process has open, fsync behaviour and network drives. All save and recovery
   tests ran on Linux.
+
+## Preservation, accuracy and speed pass (owner review of 1f68691; the run on engine 7334ffe)
+
+Same status words as above. No long simulation was started; no population, tournament, shot or history was
+removed.
+
+1. **Durable export of the 50-season world** — done, verified. `golf-legacy-world-2027-50y.tar.gz` (615 MB,
+   two parts, `EXPORT_README.md`; delivered as files): world, data, reports, the engine as a git bundle and a
+   tarball, `SHA256SUMS`. Verified: the parts rejoin to the checksum; the extracted copy is byte-identical; the
+   archive reads; the session reopens from the bundle. GitHub hosting was blocked (releases not permitted for
+   this session type; `lfs.github.com` denied by the network policy). The engine id now also derives from the
+   files when there is no git (627ed1c), so an exported source tree opens its world.
+2. **Winter move funding** — implemented, tested (75c135f). A move is paid at once, in its own year, by the
+   weekly settlement's own rule (cash, then backers' money, then family money); never next season's backing.
+   Tests: no cash + $10,000 backers' money + $6,000 move (and a $20,000 deal), family-funded, cash-funded,
+   cash-then-backers-then-family, unaffordable (blocked); each really moves. College moves stay free.
+3. **Annual finances in the archive** — implemented, tested (4754eed). Careers rows carry the final ledger
+   (after winter expenses) and `net_at_decision`, the evidence the career decision used; decision timing
+   unchanged. Tests: cash-funded and support-funded moves, save/resume, interrupted season end. The 50-season
+   run predates this: its reports flag the pre-winter net (not reconstructable exactly).
+4. **Residence before the first record is unknown** — implemented, tested (f205bfa), live and archived:
+   before, at and after arrival, college transfers, later moves, golfer to staff.
+5. **Diagnostic reports** — implemented, tested (b9af53f, `tests/test_reports.py`); regenerated from the saved
+   data, originals kept (`reports/long_run_2027/*_original.md`, changes listed in its README). Changed
+   conclusions: high-potential golfers whose full-time golf ended young and undeveloped, by episode: 20 not
+   back (was "5 left"), 3 comebacks; weekly No. 1 among later juniors 12 (was 8 by year-end, all cohorts
+   lumped); moved abroad and later returned 50 (was 59); the seeded "late bloomer" replaced.
+6. **History reading at scale** — implemented, tested (e8aef18). Index schema 2 (weekly No. 1, careers rows);
+   recap, careers, weeks at No. 1, moments, course histories and professional winners (any site of a
+   multi-site event) from the index; records built from a compact per-person store; the decoded-season
+   cache is bounded (4). Old and new answers on the 50-season world identical (28 boards, 1,370 rows, 8 other
+   answers). An older index is completed once, under the session's lock (about 90 s for 50 seasons).
+7. **Simulation and save profiling** — implemented, tested (37d9edf): archive JSON through the C encoder,
+   the cyclic collector kept off the loaded world, the planner's per-golfer invariants worked out once.
+   Fingerprint: the simulated state after 8 weeks of 2078 is the same hash before and after.
+
+**Season 51, clean process, copy of the final world** (Intel Xeon @ 2.10 GHz, 4 logical CPUs, 15 GB, Python
+3.13, Linux; both measured the same day, `tools/benchmark_skip.py --from-world`):
+
+| | Skip | Simulate | Save | Publish | Observer reload + overview | First Records page | Peak memory |
+|---|---|---|---|---|---|---|---|
+| Before (1f68691) | 335.8 s | 205.1 s | 25.2 s | 6.9 s | 98.6 s | 21.7 s | 11.0 GB |
+| After (two runs) | 216.6–224.0 s | 189.7–190.0 s | 16.3–19.4 s | 6.0–8.0 s | 4.2–6.9 s | 26.4–28.5 s | 3.6 GB |
+
+The first Records page now builds the records itself (before, the overview had already built them in 94 s).
+Runs on this container vary by about 5%; an earlier sample of the old code gave 267.6 s (simulate 171.6 s).
+
+**Remaining blockers to 120 s** (profiled): simulation is about 190 s. In the profile, playing the weeks (the
+workers playing every shot on 3 processes, plus sending each site's field and course to them and receiving
+every hole back) was 48% of the weekly work; profiling inflates the main process's own Python, so the real
+share is probably larger. The rest is serial weekly work in the main process: monthly planning (13 blocks,
+about 4 s each unprofiled), weekly entries, development, recording results and rankings. Next, in order:
+cache each plan block's event values by what they depend on; send courses to workers once instead of with
+every site; cut per-hole result transfer to what is archived; then measure on the intended hardware (more
+cores shorten the workers' share only). Season 100 is unmeasured.
+
+**Executed / inspected / untested.** Executed: the full suite (270 tests; one failure found — a finance test
+that compared pre-winter pots with the post-winter ledger, fixed in cafea33 — then the affected modules
+re-run), the focused regressions above, the fingerprint, the old-versus-new history comparison, the export
+verification, both benchmarks and a two-season strict integration check. Inspected only: the Windows code
+paths. **Untested on Windows**: hard links between generations (falls back to a copy), the lock file and
+taking over a dead owner's lock (never on Windows), `os.replace` over files another process holds open, fsync
+behaviour, network drives, and `benchmark_skip.py` memory figures (no `resource` module there).
 
 ## V1 observer UI (owner baseline, `docs/UI_REQUIREMENTS_V1.md`)
 

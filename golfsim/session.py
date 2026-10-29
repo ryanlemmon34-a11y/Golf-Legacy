@@ -502,12 +502,13 @@ def _load_generation(d, n, allow_other_engine):
 
 
 def settle_heap():
-    """Collect once, then leave the long-lived world out of the cyclic collector's full passes
-    (`gc.freeze`): a full collection over a multi-gigabyte world took seconds and found nothing. Done on
-    loading and after each archived season (objects frozen then and later dropped wait until the next
-    one). Performance only: no simulated value depends on it."""
-    gc.unfreeze()
-    gc.collect()
+    """Leave the long-lived world out of the cyclic collector's full passes (`gc.freeze`): without it,
+    full collections over the 50-season world (3.5 GB) took about 3 s of every 8 weeks; each found no
+    garbage (measured after loading and after weeks of play: the simulation's garbage is acyclic and freed
+    by reference counting). Done on loading and after each archived season, after collecting the young
+    generations. Cyclic garbage that reached the old generation before a freeze would be kept until the
+    process ends. Performance only: no simulated value depends on it."""
+    gc.collect(1)
     gc.freeze()
 
 
