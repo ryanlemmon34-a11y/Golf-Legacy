@@ -12,7 +12,11 @@ total, the coach and caddie that week, the entry route -- every site's winner is
 golfer per season), moments (holes-in-one, albatrosses, playoffs, course records); since schema 2,
 number_one (each week's No. 1, world and amateur) and careers (each golfer's season row, compressed).
 An index written before schema 2 is completed once by the session that owns it (backfill_derived). Indexed by person, event,
-series and course, so a profile, a tournament's history or a course's history is one query.
+series and course, so a profile, a tournament's history or a course's history is one query; the large
+tables (starts, seasons, careers) are also indexed by season, so reading one season's starts (records)
+or replacing one season (publishing, recovery) touches that season's rows, not the whole history. The
+small tables (sites, moments: under 100,000 rows after 50 seasons) are scanned. A writer opening an index
+from before these season indexes adds them once (a few seconds for 50 seasons).
 """
 from __future__ import annotations
 
@@ -41,6 +45,9 @@ CREATE INDEX IF NOT EXISTS moments_person ON moments(person);
 CREATE INDEX IF NOT EXISTS moments_kind ON moments(kind, year);
 CREATE INDEX IF NOT EXISTS starts_person ON starts(person, year, week);
 CREATE INDEX IF NOT EXISTS starts_event ON starts(eid);
+CREATE INDEX IF NOT EXISTS starts_year ON starts(year);
+CREATE INDEX IF NOT EXISTS seasons_year ON seasons(year);
+CREATE INDEX IF NOT EXISTS careers_year ON careers(year);
 CREATE INDEX IF NOT EXISTS editions_series ON editions(series, year);
 CREATE INDEX IF NOT EXISTS editions_year ON editions(year, week);
 CREATE INDEX IF NOT EXISTS sites_course ON sites(course, year);
