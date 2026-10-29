@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import random
 import shutil
 import sys
 import threading
@@ -176,6 +177,8 @@ class App:
         try:
             d = WL.check_name(self.lib, O.one(form, 'name'))
             seed = int(O.one(form, 'seed') or 2027)
+            if not 0 <= seed < 2 ** 31:
+                raise ValueError('The seed must be a whole number from 0 to 2147483647.')
         except (ValueError, FileExistsError) as e:
             return ('err', esc(e))
 
@@ -392,9 +395,12 @@ class App:
                    'saved it). The original is never changed.</p>')
         out.append('<h2>Create a world</h2><form method="post" action="/worlds/create" class="filters">'
                    '<label>Name<input name="name" required placeholder="my world"></label>'
-                   '<label>Seed<input name="seed" type="number" value="2027"></label><button class="primary">Create</button>'
-                   '</form><p class="muted">The whole world is generated (every nation, golfer, coach and caddie); a '
-                   'season’s skip takes a couple of minutes on a fast computer.</p>')
+                   f'<label>Seed<input name="seed" type="number" min="0" max="2147483647" value="{random.randrange(1, 1000000)}">'
+                   '</label><button class="primary">Create</button></form>'
+                   '<p class="muted">The seed is the world’s starting point: the same seed always makes the same world -- the '
+                   'same golfers and, shot for shot, the same history (that is what makes a problem report replayable). '
+                   'A new seed is suggested each time; type an earlier world’s seed (shown in the library) to make that '
+                   'world again. The whole world is generated: every nation, golfer, coach and caddie.</p>')
         if self.world is not None:
             out.append('<form method="post" action="/worlds/close"><button>Close the open world</button></form>')
         out.append('<h2>Stop the observer</h2><form method="post" action="/quit"><button>Quit</button></form>'

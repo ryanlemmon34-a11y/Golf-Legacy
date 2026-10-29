@@ -36,7 +36,8 @@ observer, tools or the save code keep it so.
 ## What you can do
 
 - **World library** (`/worlds`): every world with its date, seed, compatibility and state; **Create** (a name
-  and a seed: the whole world is generated), **Open** (resume), **Browse history** (read-only), **Copy**
+  and a seed: the whole world is generated; a new seed is suggested each time -- the same seed always makes the
+  same world and, shot for shot, the same history, a different seed a different one), **Open** (resume), **Browse history** (read-only), **Copy**
   (never changes the original), **Report a problem**, **Close**, **Quit**.
 - **Advance**: *Advance week*, *4 weeks*, *To end of season*, from the header of any page. The advance runs in
   the background with a progress bar; you can keep browsing (pages show the last saved week, which the
@@ -100,7 +101,7 @@ the failure, reproduce with the engine commit it names, and never change your or
 ## Acceptance checklist (about 20 minutes)
 
 1. Start the observer with the .bat; the library opens in the browser.
-2. Create a world (any name, seed 2027). The overview shows 2027, week 1 (1 January next).
+2. Create a world (any name, the suggested seed). The overview shows 2027, week 1 (1 January next).
 3. *Advance week* twice quickly (double-click): one week is played (2027, week 2), not two.
 4. *4 weeks*, and while it runs open a golfer and the calendar: the pages work and still show week 2; the
    result banner appears when it finishes (2027, week 6).

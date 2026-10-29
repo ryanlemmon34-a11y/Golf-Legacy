@@ -283,6 +283,9 @@ os._exit(9)                                   # the window closed: no cleanup at
         self.assertIn('2027, week 1', self.draw(app, '/'))
         self.assertEqual(app.create({'name': ['fresh world'], 'seed': ['5']})[0], 'err')   # never overwritten
         self.assertEqual(app.create({'name': ['../escape'], 'seed': ['5']})[0], 'err')
+        self.assertEqual(app.create({'name': ['negative'], 'seed': ['-1']})[0], 'err')
+        seeds = {re.search(r'name="seed"[^>]*value="(\d+)"', self.draw_library(app)).group(1) for _ in range(5)}
+        self.assertGreater(len(seeds), 1)                               # a new seed suggested each time
         # copy: the original is not changed, the copy is the same committed world
         before = files_digest(lib / 'demo')
         self.assertIsNone(app.copy({'name': ['demo'], 'new_name': ['demo copy']}))
