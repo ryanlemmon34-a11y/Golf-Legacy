@@ -199,8 +199,15 @@ class SessionTests(unittest.TestCase):
         self.assertEqual(json.loads((self.dir / 'archive' / 'world.json').read_text())['years'], [2027])
         self.assertFalse((self.dir / 'archive' / 'years' / '2028.json.gz').exists())
         from golfsim.archive_index import ArchiveIndex
-        self.assertEqual(ArchiveIndex(self.dir / 'archive' / 'index.sqlite').years(), [2027])
+        with ArchiveIndex(self.dir / 'archive' / 'index.sqlite') as idx:
+            self.assertEqual(idx.years(), [2027])
         t.close()
+
+
+def opened(test, archive):
+    """An Archive the test closes when it ends (it holds an index connection)."""
+    test.addCleanup(archive.close)
+    return archive
 
 
 def archive_view(d):
@@ -367,6 +374,7 @@ class TransactionTests(unittest.TestCase):
         s = self.at_season_end(2028)
         s.close()
         w = observer.World(self.dir)
+        self.addCleanup(w.close)                                        # (its history snapshot too)
         w.session.advance_one_week()                                    # 2028 published ...
         w.reload()
         self.assertEqual(sorted(w.stats.seen), [2027, 2028])            # ... and read into the records
@@ -375,7 +383,7 @@ class TransactionTests(unittest.TestCase):
         (self.dir / f'gen_{gen:06d}' / 'state.pkl.gz').write_bytes(b'damaged')
         w.session = Session.open(self.dir, workers=1)                   # falls back: 2028 is gone
         w.reload()
-        a = A.Archive(self.dir / 'archive')
+        a = opened(self, A.Archive(self.dir / 'archive'))
         self.assertEqual(sorted(w.stats.seen), [2027])
         for board in ('most_wins', 'most_starts'):
             self.assertEqual(getattr(w.stats, board)(), getattr(HistoryStats(a), board)())
@@ -385,7 +393,7 @@ class TransactionTests(unittest.TestCase):
         w.session.advance_one_week()                                    # 2028 again
         w.reload()
         self.assertEqual(sorted(w.stats.seen), [2027, 2028])
-        self.assertEqual(w.stats.most_wins(), HistoryStats(A.Archive(self.dir / 'archive')).most_wins())
+        self.assertEqual(w.stats.most_wins(), HistoryStats(opened(self, A.Archive(self.dir / 'archive'))).most_wins())
         w.session.close()
 
     def test_a_retry_after_recovery_rolled_the_operation_back_applies_it_once(self):
@@ -521,6 +529,7 @@ class TransactionTests(unittest.TestCase):
         s = self.new()
         s.close()
         w = observer.World(self.dir)
+        self.addCleanup(w.close)                                        # (its history snapshot too)
         form = lambda c, op, weeks='1': {'weeks': [weeks], 'year': [str(c['year'])], 'week': [str(c['week'])],
                                          'phase': [c['phase']], 'op': [op]}
         c0 = w.session.cursor
@@ -541,6 +550,7 @@ class TransactionTests(unittest.TestCase):
         s = self.at_season_end(2028)                                     # 2027 archived, 2028 about to end
         s.close()
         w = observer.World(self.dir)
+        self.addCleanup(w.close)                                        # (its history snapshot too)
         before = w.stats.most_wins()
         reads = []
         real = A._read
@@ -554,7 +564,7 @@ class TransactionTests(unittest.TestCase):
             self.assertNotIn('2027.json.gz', reads)                       # unchanged history is not reread
             self.assertNotIn('2028.json.gz', reads)                       # the new season comes from the index
             self.assertEqual(sorted(stats.seen), [2027, 2028])
-            fresh = HistoryStats(A.Archive(self.dir / 'archive'))
+            fresh = HistoryStats(opened(self, A.Archive(self.dir / 'archive')))
             self.assertEqual(stats.most_wins(), fresh.most_wins())       # the same answers as a full rebuild
             self.assertNotEqual(stats.most_wins(), before)
             reads.clear()

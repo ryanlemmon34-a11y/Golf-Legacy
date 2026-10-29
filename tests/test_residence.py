@@ -209,6 +209,7 @@ class ResidenceTests(unittest.TestCase):
         w.write_year(s, 2027) if 2027 in s.snapshots else None
         w.write_state(s)
         a = Archive(d)
+        self.addCleanup(a.close)
         moved = next(m for m in s.move_log[2027])
         pid = moved['person']
         self.assertEqual(a.residence_at(pid, 2027, 52), {'country': moved['from'][0], 'region': moved['from'][1]})

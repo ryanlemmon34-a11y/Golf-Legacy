@@ -379,6 +379,7 @@ class HistoryContractTests(unittest.TestCase):
         s.snapshots[2027] = s.season_snapshot(2027)
         with tempfile.TemporaryDirectory() as d:
             arc = Archive(write_archive(s, d, years=[2027]))
+            self.addCleanup(arc.close)
             ev = next(e for e in arc.year(2027)['events'] if e['id'] == '2027:TOUR_MASTERS')
             self.assertEqual((ev['tour'], ev['tier'], ev['category']), ('MAJORS', 0, 'major'))
             top = arc.ranking(2027, 18)
