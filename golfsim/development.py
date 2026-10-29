@@ -172,6 +172,28 @@ def perceived_gap(g, k, insight=0.0):
     return max(0.0, g.ceilings[k] - g.attrs[k] + sd * z)
 
 
+def self_views(ids):
+    """The misreadings already derived for these golfers, compactly: (attribute names, {id: values}).
+    Saved with a world only so a new process need not derive them again (each is a seeded draw: deriving
+    the 13,000 active golfers' took about 3 s); they are the same values either way."""
+    keys = sorted({k for (_, k) in _SELF_VIEW})
+    out = {}
+    for gid in ids:
+        vals = [_SELF_VIEW.get((gid, k)) for k in keys]
+        if all(v is not None for v in vals):
+            out[gid] = tuple(vals)
+    return keys, out
+
+
+def restore_self_views(saved):
+    if not saved:
+        return
+    keys, rows = saved
+    for gid, vals in rows.items():
+        for k, v in zip(keys, vals):
+            _SELF_VIEW.setdefault((gid, k), v)
+
+
 def perceived_gaps(g, insight=0.0):
     """perceived_gap for every attribute at once (the planner reads them several times a month): the same
     arithmetic, with the golfer's judgement worked out once."""

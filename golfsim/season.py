@@ -1408,9 +1408,11 @@ class Season:
         if state.get('lib') is default_library():
             state['lib'] = 'default'
             state.pop('cal', None)
+        state['_self_view'] = D.self_views([g.id for g in self.world.golfers if g.lifestyle != 'retired'])
         return state
 
     def __setstate__(self, state):
+        D.restore_self_views(state.pop('_self_view', None))  # (derived values: saved only to spare re-deriving)
         state.setdefault('new_pros_added', {})              # saves from before new professionals arrived
         state.setdefault('club_trips', defaultdict(Counter))   # saves from before payers were told apart
         state.setdefault('backer_flows', defaultdict(Counter))
