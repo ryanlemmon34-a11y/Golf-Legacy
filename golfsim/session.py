@@ -228,12 +228,13 @@ class Session:
                             if progress:
                                 progress(out[-1])
                     if out:
+                        n = _next_generation(self.dir, self.generation)
                         for r in out:
-                            r['generation'] = self.generation + 1
+                            r['generation'] = n
                         if op_key is not None:
                             self.state['ops'] = (self.state['ops'] + [[op_key, out]])[-OPS_KEPT:]
                         self.state['last_op'] = {'key': op_key, 'result': out[-1]}
-                        self._commit()
+                        self._commit(n)
                 except BaseException:
                     # an error, an interrupt or a failed commit: go back to what is committed, so memory
                     # never runs ahead of disk (a commit that succeeded but could not publish its history
@@ -351,8 +352,9 @@ class Session:
         _collect_unpublished(a)
 
     # ---- committing ---------------------------------------------------------------------------------------
-    def _commit(self):
-        n = self.generation + 1 if (self.dir / 'CURRENT').exists() else 0
+    def _commit(self, n=None):
+        if n is None:
+            n = _next_generation(self.dir, self.generation) if (self.dir / 'CURRENT').exists() else 0
         name = f'gen_{n:06d}'
         tmp = self.dir / f'{name}.tmp'
         if tmp.exists():
@@ -394,10 +396,11 @@ class Session:
         os.replace(tmp, final)
         _write_synced(self.dir / 'CURRENT.tmp', json.dumps({'generation': n, 'dir': name}).encode())
         os.replace(self.dir / 'CURRENT.tmp', self.dir / 'CURRENT')     # the commit
+        keep = {n, self.generation}                                     # and the last known good one
         self.generation = n
         self._pending = None
-        for old in sorted(self.dir.glob('gen_[0-9]*')):
-            if old.is_dir() and not old.name.endswith('.tmp') and int(old.name[4:]) <= n - KEEP_GENERATIONS:
+        for old in sorted(self.dir.glob('gen_[0-9]*')):                 # (and any damaged or abandoned)
+            if old.is_dir() and not old.name.endswith('.tmp') and int(old.name[4:]) not in keep:
                 shutil.rmtree(old, ignore_errors=True)
         if new_history:
             _publish_archive(self.dir, n)                               # committed: now the history shows it
@@ -607,6 +610,37 @@ def _collect_unpublished(a):
             continue
         if rel.endswith(('.json', '.json.gz', '.tmp')) or rel in ('PUBLISHED',):
             p.unlink()
+
+
+def _next_generation(d, current):
+    """The number of the next generation: above every generation this world has ever used, not merely
+    above the committed one. After a damaged generation made an earlier one current, the abandoned number
+    is never given to different content -- not to a checkpoint, nor to the published files named after it
+    (which readers and the index identify by name), nor to a live observer still holding the abandoned
+    world. Evidence of a number lasts as long as anything can refer to it: CURRENT (it still names the
+    abandoned generation until this commit replaces it), generation directories, the manifests, and the
+    published files' names."""
+    used = [current]
+    try:
+        used.append(int(json.loads((d / 'CURRENT').read_text())['generation']))
+    except (OSError, ValueError, KeyError, TypeError):
+        pass
+    for p in d.glob('gen_[0-9]*'):
+        m = re.match(r'gen_(\d+)', p.name)
+        if m:
+            used.append(int(m.group(1)))
+    a = d / 'archive'
+    for name in (MANIFEST, 'MANIFEST.prev.json'):
+        try:
+            m = json.loads((a / name).read_text())
+            used += [int(m['generation']), int(m.get('published_by', m['generation']))]
+        except (OSError, ValueError, KeyError, TypeError):
+            pass
+    for p in list(a.glob('*.g[0-9]*')) + list((a / 'years').glob('*.g[0-9]*')):
+        m = re.search(r'\.g(\d{6})', p.name)
+        if m:
+            used.append(int(m.group(1)))
+    return max(used) + 1
 
 
 def _committed_generation(d):

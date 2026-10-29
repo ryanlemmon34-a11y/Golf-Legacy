@@ -114,6 +114,39 @@ class PublicationTests(unittest.TestCase):
                 Session.open(d, workers=1).close()
                 self.same(history(d), self.h27, step)
 
+    def test_a_rollback_then_a_shorter_replay_never_reuses_a_generation(self):
+        """The abandoned generation published 2028 and 2029; it is damaged, the one before it (2028, week
+        52) becomes current, and the replay is one week (2028 only). The replay's generation, its files and
+        its manifest must not take the abandoned number: its files (a 2027-29 world table, end-of-2029
+        people and records) are still on disk, and an observer may still hold its world."""
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
+        import observer
+        d = self.copy(self.base, 'replay')
+        s = Session.open(d, workers=1)
+        s.advance(1 + 52)                                              # 2028 and 2029, one generation
+        abandoned = s.generation
+        s.close()
+        self.assertEqual(A.read_manifest(d / 'archive')['years'], [2027, 2028, 2029])
+        w = observer.World(d)                                          # an observer on the abandoned world
+        self.addCleanup(w.close)
+        self.assertEqual(w.session.generation, abandoned)
+        (d / f'gen_{abandoned:06d}' / 'state.pkl.gz').write_bytes(b'damaged')
+        s = Session.open(d, workers=1)                                 # back to 2028, week 52
+        self.assertEqual(s.cursor, {'year': 2028, 'week': 52, 'phase': 'week'})
+        s.advance(1)                                                   # a different, shorter replay
+        self.assertGreater(s.generation, abandoned)
+        m = A.read_manifest(d / 'archive')
+        self.assertEqual(m['years'], [2027, 2028])
+        self.assertGreater(m['generation'], abandoned)
+        self.assertTrue(all(f'g{abandoned:06d}' not in f for k, f in m['files'].items() if k != 'years'))
+        self.same(history(d), self.h28, 'replayed')                    # the reader accepts it: 2028's history
+        w.reload()                                                     # the observer follows the replay
+        self.assertEqual((w.session.generation, w.session.cursor), (s.generation, s.cursor))
+        self.assertEqual(w.a.years, [2027, 2028])
+        s.close()
+        left = {p.name for p in d.glob('gen_[0-9]*')}
+        self.assertNotIn(f'gen_{abandoned:06d}', left)                 # the damaged one is removed
+
     def test_published_files_are_never_rewritten(self):
         d = self.copy(self.base, 'immutable')
         a = d / 'archive'
