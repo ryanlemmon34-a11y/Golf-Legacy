@@ -114,63 +114,98 @@ class App:
         lv = w.live
         if O.one(form, 'world') not in (None, lv.world_id):
             return ('warn', 'That form belongs to another world: nothing was advanced.')
-        weeks, expected, op = O.advance_request(form, lv.cursor)
-        title = {1: 'Advance one week', 4: 'Advance four weeks'}.get(weeks, f'Advance {weeks} weeks')
-        if O.one(form, 'weeks') == 'season':
+        plan, op = O.advance_plan(form, lv.cursor)
+        weeks = sum(n for n, _ in plan)
+        if O.one(form, 'weeks') == 'seasons':
+            title = f'Advance {len(plan)} season{"s" if len(plan) != 1 else ""}'
+        elif O.one(form, 'weeks') == 'season':
             title = 'Advance to the end of the season'
-        self.start('advance', title, lambda job: self._run_advance(job, w, weeks, expected, op), op=op,
+        else:
+            title = {1: 'Advance one week', 4: 'Advance four weeks'}.get(weeks, f'Advance {weeks} weeks')
+        self.start('advance', title, lambda job: self._run_advance(job, w, plan, op), op=op,
                    world_dir=w.path, cancellable=True)
         return None
 
-    def _run_advance(self, job, w, weeks, expected, op):
+    def _run_advance(self, job, w, plan, op):
+        """Run an advance plan: one segment (committed once at its end), or one segment per season, each
+        committed and published as its season ends, with the pages' snapshot refreshed between seasons."""
         from golfsim.session import Busy, StaleCursor
-        job.update(total=weeks, phase='starting')
-        with w.session_lock:
-            s = w.session
-            gen0, c0 = s.generation, s.cursor
-            J.record_job(w.path, job, c0, gen0)
-            t0 = time.perf_counter()
+        total = sum(n for n, _ in plan)
+        multi = len(plan) > 1
+        job.update(total=total, phase='starting', seasons=len(plan) if multi else None, season=1)
+        t0 = time.perf_counter()
+        played, archived, applied = 0, [], 0
+        s = w.session
+        try:
+            for i, (weeks, expected) in enumerate(plan):
+                if job.cancel_requested:
+                    break
+                job.update(season=i + 1)
+                with w.session_lock:
+                    s = w.session
+                    gen0 = s.generation
+                    J.record_job(w.path, job, s.cursor, gen0)
+                    left = weeks
 
-            def progress(r):
-                y, wk = r['completed']
-                n = job.done + 1
-                phase = 'playing' if n < weeks and not job.cancel_requested else (
-                    'saving the world and publishing the season' if 'season_end' in r['changes'] else 'saving the world')
-                job.update(done=n, last=(y, wk), phase=phase)
-            try:
-                J.ensure_pool(s.season)
-                out = s.advance(weeks, progress=progress, cancel=lambda: job.cancel_requested, expected=expected, op_key=op)
-            except StaleCursor:
-                job.finish('refused', f'This form was drawn at {O.date_text(expected)}, but the world is at '
-                                      f'{O.date_text(s.cursor)}: nothing was advanced.')
-                return
-            except Busy:
-                job.finish('refused', 'Another program is advancing this world right now: nothing was advanced here.')
-                return
-            except Exception as e:
-                J.log(w.path, f'advance failed: {e!r}\n{traceback.format_exc()}')
-                if s.generation != gen0:                  # committed; only publishing its history failed
-                    job.finish('failed', f'The advance was saved: the world is at {O.date_text(s.cursor)} '
-                                         f'(generation {s.generation}). Publishing its history failed '
-                                         f'({type(e).__name__}: {e}); it is kept in the saved world and published '
-                                         'again when the world is next opened or advanced.')
-                else:
-                    job.finish('failed', f'{type(e).__name__}: {e}. Nothing of this advance was kept: the world is '
-                                         f'at its last committed week, {O.date_text(s.cursor)} (generation {s.generation}).')
-                return
-            finally:
-                J.clear_job(w.path)
-            el = time.perf_counter() - t0
-            if out and s.generation == gen0:
-                job.finish('done', f'Already applied (this request had been completed): the world is at {O.date_text(s.cursor)}.')
-            elif job.cancel_requested and len(out) < weeks:
-                job.finish('stopped', f'Stopped at your request after {len(out)} of {weeks} weeks; every completed week '
-                                      f'is saved. The world is at {O.date_text(s.cursor)} (generation {s.generation}).')
-            else:
-                ends = [r for r in out if 'season_end' in r['changes']]
-                job.finish('done', f'{len(out)} week{"s" if len(out) != 1 else ""} played and saved in {el:.0f} s'
-                                   + (f'; season {ends[-1]["completed"][0]} archived' if ends else '')
-                                   + f'. Now at {O.date_text(s.cursor)} (generation {s.generation}).')
+                    def progress(r):
+                        nonlocal left
+                        left -= 1
+                        phase = 'playing' if left and not job.cancel_requested else (
+                            'saving the world and publishing the season' if 'season_end' in r['changes']
+                            else 'saving the world')
+                        job.update(done=job.done + 1, last=tuple(r['completed']), phase=phase)
+                    try:
+                        J.ensure_pool(s.season)
+                        out = s.advance(weeks, progress=progress, cancel=lambda: job.cancel_requested,
+                                        expected=expected, op_key=None if op is None else (f'{op}#{i}' if multi else op))
+                    except StaleCursor:
+                        if applied and applied == i:            # the earlier segments were this request, done before
+                            break
+                        job.finish('refused', f'This form was drawn at {O.date_text(expected)}, but the world is at '
+                                              f'{O.date_text(s.cursor)}: nothing was advanced.')
+                        return
+                    except Busy:
+                        job.finish('refused', 'Another program is advancing this world right now: nothing was advanced here.')
+                        return
+                    except Exception as e:
+                        J.log(w.path, f'advance failed: {e!r}\n{traceback.format_exc()}')
+                        before = (f'{played} week{"s" if played != 1 else ""} played and saved before this'
+                                  + (f' (seasons {", ".join(map(str, archived))} archived)' if archived else '') + '. ')
+                        if s.generation != gen0:                # committed; only publishing its history failed
+                            job.finish('failed', before * bool(played) + f'The advance was saved: the world is at '
+                                       f'{O.date_text(s.cursor)} (generation {s.generation}). Publishing its history '
+                                       f'failed ({type(e).__name__}: {e}); it is kept in the saved world and published '
+                                       'again when the world is next opened or advanced.')
+                        else:
+                            job.finish('failed', f'{type(e).__name__}: {e}. ' + before * bool(played) + 'The weeks being '
+                                       f'played were not kept: the world is at its last committed week, '
+                                       f'{O.date_text(s.cursor)} (generation {s.generation}).')
+                        return
+                    if out and s.generation == gen0:
+                        applied += 1                            # a repeat of a segment already committed
+                    else:
+                        played += len(out)
+                        archived += [r['completed'][0] for r in out if 'season_end' in r['changes']]
+                if multi and i < len(plan) - 1 and not job.cancel_requested:
+                    job.update(phase='refreshing the pages')
+                    try:
+                        self.renderer.call(w.reload)            # browse the season just saved meanwhile
+                    except Exception as e:
+                        J.log(w.path, f'refresh between seasons failed: {e!r}')
+        finally:
+            J.clear_job(w.path)
+        el = time.perf_counter() - t0
+        s = w.session
+        where = f'Now at {O.date_text(s.cursor)} (generation {s.generation}).'
+        seasons = (f'; season{"s" if len(archived) != 1 else ""} {archived[0]}' +
+                   (f'–{archived[-1]}' if len(archived) > 1 else '') + ' archived') if archived else ''
+        if not played and applied:
+            job.finish('done', f'Already applied (this request had been completed): the world is at {O.date_text(s.cursor)}.')
+        elif job.cancel_requested and played < total:
+            job.finish('stopped', f'Stopped at your request after {played} of {total} weeks{seasons}; every completed '
+                                  f'week is saved. {where}')
+        else:
+            job.finish('done', f'{played} week{"s" if played != 1 else ""} played and saved in {el:.0f} s{seasons}. {where}')
 
     # -- library operations (each a job) --------------------------------------------------------------------
     def create(self, form):
@@ -218,7 +253,7 @@ class App:
             extra = ''
             if w.interrupted:
                 extra = (f' An advance started {w.interrupted.get("started")} did not finish (the observer stopped while it '
-                         'ran); nothing of it was saved.')
+                         'ran): the weeks being played then were not kept; everything saved before that is here.')
             job.finish('done', f'“{d.name}” open at {O.date_text(s.cursor)} (generation {s.generation}).{extra}')
         _, started = self.start('open', f'Open “{name}”' + (' read-only' if read_only else ''), run,
                                 world_dir=None if read_only else d)

@@ -57,6 +57,7 @@ class Job:
         self.last = None                       # (year, week) last completed
         self.started, self.finished = time.time(), None
         self.cancel_requested = False
+        self.seasons, self.season = None, None   # a multi-season advance: how many, which one now
         self.result = None
         self._lock = threading.Lock()
 
@@ -76,7 +77,8 @@ class Job:
                     'message': self.message, 'phase': self.phase, 'done': self.done, 'total': self.total,
                     'last': list(self.last) if self.last else None, 'elapsed': round(elapsed, 1),
                     'cancellable': self.cancellable and self.state == 'running',
-                    'cancel_requested': self.cancel_requested, 'op': self.op_key}
+                    'cancel_requested': self.cancel_requested, 'op': self.op_key,
+                    'seasons': self.seasons, 'season': self.season}
 
 
 class Jobs:

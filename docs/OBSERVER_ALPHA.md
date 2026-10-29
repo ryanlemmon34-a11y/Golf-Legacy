@@ -39,9 +39,12 @@ observer, tools or the save code keep it so.
   and a seed: the whole world is generated; a new seed is suggested each time -- the same seed always makes the
   same world and, shot for shot, the same history, a different seed a different one), **Open** (resume), **Browse history** (read-only), **Copy**
   (never changes the original), **Report a problem**, **Close**, **Quit**.
-- **Advance**: *Advance week*, *4 weeks*, *To end of season*, from the header of any page. The advance runs in
-  the background with a progress bar; you can keep browsing (pages show the last saved week, which the
-  footer names) and **Stop after this week** (every completed week is kept). One operation at a time.
+- **Advance**: *Advance week*, *4 weeks*, *To end of season*, or a number of seasons and *Advance seasons*
+  (the rest of this season, then whole seasons), from the header of any page. The advance runs in the
+  background with a progress bar; you can keep browsing (pages show the last saved week, which the footer
+  names) and **Stop simulation** (it stops after the week being played; every completed week is kept). A
+  multi-season advance saves and publishes each season as it ends, and the pages move on to it, so stopping
+  or closing the window never loses a finished season. One operation at a time.
 - **Explore**: Overview, Calendar (this season, played / scheduled / not held), Rankings (world, amateur),
   Golfers / Coaches / Caddies directories (filters: name, nation, tour, status; sorting), Courses, Nations,
   Tours, Tournaments (filters: tour, kind), Seasons and season recaps, Records & frivolities, Moments.
@@ -53,6 +56,17 @@ observer, tools or the save code keep it so.
 - **An edition** (one year of a tournament) is separate from the **tournament** (all its editions), and a
   **course layout** from its course. The current season's editions are linked as soon as they are played and
   read the same after the season is archived.
+
+## Long runs (for example 100 seasons)
+
+- Use its own Golf Legacy folder for a long run and keep that folder's code unchanged until the run ends;
+  install updates into another folder (copy worlds across only when you want to open them with newer code).
+- Note the world's name, seed and start year (the library shows the seed; the start year is 2027).
+- Keep the laptop plugged in, and keep about 10 GB of disk free (a 50-season world with its history index
+  takes about 1.3 GB; 100 seasons is larger, not yet measured).
+- Type the number of seasons and press *Advance seasons*. You can browse meanwhile; *Stop simulation* stops
+  after the current week. To continue later, Open the world and advance the remaining seasons.
+- Report a problem and Copy wait for the running advance: stop it first.
 
 ## Saving
 

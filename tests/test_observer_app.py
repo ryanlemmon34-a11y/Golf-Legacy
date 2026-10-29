@@ -143,7 +143,7 @@ class ObserverAppTests(unittest.TestCase):
             main = lambda html: html.split('<main>')[1].split('</main>')[0]
             self.assertEqual(main(during), main(before))                # the same committed snapshot
             self.assertIn('2027, week 41', during)
-            self.assertIn('Stop after this week', during)
+            self.assertIn('Stop simulation', during)
             for path in ('/', '/golfers', '/calendar', '/records', f'/golfer/{sorted(w.live.wr, key=w.live.wr.get)[0]}'):
                 self.assertIn('</html>', self.draw(app, path))
             gate.set()
@@ -151,6 +151,60 @@ class ObserverAppTests(unittest.TestCase):
         after = self.draw(app, '/')
         self.assertIn('2027, week 45', after)
         self.assertIn('4 weeks played and saved', after)               # the result, once
+
+    def test_several_seasons_are_saved_one_by_one_and_can_be_stopped(self):
+        """N seasons: the rest of this one, then whole seasons, each saved and published as it ends; the pages
+        move on between seasons; Stop simulation keeps every completed week; the same form again advances
+        nothing."""
+        app, lib = self.app('seasons')
+        w = self.opened(app, lib)                                       # 2027, week 41
+        f = {**form(w, 'seasons', op='three'), 'seasons': ['3']}
+        real, gate, entered = Session._step, threading.Event(), threading.Event()
+
+        def step(s):
+            c = s.state['cursor']
+            if (c['year'], c['week']) == (2028, 5) and not entered.is_set():
+                entered.set()
+                gate.wait(60)
+            return real(s)
+        with mock.patch.object(Session, '_step', step):
+            self.assertIsNone(app.renderer.call(app.advance, f))
+            self.assertTrue(entered.wait(300))
+            page = self.draw(app, '/')
+            self.assertIn('2028, week 1', page)                         # the first season saved, shown
+            self.assertIn('season 2 of 3', page)
+            self.assertIn('Stop simulation', page)
+            self.assertEqual(app.world.a.years, [2027])
+            app.jobs.cancel(app.jobs.current.id)                        # Stop simulation, in the second season
+            gate.set()
+            app.jobs.wait(300)
+        j = app.job()
+        self.assertEqual(j['state'], 'stopped', j['message'])
+        self.assertIn('2027 archived', j['message'])
+        self.draw(app)
+        self.assertEqual(app.world.live.cursor, {'year': 2028, 'week': 6, 'phase': 'week'})
+        on_disk = json.loads((lib / 'demo' / 'CURRENT').read_text())['generation']
+        self.assertEqual(on_disk, app.world.live.generation)
+        app.renderer.call(app.advance, f)                               # the same form again
+        app.jobs.wait(60)
+        self.assertIn('Already applied', app.job()['message'])
+        self.draw(app)
+        self.assertEqual(app.world.live.cursor, {'year': 2028, 'week': 6, 'phase': 'week'})
+
+    def test_two_seasons_to_the_end(self):
+        app, lib = self.app('two')
+        w = self.opened(app, lib)
+        gen = w.live.generation
+        app.renderer.call(app.advance, {**form(w, 'seasons', op='two'), 'seasons': ['2']})
+        app.jobs.wait(600)
+        j = app.job()
+        self.assertEqual(j['state'], 'done', j['message'])
+        self.assertEqual((j['done'], j['total']), (12 + 52, 12 + 52))
+        self.assertIn('seasons 2027–2028 archived', j['message'])
+        page = self.draw(app, '/')
+        self.assertIn('2029, week 1', page)
+        self.assertEqual(app.world.a.years, [2027, 2028])
+        self.assertEqual(app.world.live.generation, gen + 2)            # one commit per season
 
     def test_stop_keeps_every_completed_week(self):
         app, lib = self.app('stop')

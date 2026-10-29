@@ -81,6 +81,7 @@ textarea { width:100%; min-height:5em; }
 .tabs { display:flex; gap:4px; border-bottom:1px solid var(--line); margin:8px 0 12px; flex-wrap:wrap; }
 .tabs a { padding:4px 10px; border:1px solid transparent; border-bottom:none; border-radius:4px 4px 0 0; }
 .tabs a.on { border-color:var(--line); background:var(--panel); color:var(--fg); font-weight:600; }
+header .sep { color:var(--muted); }
 .card { border:1px solid var(--line); border-radius:6px; padding:10px 14px; margin:10px 0; background:var(--panel); }
 progress { width:220px; }
 dl.kv { display:grid; grid-template-columns:max-content 1fr; gap:2px 14px; } dl.kv dt { color:var(--muted); }
@@ -367,14 +368,32 @@ def _field(e):
     return sum(len(s) for s in e['finish'])
 
 
+MAX_SEASONS = 1000
+
+
 def advance_request(form, cursor):
-    """(weeks, expected cursor, op key) from an Advance form."""
+    """(weeks, expected cursor, op key) from an Advance form (a single segment: see advance_plan)."""
+    plan, op = advance_plan(form, cursor)
+    return plan[0][0], plan[0][1], op
+
+
+def advance_plan(form, cursor):
+    """([(weeks, expected cursor)], op key) from an Advance form: one segment for a week, four weeks or the
+    rest of the season; for N seasons, the rest of this season and then N-1 whole seasons, one segment each
+    (each committed and published when its season ends). Every segment names the cursor it must start
+    from, so a form resubmitted after the advance finished advances nothing, however many seasons ago."""
     v = one(form, 'weeks', '1')
     expected = ({'year': int(one(form, 'year')), 'week': int(one(form, 'week')), 'phase': one(form, 'phase')}
                 if one(form, 'year') is not None else None)
     c = expected or cursor
+    if v == 'seasons':
+        n = max(1, min(MAX_SEASONS, int(one(form, 'seasons', '1') or 1)))
+        plan = [(53 - c['week'], expected)]
+        plan += [(52, {'year': c['year'] + i, 'week': 1, 'phase': 'start'} if expected is not None else None)
+                 for i in range(1, n)]
+        return plan, one(form, 'op')
     weeks = 53 - c['week'] if v == 'season' else max(1, min(52, int(v)))
-    return weeks, expected, one(form, 'op')
+    return [(weeks, expected)], one(form, 'op')
 
 
 # ---- page frame ---------------------------------------------------------------------------------------------
@@ -386,8 +405,9 @@ def advance_controls(w, job=None):
     """The Advance buttons, or the running operation's progress (with Stop)."""
     if job is not None and job.get('state') == 'running':
         stop = (f'<form method="post" action="/cancel"><input type="hidden" name="job" value="{esc(job["id"])}">'
-                f'<button{" disabled" if not job["cancellable"] or job["cancel_requested"] else ""}>'
-                'Stop after this week</button></form>') if job['kind'] == 'advance' else ''
+                f'<button title="Stops after the week being played; every completed week is kept"'
+                f'{" disabled" if not job["cancellable"] or job["cancel_requested"] else ""}>'
+                'Stop simulation</button></form>') if job['kind'] == 'advance' else ''
         total = job['total'] or 0
         bar = f'<progress max="{total}" value="{job["done"]}"></progress>' if total else '<progress></progress>'
         return (f'<span id="job" data-job="{esc(job["id"])}" role="status" aria-live="polite">{esc(job["title"])}: '
@@ -400,13 +420,18 @@ def advance_controls(w, job=None):
                       ('op', uuid.uuid4().hex)))
     return (f'<form method="post" action="/advance">{hidden}<button name="weeks" value="1" class="primary">Advance week</button>'
             '<button name="weeks" value="4">4 weeks</button><button name="weeks" value="season">'
-            'To end of season</button></form>')
+            'To end of season</button><span class="sep" aria-hidden="true">·</span>'
+            f'<input name="seasons" type="number" min="1" max="{MAX_SEASONS}" value="1" aria-label="Number of seasons" '
+            'title="Plays to the end of this season, then the rest as whole seasons; each season is saved when it ends" '
+            'style="width:5em"><button name="weeks" value="seasons">Advance seasons</button></form>')
 
 
 def job_line(job):
     if job['state'] != 'running':
         return job['message']
     parts = [job['phase']]
+    if job.get('seasons'):
+        parts.append(f'season {job["season"]} of {job["seasons"]}')
     if job.get('total'):
         parts.append(f'{job["done"]}/{job["total"]} weeks')
     if job.get('last'):
@@ -547,9 +572,10 @@ def overview(w, q):
     out = []
     if w.interrupted:
         i = w.interrupted
-        out.append(f'<div class="banner warn">An advance started {esc(i.get("started"))} ({esc(i.get("title"))}, from '
-                   f'{esc(date_text(i["cursor_before"]) if i.get("cursor_before") else "?")}) did not finish: the '
-                   f'observer stopped while it ran. Nothing of it was saved; the world is at its last committed week.</div>')
+        out.append(f'<div class="banner warn">An advance started {esc(i.get("started"))} ({esc(i.get("title"))}) did not '
+                   f'finish: the observer stopped while it ran. The world is at its last saved week, '
+                   f'{esc(date_text(w.live.cursor) if w.live else "?")}; the weeks being played when it stopped were not '
+                   'kept (seasons completed before that were saved as they ended).</div>')
     if w.live:
         lv = w.live
         year = lv.cursor['year']

@@ -126,6 +126,13 @@ the shot simulation in the workers, sets the time. Windows memory measurement ve
 unmeasured on it: a mature world** (the 50-season world: drag `world_2027` onto the launcher) **and season
 100** (no such save exists; making one is a long run, an owner decision).
 
+**Advance seasons** (owner request, 29 October 2026): a number of seasons from the header; the rest of the
+current season, then whole seasons, each one segment committed and published as its season ends (a long
+run never holds more than one season in memory or at risk); the pages' snapshot moves on between seasons;
+**Stop simulation** stops after the current week; every segment names the cursor it must start from, so the
+same form resubmitted later advances nothing however many seasons ago it ran. Tested (two seasons to the
+end; three seasons stopped in the second, then resubmitted).
+
 **Unverified / open**: Windows beyond the paths above (launcher, lock takeover); network drives;
 season 100 performance; as-of views; records over the current season (archived seasons only); dated
 partnerships during a season come from the archive (through the last season end).
