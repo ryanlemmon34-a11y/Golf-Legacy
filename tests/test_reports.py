@@ -103,6 +103,19 @@ class ReportRuleTests(unittest.TestCase):
         self.assertTrue(any('World No. 1 at a season\'s end' in x for x in lines))
         self.assertIn('In all: 10 full-time professional seasons', lines[-1])
 
+    def test_majors_are_numbered_in_the_order_they_were_played(self):
+        """Three majors in one season: weeks 18, 24 and 30 (Tour Masters, Premier Tour Championship,
+        Britannia Open), whose names sort the other way round."""
+        d = world()
+        d['majors'] = {'2035:BRITANNIA_OPEN': 1, '2035:TOUR_MASTERS': 1, '2035:PREMIER_TOUR_CHAMPIONSHIP': 1,
+                       '2034:USA_OPEN': 1}
+        a = LW.analyse(d, 3)
+        won = [x.split(': ', 1)[1] for x in LW.milestones(d, a, 1, limit=99) if 'major No.' in x]
+        self.assertEqual(won, ['Won the USA Open (major No. 1)', 'Won the Tour Masters (major No. 2)',
+                               'Won the Premier Tour Championship (major No. 3)', 'Won the Britannia Open (major No. 4)'])
+        self.assertEqual(sorted(d['majors'], key=LW.major_order),
+                         ['2034:USA_OPEN', '2035:TOUR_MASTERS', '2035:PREMIER_TOUR_CHAMPIONSHIP', '2035:BRITANNIA_OPEN'])
+
 
 if __name__ == '__main__':
     unittest.main()

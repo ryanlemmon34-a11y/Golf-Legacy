@@ -49,6 +49,16 @@ FORMAT = 'golf-legacy-long-world/2'
 MAJORS = ('TOUR_MASTERS', 'PREMIER_TOUR_CHAMPIONSHIP', 'USA_OPEN', 'BRITANNIA_OPEN')
 MAJOR_NAME = {'TOUR_MASTERS': 'Tour Masters', 'PREMIER_TOUR_CHAMPIONSHIP': 'Premier Tour Championship',
               'USA_OPEN': 'USA Open', 'BRITANNIA_OPEN': 'Britannia Open'}
+def major_order(key):
+    """Chronological sort key for a recorded major, 'year:SERIES': the year, the week the engine's calendar
+    plays that major (golfsim.calendar.MAJORS), then the series id (a stable tie-breaker). Never the
+    display name."""
+    from golfsim.calendar import MAJOR_ID_BY_WEEK
+    y, sid = key.split(':')
+    week = next((w for w, s in MAJOR_ID_BY_WEEK.items() if s == sid), 99)
+    return int(y), week, sid
+
+
 LEVEL = {1: 'Premier', 2: 'Challenger', 3: 'Regional', 4: 'Mini', 5: 'College', 6: 'Amateur', 9: '—'}
 ROW = ('status', 'lifestyle', 'tier', 'next_tier', 'events', 'wins', 'wins_by_tier', 'majors', 'top10', 'cuts',
        'prize', 'net', 'cash', 'wr', 'am', 'injury_weeks', 'zero_start', 'coach', 'deal', 'caddie',
@@ -65,6 +75,23 @@ def git_state():
         return commit, dirty
     except Exception:
         return 'unknown', True
+
+
+def analysis_note(man):
+    """Which tools wrote a report, apart from which engine simulated the world: a report regenerated
+    from saved data is a corrected analysis of the same world, not a new simulation."""
+    try:
+        head = subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD'], cwd=ROOT, text=True).strip()
+        dirty = bool(subprocess.check_output(['git', 'status', '--porcelain', '--', 'tools', 'golfsim'], cwd=ROOT,
+                                             text=True).strip())
+    except Exception:
+        head, dirty = 'unknown', True
+    sim = str(man.get('commit', '?'))[:7]
+    if head != 'unknown' and sim.startswith(head[:7]) and not dirty:
+        return f'Written by the run itself (tools and engine `{sim}`).'
+    return (f'Analysis written from the run\'s saved data by the report tools at `{head}`'
+            f'{" (with uncommitted changes)" if dirty else ""}; the world was simulated by engine `{sim}`. '
+            'Re-generated analysis of the same world, not a new simulation.')
 
 
 def config():
@@ -567,7 +594,7 @@ def highlights(d, a):
     out = []
     g = d['golfers']
     by_year = defaultdict(list)
-    for k, w in d['majors'].items():
+    for k, w in sorted(d['majors'].items(), key=lambda kw: major_order(kw[0])):
         y, m = k.split(':')
         by_year[int(y)].append(f'{MAJOR_NAME[m]}: {name(d, w)}')
     prev_no1 = None
@@ -626,7 +653,8 @@ def milestones(d, a, gid, best_week=None, limit=16):
                 out.append((y, 3, ('First win, at ' if not won_any else 'First win at ') + f'{WIN_LEVEL.get(tier, "?")} level'
                             + (f' ({n} that season)' if n > 1 else '')))
                 won_any = True
-    majors = sorted((int(k.split(':')[0]), MAJOR_NAME[k.split(':')[1]]) for k, w in d['majors'].items() if w == gid)
+    majors = [(int(k.split(':')[0]), MAJOR_NAME[k.split(':')[1]])        # in the order they were played
+              for k in sorted((k for k, w in d['majors'].items() if w == gid), key=major_order)]
     for i, (y, m) in enumerate(majors):
         out.append((y, 4, f'Won the {m} (major No. {i + 1})'))
     no1 = sorted(y for y, w in d['number_one'].items() if w == gid)
@@ -706,6 +734,7 @@ def report(results, man, mature):
     row = lambda label, f: f'| {label} | ' + ' | '.join(f(r['a'], r['d']) for r in results) + ' |'
     pct = lambda n, t: f'{100 * n / t:.0f}%' if t else '—'
     out = ['# Golf Legacy — Long-World Test', '',
+           analysis_note(man), '',
            f'Engine commit `{man.get("commit", "?")}`' + (' (**uncommitted engine changes present**)' if man.get('dirty') else '')
            + f', format `{FORMAT}`. Seeds and seasons completed: '
            + ', '.join(f'{s} ({man["seeds"][str(s)]["years_completed"]})' for s in seeds) + '. '
@@ -777,7 +806,7 @@ def report(results, man, mature):
             row('Concentration (HHI)', lambda a, d: f'{a["major_hhi"]:.3f}'), '']
     for r in results:
         d = r['d']
-        names = [f'{k.split(":")[0]} {MAJOR_NAME[k.split(":")[1]]}: {name(d, w)}' for k, w in sorted(d['majors'].items())
+        names = [f'{k.split(":")[0]} {MAJOR_NAME[k.split(":")[1]]}: {name(d, w)}' for k, w in sorted(d['majors'].items(), key=lambda kw: major_order(kw[0]))
                  if int(k.split(':')[0]) > d['first']]
         out += [f'**Seed {d["seed"]} — major winners from season two on:** ' + '; '.join(names), '']
         masters = [k for k in sorted(d['routes']) if k.endswith('TOUR_MASTERS')]

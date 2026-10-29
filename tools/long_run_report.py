@@ -53,6 +53,7 @@ def money(x):
 def section_run(d, man, perf_years):
     years = sorted(d['rows'])
     return ['# Long run: one world, every shot, seed ' + str(d['seed']), '',
+            f'- {LW.analysis_note(man)}',
             f'- Engine commit `{man.get("commit")}`{" (working tree had changes)" if man.get("dirty") else ""}, '
             f'engine id `{man.get("engine")}`, Python {man.get("python")}.',
             f'- Hardware: {man.get("machine", "not recorded")}.',
