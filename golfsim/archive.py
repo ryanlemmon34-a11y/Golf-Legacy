@@ -21,7 +21,9 @@ Layout of an archive directory (JSON, gzip):
     records.json.gz     course records per layout; every mark carries golfer id and event id
     years/YYYY.json.gz  one season: every edition (series, week, venues, finishers per site, and the
                         coach and caddie each golfer had that week), each golfer's season (tour, events,
-                        wins, money, rankings, injuries, where they lived that season), career decisions
+                        wins, money -- net, income and costs as finally settled after winter expenses,
+                        with net_at_decision, the figure the career decisions saw -- rankings, injuries,
+                        where they lived that season), career decisions
                         with their reasons, that winter's moves, staff work, and that season's narrative
                         log lines (display text only)
 
@@ -121,7 +123,16 @@ class ArchiveWriter:
             home = season.places.residence_at(gid, year, 52)                     # where they lived that season
             careers[gid]['residence'] = list(home) if home else None
             careers[gid]['prize'] = round(careers[gid]['prize'] or 0)
-            careers[gid]['net'] = round(careers[gid]['net'] or 0)
+            # the season's money as finally settled (after winter expenses such as a move, and the support
+            # drawn for them); the figure the career decisions saw, before the winter, is kept beside it
+            careers[gid]['net_at_decision'] = round(careers[gid]['net'] or 0)
+            led = season.ledgers.get(year, {}).get(gid)
+            if led is not None:
+                careers[gid].update({'net': round(led.net), 'income': round(led.income), 'costs': round(led.costs),
+                                     'support': round(led.support), 'backer_support': round(led.backer_support),
+                                     'moving': round(led.moving)})
+            else:
+                careers[gid]['net'] = careers[gid]['net_at_decision']
         log = {gid: [(w, t) for y, w, t in h if y == year] for gid, h in season.history.items()}
         chunk = {'year': year, 'events': events, 'careers': careers,
                  'transitions': season.transitions.get(year, []),

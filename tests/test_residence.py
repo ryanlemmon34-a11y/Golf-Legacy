@@ -300,6 +300,60 @@ class MoveFundingTests(unittest.TestCase):
         self.assertEqual(s.move_blocked[2027], 1)
 
 
+class ArchivedFinanceTests(unittest.TestCase):
+    """The archive's annual money is the season as finally settled, winter expenses included; the figure
+    the career decisions saw before the winter is kept beside it."""
+
+    @classmethod
+    def setUpClass(cls):
+        from unittest import mock
+        s = cls.s = Season(generate_world(seed=19, scale=0.1), seed=19, development=True, workers=1)
+        s.start_year(2027)
+        for w in range(1, 53):
+            s.advance_week(2027, w)
+        pros = [g for g in s.active_golfers() if g.status == 'pro' and g.lifestyle == 'full_time' and g.age(2027) < 30
+                and g.tour in TOUR_BY_KEY and s.places.known(g.id) and s.staff.coach(g.id) is None and not g.backer]
+        cls.a, cls.b = pros[0], pros[1]
+        cls.a.cash = 100000.0                                                # pays for its move in cash
+        cls.b.cash, cls.b.backing = 0.0, 60000.0                             # family money pays
+        cls.support_before = s.ledgers[2027][cls.b.id].support if cls.b.id in s.ledgers[2027] else 0.0
+        cls.dest = {g.id: ('England' if s.places.home[g.id][0] != 'England' else 'Japan') for g in (cls.a, cls.b)}
+        odds = lambda season, x, year, changed=False: (cls.dest[x.id], 1.0) if x.id in cls.dest else (season.places.home[x.id][0], 0.0)
+        with mock.patch.object(RES, 'move_odds', odds):
+            s.finish_year(2027)
+        w = ArchiveWriter.__new__(ArchiveWriter)
+        w.created, w.initial = {}, set()
+        cls.chunk = w.year_chunk(s, 2027)['careers']
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.s.close()
+
+    def test_a_cash_funded_move_is_in_the_years_ledger_and_archived_net(self):
+        s, g = self.s, self.a
+        self.assertEqual(s.places.home[g.id][0], self.dest[g.id])           # it really moved
+        led = s.ledgers[2027][g.id]
+        row = self.chunk[g.id]
+        self.assertEqual(led.moving, RES.MOVE_COST)
+        self.assertEqual(row['moving'], RES.MOVE_COST)
+        self.assertEqual(row['net'], round(led.net))                          # the settled year
+        self.assertEqual(row['net_at_decision'] - row['net'], RES.MOVE_COST)  # the decisions saw the year before it
+        self.assertEqual(round(s.snapshots[2027][g.id]['net']), row['net_at_decision'])
+
+    def test_a_support_funded_move_archives_the_draw(self):
+        s, g = self.s, self.b
+        self.assertEqual(s.places.home[g.id][0], self.dest[g.id])
+        led = s.ledgers[2027][g.id]
+        row = self.chunk[g.id]
+        self.assertEqual((row['moving'], row['support']), (RES.MOVE_COST, round(led.support)))
+        self.assertGreaterEqual(led.support, RES.MOVE_COST - 1e-6)
+        self.assertEqual(row['net'], round(led.net))
+        drawn = led.support - self.support_before                             # drawn at the winter
+        self.assertGreaterEqual(drawn, RES.MOVE_COST - 1e-6)
+        self.assertAlmostEqual(g.backing, 60000.0 - drawn, delta=0.01)       # the pot fell by exactly that
+        self.assertGreaterEqual(g.cash, -1e-6)                               # nothing left as debt
+
+
 def COUNTRY_REGION(country):
     from golfsim.geography import COUNTRIES
     return COUNTRIES[country].region

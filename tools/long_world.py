@@ -129,7 +129,7 @@ def year_rows(s, year, snap):
         act = s.activity_counts[year].get(gid, {})
         nt = TOUR_BY_KEY[r['next_tour']].tier if r.get('next_tour') in TOUR_BY_KEY else 9
         rows[gid] = [r['status'], r['lifestyle'], r['tier'], nt, r['events'], r['wins'], r['wins_by_tier'], r['majors'],
-                     r['top10'], r['cuts'], round(r['prize']), round(r['net']), round(g.cash), r['wr_end'], r['am_end'],
+                     r['top10'], r['cuts'], round(r['prize']), round(led.net if led else r['net']), round(g.cash), r['wr_end'], r['am_end'],
                      r['injury_weeks'], r.get('zero_start_reason', ''), a.get('coach_of', {}).get(gid),
                      a.get('deal', {}).get(gid), a.get('caddie_of', {}).get(gid),
                      round(led.coaching + led.coach_share) if led else 0, round(led.caddie + led.caddie_share) if led else 0,

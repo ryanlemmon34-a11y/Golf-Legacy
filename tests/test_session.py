@@ -452,6 +452,30 @@ class TransactionTests(unittest.TestCase):
                 self.assertAlmostEqual(g.cash, c0 + (led[g.id].net if g.id in led else 0.0), delta=0.01)
         t.close()
 
+    def test_archived_annual_money_is_settled_after_an_interrupted_season_end(self):
+        """A move paid at the winter is in the archived year (net, moving cost) exactly once after a
+        crash before publication, reopening and recovery -- and matches the committed ledger."""
+        from golfsim import residence as RES
+        from golfsim.archive import _read
+        s = self.at_season_end(2027)
+        g = next(g for g in s.season.active_golfers() if g.status == 'pro' and g.lifestyle == 'full_time'
+                 and g.age(2027) < 30 and s.season.places.known(g.id) and g.tour.startswith(('MN_', 'RG_', 'CH_')))
+        g.cash += 100000.0
+        dest = 'England' if s.season.places.home[g.id][0] != 'England' else 'Japan'
+        odds = lambda season, x, year, changed=False: (dest, 1.0) if x.id == g.id else (season.places.home[x.id][0], 0.0)
+        with mock.patch.object(RES, 'move_odds', odds), \
+                mock.patch.object(SES, '_publish_archive', side_effect=OSError('power cut')), self.assertRaises(OSError):
+            s.advance_one_week()
+        s.close()
+        t = Session.open(self.dir, workers=1)
+        led = t.season.ledgers[2027][g.id]
+        row = _read(self.dir / 'archive' / 'years' / '2027.json.gz')['careers'][str(g.id)]
+        self.assertEqual(t.season.places.home[g.id][0], dest)
+        self.assertEqual((row['moving'], row['net']), (RES.MOVE_COST, round(led.net)))
+        self.assertEqual(row['net_at_decision'] - row['net'], RES.MOVE_COST)
+        self.assertEqual(len(t.season.places.moves[g.id]), 1)
+        t.close()
+
     def test_a_retry_through_another_handle_is_recognised(self):
         a = self.new()
         b = Session.open(self.dir, workers=1)                            # a second, independently opened handle
