@@ -46,6 +46,7 @@ a checkpoint does not carry the whole history.
 """
 from __future__ import annotations
 
+import gc
 import gzip
 import hashlib
 import json
@@ -356,6 +357,7 @@ class Session:
                 shutil.rmtree(old, ignore_errors=True)
         if new_history:
             _publish_archive(self.dir, n)                               # committed: now the history shows it
+            settle_heap()                                               # a season's garbage, once a season
         # (a generation that only carries the history it stands on publishes nothing: what is published
         # is already its history; recovery republishes only when PUBLISHED names another)
 
@@ -490,8 +492,23 @@ def _load_generation(d, n, allow_other_engine):
     if not allow_other_engine and meta['engine'] != engine_id():
         raise ValueError(f'world saved by engine {meta["engine"]} (commit {meta["commit"]}); this engine is {engine_id()}')
     with gzip.open(d / name / 'state.pkl.gz', 'rb') as f:
-        blob = pickle.load(f)
+        gc.disable()                                    # millions of objects: no collections while loading
+        try:
+            blob = pickle.load(f)
+        finally:
+            gc.enable()
+    settle_heap()
     return blob['season'], blob['state']
+
+
+def settle_heap():
+    """Collect once, then leave the long-lived world out of the cyclic collector's full passes
+    (`gc.freeze`): a full collection over a multi-gigabyte world took seconds and found nothing. Done on
+    loading and after each archived season (objects frozen then and later dropped wait until the next
+    one). Performance only: no simulated value depends on it."""
+    gc.unfreeze()
+    gc.collect()
+    gc.freeze()
 
 
 def _lock_owner():

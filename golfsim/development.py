@@ -173,8 +173,16 @@ def perceived_gap(g, k, insight=0.0):
 
 
 def perceived_gaps(g, insight=0.0):
-    """perceived_gap for every attribute at once (the planner reads them several times a month)."""
-    return {k: perceived_gap(g, k, insight) for k in g.attrs}
+    """perceived_gap for every attribute at once (the planner reads them several times a month): the same
+    arithmetic, with the golfer's judgement worked out once."""
+    sd = 2.0 + 6.0 * (1 - max(judgement(g), insight))
+    out, gid, ceil, attrs = {}, g.id, g.ceilings, g.attrs
+    for k in attrs:
+        z = _SELF_VIEW.get((gid, k))
+        if z is None:
+            z = _SELF_VIEW[(gid, k)] = random.Random(f'{gid}:{k}:selfview').gauss(0, 1)
+        out[k] = max(0.0, ceil[k] - attrs[k] + sd * z)
+    return out
 
 
 def development_value(g, activity, age, category=None, insight=0.0, coach=0.3, experience=1.0, gaps=None):

@@ -32,6 +32,13 @@ def golfer(age=20, gap=10.0, **pers):
 
 
 class DevelopmentTests(unittest.TestCase):
+    def test_all_gaps_at_once_equal_each_gap(self):
+        """The planner's one-pass perceived_gaps is exactly perceived_gap per attribute (a speed-up only)."""
+        for g in generate_world(seed=5, scale=0.02).golfers[:50]:
+            for insight in (0.0, 0.4, 0.9):
+                fresh = D.perceived_gaps(g, insight)
+                self.assertEqual(fresh, {k: D.perceived_gap(g, k, insight) for k in g.attrs})
+
     def test_learning_slows_with_age(self):
         rates = [D.learning_rate(a) for a in (18, 25, 35, 50)]
         self.assertEqual(rates, sorted(rates, reverse=True))

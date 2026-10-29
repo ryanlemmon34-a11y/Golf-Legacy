@@ -63,12 +63,12 @@ def esc(x):
 class World:
     """What the pages read: a session (live, can advance) or an archive alone (read-only)."""
 
-    def __init__(self, path):
+    def __init__(self, path, allow_other_engine=False):
         p = Path(path)
         self.session = None
         if (p / 'CURRENT').exists():
             from golfsim.session import Session
-            self.session = Session.open(p)
+            self.session = Session.open(p, allow_other_engine=allow_other_engine)
             self.archive_dir = p / 'archive'
         else:
             self.archive_dir = p

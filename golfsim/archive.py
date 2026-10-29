@@ -46,8 +46,9 @@ FORMAT = 'golf-legacy-archive/1'
 
 def _write(path, obj):
     tmp = path.with_suffix(path.suffix + '.tmp')
-    with gzip.open(tmp, 'wt') as f:
-        json.dump(obj, f, separators=(',', ':'))
+    text = json.dumps(obj, separators=(',', ':'))        # the C encoder (json.dump streams through the slow
+    with gzip.open(tmp, 'wt', compresslevel=6) as f:    # pure-Python one); the same text, a little larger file
+        f.write(text)
     tmp.replace(path)
 
 

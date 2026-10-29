@@ -2048,8 +2048,18 @@ class Season:
             playable = [i for i, w in enumerate(weeks) if base[i] is not None and now + w >= inj_until]
             slot = {i: j for j, i in enumerate(playable)}
             best_val, best_acts = None, None
+            # loop invariants, worked out once with the same arithmetic as before (injury_chance for 4
+            # rounds, each week's pace target, major-week caution and net trip cost)
+            inj0 = INJURY_BASE * 4 / 4
+            inj_b = 1.8 - 1.6 * g.attrs['injury_resistance'] / 100
+            inj_c = 1 + 0.05 * max(0, age - 30)
+            inj_d = 1 + 0.5 * (1 - g.attrs['stamina'] / 100)
+            pace0 = [target * w / 52 for w in weeks]
+            major = [6 if w + 1 in MAJOR_WEEKS and top100 else 0 for w in weeks]
+            net = [(costs[i] - prizes[i]) / unit for i in range(len(weeks))]
+            f0 = self.fatigue[g.id]
             for mask in range(1 << len(playable)):
-                f = self.fatigue[g.id]
+                f = f0
                 val, n, money, acts = 0.0, played0, money0, []
                 for i, w in enumerate(weeks):
                     if now + w < inj_until:                  # injured: recovering, and earning if they must
@@ -2063,11 +2073,11 @@ class Season:
                             val = None                       # they cannot pay for this trip (school-paid: free)
                             break
                         money -= costs[i]
-                        pace = target * w / 52 - n
-                        v = base[i][0] + max(-25.0, min(6.0, 3.5 * pace)) - (6 if w + 1 in MAJOR_WEEKS and top100 else 0)
+                        pace = pace0[i] - n
+                        v = base[i][0] + max(-25.0, min(6.0, 3.5 * pace)) - major[i]
                         eff = max(0.0, f - 0.2) * 1.25
-                        val += ((v - bar) + dp - 12 * eff - 400 * self.injury_chance(g, 4, year, f)
-                                - (costs[i] - prizes[i]) / unit)
+                        val += ((v - bar) + dp - 12 * eff - 400 * (inj0 * (1 + 6 * f * f) * inj_b * inj_c * inj_d)
+                                - net[i])
                         f = 1 - (1 - 0.9 * f) * (1 - load4)
                         n += 1
                         acts.append('play')
