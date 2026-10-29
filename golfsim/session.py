@@ -298,6 +298,12 @@ class Session:
         if extra:
             world['years'] = [y for y in world['years'] if y not in extra]
             p.write_text(json.dumps(world))
+        if idx_path.exists() and world.get('years'):       # indexes from before the weekly No. 1 table:
+            from types import SimpleNamespace               # filled once, by the archive's owner, under its lock
+            idx = ArchiveIndex(idx_path)
+            if not idx.derived_complete(world['years']):
+                idx.backfill_derived(SimpleNamespace(years=world['years'], dir=self.dir / 'archive'))
+            idx.close()
 
     # ---- committing ---------------------------------------------------------------------------------------
     def _commit(self):

@@ -35,7 +35,7 @@ from __future__ import annotations
 
 import gzip
 import json
-from collections import Counter, defaultdict
+from collections import Counter, OrderedDict, defaultdict
 from pathlib import Path
 
 from .calendar import TOUR_BY_KEY
@@ -214,7 +214,7 @@ class Archive:
         self.rel = Relations.load(_read(self.dir / 'relations.json.gz'))
         self.records = _read(self.dir / 'records.json.gz')
         self.years = sorted(self.world['years'])
-        self._years = {}
+        self._years = OrderedDict()                     # the few seasons decoded most recently (CACHE_SEASONS)
         self.index = None
         if (self.dir / 'index.sqlite').exists():
             from .archive_index import ArchiveIndex
@@ -227,15 +227,22 @@ class Archive:
         st = (self.dir / 'years' / f'{y}.json.gz').stat()
         return st.st_size, st.st_mtime_ns
 
+    CACHE_SEASONS = 4                # decoded seasons kept in memory (a season decodes to hundreds of MB late on)
+
     def year(self, y):
-        if y not in self._years:
-            d = _read(self.dir / 'years' / f'{y}.json.gz')
-            d['careers'] = {int(k): v for k, v in d['careers'].items()}
-            for e in d['events']:
-                e['team'] = {int(k): tuple(v) for k, v in e['team'].items()}
-                e['routes'] = {int(k): v for k, v in e.get('routes', {}).items()}
-            self._years[y] = d
-        return self._years[y]
+        """One season, decoded (a bounded cache keeps the most recently used few)."""
+        if y in self._years:
+            self._years.move_to_end(y)
+            return self._years[y]
+        d = _read(self.dir / 'years' / f'{y}.json.gz')
+        d['careers'] = {int(k): v for k, v in d['careers'].items()}
+        for e in d['events']:
+            e['team'] = {int(k): tuple(v) for k, v in e['team'].items()}
+            e['routes'] = {int(k): v for k, v in e.get('routes', {}).items()}
+        self._years[y] = d
+        while len(self._years) > self.CACHE_SEASONS:
+            self._years.popitem(last=False)
+        return d
 
     def events(self, years=None):
         """(year, edition) for every edition, or only those of `years` (only those seasons are read)."""
@@ -277,7 +284,10 @@ class Archive:
         return [r for r in ('golfer', 'coach', 'caddie') if r in p]
 
     def playing_career(self, pid):
-        """Season by season: [(year, row)] for every season they competed."""
+        """Season by season: [(year, row)] for every season they competed (the index says which seasons,
+        so only those are read)."""
+        if self.index is not None and self.index.derived_complete(self.years):
+            return self.index.career(pid)               # one query (rows exactly as in the season files)
         return [(y, self.year(y)['careers'][pid]) for y in self.years if pid in self.year(y)['careers']]
 
     def results(self, pid):
@@ -304,8 +314,14 @@ class Archive:
     def weeks_at_number_one(self, amateur=False):
         """{person id: weeks at No. 1} over the archive's coverage."""
         out = {}
+        kind = 'amateur' if amateur else 'world'
+        if self.index is not None and self.index.derived_complete(self.years):
+            for pid, n in self.index.db.execute('SELECT person, COUNT(*) FROM number_one WHERE kind = ? GROUP BY person',
+                                                (kind,)):
+                out[pid] = n
+            return out
         for y in self.years:
-            for top in self.year(y).get('rankings', {}).get('amateur' if amateur else 'world', {}).values():
+            for top in self.year(y).get('rankings', {}).get(kind, {}).values():
                 if top:
                     out[top[0]] = out.get(top[0], 0) + 1
         return out
@@ -314,6 +330,17 @@ class Archive:
         """Special moments as facts: holes-in-one, albatrosses, playoffs (with who lost them), course records
         set or equalled — each with the golfer, the edition, the week and the layout."""
         out = []
+        if self.index is not None:                       # the index holds every moment, in archive order
+            q, args = 'SELECT year, detail, kind, person, event_id, layout, week FROM moments WHERE 1=1', []
+            if year:
+                q, args = q + ' AND year = ?', args + [year]
+            if kind:
+                q, args = q + ' AND kind = ?', args + [kind]
+            for y, d, k, p, e, lay, w in self.index.db.execute(q + ' ORDER BY year, rowid', args):
+                m = dict(json.loads(d), kind=k, person=p, event=e, layout=lay, week=w)
+                if person is None or p == person or person in m.get('beat', ()):
+                    out.append(dict(m, year=y))
+            return out
         for y in ([year] if year else self.years):
             for m in self.year(y).get('moments', []):
                 if (kind is None or m['kind'] == kind) and (person is None or m['person'] == person
@@ -360,15 +387,41 @@ class Archive:
     def course(self, course_id):
         """Editions played at a course (with winners) and its layouts' records (with golfer ids)."""
         held = []
-        for y, e in self.events():
-            for i, (cid, layout, city) in enumerate(e['sites']):
-                if cid == course_id:
-                    winner = next((g for g, p, _ in e['finish'][i] if p == 1), None) if i < len(e['finish']) else None
-                    held.append({'year': y, 'event': e['id'], 'layout': layout, 'winner': winner})
+        if self.index is not None:                       # each site's own winner (not the edition's first)
+            q = ('SELECT si.year, e.event_id, si.layout, (SELECT st.person FROM starts st WHERE st.eid = si.eid '
+                 'AND st.site = si.site AND st.pos = 1 ORDER BY st.rowid LIMIT 1) FROM sites si JOIN editions e '
+                 'USING(eid) WHERE si.course = ? ORDER BY si.year, e.eid, si.site')
+            held = [{'year': y, 'event': eid, 'layout': lay, 'winner': w}
+                    for y, eid, lay, w in self.index.db.execute(q, (course_id,))]
+        else:
+            for y, e in self.events():
+                for i, (cid, layout, city) in enumerate(e['sites']):
+                    if cid == course_id:
+                        winner = next((g for g, p, _ in e['finish'][i] if p == 1), None) if i < len(e['finish']) else None
+                        held.append({'year': y, 'event': e['id'], 'layout': layout, 'winner': winner})
         recs = {lid: r for lid, r in self.records.items() if lid.split(':')[0] == course_id}
         return {'course': self.world['courses'].get(course_id), 'editions': held, 'records': recs}
 
     # -- a season, from facts -----------------------------------------------------------------------------
+    def professional_winners(self, people, through):
+        """Which of `people` won an event of a series classified tier 1-3 (any site's winner counts) in
+        a season up to `through`: one index query for just those people, else the season files."""
+        people = set(people)
+        if not people:
+            return set()
+        series = [sid for sid, m in self.world['series'].items() if m.get('tier') is not None and m['tier'] <= 3]
+        if self.index is not None:
+            ids, found = sorted(people), set()
+            for i in range(0, len(ids), 500):
+                chunk = ids[i:i + 500]
+                q = ('SELECT DISTINCT s.person FROM starts s JOIN editions e USING(eid) WHERE s.pos = 1 AND s.year <= ? '
+                     f'AND s.person IN ({",".join("?" * len(chunk))}) AND e.series IN ({",".join("?" * len(series))})')
+                found |= {r[0] for r in self.index.db.execute(q, [through, *chunk, *series])}
+            return found
+        tiers = set(series)
+        return {g for yy in self.years if yy <= through for e in self.year(yy)['events'] if e['series'] in tiers
+                for site in e['finish'] for g, p, _ in site if p == 1 and g in people}
+
     def recap(self, y):
         """The season's headline facts, each with the ids it refers to."""
         d = self.year(y)
@@ -385,12 +438,18 @@ class Archive:
                                           + (f', caddie {self.name(caddie)}' if caddie else '')})
         no1 = [g for g, r in d['careers'].items() if r.get('wr_end') == 1]
         if no1:
-            prev = [g for g, r in self.year(y - 1)['careers'].items() if r.get('wr_end') == 1] if y - 1 in self.years else []
+            if y - 1 not in self.years:
+                prev = []
+            elif self.index is not None:
+                prev = [g for (g,) in self.index.db.execute(
+                    'SELECT person FROM seasons WHERE year = ? AND wr_end = 1 ORDER BY rowid', (y - 1,))]
+            else:
+                prev = [g for g, r in self.year(y - 1)['careers'].items() if r.get('wr_end') == 1]
             if no1 != prev:
                 facts.append({'fact': 'number one', 'golfer': no1[0], 'text': f'New world No.1: {self.name(no1[0])}'})
         kinds = Counter(t['kind'] for t in d['transitions'])
-        winners = {g for yy in self.years if yy <= y for e in self.year(yy)['events'] for site in e['finish']
-                   for g, p, _ in site if p == 1 and self.world['series'][e['series']]['tier'] <= 3}
+        asked = {t['gid'] for t in d['transitions'] if t['kind'] in ('became coach', 'became caddie')}
+        winners = self.professional_winners(asked, y)
         for t in d['transitions']:
             if t['kind'] in ('became coach', 'became caddie') and t['gid'] in winners:   # notable ones by name
                 facts.append({'fact': t['kind'], 'golfer': t['gid'],

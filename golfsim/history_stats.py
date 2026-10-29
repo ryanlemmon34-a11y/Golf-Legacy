@@ -27,6 +27,7 @@ Definitions (DEFINITIONS holds the wording shown to the user):
 """
 from __future__ import annotations
 
+from array import array
 from collections import defaultdict
 
 DEFINITIONS = {
@@ -46,10 +47,73 @@ DEFINITIONS = {
 SCOPES = ('all', 'professional', 'premier', 'major')
 
 
+POS_BITS = 12                    # a start is one integer: (edition rank << POS_BITS) | (position + 1, 0 = no position)
+
+
+class Starts:
+    """Every archived start (qualifying stages excluded), compactly: each edition once, ranked in
+    (year, week, event id) order, and per person an array of integers (edition rank, finishing position)
+    in that order -- a few bytes a start instead of a tuple. Reading a person gives the same tuples, in the
+    same order, as a list of (year, week, event id, tour, tier, kind, pos) would: made on demand."""
+
+    def __init__(self):
+        self.ed = []                             # rank -> (year, week, event id, tour, tier, kind)
+        self.by = {}                             # pid -> array('q') of packed starts, ascending
+
+    def add_editions(self, editions):
+        """`editions`: [(year, week, event id, tour, tier, kind)] of seasons later than any already held;
+        returns {event id: rank}."""
+        ranks = {}
+        for e in sorted(editions, key=lambda e: (e[0], e[1], e[2])):
+            ranks[e[2]] = len(self.ed)
+            self.ed.append(e)
+        return ranks
+
+    def add(self, pid, rank, pos):
+        a = self.by.get(pid)
+        if a is None:
+            a = self.by[pid] = array('q')
+        a.append((rank << POS_BITS) | (0 if pos is None else pos + 1))
+
+    def settle(self, pids):
+        for pid in pids:                         # appended year by year: order each touched person once
+            a = self.by[pid]
+            if any(a[i] > a[i + 1] for i in range(len(a) - 1)):
+                self.by[pid] = array('q', sorted(a))
+
+    def __getitem__(self, pid):
+        a = self.by.get(pid)
+        if a is None:
+            return []
+        ed, mask = self.ed, (1 << POS_BITS) - 1
+        return [ed[c >> POS_BITS] + (((c & mask) - 1) if c & mask else None,) for c in a]
+
+    def __iter__(self):
+        return iter(self.by)
+
+    def __len__(self):
+        return len(self.by)
+
+    def __contains__(self, pid):
+        return pid in self.by
+
+    def items(self):
+        return ((pid, self[pid]) for pid in self.by)
+
+    def clear(self):
+        self.ed.clear()
+        self.by.clear()
+
+
 class HistoryStats:
+    """Records from the archive. Starts are held compactly (Starts) and read from the archive's index
+    when it has one (one query per season, no season file decoded), otherwise from the season files;
+    prize totals and coaches' major champions are index aggregates when there is an index. The record
+    definitions, ties and evidence are the same either way (tested against each other)."""
+
     def __init__(self, archive):
         self.a = archive
-        self.starts = defaultdict(list)          # pid -> [(year, week, event id, tour, tier, kind, pos)], in order
+        self.starts = Starts()                   # pid -> [(year, week, event id, tour, tier, kind, pos)], in order
         self.seen = set()                        # seasons already read
         self.sig = {}                            # season -> its file's signature when read
         self.extend(archive)
@@ -66,23 +130,56 @@ class HistoryStats:
             self.seen.clear()
             self.sig.clear()
         new = [y for y in archive.years if y not in self.seen]
+        if new and self.seen and min(new) < max(self.seen):   # a gap filled in: start again, in order
+            self.starts.clear()
+            self.seen.clear()
+            self.sig.clear()
+            new = list(archive.years)
+        idx = getattr(archive, 'index', None)
         touched = set()
-        for y, e in archive.events(new):
-            meta = archive.world['series'].get(e['series'], {})
-            tier = e.get('tier', meta.get('tier'))
-            tour = e.get('tour', meta.get('tour'))
-            kind = 'major' if e.get('category', meta.get('category')) == 'major' else meta.get('kind', '')
-            if kind == 'qualifying':
-                continue
-            for site in e['finish']:
-                for gid, pos, _ in site:
-                    self.starts[gid].append((y, e['week'], e['id'], tour, tier, kind, pos))
-                    touched.add(gid)
-        for gid in touched:
-            self.starts[gid].sort()
+        for y in new:                                # season by season: nothing more than one season in memory
+            if idx is not None:
+                editions, rows = self._from_index(archive, idx, y)
+            else:
+                editions, rows = self._from_files(archive, y)
+            ranks = self.starts.add_editions(editions)
+            for gid, eid, pos in rows:
+                self.starts.add(gid, ranks[eid], pos)
+                touched.add(gid)
+        self.starts.settle(touched)
         self.seen.update(new)
         self.sig.update((y, sign(y)) for y in new)
         return new
+
+    @staticmethod
+    def _classify(archive, series, tour, tier, category):
+        meta = archive.world['series'].get(series, {})
+        tier = meta.get('tier') if tier is None else tier
+        tour = meta.get('tour') if tour is None else tour
+        kind = 'major' if (category if category is not None else meta.get('category')) == 'major' else meta.get('kind', '')
+        return tour, tier, kind
+
+    def _from_files(self, archive, y):
+        editions, rows = [], []
+        for _, e in archive.events([y]):
+            tour, tier, kind = self._classify(archive, e['series'], e.get('tour'), e.get('tier'), e.get('category'))
+            if kind == 'qualifying':
+                continue
+            editions.append((y, e['week'], e['id'], tour, tier, kind))
+            rows += [(gid, e['id'], pos) for site in e['finish'] for gid, pos, _ in site]
+        return editions, rows
+
+    def _from_index(self, archive, idx, y):
+        editions, keep = [], set()
+        for eid, week, series, tour, tier, category in idx.db.execute(
+                'SELECT event_id, week, series, tour, tier, category FROM editions WHERE year = ?', (y,)):
+            tour, tier, kind = self._classify(archive, series, tour, tier, category)
+            if kind != 'qualifying':
+                editions.append((y, week, eid, tour, tier, kind))
+                keep.add(eid)
+        rows = [r for r in idx.db.execute('SELECT s.person, e.event_id, s.pos FROM starts s JOIN editions e USING(eid) '
+                                          'WHERE s.year = ?', (y,)) if r[1] in keep]
+        return editions, rows
 
     # ---- the shared vocabulary ------------------------------------------------------------------------
     @staticmethod
@@ -137,9 +234,14 @@ class HistoryStats:
 
     def most_prize(self, n=25):
         total = defaultdict(int)
-        for y in self.a.years:
-            for pid, row in self.a.year(y)['careers'].items():
-                total[pid] += row.get('prize') or 0
+        idx = getattr(self.a, 'index', None)
+        if idx is not None:                          # an aggregate over the index's season rows
+            for pid, prize in idx.db.execute('SELECT person, SUM(COALESCE(prize, 0)) FROM seasons GROUP BY person'):
+                total[pid] = prize
+        else:
+            for y in self.a.years:
+                for pid, row in self.a.year(y)['careers'].items():
+                    total[pid] += row.get('prize') or 0
         return self._top([self._row(pid, v) for pid, v in total.items() if v > 0], n)
 
     # ---- age -----------------------------------------------------------------------------------------------
@@ -306,15 +408,24 @@ class HistoryStats:
         """Distinct golfers who won a major while this person coached them (the coach recorded with the
         result). Association, not causation."""
         champs = defaultdict(dict)
-        for y, e in self.a.events():
-            if e.get('category', self.a.world['series'].get(e['series'], {}).get('category')) != 'major':
-                continue
-            for site in e['finish']:
-                for gid, pos, _ in site:
-                    if pos == 1:
-                        coach = e['team'].get(gid, (0, 0))[0]
-                        if coach:
-                            champs[coach].setdefault(gid, e['id'])
+        idx = getattr(self.a, 'index', None)
+        if idx is not None:                          # winners at every site of every major, in archive order
+            series = self.a.world['series']
+            for gid, coach, eid, ser, cat in idx.db.execute(
+                    'SELECT s.person, s.coach, e.event_id, e.series, e.category FROM starts s JOIN editions e USING(eid) '
+                    'WHERE s.pos = 1 AND s.coach ORDER BY e.year, e.eid, s.site'):
+                if (cat if cat is not None else series.get(ser, {}).get('category')) == 'major':
+                    champs[coach].setdefault(gid, eid)
+        else:
+            for y, e in self.a.events():
+                if e.get('category', self.a.world['series'].get(e['series'], {}).get('category')) != 'major':
+                    continue
+                for site in e['finish']:
+                    for gid, pos, _ in site:
+                        if pos == 1:
+                            coach = e['team'].get(gid, (0, 0))[0]
+                            if coach:
+                                champs[coach].setdefault(gid, e['id'])
         rows = [dict(self._row(c, len(g), list(g.values())), golfers=sorted(g)) for c, g in champs.items()]
         return self._top(rows, n)
 

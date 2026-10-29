@@ -110,7 +110,18 @@ years/YYYY.json.gz    one season: every edition (venues, finishers per site, eac
 each archived season is indexed in one transaction that first removes that season's rows (so a retried
 season never duplicates), and it can be rebuilt from the files at any time. A golfer's results, a
 tournament's editions, a course's editions or an edition's leaderboard are each one indexed query
-(`Archive.results` uses it when it covers every season). Size: about 8 MB a season.
+(`Archive.results` uses it when it covers every season). Since schema 2 it also holds each week's No. 1
+and each golfer's season row (compressed), so records, recaps, careers, moments, course histories and weeks
+at No. 1 never decode the season files. Every site's winner of a multi-site event is in `starts`
+(`editions.winner` is only the first site's). An index from before schema 2 is completed once by the session
+that owns the world, under its lock (about 70 s for 50 seasons); readers meanwhile fall back to the season
+files. Size: about 10 MB a season, 18 MB with schema 2 (881 MB for the 50-season world).
+
+**Memory.** `Archive.year` keeps only the `CACHE_SEASONS` (4) most recently decoded seasons (late seasons decode
+to hundreds of MB). `HistoryStats` holds every start as one integer, edition rank and position (`Starts`), not a
+tuple, and builds from the index one season at a time. On the 50-season world, opening the Overview fell from
+76 s and 7.7 GB to under 1 s, and every Records board from 8.4 GB to 1.1 GB peak, with identical answers (all 28
+boards, recaps, courses, moments, weeks at No. 1, careers).
 
 Facts are stored once and referenced by id: a win lives in its edition; a coach's record is derived
 from stints and editions. The archive grows by one season file a year instead of copying data into

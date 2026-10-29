@@ -6,19 +6,22 @@ The archive's season files stay the record of facts; this is a derived index bes
 season's rows, so indexing is idempotent: writing a season again (a retried advance) never duplicates
 anything, and dropping seasons beyond a committed point (session recovery) is one statement.
 
-Tables: editions (one per event played, with its classification when played and its winner), sites
-(course and layout of each site), starts (one per golfer per edition: position, total, the coach and
-caddie that week, the entry route), seasons (one per golfer per season), moments (holes-in-one,
-albatrosses, playoffs, course records). Indexed by person, event,
+Tables: editions (one per event played, with its classification when played and its first site's
+winner), sites (course and layout of each site), starts (one per golfer per edition and site: position,
+total, the coach and caddie that week, the entry route -- every site's winner is here), seasons (one per
+golfer per season), moments (holes-in-one, albatrosses, playoffs, course records); since schema 2,
+number_one (each week's No. 1, world and amateur) and careers (each golfer's season row, compressed).
+An index written before schema 2 is completed once by the session that owns it (backfill_derived). Indexed by person, event,
 series and course, so a profile, a tournament's history or a course's history is one query.
 """
 from __future__ import annotations
 
 import json
 import sqlite3
+import zlib
 from pathlib import Path
 
-SCHEMA = 1
+SCHEMA = 2
 DDL = """
 CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT);
 CREATE TABLE IF NOT EXISTS editions(eid INTEGER PRIMARY KEY, event_id TEXT UNIQUE, year INT, week INT, series TEXT,
@@ -32,6 +35,8 @@ CREATE TABLE IF NOT EXISTS seasons(person INT, year INT, tour TEXT, status TEXT,
     wins INT, prize INT, wr_end INT, am_end INT, PRIMARY KEY(person, year));
 CREATE TABLE IF NOT EXISTS moments(year INT, week INT, kind TEXT, person INT, event_id TEXT, layout TEXT,
     detail TEXT);
+CREATE TABLE IF NOT EXISTS number_one(year INT, week INT, kind TEXT, person INT, PRIMARY KEY(year, week, kind));
+CREATE TABLE IF NOT EXISTS careers(person INT, year INT, row BLOB, PRIMARY KEY(person, year));
 CREATE INDEX IF NOT EXISTS moments_person ON moments(person);
 CREATE INDEX IF NOT EXISTS moments_kind ON moments(kind, year);
 CREATE INDEX IF NOT EXISTS starts_person ON starts(person, year, week);
@@ -82,17 +87,51 @@ class ArchiveIndex:
                 (year, m.get('week'), m['kind'], m['person'], m['event'], m.get('layout'),
                  json.dumps({k: v for k, v in m.items() if k not in ('kind', 'person', 'event', 'layout', 'week')}))
                 for m in chunk.get('moments', [])])
+            self._derived(year, chunk)
             self.db.executemany('INSERT INTO seasons VALUES (?,?,?,?,?,?,?,?,?,?)', [
                 (int(g), year, r.get('tour'), r.get('status'), r.get('lifestyle'), r.get('events'), r.get('wins'),
                  r.get('prize'), r.get('wr_end'), r.get('am_end')) for g, r in chunk['careers'].items()])
+
+    def _derived(self, year, chunk):
+        """The tables added after the first index (schema 2): each week's No. 1 of the world and amateur
+        rankings, and each golfer's season row (compressed), so a career is one query."""
+        for t in ('number_one', 'careers'):
+            self.db.execute(f'DELETE FROM {t} WHERE year = ?', (year,))
+        self.db.executemany('INSERT INTO number_one VALUES (?,?,?,?)', [
+            (year, int(w), kind, top[0]) for kind, table in chunk.get('rankings', {}).items()
+            for w, top in table.items() if top])
+        self.db.executemany('INSERT INTO careers VALUES (?,?,?)', [
+            (int(g), year, zlib.compress(json.dumps(r).encode(), 6)) for g, r in chunk['careers'].items()])
+        self.db.execute('INSERT OR REPLACE INTO meta VALUES (?, ?)', (f'derived:{year}', str(year)))
+
+    def derived_complete(self, years):
+        """Whether the schema-2 tables cover these seasons (an index written before them does not)."""
+        done = {int(r[0]) for r in self.db.execute("SELECT value FROM meta WHERE key LIKE 'derived:%'")}
+        return set(years) <= done
+
+    def backfill_derived(self, archive):
+        """Fill the schema-2 tables for seasons indexed before they existed, one season file at a time
+        (derived data only: the season files are never touched). Run by the session that owns the archive,
+        under its lock."""
+        from .archive import _read
+        for y in archive.years:
+            if not self.derived_complete([y]):
+                with self.db:
+                    self._derived(y, _read(archive.dir / 'years' / f'{y}.json.gz'))
+
+    def career(self, pid):
+        """[(year, season row)] for every season a golfer competed (as in the season files)."""
+        return [(y, json.loads(zlib.decompress(row))) for y, row in
+                self.db.execute('SELECT year, row FROM careers WHERE person = ? ORDER BY year', (pid,))]
 
     def drop_years_after(self, year):
         with self.db:
             self._delete(year, '>')
 
     def _delete(self, year, op):
-        for t in ('editions', 'sites', 'starts', 'seasons', 'moments'):
+        for t in ('editions', 'sites', 'starts', 'seasons', 'moments', 'number_one', 'careers'):
             self.db.execute(f'DELETE FROM {t} WHERE year {op} ?', (year,))
+        self.db.execute(f"DELETE FROM meta WHERE key LIKE 'derived:%' AND CAST(value AS INT) {op} ?", (year,))
         # (the routes table is a shared dictionary of route texts; unused entries are harmless)
 
     @classmethod

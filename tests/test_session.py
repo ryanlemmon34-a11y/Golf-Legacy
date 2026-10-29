@@ -552,7 +552,7 @@ class TransactionTests(unittest.TestCase):
             w.reload()
             stats = w.stats
             self.assertNotIn('2027.json.gz', reads)                       # unchanged history is not reread
-            self.assertIn('2028.json.gz', reads)
+            self.assertNotIn('2028.json.gz', reads)                       # the new season comes from the index
             self.assertEqual(sorted(stats.seen), [2027, 2028])
             fresh = HistoryStats(A.Archive(self.dir / 'archive'))
             self.assertEqual(stats.most_wins(), fresh.most_wins())       # the same answers as a full rebuild
