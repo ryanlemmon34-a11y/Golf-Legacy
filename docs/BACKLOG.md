@@ -14,6 +14,86 @@ Owner requirements and planned work, in rough order. "Built" items link to where
 - Nationality, birthplace, residence and dated moves (`docs/RESIDENCE.md`)
 - Persistent identities, the history archive and resumable saves (`docs/HISTORY_AND_PERSISTENCE.md`)
 
+## Current delivery order (owner roadmap, 29 October 2026: UI first)
+
+This order supersedes the earlier milestone order and the pre-UI long-test gates. Simulation and history
+requirements are unchanged; no new long run, spending or calibration change is authorised.
+
+1. **Observer alpha now** -- *delivered in this pass* (below; `docs/OBSERVER_ALPHA.md`).
+2. **The owner's playtests** -- launch with `RUN_OBSERVER_WINDOWS.bat`, the acceptance checklist in
+   `docs/OBSERVER_ALPHA.md`; each reported world is preserved and arrives as a diagnostic package; we review
+   a copy read-only first, reproduce with the engine commit it names, and never change the original.
+3. **Parallel evidence work** (not gates for the alpha): performance measurement on the owner's machine; the
+   existing-world realism audit (population by level, careers, winner ages, course geography and difficulty;
+   measurement before any tuning, owner review first).
+4. **Expand the observer from playtest feedback**: linked directories, staff histories, courses, nations,
+   tournaments, records and frivolities; navigation and long-history queries.
+5. **Complete the universe and release proof**: nation development, remaining autonomous pathway details,
+   broad long-run validation. Nation-versus-nation events later; nationality and residence history kept.
+
+## Observer alpha pass (owner roadmap of 29 October 2026; review pin 832c55a)
+
+Status words: **implemented**, **tested** (automated tests, full suite), **measured** (timed on copies of
+saves in this container), **unverified** (not run where it matters, e.g. Windows).
+
+**R1 -- a generation number reused after a rollback** -- reproduced, fixed, tested (7cf6d20). Reproduced
+exactly as reviewed: generation 1 ends 2027, generation 2 publishes 2028-29 and is damaged, recovery returns
+to generation 1, a one-season replay commits generation 2 again; the abandoned `world.g000002.json` (years
+2027-29) stayed on disk and was kept by `_place`, so the new manifest (2027-28) named it and the reader refused
+the archive ("manifest and world table disagree"); an observer holding the abandoned world also saw the same
+number and kept it. Now a generation number is never reused (above every number the world has used); a test
+does a rollback then a shorter replay (fails before, passes after).
+
+**Observer alpha** -- implemented and tested unless marked:
+- *Background advances* (week, 4 weeks, to season end): one job at a time; progress bar and `/api/status`;
+  forms carry the world, the date drawn at and a one-time key (double clicks, refreshes, retries,
+  reconnects and old forms never advance twice); **Stop after this week** keeps every completed week; a
+  failure shows its error, keeps the last committed week and goes to the world's `observer.log`; an advance
+  cut short by the observer stopping (window closed, crash) is reported on the next open, nothing
+  half-written. Tested, including a process killed mid-advance.
+- *Pages from one committed generation*: a snapshot of the committed world (`tools/observer_live.py`) with
+  the history published with it; pages never read the world being advanced (tested: identical pages during
+  an advance). SQLite reads stay on one renderer thread.
+- *World library*: create (name, seed), open, browse read-only, copy (original unchanged, tested by
+  checksums), close, quit; date, seed, engine and save-format compatibility. Worlds saved by another engine
+  are never resumed in place: browse, or copy with "continue with this engine" (recorded in the copy's
+  `ENGINE_ACCEPTED.json`); measured on a copy of the 50-season world (7334ffe). A lock left by a dead
+  process is taken over (POSIX tested; Windows check implemented, **unverified**); a manual release with
+  confirmation as a fallback.
+- *Connected history*: directories with filters for golfers, coaches, caddies, courses, nations, tours,
+  tournaments, the current calendar; person pages with Playing / Results / Coaches & caddies / Coaching /
+  Caddying tabs; editions separate from tournaments, layouts from courses; current-season editions use the
+  archive's own edition record (tested: an edition, a golfer's results and the leaderboard read the same
+  before and after the season is archived, no double counting); records "Start here" lists (youngest and
+  oldest major champions and Premier debutants, most starts without a win, any tour) with partial/active
+  flags and the age precision stated.
+- *Diagnostic package*: the committed save, every history file it depends on, log (local folder names
+  removed), versions, seed, date, generations, file hashes, an issue note; index and previous checkpoint
+  optional; tested to reopen as the same world. Never uploaded.
+- *Windows launcher*: `RUN_OBSERVER_WINDOWS.bat` -- **unverified on Windows**.
+- *Local only*: 127.0.0.1; posts from other web sites and foreign Host headers refused.
+- *Worker processes*: started fresh ('spawn', as on Windows) and exiting when the observer is gone. Found in
+  the demonstration: forked workers outlived a killed observer and held its port. Measured identical world
+  (every part) with the engine's pool and the observer's over six full-population weeks.
+- *Demonstration* (full population, in a browser; `reports/OBSERVER_ALPHA_DEMO.md`): create 4.9 s; a
+  double-clicked week advanced once; four weeks 6 s with browsing during; observer killed mid-season and
+  reopened at its last saved week; the remaining 47 weeks 94.4 s (95.1 s click to overview); quit, resume,
+  copy, export.
+
+**Measured** (this container: 4 CPUs, Python 3.13, Linux; copies of saves; see `docs/OBSERVER_ALPHA.md`):
+the 50-season world (49,378 people): first open of an older-engine copy 102.9 s (one-time migration and index
+upgrade), later opens 16 s; pages 0.06-0.26 s (golfers directory 1.2 s first time; Records' first list
+13.8 s while the statistics are built, then 2-3 s; Seasons 36 s before it was moved to the index, 0.0 s
+after); the per-page check of the committed checkpoint hashes 80 MB in 71-81 ms (not optimised: acceptable
+now, and recovery depends on it); browsing during an advance 0.19 s; the first page after an advance 0.64 s;
+main process peak RSS 3.06 GB; a diagnostic package 282 MB required + 973 MB optional index (811 MB zipped
+with the index). A one-week advance from 1 January took 33 s (the year start runs with that week, then the
+save).
+
+**Unverified / open**: Windows (launcher, lock takeover, file replacement while read); network drives;
+season 100 performance; as-of views; records over the current season (archived seasons only); dated
+partnerships during a season come from the archive (through the last season end).
+
 ## Prestige (owner, recorded for the backlog; first version built in the season system)
 
 - **Every event has a prestige level** from: the quality of the course, the tour playing it, the quality
@@ -469,7 +549,7 @@ and eventually as-of-year views. Not built. Before it, close the archive gaps li
    course records set after a fair sample (300 earlier rounds on the layout) are archived each season with
    golfer, edition, week and layout (`Archive.moments`, indexed; boards for most holes-in-one, playoff
    wins, course records).
-6. A throwaway observer prototype to try the browsing journeys before the framework decision:
+6. ~~A throwaway observer prototype~~ -- superseded by the observer alpha (above), which grew from it:
    `tools/observer.py` (standard library web server; Overview with Advance week / 4 weeks / to end of
    season through the session, golfer profiles with career, team history, results with entry routes and
    moments, tournament histories and edition leaderboards with coach and caddie, course pages, records and
@@ -481,7 +561,7 @@ Open owner decisions: framework and desktop packaging, visual design, the first 
 frivolities lists, when to deliver as-of views and a university directory, performance budgets and
 accessibility checks.
 
-## Next (in order)
+## Earlier "Next" list (superseded by the current delivery order at the top; kept for its notes)
 
 1. **Historical identity and persistence** — *done in this pass*: person ids, stints, event-time teams,
    the archive, saves (`docs/HISTORY_AND_PERSISTENCE.md`). Next: archive the narrative of special

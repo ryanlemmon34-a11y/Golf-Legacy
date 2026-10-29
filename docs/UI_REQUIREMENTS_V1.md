@@ -2,7 +2,9 @@
 
 Summary of the owner's *Golf Legacy V1 UI Requirements — History exploration baseline* (version 1.0,
 27 October 2026), the companion to the V1 Universe Simulation Roadmap. It describes the intended
-experience; **nothing here is built yet**, and individual golfer control remains V2.
+experience; individual golfer control remains V2. **The observer alpha** (`tools/observer.py`,
+`docs/OBSERVER_ALPHA.md`; owner roadmap of 29 October 2026: UI first) covers part of it now -- see
+"Observer alpha: what exists" at the end; the rest is still to build.
 
 ## The experience
 
@@ -107,3 +109,28 @@ Assessed against `golfsim/archive.py` and `docs/HISTORY_AND_PERSISTENCE.md` as o
 | Central records and frivolities from one set of definitions | First version: `golfsim/history_stats.py` (definitions, 25 boards with evidence and active/partial flags; `tools/history_query.py ARCHIVE board NAME`) | Owner's choice of the first lists; more scopes and filters (era, nation) |
 | Century-scale browsing | Yes: `archive/index.sqlite` (person → starts and seasons, series → editions, course → editions, edition → leaderboard; ~8 MB a season), one query per page | Pagination in the UI |
 | Season recaps from recorded facts | `Archive.recap` and the narrative log | Richer recap selection rules |
+
+## Observer alpha: what exists (and what does not yet)
+
+Built on the session and archive (no second engine); standard-library web pages, local only. Status words as
+in the backlog: implemented, tested (automated), measured, unverified.
+
+| Requirement | Alpha | Status |
+|---|---|---|
+| Create a seeded world, open, copy without overwriting, read-only browsing vs resuming | World library: create (name, seed), open, browse history, copy, close; date, seed, engine and save-format compatibility per world | implemented, tested |
+| Worlds saved by another engine (the 50-season world, 7334ffe) | Never resumed in place: browse read-only, or copy with an explicit "continue with this engine" (recorded in the copy) | implemented, tested; measured on a copy of the 50-season world |
+| Advance one week, four weeks, to season end; one at a time; no double application | Background jobs; forms carry world, date and a one-time key; a second request while one runs is refused, a repeat is shown the running one | implemented, tested |
+| Progress, busy state, errors, browsing during an advance | Progress bar and status endpoint; pages drawn from the last committed week (named in the footer); errors shown with the world at its last committed week and written to its log | implemented, tested |
+| Stop at a safe boundary; server restart or crash mid-advance | Stop after the current week keeps every completed week; an advance cut short by the observer stopping is reported on the next open and nothing half-written is kept | implemented, tested (POSIX); Windows unverified |
+| Easy Windows launcher, stop/reopen instructions | `RUN_OBSERVER_WINDOWS.bat`; Quit button; `docs/OBSERVER_ALPHA.md` | implemented; unverified on Windows |
+| Overview, rankings, results, golfer profiles, records, moments | Kept and extended | implemented |
+| Browse/filter golfers, coaches, caddies, courses, nations, tours, tournaments, calendar | Directories with filters, sorting and pages; calendar of the current season | implemented, smoke-tested |
+| Current-season and first-season events linked like archived ones; no double counting or future leakage | The current season's editions use the archive's own edition record; only seasons the published history does not hold are drawn from the snapshot | implemented, tested (an edition reads the same before and after its season is archived) |
+| Event -> golfer, event-time coach and caddie, course, tournament; Back keeps filters | Links everywhere; filters are in the URL | implemented |
+| Coach and caddie stints both ways; separate playing and staff tabs under one identity | Person page tabs: Playing, Results, Coaches & caddies, Coaching, Caddying | implemented (stints as archived at the last season end; current coach/caddie from the snapshot) |
+| Layouts distinct from courses, editions from tournaments | Course page lists layouts and per-layout records; edition and tournament pages are separate | implemented |
+| First records/frivolities: youngest/oldest major winner, youngest/oldest Premier debut, most starts without a win by tour; label incomplete history and age precision | "Start here" lists; scope filter (all, professional, Premier, major, any tour); partial/active flags; age = season year minus birth year, stated | implemented (archived seasons only) |
+| Diagnostic copy of a saved world | Zip with the committed save and every history file it needs, log, versions, seed, date, generations, file hashes and an issue note; optional index and previous checkpoint; local paths removed from the log; never uploaded | implemented, tested (the package reopens as the same world) |
+
+Not yet: as-of-year views, the university directory, nation development, era filters on records, charts and
+art, a packaged desktop app.

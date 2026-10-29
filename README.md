@@ -13,6 +13,8 @@ majors, and a full season must still run quickly. See `docs/ENGINE_DESIGN.md`, s
 | Path | What it is |
 |---|---|
 | `golfsim/` | The engine: ratings, golfers, courses, shot-by-shot hole simulation, stats, tournaments (stroke and match play), world calendar, geography, major qualification, course library, course records, nations and the world population, season engine, prestige and tour cards, development, finances and careers |
+| `tools/observer.py` | The observer (alpha): world library, background advances, linked history pages (`observer_app.py` server, `observer_jobs.py` jobs, `observer_live.py` committed snapshot, `observer_worlds.py` create/copy/export); see `docs/OBSERVER_ALPHA.md` |
+| `tools/world.py` | Create and advance a world from the command line |
 | `tools/balance_test.py` | Runs the balance study and writes `reports/BALANCE_REPORT.md` |
 | `tools/calibrate.py` | Quick rating-ladder check against target scores |
 | `tools/calendar_report.py` | Writes the full world calendar to `reports/CALENDAR_REPORT.md` |
@@ -29,14 +31,24 @@ majors, and a full season must still run quickly. See `docs/ENGINE_DESIGN.md`, s
 | `docs/WORLD_POPULATION.md` | Nations and how the world's golfers are generated |
 | `docs/SEASON_SYSTEM.md` | The season engine, event and player prestige, rankings, money and tour cards |
 | `docs/DEVELOPMENT_AND_CAREERS.md` | Development, the monthly plan, money and careers |
-| `docs/BACKLOG.md` | Owner requirements and planned work |
+| `docs/OBSERVER_ALPHA.md` | How to play the observer alpha, supported saves, bug reports, acceptance checklist |
+| `docs/UI_REQUIREMENTS_V1.md` | The V1 interface requirements and what the alpha already covers |
+| `docs/BACKLOG.md` | Owner requirements and planned work (current order: observer alpha first) |
 | `data/` | Generated course library (`course_library.json`) and layout ratings |
 | `reports/` | Latest reports (balance, majors, high school, calendar, qualifying, course library, world population, multi-season test, world history) |
 | `legacy/` | The original v0.13 package, untouched |
 
+## Playing it: the observer (alpha)
+
+Double-click **`RUN_OBSERVER_WINDOWS.bat`** (Python 3.11+, nothing else to install): your browser opens the
+world library, where you create or open a world, advance it a week, four weeks or to the end of the season,
+and explore its people, tournaments, courses, nations, tours, records and history. **Report a problem**
+packages a saved world for us. How to stop, reopen, which saves are supported and a short acceptance
+checklist: `docs/OBSERVER_ALPHA.md`. From a terminal: `python tools/observer.py --open`.
+
 ## Running it (Windows)
 
-1. Install Python 3.10 or newer from python.org (tick "Add Python to PATH").
+1. Install Python 3.11 or newer from python.org (tick "Add Python to PATH").
 2. Double-click `RUN_TESTS_WINDOWS.bat` to run the tests.
 3. Double-click `RUN_BALANCE_TEST_WINDOWS.bat` to regenerate the balance report (about 5–6 minutes).
 
