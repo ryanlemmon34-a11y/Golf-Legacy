@@ -211,20 +211,26 @@ class App:
     def create(self, form):
         try:
             d = WL.check_name(self.lib, O.one(form, 'name'))
-            seed = int(O.one(form, 'seed') or 2027)
+            seed = O.one(form, 'seed')
+            seed = int(seed) if seed not in (None, '') else random.randrange(1, 1000000)
             if not 0 <= seed < 2 ** 31:
                 raise ValueError('The seed must be a whole number from 0 to 2147483647.')
+            start = int(O.one(form, 'start_year') or 2027)
+            if not 1900 <= start <= 2200:
+                raise ValueError('The starting year must be from 1900 to 2200.')
         except (ValueError, FileExistsError) as e:
             return ('err', esc(e))
 
         def run(job):
+            from golfsim.population import generate_world
             from golfsim.session import Session
             job.update(phase='generating the world and its population')
-            s = Session.create(d, seed=seed, workers=self.workers)
-            J.log(d, f'created with seed {seed}')
+            s = Session.create(d, seed=seed, workers=self.workers, world=generate_world(year=start, seed=seed))
+            WL.record_creation(d, seed, start)
+            J.log(d, f'created with seed {seed}, starting in {start}')
             job.update(phase='opening')
             self.renderer.call(self._install, d, s)
-            job.finish('done', f'World “{d.name}” created (seed {seed}) at {O.date_text(s.cursor)}.')
+            job.finish('done', f'World “{d.name}” created (seed {seed}, starting {start}) at {O.date_text(s.cursor)}.')
         _, started = self.start('create', f'Create world “{d.name}”', run, world_dir=None)
         return None if started else ('warn', 'Another operation is running: one at a time.')
 
@@ -306,6 +312,41 @@ class App:
                                'Nothing was uploaded; share it yourself if you want us to look.')
         _, started = self.start('export', f'Export a diagnostic copy of “{Path(src).name}”', run, world_dir=src)
         return None if started else ('warn', 'Another operation is running: one at a time.')
+
+    def remove(self, form):
+        """Remove a world from the library into the trash (restorable). Never the open world, never while an
+        operation runs."""
+        name = O.one(form, 'name') or ''
+        if O.one(form, 'confirm') != 'yes':
+            return ('warn', 'Tick the box to confirm removing the world.')
+        if self.jobs.running():
+            return ('warn', 'Wait for the running operation to finish (or stop it) first.')
+        if self.world is not None and self.world.path == self.lib / name:
+            return ('warn', 'Close the world before removing it.')
+        try:
+            dst = self.renderer.call(WL.remove_world, self.lib, name)
+        except (ValueError, OSError) as e:
+            return ('err', esc(e))
+        return ('ok', f'“{esc(name)}” moved to the trash ({esc(dst.name)}): restore it below, or delete it permanently.')
+
+    def restore(self, form):
+        if self.jobs.running():
+            return ('warn', 'Wait for the running operation to finish first.')
+        try:
+            dst = self.renderer.call(WL.restore_world, self.lib, O.one(form, 'folder') or '')
+        except (ValueError, OSError) as e:
+            return ('err', esc(e))
+        return ('ok', f'“{esc(dst.name)}” restored.')
+
+    def purge(self, form):
+        if self.jobs.running():
+            return ('warn', 'Wait for the running operation to finish first.')
+        try:
+            name = self.renderer.call(WL.delete_permanently, self.lib, O.one(form, 'folder') or '',
+                                      (O.one(form, 'typed') or '').strip())
+        except (ValueError, OSError) as e:
+            return ('err', esc(e))
+        return ('ok', f'“{esc(name)}” deleted permanently from disk.')
 
     def unlock(self, form):
         """Remove a lock left by a program that no longer runs (the owner asked, after confirming that no other
@@ -418,24 +459,42 @@ class App:
                         + ('<label class="muted"><input type="checkbox" name="accept_engine" value="yes" required> continue '
                            'with this engine</label>' if other else '') + '<button>Copy</button></form>')
             acts.append(f'<a class="button" href="/export?name={quote(i["name"])}">Report a problem</a>')
+            if not (self.world is not None and self.world.path == i['path']):
+                acts.append(f'<form method="post" action="/worlds/remove">{hidden}<label class="muted"><input type="checkbox" '
+                            'name="confirm" value="yes" required> remove</label><button title="Moves it to the trash: it can '
+                            'be restored">Remove…</button></form>')
             seed = i.get('seed')
             rows.append([f'<strong>{name}</strong>' + (' <span class="tag">open</span>' if self.world is not None
                                                        and self.world.path == i['path'] else ''),
-                         esc(date), esc(seed if seed is not None else '—'), compat, state, '<div class="filters">'
+                         esc(date), esc(seed if seed is not None else '—'), esc(i.get('start_year') or '—'), compat, state,
+                         '<div class="filters">'
                          + ''.join(acts) + '</div>'])
-        out.append(O.table(['World', 'Date', 'Seed', 'Compatibility', 'State', ''], rows) if rows else
+        out.append(O.table(['World', 'Date', 'Seed', 'Start', 'Compatibility', 'State', ''], rows) if rows else
                    '<p class="muted">No worlds yet: create one below.</p>')
         out.append('<p class="muted">A world saved by another engine cannot be resumed in place: browse its history, or '
                    'tick “continue with this engine” to copy it and continue the copy (the copy records which engine '
                    'saved it). The original is never changed.</p>')
         out.append('<h2>Create a world</h2><form method="post" action="/worlds/create" class="filters">'
                    '<label>Name<input name="name" required placeholder="my world"></label>'
+                   '<label>Starting year<input name="start_year" type="number" min="1900" max="2200" value="2027"></label>'
                    f'<label>Seed<input name="seed" type="number" min="0" max="2147483647" value="{random.randrange(1, 1000000)}">'
                    '</label><button class="primary">Create</button></form>'
-                   '<p class="muted">The seed is the world’s starting point: the same seed always makes the same world -- the '
+                   '<p class="muted">The starting year is the first season’s calendar year (golfers’ ages are set '
+                   'from it); the seed is separate. The seed is the world’s starting point: the same seed always makes the same world -- the '
                    'same golfers and, shot for shot, the same history (that is what makes a problem report replayable). '
                    'A new seed is suggested each time; type an earlier world’s seed (shown in the library) to make that '
                    'world again. The whole world is generated: every nation, golfer, coach and caddie.</p>')
+        trash = WL.trashed(self.lib)
+        if trash:
+            out.append('<h2>Removed worlds (trash)</h2>' + O.table(['World', 'Removed', 'Size', ''], [
+                [esc(name), esc(when), f'{mb:,.0f} MB',
+                 f'<div class="filters"><form method="post" action="/worlds/restore"><input type="hidden" name="folder" '
+                 f'value="{esc(folder)}"><button>Restore</button></form><form method="post" action="/worlds/purge">'
+                 f'<input type="hidden" name="folder" value="{esc(folder)}"><input name="typed" required size="14" '
+                 f'placeholder="type its name" aria-label="Type the world name to delete it permanently">'
+                 '<button>Delete permanently</button></form></div>'] for folder, name, when, mb in trash])
+                + '<p class="muted">Removing only moves a world here; it is deleted from disk only by “Delete permanently” '
+                  'with its name typed.</p>')
         if self.world is not None:
             out.append('<form method="post" action="/worlds/close"><button>Close the open world</button></form>')
         out.append('<h2>Stop the observer</h2><form method="post" action="/quit"><button>Quit</button></form>'
@@ -579,6 +638,19 @@ def make_handler(app):
                     notice, to = app.open(form, read_only=True), '/'
                 elif u.path == '/worlds/copy':
                     notice, to = app.copy(form), '/worlds'
+                elif u.path == '/worlds/remove':
+                    notice, to = app.remove(form), '/worlds'
+                elif u.path == '/worlds/restore':
+                    notice, to = app.restore(form), '/worlds'
+                elif u.path == '/worlds/purge':
+                    notice, to = app.purge(form), '/worlds'
+                elif u.path == '/shortlist':
+                    w = app.world
+                    ok = app.renderer.call(O.set_shortlist, w, O.one(form, 'kind'), O.one(form, 'id'), O.one(form, 'on') == '1')
+                    if not ok:
+                        notice = ('warn', 'Open a world (not only its history) to keep a shortlist.')
+                    ref = self.headers.get('Referer') or ''
+                    to = (urlparse(ref).path + ('?' + urlparse(ref).query if urlparse(ref).query else '')) if ref else '/shortlist'
                 elif u.path == '/worlds/unlock':
                     notice, to = app.unlock(form), '/worlds'
                 elif u.path == '/worlds/close':

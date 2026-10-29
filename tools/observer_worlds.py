@@ -36,7 +36,10 @@ from golfsim.archive import MANIFEST, legacy_files, published_stamp, read_manife
 import observer_jobs as J                                            # noqa: E402
 
 ENGINE_ACCEPTED = 'ENGINE_ACCEPTED.json'
+WORLD_INFO = 'observer_world.json'          # seed and starting year as chosen when the world was created
 DIAGNOSTICS = '_diagnostics'
+TRASH = '_trash'                             # removed worlds, restorable until deleted permanently
+REMOVED = 'REMOVED.json'
 NAME = re.compile(r'^[A-Za-z0-9][A-Za-z0-9 _.-]{0,59}$')
 _ENGINE = {}
 
@@ -47,6 +50,72 @@ def engine_now():
         from golfsim.savegame import engine_commit, engine_id
         _ENGINE['id'], _ENGINE['commit'] = engine_id(), engine_commit()
     return _ENGINE['id'], _ENGINE['commit']
+
+
+def record_creation(d, seed, start_year):
+    """The world's chosen seed and starting year, kept beside it (the save and its history hold them too)."""
+    engine, commit = engine_now()
+    (Path(d) / WORLD_INFO).write_text(json.dumps({'seed': seed, 'start_year': start_year, 'engine': engine,
+                                                  'commit': commit, 'created': time.strftime('%Y-%m-%d %H:%M:%S')}, indent=1))
+
+
+def remove_world(lib, name):
+    """Move a world into the trash (worlds/_trash/), restorable; nothing is deleted."""
+    src = Path(lib) / name
+    if not name or name != Path(name).name or name.startswith(('.', '_')) or inspect(src) is None:
+        raise ValueError('No such world.')
+    if (src / 'lock').exists() and not SES._owner_gone((src / 'lock').read_text()):
+        raise ValueError('That world is being advanced by another program.')
+    trash = Path(lib) / TRASH
+    trash.mkdir(exist_ok=True)
+    dst = trash / f'{name}--{time.strftime("%Y%m%d-%H%M%S")}'
+    os.replace(src, dst)
+    (dst / REMOVED).write_text(json.dumps({'name': name, 'removed': time.strftime('%Y-%m-%d %H:%M:%S')}, indent=1))
+    J.log(dst, f'removed from the library (restorable from {TRASH})')
+    return dst
+
+
+def trashed(lib):
+    """[(folder name, original name, removed at, size in MB)] in the trash, newest first."""
+    out = []
+    t = Path(lib) / TRASH
+    for p in sorted(t.iterdir(), reverse=True) if t.is_dir() else []:
+        try:
+            info = json.loads((p / REMOVED).read_text())
+        except (OSError, ValueError):
+            continue
+        size = sum(f.stat().st_size for f in p.rglob('*') if f.is_file()) / 1e6
+        out.append((p.name, info.get('name'), info.get('removed'), size))
+    return out
+
+
+def _trashed_path(lib, folder):
+    p = Path(lib) / TRASH / folder
+    if not folder or folder != Path(folder).name or not (p / REMOVED).exists():
+        raise ValueError('No such removed world.')
+    return p
+
+
+def restore_world(lib, folder):
+    p = _trashed_path(lib, folder)
+    name = json.loads((p / REMOVED).read_text())['name']
+    dst = Path(lib) / name
+    if dst.exists():
+        raise FileExistsError(f'A world named “{name}” exists again: remove or rename it first.')
+    (p / REMOVED).unlink()
+    os.replace(p, dst)
+    J.log(dst, 'restored from the trash')
+    return dst
+
+
+def delete_permanently(lib, folder, typed_name):
+    """Delete a removed world from disk: only from the trash, and only when its name is typed exactly."""
+    p = _trashed_path(lib, folder)
+    name = json.loads((p / REMOVED).read_text())['name']
+    if typed_name != name:
+        raise ValueError(f'Type the world’s name exactly (“{name}”) to delete it permanently.')
+    shutil.rmtree(p)
+    return name
 
 
 def check_name(lib, name):
@@ -82,6 +151,10 @@ def inspect(path):
                      'history_gen': meta.get('history_gen')})
         wid = str(meta.get('world_id') or '')
         info['seed'] = int(wid.split('-')[0]) if wid.split('-')[0].isdigit() else None
+        try:
+            info['start_year'] = json.loads((p / WORLD_INFO).read_text()).get('start_year')
+        except (OSError, ValueError):
+            info['start_year'] = None
         info['format_ok'] = meta.get('format') == SES.FORMAT and meta.get('schema') == SES.SCHEMA
         info['same_engine'] = meta.get('engine') == engine
         try:
@@ -105,8 +178,13 @@ def inspect(path):
         stamp = published_stamp(a)
         info['years'] = list(stamp[1])
         info['manifest'] = stamp[2] is not None
-        if info['kind'] == 'archive' and stamp[1]:
-            info['seed'] = json.loads((a / (read_manifest(a)['files']['world'] if stamp[2] else 'world.json')).read_text()).get('seed')
+        if (info['kind'] == 'archive' or info.get('start_year') is None) and \
+                ((a / MANIFEST).exists() or (a / 'world.json').exists()):
+            wt = json.loads((a / (read_manifest(a)['files']['world'] if stamp[2] else 'world.json')).read_text())
+            if info.get('seed') is None:
+                info['seed'] = wt.get('seed')
+            if info.get('start_year') is None:
+                info['start_year'] = wt.get('first_year')
     except (OSError, ValueError, KeyError):
         info['years'], info['manifest'] = [], False
     return info
@@ -115,7 +193,7 @@ def inspect(path):
 def list_worlds(lib):
     out = []
     for p in sorted(Path(lib).iterdir()) if Path(lib).is_dir() else []:
-        if p.is_dir() and not p.name.startswith(('.', DIAGNOSTICS)) and not p.name.endswith('.copying'):
+        if p.is_dir() and not p.name.startswith(('.', '_')) and not p.name.endswith('.copying'):
             i = inspect(p)
             if i is not None:
                 out.append(i)
@@ -144,7 +222,7 @@ class _Locked:
 
 
 def _skip(name):
-    return (name in ('lock', J.JOB_FILE, 'CURRENT.tmp', 'MANIFEST.tmp') or name.startswith('lock.stale.')
+    return (name in ('lock', J.JOB_FILE, 'CURRENT.tmp', 'MANIFEST.tmp', 'observer_cache') or name.startswith('lock.stale.')
             or (name.startswith('gen_') and name.endswith('.tmp')))
 
 
@@ -229,7 +307,7 @@ def export_diagnostic(src, out_dir, note='', steps='', expected='', include_inde
                 for d in sorted(src.glob('gen_[0-9]*')):
                     if d.is_dir() and d != g and not d.name.endswith('.tmp'):
                         entries += [(p.relative_to(src).as_posix(), p, False) for p in sorted(d.rglob('*')) if p.is_file()]
-            for name in (J.LOG_FILE, J.JOB_FILE, ENGINE_ACCEPTED):
+            for name in (J.LOG_FILE, J.JOB_FILE, ENGINE_ACCEPTED, WORLD_INFO, 'observer_shortlist.json'):
                 if (src / name).exists():
                     entries.append((name, src / name, True))
         prefix = 'archive/' if info['kind'] == 'session' else ''
@@ -264,6 +342,7 @@ def export_diagnostic(src, out_dir, note='', steps='', expected='', include_inde
                 listing.append({'path': arc, 'bytes': size, 'sha256': digest, 'required': required})
             diag = {'format': 'golf-legacy-diagnostic/1', 'exported': time.strftime('%Y-%m-%d %H:%M:%S'),
                     'world': src.name, 'kind': info['kind'], 'world_id': info.get('world_id'), 'seed': info.get('seed'),
+                    'start_year': info.get('start_year'),
                     'cursor': info.get('cursor'), 'generation': info.get('generation'),
                     'history_generation': info.get('history_gen'), 'archived_seasons': info.get('years'),
                     'published_generation': (m or {}).get('generation'),

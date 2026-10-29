@@ -1,0 +1,178 @@
+"""Facts the observer's profile and statistics pages are drawn from (no HTML here): results with each
+edition's classification when played, per-start prize money, career honors, season-by-season and per-tour
+rollups, and ratings with their changes. Everything is derived from recorded results and snapshots.
+"""
+from __future__ import annotations
+
+from collections import defaultdict
+
+import observer_stats as ST
+
+# Career honors: (key, label, test on an edition's classification when it was played). An edition counts in
+# one category only (the first that matches); qualifying stages are never honors.
+COLLEGE_TITLES = ('National Championship', 'World University Championship')
+HONORS = (
+    ('major', 'Major winner', lambda e: e['category'] == 'major'),
+    ('premier', 'Premier Tour winner', lambda e: e['tier'] == 1),
+    ('challenger', 'Challenger Tour winner', lambda e: e['tier'] == 2),
+    ('regional', 'Regional tour winner', lambda e: e['tier'] == 3),
+    ('mini', 'Mini tour winner', lambda e: e['tier'] == 4),
+    ('college_national', 'College national champion',
+     lambda e: e['category'] == 'college_postseason' and any(t in (e['name'] or '') for t in COLLEGE_TITLES)),
+    ('college_postseason', 'College conference / regional champion', lambda e: e['category'] == 'college_postseason'),
+    ('college', 'College event winner', lambda e: e['tier'] == 5),
+    ('amateur_championship', 'Amateur championship winner',
+     lambda e: e['category'] in ('national_amateur', 'elite_amateur')),
+    ('amateur', 'Other amateur event winner', lambda e: e['tier'] == 6),
+    ('club_pro', 'Club professional event winner', lambda e: e['tier'] == 8),
+)
+OUTCOMES = {'win': lambda p: p == 1, 'runner-up': lambda p: p == 2, 'top2': lambda p: p is not None and p <= 2,
+            'top5': lambda p: p is not None and p <= 5, 'top10': lambda p: p is not None and p <= 10,
+            'made-cut': lambda p: p is not None, 'missed-cut': lambda p: p is None}
+
+
+def results(w, pid):
+    """Every start, oldest first, with the edition's classification when played:
+    [{year, week, event, series, name, tour, tier, category, pos, site, coach, caddie, route, live}]."""
+    out = []
+    a = w.a
+    if a is not None and pid in a.people:
+        idx = a.index
+        if idx is not None:
+            q = ('SELECT s.year, s.week, e.event_id, e.series, e.name, e.tour, e.tier, e.category, s.pos, s.site, s.coach, '
+                 's.caddie, r.text FROM starts s JOIN editions e USING(eid) LEFT JOIN routes r USING(rid) WHERE s.person = ?'
+                 + idx.upto('s.year') + ' ORDER BY s.year, s.week, e.event_id, s.site')
+            keys = ('year', 'week', 'event', 'series', 'name', 'tour', 'tier', 'category', 'pos', 'site', 'coach',
+                    'caddie', 'route')
+            out = [dict(zip(keys, r), live=False) for r in idx.db.execute(q, (pid,))]
+        else:
+            for y, e in a.events():
+                for k, site in enumerate(e['finish']):
+                    for gid, pos, _ in site:
+                        if gid == pid:
+                            coach, caddie = e['team'].get(str(pid), (0, 0))
+                            out.append({'year': y, 'week': e['week'], 'event': e['id'], 'series': e['series'],
+                                        'name': e.get('name'), 'tour': e.get('tour'), 'tier': e.get('tier'),
+                                        'category': e.get('category'), 'pos': pos, 'site': k, 'coach': coach,
+                                        'caddie': caddie, 'route': e['routes'].get(str(pid)), 'live': False})
+    if w.live is not None:
+        for eid, k, pos in w.live.by_person.get(pid, ()):
+            e = w.live.editions[eid]
+            coach, caddie = e['team'].get(str(pid), (0, 0))
+            out.append({'year': int(eid.split(':')[0]), 'week': e['week'], 'event': eid, 'series': e['series'],
+                        'name': e['name'], 'tour': e['tour'], 'tier': e['tier'], 'category': e['category'], 'pos': pos,
+                        'site': k, 'coach': coach, 'caddie': caddie, 'route': e['routes'].get(str(pid)), 'live': True})
+    return out
+
+
+def is_qualifying(r):
+    return r.get('tier') == 7
+
+
+def start_prizes(w, pid, rows, db=None):
+    """{(event, site): prize} for the given starts of one person where it is known: the event's payouts
+    recomputed (observer_stats.payouts) from its recorded finish, the golfers' in-season statuses and its
+    purse (as recorded when played, or the calendar's), only for person-seasons whose payouts reconcile with
+    the money actually paid. Unknown starts are left out (shown as unknown, never as zero)."""
+    out = {}
+    live_rec = None
+    for r in rows:
+        key = (r['event'], r['site'])
+        if r['live']:
+            if live_rec is None:
+                live_rec = ST.live_tables(w.live)[1]
+            e = w.live.editions[r['event']]
+            if not live_rec.get(pid):
+                continue
+            status = {g: p.get('status') for g, p in w.live.people.items()}
+            won = ST.payouts(e['purse'], e['cut_top'], e['field_size'], e['finish'][r['site']],
+                             lambda g: None if g not in status else status[g] == 'amateur')
+            out[key] = won.get(pid, 0.0)
+            continue
+        if db is None or w.a is None or w.a.index is None:
+            continue
+        ok = db.execute('SELECT reconciled FROM season_prize WHERE person = ? AND year = ?', (pid, r['year'])).fetchone()
+        m = ST.edition_money(db, r['event'])
+        if not ok or not ok[0] or m is None:
+            continue
+        purse, cut_top, field_size, _ = m
+        if not purse:
+            out[key] = 0.0
+            continue
+        board = [x for x in w.a.index.leaderboard(r['event']) if x['site'] == r['site']]
+        order = sorted(board, key=lambda x: (x['pos'] is None, x['pos'] if x['pos'] is not None else 0))
+        ids = [x['person'] for x in order]
+        status = {p: s for p, s in w.a.index.db.execute(
+            f'SELECT person, status FROM seasons WHERE year = ? AND person IN ({",".join("?" * len(ids))})',
+            [r['year'], *ids])}
+        try:
+            won = ST.payouts(purse, cut_top, field_size, [(x['person'], x['pos'], x['total']) for x in order],
+                             lambda g: None if g not in status else status[g] == 'amateur')
+        except KeyError:
+            continue
+        out[key] = won.get(pid, 0.0)
+    return out
+
+
+def honors(rows):
+    """[(key, label, wins [(year, event)])] earned, from wins and each edition's classification when played."""
+    got = defaultdict(list)
+    for r in rows:
+        if r['pos'] != 1 or is_qualifying(r):
+            continue
+        for key, _, test in HONORS:
+            if test({'category': r.get('category'), 'tier': r.get('tier'), 'name': r.get('name')}):
+                got[key].append((r['year'], r['event']))
+                break
+    return [(k, label, got[k]) for k, label, _ in HONORS if got[k]]
+
+
+def season_rollup(rows):
+    """{year: {'all': stats, 'tours': {tour: stats}}} from starts (qualifying counted apart); stats as
+    observer_stats.COLUMNS (cuts only for stroke-play events with a cut where the format is known)."""
+    out = {}
+    for r in rows:
+        y = out.setdefault(r['year'], {'all': dict.fromkeys(ST.COLUMNS, 0), 'tours': {}})
+        t = y['tours'].setdefault(r['tour'] or '', dict.fromkeys(ST.COLUMNS, 0))
+        for agg in (y['all'], t):
+            if is_qualifying(r):
+                agg['qualifiers'] += 1
+                continue
+            p = r['pos']
+            agg['starts'] += 1
+            agg['wins'] += p == 1
+            agg['runner_ups'] += p == 2
+            agg['top2'] += p is not None and p <= 2
+            agg['top5'] += p is not None and p <= 5
+            agg['top10'] += p is not None and p <= 10
+            if r.get('cut') is not None:
+                agg['cut_events'] += r['cut']
+                agg['cuts_made'] += r['cut'] and p is not None
+    return out
+
+
+def cut_flags(w, rows, db=None):
+    """Mark each start with whether its event had a cut (stroke play with a cut): r['cut'] = 1 / 0 / None."""
+    for r in rows:
+        r['cut'] = None
+        if r['live']:
+            e = w.live.editions[r['event']]
+            r['cut'] = int(bool(e.get('cut_top')) and not e.get('match_play'))
+        elif db is not None:
+            m = ST.edition_money(db, r['event'])
+            if m is not None:
+                r['cut'] = int(bool(m[1]) and not m[3])
+    return rows
+
+
+def rating_snapshots(w, pid):
+    """{year: [overall, attrs...]}: ratings at the start of each season (recorded when the season before it
+    was archived), in the archive's rating_keys order."""
+    out = {}
+    a = w.a
+    if a is None or pid not in a.people or 'rating_keys' not in a.world:
+        return out
+    for y, row in a.playing_career(pid):
+        if row.get('ratings'):
+            out[y + 1] = row['ratings']
+    return out

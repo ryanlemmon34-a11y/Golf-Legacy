@@ -68,9 +68,13 @@ def capture(session):
     st = s.staff
     archived = set(session._history_years())
     people = {}
+    from golfsim.ratings import ATTRIBUTE_KEYS
     for g in s.world.golfers:
         people[g.id] = {'name': g.name, 'country': g.country, 'born': g.born, 'status': g.status,
                         'lifestyle': g.lifestyle, 'tour': g.tour, 'turned_pro': g.turned_pro, 'roles': ['golfer']}
+        if g.lifestyle != 'retired':                 # current ratings (overall, then the attributes)
+            people[g.id]['ratings'] = (round(g.overall, 1),) + tuple(round(g.attrs[k], 1) for k in ATTRIBUTE_KEYS)
+            people[g.id]['archetype'] = g.archetype
     for kind, table in (('coach', st.coaches), ('caddie', st.caddies)):
         for c in table.values():
             p = people.setdefault(c.id, {'name': c.name, 'country': c.country, 'born': c.born, 'roles': []})
@@ -119,6 +123,7 @@ def capture(session):
         coach_of=dict(st.coach_of), caddie_of=dict(st.caddie_of),
         birth=dict(pl.birth), home=dict(pl.home), first=dict(pl.first),
         moves={k: list(v) for k, v in pl.moves.items()}, courses=courses, tours=tours, records=records,
+        prize={gid: led.prize for gid, led in s.ledgers.get(year, {}).items()},
         captured=time.time())
     view.capture_seconds = round(time.perf_counter() - t0, 2)
     return view
