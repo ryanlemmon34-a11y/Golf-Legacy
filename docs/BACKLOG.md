@@ -374,6 +374,79 @@ work), so only same-session comparisons are meaningful.
 - Windows: hard links, the lock file, `os.replace` over open files, fsync, WAL files, deleting a test's
   temporary directory while a connection is open, and the restore steps' Windows commands.
 
+## History correctness and measured performance pass (owner review of 45c2dee)
+
+Status words: **implemented**, **tested** (regression tests, full suite), **measured** (benchmarks or
+equivalence on copies of saves), **unverified** (not shown at the scale or on the platform that matters).
+No long simulation was started; no population, event, shot or history was removed; no gameplay rule changed.
+
+**Correctness** (each reproduced first, then fixed; separate from the performance commits)
+1. **Publication as one atomic manifest** — implemented, tested (fa72a8e). Reproduced: a publisher stopped
+   between the tables and the season list left readers 463 course records, 632 stints and 14 moves from a season
+   they did not have. Now immutable generation-named files selected by `archive/MANIFEST.json` (atomic); index
+   rows carry their source file; recovery and migration publish whole manifests. `tests/test_publication.py`
+   stops a publisher after every step (season end and rollback) and compares people, residence, relationships,
+   records, starts, prizes, rankings and index use with clean references.
+2. **Live observer follows committed generations** — implemented, tested (fa72a8e). Reproduced: after another
+   process ended the season, the observer showed week 51 beside the 2028 history. `tests/test_observer_sync.py`:
+   another process playing a week, ending a season, recovering to an earlier generation, still publishing;
+   stale forms refused, resubmitted ones applied once, nothing replayed.
+3. **Recoverable records refresh** — implemented, tested (fa72a8e): a failure after one new season keeps the
+   previous snapshot, drops the partial statistics, and the retry equals a fresh reader.
+4. **Tournament totals** — implemented, tested (d0b0576). Confirmed: no world had ever recorded them (the call
+   was missing). Recorded per site and layout from completed stroke-play events of 2+ rounds; editions now keep
+   their format; `totals_since` marks the first season recorded. For the 50-season world: 1,285 totals
+   reconstructed exactly from its evidence, as a report (`reports/long_run_2027/TOTALS_RECONSTRUCTED.md`);
+   the world is unchanged.
+5. **Benchmark cleanup** — implemented, tested (d7af5aa): the whole observer closed in `finally`, sampler and
+   instrumentation undone however a skip ends.
+
+**Performance** (profiled first; each checked with `tools/equivalence_check.py`: every result, statistic,
+development, familiarity, finance and ledger, staff relationship and work, fatigue and injury, ranking,
+record, moment, history line and the published archive identical to d7af5aa, over a full small-world season
+with match play, playoffs, missed cuts and a publication, and weeks of the 50-season world)
+- Measured season 51 (52 weeks, 4 workers): workers playing every shot about 60-65 s; main process monthly
+  plans 27-30 s, weekly entries 23 s, development 12 s, recording results 10 s, rankings / fame / finances /
+  access about 15 s; garbage collection about 17 s; data to and from workers 84-86 MB and 38-39 MB a season
+  (pickled in about a second). **Not done, by measurement:** caching courses in workers and shrinking worker
+  payloads (courses are a small part of 86 MB a season; the whole transfer is about 1% of the skip). The
+  monthly planning cache was profiled: it is about 11% of planning; the rest is per-golfer work, so it was
+  not extended.
+- **Collector paused while weeks are simulated** — implemented, measured (d3f8da3): identical results.
+- **Derived self-misreadings saved with the world** — implemented, measured (a706722): identical results; the
+  first monthly plan in a new process 4.29 -> 1.64 s on a world saved by this code (no effect on worlds
+  saved before it until their first save, such as the 50-season run).
+
+**Benchmark** (copies of the same saves, this container: Intel Xeon @ 2.10 GHz, 4 logical CPUs, 15 GB,
+Python 3.13, Linux; 4 workers; clean measured process; the copy's one-time first open -- recovery, index
+upgrades, migration to a manifest: 92-96 s -- done beforehand in its own process and excluded):
+
+| Code | Season | Click to overview | Simulate | Save | Publish | Settle | Reload + overview | First Records page | Peak memory (main RSS / all PSS) |
+|---|---|---|---|---|---|---|---|---|---|
+| d7af5aa | 51 (13,187 active) | 197.4 s | 175.4 s | 11.5 s | 5.0 s | 1.7 s | 3.7 s | 15.6 s | 2.36 GB / 3.8 GB |
+| a706722 | 51 | 189.6 s | 165.4 s | 13.8 s | 4.4 s | 1.8 s | 4.2 s | 15.0 s | 2.37 GB / 3.8 GB |
+| d7af5aa | 1 (6,449 active) | 117.0 s | 112.1 s | 2.4 s | 1.8 s | 0.2 s | 0.6 s | 0.3 s | 0.47 GB / 0.57 GB |
+| a706722 | 1 | 108.8 s | 103.7 s | 2.7 s | 1.5 s | 0.3 s | 0.6 s | 0.4 s | 0.47 GB / 0.57 GB |
+
+This container ran the same work faster than in the previous session (season 51 at d7af5aa-equivalent code:
+about 240 s then), so only same-session rows compare. **Season 1 is under 120 s here; season 51 is not
+(about 190 s); season 100 is unmeasured** (no season-100 save; making one needs a long run).
+
+**Remaining blockers to 120 s at season 51+** (measured): the workers' share (60-65 s on 4 CPUs) shrinks
+only with more cores; the main process's serial weekly work (about 105 s) is spread over per-golfer
+planning, entries, development and recording. Making it substantially faster means doing per-golfer work in
+parallel, which changes the order random numbers are drawn in -- an engine change with different (equally
+valid) outcomes, not a performance-only one: an owner decision. Measure on the intended hardware first.
+
+**Unverified:** Windows (hard links for published files fall back to copies; WAL; replacing the manifest
+while a reader holds the old one; the lock), network drives (no WAL: no pinned snapshot), season 100.
+
+**Measuring on the intended hardware** (Python 3.11 or later, nothing to install; it never changes the world it
+copies): `python tools/benchmark_skip.py --workers N` (season 1 of a new world, about 2 minutes), and with the
+50-season export extracted (2 GB free), `python tools/benchmark_skip.py --from-world <extracted>/world_2027
+--workers N` (season 51 on a copy). Try N = the number of logical CPUs, and one fewer. The printed lines are
+the whole result.
+
 ## V1 observer UI (owner baseline, `docs/UI_REQUIREMENTS_V1.md`)
 
 The V1 interface is an interactive golf encyclopedia over a world the player only advances: linked

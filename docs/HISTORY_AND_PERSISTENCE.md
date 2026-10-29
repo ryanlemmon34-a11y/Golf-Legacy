@@ -79,13 +79,23 @@ week by week is the world a whole-season run produces (tested, fingerprint-equal
 - **History in the same transaction.** At season end the season's history (its season file, the people,
   relationships and records tables, the list of archived seasons) is staged inside the new generation
   (`gen_n/archive/`, hashed with it), not written to the archive. After the commit it is published to
-  `archive/` (season file and index rows first, then the tables, the list of seasons last) and
-  `archive/PUBLISHED` records the generation. A crash before the commit leaves the archive untouched; a
-  crash after it is repaired by publishing the committed generation's staged history again (on opening or
-  before the next advance; idempotent). The running world, the committed checkpoint and the visible history
-  therefore agree after any failure, in the same process or after reopening (tested: failed final commits
-  of long advances, failures at a season-end commit, a crash between commit and publication, in the first
-  and second seasons, comparing seasons, index, people, relationships and records with an uninterrupted run).
+  `archive/`: each file under a name carrying the generation that produced it, never rewritten (season
+  files `years/YYYY.gNNNNNN.json.gz`; `world`, `people`, `relations`, `records` `.gNNNNNN.json[.gz]`), then
+  the index rows (each season's recorded with the file it came from), then `archive/MANIFEST.json`, which
+  names exactly those files and is replaced atomically: the moment readers see the new history, whole.
+  Afterwards rows of seasons no longer published (a rollback) and files neither this manifest nor the
+  previous one (`MANIFEST.prev.json`, kept for readers that opened it a moment before) names are removed.
+  A crash before the commit leaves the archive untouched; a publisher stopped at any step after it leaves
+  readers the previous manifest's history, whole, and the next session to open the world (or its next
+  advance, or an observer finding the lock free) publishes the committed generation's history again. After
+  a rollback, recovery publishes the earlier generation's history as a new manifest; a lost manifest is
+  rebuilt from the committed generation (each season's latest file from a generation no later than its
+  history). An archive from before manifests (`world.json`, `people.json.gz`, ..., `PUBLISHED`) is read as
+  before, read-only, and migrated by the first session that owns it: its season files are adopted as they
+  are, with the index rows already indexed from them (tested: `tests/test_publication.py` stops a
+  publisher after every step, for a season end and for a rollback, and checks people, residence,
+  relationships, records, starts, prizes, rankings and index use all belong to one generation; files are
+  never rewritten; migration keeps the index).
 - **Bounded checkpoints.** The live simulation keeps only this season and last of its per-season tables,
   older results reduced to their winners (`Season.prune_history`), and is saved without the standard
   course library (rebuilt from its seed), so a weekly checkpoint does not grow with the world's history.
@@ -97,21 +107,30 @@ world/
                        archive/ (a season end's staged history, until the next generations replace it)
   gen_00000(n-1)/      the last known good generation
   lock                 present while an advance runs (process id and host)
-  archive/             the history archive (below); PUBLISHED: the generation it shows
+  archive/             the history archive (below); MANIFEST.json: the history it shows
 ```
 
 ### The archive
 
 ```
-world.json            format, seed, years written; tours, series, courses and layouts
-people.json.gz        every person: name, country (nationality), born, hometown, birthplace, residence and
-                      dated moves (docs/RESIDENCE.md), arrival, roles (golfer/coach/caddie)
-relations.json.gz     every stint, and each pair's working relationship
-records.json.gz       course records per layout, every mark with golfer id and event id
-years/YYYY.json.gz    one season: every edition (venues, finishers per site, each golfer's team that
-                      week), every golfer's season, career decisions with reasons, staff work, and
-                      that season's narrative log lines (display text only)
+MANIFEST.json                 the published history: its generation, seasons and the file of each part
+                              (replaced atomically; MANIFEST.prev.json: the previous one)
+world.gNNNNNN.json            format, seed, years written; tours, series, courses and layouts
+people.gNNNNNN.json.gz        every person: name, country (nationality), born, hometown, birthplace,
+                              residence and dated moves (docs/RESIDENCE.md), arrival, roles
+relations.gNNNNNN.json.gz     every stint, and each pair's working relationship
+records.gNNNNNN.json.gz       course records per layout, every mark with golfer id and event id; lowest
+                              36/54/72-hole tournament totals (since `totals_since`)
+years/YYYY.gNNNNNN.json.gz    one season: every edition (venues, its format then -- rounds, match play --,
+                              finishers per site, each golfer's team that week), every golfer's season,
+                              career decisions with reasons, staff work, and that season's narrative log
+                              lines (display text only)
+index.sqlite                  the query index (below)
 ```
+
+Files are never rewritten; `gNNNNNN` is the generation that produced them. Archives written by
+`ArchiveWriter` alone (tests, short runs) and by versions before manifests use fixed names (`world.json`,
+`people.json.gz`, `years/YYYY.json.gz`, ...) and are read the same way.
 
 **The query index** (`archive/index.sqlite`, `golfsim/archive_index.py`) is derived from the season files:
 each archived season is indexed in one transaction that first removes that season's rows (so a retried
@@ -128,18 +147,27 @@ indexed by season, so reading one season's starts or replacing one season touche
 50-season index). Size: about 10 MB a season, 18 MB with schema 2, about 19.5 MB with the season indexes (881
 MB for the 50-season world before them, 972 MB after re-indexing a season with them, part of it free pages).
 
-**Consistent snapshots.** An `Archive` is one snapshot of one published generation. It reads the files, then
-holds a read transaction on the index for its lifetime (the index is in WAL mode, so the session keeps
-publishing meanwhile), and checks that the published stamp (`PUBLISHED` and the season list) did not change
-while it read, retrying if it did; an index that does not cover exactly its seasons is not used. Every index
-query is also limited to the snapshot's own seasons. A season file that recovery removed or republished after
-the snapshot was opened raises `ArchiveChanged` rather than mixing two generations. The observer re-checks
-what is published at the start of every page and advance, opens a new snapshot when it changed, closes the
-old one, redraws a page whose snapshot was rolled back mid-page, and shows which seasons and generation a page
-was drawn from. `Archive.close()` (or `with Archive(...)`) releases the connection; the session's index
-writers always close, also on errors. Without shared memory (network drives) SQLite cannot use WAL: then no
-read transaction is held (it would block the session's writes) and only the season limit applies, so a
-rollback could still mix into an open snapshot's index answers there (untested).
+**Consistent snapshots.** An `Archive` is one snapshot of one published history: it reads the manifest
+once and only the files it names, which never change, so its people, relationships, records and seasons all
+belong to one generation wherever a publisher is. It holds a read transaction on the index for its lifetime
+(WAL mode, so the session keeps publishing meanwhile) and uses the index only if, in that snapshot, every
+season's rows were indexed from exactly the file its manifest names; otherwise the season files of the same
+manifest answer. Every index query is also limited to the snapshot's own seasons. A season file collected
+after two newer publications raises `ArchiveChanged` rather than mixing two generations. `Archive.close()`
+(or `with Archive(...)`) releases the connection; index writers always close, also on errors. Without shared
+memory (network drives) SQLite cannot use WAL: then no read transaction is held and only the season limit
+and the per-season source check apply (untested there).
+
+**The live observer** (`tools/observer.py` on a session directory) shows the committed world and its history
+as one generation. Every page and advance starts with `World.reload`: if another process committed since (an
+ordinary week, a season's end, a recovery to an earlier generation), the committed world is loaded as
+committed -- never simulated or replayed -- together with that generation's published history
+(`Session.refresh`); a publication someone left unfinished is completed when the lock is free; while its
+owner is still publishing, the page keeps the previous generation, live world and history alike, and says
+so. Stale forms stay refused (the cursor they were drawn at), resubmitted ones apply once (their key). A
+changed history becomes a new snapshot only after the records took it in; a failure on the way keeps the
+previous snapshot and rebuilds the records when next needed (`HistoryStats` marks itself incomplete until
+an extension finishes). Tested in `tests/test_observer_sync.py`.
 
 **Memory.** `Archive.year` keeps only the `CACHE_SEASONS` (4) most recently decoded seasons (late seasons decode
 to hundreds of MB). `HistoryStats` holds every start as one integer, edition rank and position (`Starts`), not a

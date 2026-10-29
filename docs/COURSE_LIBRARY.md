@@ -63,7 +63,13 @@ municipal one. See the report for full ranges by class and layout.
 noted) and its full history, the record at each level of golf (Premier, Challenger, college...), lowest
 36/54/72-hole totals, the highest round, the best score on every hole, every hole-in-one, rounds played
 and scoring average. `play_event(..., on_round=book.round_recorder(course, event_id, year, week, tier))`
-feeds it every competitive round; `book.add_event(...)` records tournament totals.
+feeds it every competitive round; `book.add_event(...)` records tournament totals (the course-library
+builder and tests). In the universe, `Season.record_event` records each layout's lowest totals itself (since
+d0b0576): every golfer who played every round of a stroke-play event of two rounds or more at that site --
+never a missed cut, a match-play event, playoff holes or a one-round event; a total equal to the record does
+not take it. The book notes the season it began (`totals_since`): worlds simulated earlier have none for
+their earlier seasons, and `tools/reconstruct_totals.py` rebuilds them from an archive's evidence as a
+report, exact when the editions carry their format (or the calendar is unchanged since the world's engine).
 
 ## Familiarity
 

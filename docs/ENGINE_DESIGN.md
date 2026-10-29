@@ -51,6 +51,10 @@ the development container (Intel Xeon @ 2.10 GHz, 4 logical CPUs, Python 3.13, L
 | Corrected benchmark, ea7b508, 4 workers | 239.6 s | 209.2 s | 17.2 s + 1.8 s settle | 6.7 s | 4.7 s (main 2.36 GB, all 3.8 GB) | 16.2 s |
 | Corrected benchmark, ea7b508, 3 workers | 244.2 s | 214.5 s | 16.5 s + 1.9 s settle | 6.9 s | 4.5 s | 15.1 s |
 | Corrected benchmark, ea7b508, season 1, 4 workers | 121.0 s | 114.7 s | 2.6 s | 2.8 s | 0.7 s (main 0.56 GB) | 0.3 s |
+| Next session, d7af5aa (correctness HEAD), season 51, 4 workers | 197.4 s | 175.4 s | 11.5 s + 1.7 s settle | 5.0 s | 3.7 s (main 2.36 GB, all 3.8 GB) | 15.6 s |
+| Same session, a706722 (collector paused, saved self-misreadings), season 51 | 189.6 s | 165.4 s | 13.8 s + 1.8 s settle | 4.4 s | 4.2 s (main 2.37 GB, all 3.8 GB) | 15.0 s |
+| Same session, d7af5aa, season 1 | 117.0 s | 112.1 s | 2.4 s | 1.8 s | 0.6 s (main 0.47 GB) | 0.3 s |
+| Same session, a706722, season 1 | 108.8 s | 103.7 s | 2.7 s | 1.5 s | 0.6 s (main 0.47 GB) | 0.4 s |
 
 Single runs vary by several seconds (about 5% on this container; between sessions the same work has
 measured 190 s and 209 s, so compare only runs from one session); season 2 sits at the target, not safely
