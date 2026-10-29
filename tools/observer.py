@@ -24,7 +24,7 @@ from urllib.parse import parse_qs, quote, unquote, urlparse
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from golfsim.archive import Archive                                   # noqa: E402
+from golfsim.archive import Archive, ArchiveChanged, published_stamp  # noqa: E402
 from golfsim.history_stats import BOARDS, DEFINITIONS, HistoryStats, board   # noqa: E402
 
 CSS = """
@@ -63,12 +63,12 @@ def esc(x):
 class World:
     """What the pages read: a session (live, can advance) or an archive alone (read-only)."""
 
-    def __init__(self, path, allow_other_engine=False):
+    def __init__(self, path, allow_other_engine=False, workers=None):
         p = Path(path)
         self.session = None
         if (p / 'CURRENT').exists():
             from golfsim.session import Session
-            self.session = Session.open(p, allow_other_engine=allow_other_engine)
+            self.session = Session.open(p, workers=workers, allow_other_engine=allow_other_engine)
             self.archive_dir = p / 'archive'
         else:
             self.archive_dir = p
@@ -94,22 +94,34 @@ class World:
             self.reload()
 
     def reload(self):
-        """Read the history again only if what is published has changed (a season was archived): the
-        archive's season list and published generation. Records are then brought up to date with the
-        new seasons only (HistoryStats.extend); they are built at all only when first asked for."""
-        import json
-        wj = self.archive_dir / 'world.json'
-        seasons = json.loads(wj.read_text()).get('years') if wj.exists() else None
-        pub = self.archive_dir / 'PUBLISHED'
-        stamp = (tuple(seasons or ()), pub.read_text() if pub.exists() else None)
+        """Refresh policy: every page (and every advance) starts here. If what is published has changed
+        (a season was archived or recovery republished one, by this process or another), a new Archive is
+        opened -- one consistent snapshot of the published generation -- and the old one is closed; the
+        page is then drawn wholly from that snapshot, and says which seasons and generation it shows.
+        Records are brought up to date with the new seasons only (HistoryStats.extend; rebuilt if a
+        season was republished); they are built at all only when first asked for."""
+        stamp = published_stamp(self.archive_dir)
         if stamp == getattr(self, '_stamp', None):
             return
-        self._stamp = stamp
-        self.a = Archive(self.archive_dir) if seasons else None     # nothing archived before the first season ends
-        if getattr(self, '_stats', None) is not None and self.a:
-            self._stats.extend(self.a)
-        elif not self.a:
-            self._stats = None
+        new = Archive(self.archive_dir) if stamp[1] else None   # nothing archived before the first season ends
+        old, self.a = getattr(self, 'a', None), new
+        self._stamp = new.stamp if new else stamp
+        try:
+            if getattr(self, '_stats', None) is not None and self.a:
+                self._stats.extend(self.a)
+            elif not self.a:
+                self._stats = None
+        finally:
+            if old is not None:
+                old.close()
+
+    def close(self):
+        if getattr(self, 'a', None) is not None:
+            self.a.close()
+            self.a = None
+        self._stats = None
+        if self.session is not None:
+            self.session.close()
 
     @property
     def stats(self):
@@ -163,7 +175,17 @@ def page(w, title, body):
             f'content="width=device-width, initial-scale=1"><title>{esc(title)} — Golf Legacy</title>'
             f'<style>{CSS}</style></head><body><header><strong>Golf Legacy</strong><span class="date">{esc(date)}</span>'
             f'<form action="/search"><input name="q" placeholder="Search golfers" aria-label="Search golfers"></form>'
-            f'{controls}</header><div class="layout">{nav}<main><h1>{esc(title)}</h1>{body}</main></div></body></html>')
+            f'{controls}</header><div class="layout">{nav}<main><h1>{esc(title)}</h1>{body}{history_note(w)}</main></div>'
+            '</body></html>')
+
+
+def history_note(w):
+    """Which published history the page was drawn from (every part of a page comes from this one)."""
+    if not getattr(w, 'a', None):
+        return '<p class="muted">No archived seasons yet.</p>'
+    gen = (w.a.stamp[0] or '').strip() or '?'
+    return (f'<p class="muted">History: seasons {w.a.years[0]}–{w.a.years[-1]}, published generation '
+            f'{esc(gen)}.</p>')
 
 
 # ---- pages --------------------------------------------------------------------------------------------------
@@ -296,7 +318,7 @@ def event(w, q, eid):
                  'caddie': team.get(g, (0, 0))[1], 'route': None} for k, site in enumerate(r.finish) for g, pos, tot in site]
     if w.a and w.a.index:
         sites = w.a.index.db.execute('SELECT s.site, s.course, s.layout, s.city FROM sites s JOIN editions e USING(eid) '
-                                     'WHERE e.event_id = ?', (eid,)).fetchall()
+                                     'WHERE e.event_id = ?' + w.a.index.upto('e.year'), (eid,)).fetchall()
         out.append('<p>' + ' · '.join(f'<a href="/course/{quote(c)}">{esc(w.a.world["courses"].get(c, {}).get("name", c))}</a> '
                                       f'({esc(lay)}, {esc(city)})' for _, c, lay, city in sites) + '</p>')
     out.append('<table><tr><th class="n">Pos</th><th>Golfer</th><th class="n">Total</th><th>Coach</th><th>Caddie</th>'
@@ -319,8 +341,8 @@ def series(w, q, sid):
 def tournaments(w, q):
     if not (w.a and w.a.index):
         return 'Tournaments', '<p class="muted">No archived seasons yet.</p>'
-    rows = w.a.index.db.execute('SELECT series, MAX(name), COUNT(*), MAX(prestige) FROM editions GROUP BY series '
-                                'ORDER BY MAX(prestige) DESC LIMIT 200').fetchall()
+    rows = w.a.index.db.execute('SELECT series, MAX(name), COUNT(*), MAX(prestige) FROM editions WHERE 1=1'
+                                + w.a.index.upto() + ' GROUP BY series ORDER BY MAX(prestige) DESC LIMIT 200').fetchall()
     return 'Tournaments', '<table><tr><th>Tournament</th><th class="n">Editions</th><th class="n">Prestige</th></tr>' + ''.join(
         f'<tr><td><a href="/series/{quote(sid)}">{esc(name)}</a></td><td class="n">{n}</td><td class="n">{p:.0f}</td></tr>'
         for sid, name, n, p in rows) + '</table><p class="muted">The 200 most prestigious.</p>'
@@ -384,13 +406,18 @@ def make_handler(w):
             q = parse_qs(u.query)
             try:
                 with w.lock:
-                    if u.path in PAGES:
-                        title, body = PAGES[u.path](w, q)
-                    else:
-                        fn = next((f for prefix, f in ROUTES if u.path.startswith(prefix)), None)
-                        if fn is None:
-                            return self.send_error(404)
-                        title, body = fn(w, q, u.path.split('/', 2)[2])
+                    fn = PAGES.get(u.path) or next((f for prefix, f in ROUTES if u.path.startswith(prefix)), None)
+                    if fn is None:
+                        return self.send_error(404)
+                    args = (w, q) if u.path in PAGES else (w, q, u.path.split('/', 2)[2])
+                    for attempt in range(3):
+                        w.reload()                           # the latest published history, as one snapshot
+                        try:
+                            title, body = fn(*args)
+                            break
+                        except ArchiveChanged:               # rolled back while drawn: draw it again
+                            if attempt == 2:
+                                raise
                     out = page(w, title, body)
             except Exception as e:                           # a prototype: show the problem, keep serving
                 out = page(w, 'Something went wrong', f'<pre>{esc(repr(e))}</pre>')

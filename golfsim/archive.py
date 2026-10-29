@@ -35,6 +35,8 @@ from __future__ import annotations
 
 import gzip
 import json
+import sqlite3
+import time
 from collections import Counter, OrderedDict, defaultdict
 from pathlib import Path
 
@@ -188,9 +190,8 @@ STATE_FILES = ('people.json.gz', 'relations.json.gz', 'records.json.gz')
 def index_season(directory, year, chunk):
     """Index one season (idempotent: the season's rows are replaced), exactly as it reads back from disk."""
     from .archive_index import ArchiveIndex
-    idx = ArchiveIndex(Path(directory) / 'index.sqlite')
-    idx.index_year(year, json.loads(json.dumps(chunk)))
-    idx.close()
+    with ArchiveIndex(Path(directory) / 'index.sqlite') as idx:
+        idx.index_year(year, json.loads(json.dumps(chunk)))
 
 
 def write_archive(season, directory, years=None):
@@ -203,11 +204,63 @@ def write_archive(season, directory, years=None):
 
 
 # ---- reading ----------------------------------------------------------------------------------------------
+class ArchiveChanged(RuntimeError):
+    """A season file this snapshot refers to was removed or republished since it was opened (recovery
+    rolled the history back): open a new Archive (the observer does, and draws the page again)."""
+
+
+def published_stamp(directory):
+    """What identifies the published history: the PUBLISHED generation and the season list (a session
+    publishes season files and index rows, then the tables, then the season list, then PUBLISHED;
+    recovery trims the index, then the season list)."""
+    d = Path(directory)
+    try:
+        pub = (d / 'PUBLISHED').read_text()
+    except FileNotFoundError:
+        pub = None
+    try:
+        years = json.loads((d / 'world.json').read_text()).get('years')
+    except FileNotFoundError:
+        years = None
+    return pub, tuple(sorted(years or ()))
+
+
 class Archive:
-    """A world's history, read back. Every answer refers to people, events and courses by id."""
+    """A world's history, read back: one consistent snapshot of what was published when it was opened.
+    Its files and its index agree on one published generation, and every answer is limited to its
+    seasons, however much the session publishes meanwhile (a newer generation is a new Archive). Every
+    answer refers to people, events and courses by id. Close it when replaced (`close`, or `with`)."""
+
+    OPEN_ATTEMPTS = 10
 
     def __init__(self, directory):
         self.dir = Path(directory)
+        self.index = None
+        for attempt in range(self.OPEN_ATTEMPTS):
+            index = None
+            try:
+                stamp = published_stamp(self.dir)
+                self._load_files()
+                index = self._open_index()
+                sigs = {y: self._signature(y) for y in self.years}    # the season files of this snapshot
+                same = published_stamp(self.dir) == stamp and tuple(self.years) == stamp[1]
+            except (OSError, ValueError, EOFError):     # a table replaced or the list rewritten as it was read
+                same = False
+                if attempt == self.OPEN_ATTEMPTS - 1:
+                    raise
+            if same and (index is not None or attempt >= 3):
+                break                                   # nothing was published while it was read (an index
+                #                                         that does not match is retried, then not used)
+            if index is not None:
+                index.close()
+            if attempt == self.OPEN_ATTEMPTS - 1:
+                raise RuntimeError(f'{self.dir}: the history kept changing while it was read')
+            time.sleep(0.05 * (attempt + 1))
+        self.stamp = stamp
+        self.index = index
+        self._sigs = sigs
+
+    def _load_files(self):
         self.world = json.loads((self.dir / 'world.json').read_text())
         if self.world.get('format') != FORMAT:
             raise ValueError(f'archive format {self.world.get("format")} is not {FORMAT}')
@@ -216,17 +269,48 @@ class Archive:
         self.records = _read(self.dir / 'records.json.gz')
         self.years = sorted(self.world['years'])
         self._years = OrderedDict()                     # the few seasons decoded most recently (CACHE_SEASONS)
-        self.index = None
-        if (self.dir / 'index.sqlite').exists():
-            from .archive_index import ArchiveIndex
-            idx = ArchiveIndex(self.dir / 'index.sqlite')
-            self.index = idx if idx.years() == self.years else None  # only an index covering every season
+
+    def _open_index(self):
+        """The index as a reader pinned to this snapshot, if it covers exactly these seasons (else the
+        season files answer)."""
+        if not (self.dir / 'index.sqlite').exists():
+            return None
+        from .archive_index import ArchiveIndex
+        idx = ArchiveIndex(self.dir / 'index.sqlite', reader=True)
+        try:
+            idx.snapshot()
+            if self.years and idx.years() == self.years:
+                idx.through = self.years[-1]
+                return idx
+        except sqlite3.Error:                            # e.g. an index still being created
+            pass
+        idx.close()
+        return None
+
+    def close(self):
+        """Release the index connection (and its snapshot) and the decoded seasons."""
+        if self.index is not None:
+            self.index.close()
+            self.index = None
+        self._years.clear()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        self.close()
 
     def signature(self, y):
-        """What identifies a season file as written (size, modification time): a season published again
-        (after a recovery fell back to an earlier checkpoint) has a new one."""
-        st = (self.dir / 'years' / f'{y}.json.gz').stat()
-        return st.st_size, st.st_mtime_ns
+        """What identifies a season file as written (size, modification time, inode): a season published
+        again (after a recovery fell back to an earlier checkpoint) has a new one. This snapshot's own."""
+        return self._sigs[y] if y in getattr(self, '_sigs', {}) else self._signature(y)
+
+    def _signature(self, y):
+        try:
+            st = (self.dir / 'years' / f'{y}.json.gz').stat()
+        except FileNotFoundError:
+            return None
+        return st.st_size, st.st_mtime_ns, st.st_ino
 
     CACHE_SEASONS = 4                # decoded seasons kept in memory (a season decodes to hundreds of MB late on)
 
@@ -235,7 +319,11 @@ class Archive:
         if y in self._years:
             self._years.move_to_end(y)
             return self._years[y]
+        if y in self._sigs and self._signature(y) != self._sigs[y]:
+            raise ArchiveChanged(f'season {y} was removed or republished after this history was opened')
         d = _read(self.dir / 'years' / f'{y}.json.gz')
+        if y in self._sigs and self._signature(y) != self._sigs[y]:       # replaced while it was read
+            raise ArchiveChanged(f'season {y} was republished while it was read')
         d['careers'] = {int(k): v for k, v in d['careers'].items()}
         for e in d['events']:
             e['team'] = {int(k): tuple(v) for k, v in e['team'].items()}
@@ -317,8 +405,8 @@ class Archive:
         out = {}
         kind = 'amateur' if amateur else 'world'
         if self.index is not None and self.index.derived_complete(self.years):
-            for pid, n in self.index.db.execute('SELECT person, COUNT(*) FROM number_one WHERE kind = ? GROUP BY person',
-                                                (kind,)):
+            for pid, n in self.index.db.execute('SELECT person, COUNT(*) FROM number_one WHERE kind = ?'
+                                                + self.index.upto() + ' GROUP BY person', (kind,)):
                 out[pid] = n
             return out
         for y in self.years:
@@ -332,7 +420,7 @@ class Archive:
         set or equalled — each with the golfer, the edition, the week and the layout."""
         out = []
         if self.index is not None:                       # the index holds every moment, in archive order
-            q, args = 'SELECT year, detail, kind, person, event_id, layout, week FROM moments WHERE 1=1', []
+            q, args = 'SELECT year, detail, kind, person, event_id, layout, week FROM moments WHERE 1=1' + self.index.upto(), []
             if year:
                 q, args = q + ' AND year = ?', args + [year]
             if kind:
@@ -391,7 +479,7 @@ class Archive:
         if self.index is not None:                       # each site's own winner (not the edition's first)
             q = ('SELECT si.year, e.event_id, si.layout, (SELECT st.person FROM starts st WHERE st.eid = si.eid '
                  'AND st.site = si.site AND st.pos = 1 ORDER BY st.rowid LIMIT 1) FROM sites si JOIN editions e '
-                 'USING(eid) WHERE si.course = ? ORDER BY si.year, e.eid, si.site')
+                 'USING(eid) WHERE si.course = ?' + self.index.upto('si.year') + ' ORDER BY si.year, e.eid, si.site')
             held = [{'year': y, 'event': eid, 'layout': lay, 'winner': w}
                     for y, eid, lay, w in self.index.db.execute(q, (course_id,))]
         else:
@@ -411,6 +499,7 @@ class Archive:
         if not people:
             return set()
         series = [sid for sid, m in self.world['series'].items() if m.get('tier') is not None and m['tier'] <= 3]
+        through = min(through, self.years[-1]) if self.years else through
         if self.index is not None:
             ids, found = sorted(people), set()
             for i in range(0, len(ids), 500):

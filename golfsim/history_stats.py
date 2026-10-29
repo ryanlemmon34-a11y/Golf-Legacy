@@ -236,7 +236,8 @@ class HistoryStats:
         total = defaultdict(int)
         idx = getattr(self.a, 'index', None)
         if idx is not None:                          # an aggregate over the index's season rows
-            for pid, prize in idx.db.execute('SELECT person, SUM(COALESCE(prize, 0)) FROM seasons GROUP BY person'):
+            for pid, prize in idx.db.execute('SELECT person, SUM(COALESCE(prize, 0)) FROM seasons WHERE 1=1'
+                                             + idx.upto() + ' GROUP BY person'):
                 total[pid] = prize
         else:
             for y in self.a.years:
@@ -413,7 +414,7 @@ class HistoryStats:
             series = self.a.world['series']
             for gid, coach, eid, ser, cat in idx.db.execute(
                     'SELECT s.person, s.coach, e.event_id, e.series, e.category FROM starts s JOIN editions e USING(eid) '
-                    'WHERE s.pos = 1 AND s.coach ORDER BY e.year, e.eid, s.site'):
+                    'WHERE s.pos = 1 AND s.coach' + idx.upto('e.year') + ' ORDER BY e.year, e.eid, s.site'):
                 if (cat if cat is not None else series.get(ser, {}).get('category')) == 'major':
                     champs[coach].setdefault(gid, eid)
         else:

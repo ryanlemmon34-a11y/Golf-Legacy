@@ -40,7 +40,12 @@ class IndexedHistoryTests(unittest.TestCase):
         if not plain.exists():
             shutil.copytree(self.dir / 'archive', plain)
             (plain / 'index.sqlite').unlink()
-        return A.Archive(self.dir / 'archive'), A.Archive(plain)
+        return self.open_archive(self.dir / 'archive'), self.open_archive(plain)
+
+    def open_archive(self, path):
+        a = A.Archive(path)
+        self.addCleanup(a.close)                                        # (releases its index connection)
+        return a
 
     def test_indexed_records_equal_records_read_from_the_season_files(self):
         idx, files = self._archives()
@@ -94,7 +99,7 @@ class IndexedHistoryTests(unittest.TestCase):
         w.reload()                                                      # warm: nothing changed
         self.assertIs(w.stats, stats)
         self.assertLessEqual(len(w.a._years), A.Archive.CACHE_SEASONS)
-        w.session.close()
+        w.close()
 
     def test_derived_tables_follow_rollback_and_replay(self):
         d = self.tmp / 'replay'
@@ -114,8 +119,9 @@ class IndexedHistoryTests(unittest.TestCase):
         self.assertTrue(idx.derived_complete(idx.years()))
         self.assertEqual(idx.years(), [2027, 2028])
         idx.close()
-        fresh = HistoryStats(A.Archive(d / 'archive'))
-        self.assertEqual(board(fresh, 'most-wins', n=50)[1], board(HistoryStats(A.Archive(self.dir / 'archive')), 'most-wins', n=50)[1])
+        fresh = HistoryStats(self.open_archive(d / 'archive'))
+        self.assertEqual(board(fresh, 'most-wins', n=50)[1],
+                         board(HistoryStats(self.open_archive(self.dir / 'archive')), 'most-wins', n=50)[1])
         s.close()
 
     def test_an_index_from_before_schema_2_is_completed_by_its_session(self):
@@ -127,11 +133,11 @@ class IndexedHistoryTests(unittest.TestCase):
             idx.db.execute('DELETE FROM number_one')
             idx.db.execute("DELETE FROM meta WHERE key LIKE 'derived:%'")
         idx.close()
-        before = A.Archive(d / 'archive')
+        before = self.open_archive(d / 'archive')
         self.assertFalse(before.index.derived_complete(before.years))   # readers fall back to the files
         answer = before.weeks_at_number_one()
         s = Session.open(d, workers=1)                                  # the owner completes it, once
-        after = A.Archive(d / 'archive')
+        after = self.open_archive(d / 'archive')
         self.assertTrue(after.index.derived_complete(after.years))
         self.assertEqual(after.weeks_at_number_one(), answer)
         s.close()

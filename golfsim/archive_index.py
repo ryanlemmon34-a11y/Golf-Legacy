@@ -48,15 +48,59 @@ CREATE INDEX IF NOT EXISTS sites_course ON sites(course, year);
 
 
 class ArchiveIndex:
-    def __init__(self, path):
+    """A connection to the index. A writer (the session publishing or recovering) creates the tables and
+    keeps the database in WAL mode. A reader (`reader=True`, used by Archive) writes nothing: it holds
+    one read transaction for its lifetime (`snapshot`), so it sees the index exactly as it was when its
+    Archive was opened while the session goes on publishing, and every query is limited to its
+    Archive's seasons (`through`). Close it (`close`, or use it as a context manager): an open reader
+    keeps its connection and its WAL snapshot."""
+
+    def __init__(self, path, reader=False):
         self.path = Path(path)
-        self.db = sqlite3.connect(self.path)
-        self.db.executescript(DDL)
-        self.db.execute("INSERT OR IGNORE INTO meta VALUES ('schema', ?)", (str(SCHEMA),))
-        self.db.commit()
+        self.reader = reader
+        self.through = None                             # readers: the last season their Archive holds
+        self.snapshot_held = False
+        self.db = sqlite3.connect(self.path, timeout=30, isolation_level=None if reader else '')
+        try:
+            if reader:
+                return
+            self.db.execute('PRAGMA journal_mode=WAL')    # (refused without shared memory: see snapshot)
+            self.db.executescript(DDL)
+            self.db.execute("INSERT OR IGNORE INTO meta VALUES ('schema', ?)", (str(SCHEMA),))
+            self.db.commit()
+        except BaseException:
+            self.db.close()
+            raise
+
+    def snapshot(self):
+        """Readers: begin the read transaction that pins what this connection sees (WAL only; in
+        another journal mode a held read would block the session's writes, so none is held and only
+        the season bound applies)."""
+        if self.db.execute('PRAGMA journal_mode').fetchone()[0].lower() == 'wal':
+            self.db.execute('BEGIN')
+            self.db.execute('SELECT COUNT(*) FROM meta').fetchone()
+            self.snapshot_held = True
+        return self.snapshot_held
+
+    def upto(self, col='year'):
+        """The readers' season bound, as SQL ('' for writers)."""
+        return '' if self.through is None else f' AND {col} <= {int(self.through)}'
 
     def close(self):
-        self.db.close()
+        if self.db is None:
+            return
+        try:
+            if self.db.in_transaction and self.reader:
+                self.db.rollback()
+        finally:
+            self.db.close()
+            self.db = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        self.close()
 
     # ---- writing --------------------------------------------------------------------------------------------
     def index_year(self, year, chunk):
@@ -122,7 +166,7 @@ class ArchiveIndex:
     def career(self, pid):
         """[(year, season row)] for every season a golfer competed (as in the season files)."""
         return [(y, json.loads(zlib.decompress(row))) for y, row in
-                self.db.execute('SELECT year, row FROM careers WHERE person = ? ORDER BY year', (pid,))]
+                self.db.execute('SELECT year, row FROM careers WHERE person = ?' + self.upto() + ' ORDER BY year', (pid,))]
 
     def drop_years_after(self, year):
         with self.db:
@@ -138,45 +182,53 @@ class ArchiveIndex:
     def rebuild(cls, archive):
         """Build the index from an archive's season files (e.g. for an archive written before indexes)."""
         path = archive.dir / 'index.sqlite'
-        if path.exists():
-            path.unlink()
+        for p in (path, path.with_name(path.name + '-wal'), path.with_name(path.name + '-shm')):
+            if p.exists():
+                p.unlink()
         idx = cls(path)
         from .archive import _read
-        for y in archive.years:
-            idx.index_year(y, _read(archive.dir / 'years' / f'{y}.json.gz'))
+        try:
+            for y in archive.years:
+                idx.index_year(y, _read(archive.dir / 'years' / f'{y}.json.gz'))
+        except BaseException:
+            idx.close()
+            raise
         return idx
 
     # ---- reading ----------------------------------------------------------------------------------------------
     def years(self):
+        """Every season indexed (in a reader's snapshot; not limited by `through`)."""
         return [r[0] for r in self.db.execute('SELECT DISTINCT year FROM editions ORDER BY year')]
 
     def results(self, pid):
         """The same rows as Archive.results, from the index."""
         q = ('SELECT s.year, s.week, e.event_id, e.series, s.pos, s.coach, s.caddie, r.text FROM starts s '
-             'JOIN editions e USING(eid) LEFT JOIN routes r USING(rid) WHERE s.person = ? '
-             'ORDER BY s.year, s.week, e.event_id, s.site')
+             'JOIN editions e USING(eid) LEFT JOIN routes r USING(rid) WHERE s.person = ?' + self.upto('s.year') +
+             ' ORDER BY s.year, s.week, e.event_id, s.site')
         return [{'year': y, 'week': w, 'event': eid, 'series': ser, 'pos': p, 'coach': c, 'caddie': k, 'route': r}
                 for y, w, eid, ser, p, c, k, r in self.db.execute(q, (pid,))]
 
     def editions(self, series):
         """A tournament's history: every edition with its year, week, winner and field size."""
-        q = 'SELECT event_id, year, week, winner, field, prestige, tour, tier FROM editions WHERE series = ? ORDER BY year'
+        q = ('SELECT event_id, year, week, winner, field, prestige, tour, tier FROM editions WHERE series = ?'
+             + self.upto() + ' ORDER BY year')
         return [dict(zip(('event', 'year', 'week', 'winner', 'field', 'prestige', 'tour', 'tier'), r))
                 for r in self.db.execute(q, (series,))]
 
     def course_editions(self, course_id):
         q = ('SELECT s.year, e.event_id, s.layout, e.winner FROM sites s JOIN editions e USING(eid) '
-             'WHERE s.course = ? ORDER BY s.year, e.event_id')
+             'WHERE s.course = ?' + self.upto('s.year') + ' ORDER BY s.year, e.event_id')
         return [{'year': y, 'event': eid, 'layout': lay, 'winner': w} for y, eid, lay, w in self.db.execute(q, (course_id,))]
 
     def leaderboard(self, event_id):
         q = ('SELECT s.person, s.site, s.pos, s.total, s.coach, s.caddie, r.text FROM starts s JOIN editions e USING(eid) '
-             'LEFT JOIN routes r USING(rid) WHERE e.event_id = ? ORDER BY s.site, s.pos IS NULL, s.pos')
+             'LEFT JOIN routes r USING(rid) WHERE e.event_id = ?' + self.upto('e.year') +
+             ' ORDER BY s.site, s.pos IS NULL, s.pos')
         return [dict(zip(('person', 'site', 'pos', 'total', 'coach', 'caddie', 'route'), r))
                 for r in self.db.execute(q, (event_id,))]
 
     def moments(self, kind=None, person=None):
-        q, args = 'SELECT year, week, kind, person, event_id, layout, detail FROM moments WHERE 1=1', []
+        q, args = 'SELECT year, week, kind, person, event_id, layout, detail FROM moments WHERE 1=1' + self.upto(), []
         if kind:
             q, args = q + ' AND kind = ?', args + [kind]
         if person is not None:
@@ -185,6 +237,7 @@ class ArchiveIndex:
                 for y, w, k, p, e, lay, d in self.db.execute(q + ' ORDER BY year, week', args)]
 
     def seasons(self, pid):
-        q = 'SELECT year, tour, status, lifestyle, events, wins, prize, wr_end, am_end FROM seasons WHERE person = ? ORDER BY year'
+        q = ('SELECT year, tour, status, lifestyle, events, wins, prize, wr_end, am_end FROM seasons WHERE person = ?'
+             + self.upto() + ' ORDER BY year')
         return [dict(zip(('year', 'tour', 'status', 'lifestyle', 'events', 'wins', 'prize', 'wr_end', 'am_end'), r))
                 for r in self.db.execute(q, (pid,))]

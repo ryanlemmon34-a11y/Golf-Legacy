@@ -206,16 +206,20 @@ class Session:
         """Under the lock: work from the committed world, with its history published."""
         gen = _committed_generation(self.dir)
         if gen != self.generation:
+            workers = self.season.workers
             self.season.close()
             self.season, self.state = _load_generation(self.dir, gen, False)
+            self.season.workers = workers                 # this process's choice, not the saved one
             Session.__init__(self, self.dir, self.season, self.state, gen)
         self._recover_archive()
 
     def _rollback(self):
+        workers = self.season.workers
         self.season.close()
         self._pending = None
         gen = _committed_generation(self.dir)
         self.season, self.state = _load_generation(self.dir, gen, True)
+        self.season.workers = workers                     # this process's choice, not the saved one
         self.generation = gen
         self.state.setdefault('ops', [])
 
@@ -288,9 +292,8 @@ class Session:
         idx_path = self.dir / 'archive' / 'index.sqlite'
         if idx_path.exists():
             from .archive_index import ArchiveIndex
-            idx = ArchiveIndex(idx_path)
-            idx.drop_years_after(through if through is not None else -1)
-            idx.close()
+            with ArchiveIndex(idx_path) as idx:
+                idx.drop_years_after(through if through is not None else -1)
         beyond = lambda y: through is None or y > through
         for f in (self.dir / 'archive' / 'years').glob('*.json.gz'):
             if beyond(int(f.name.split('.')[0])):          # listed or not (world.json may be republished)
@@ -298,13 +301,13 @@ class Session:
         extra = [y for y in world.get('years', []) if beyond(y)]
         if extra:
             world['years'] = [y for y in world['years'] if y not in extra]
-            p.write_text(json.dumps(world))
+            _write_synced(p.with_name('world.json.tmp'), json.dumps(world).encode())
+            os.replace(p.with_name('world.json.tmp'), p)               # readers never see half a list
         if idx_path.exists() and world.get('years'):       # indexes from before the weekly No. 1 table:
             from types import SimpleNamespace               # filled once, by the archive's owner, under its lock
-            idx = ArchiveIndex(idx_path)
-            if not idx.derived_complete(world['years']):
-                idx.backfill_derived(SimpleNamespace(years=world['years'], dir=self.dir / 'archive'))
-            idx.close()
+            with ArchiveIndex(idx_path) as idx:
+                if not idx.derived_complete(world['years']):
+                    idx.backfill_derived(SimpleNamespace(years=world['years'], dir=self.dir / 'archive'))
 
     # ---- committing ---------------------------------------------------------------------------------------
     def _commit(self):
@@ -357,7 +360,7 @@ class Session:
                 shutil.rmtree(old, ignore_errors=True)
         if new_history:
             _publish_archive(self.dir, n)                               # committed: now the history shows it
-            settle_heap()                                               # a season's garbage, once a season
+            settle_heap(full=True)                                      # a season's garbage, once a season
         # (a generation that only carries the history it stands on publishes nothing: what is published
         # is already its history; recovery republishes only when PUBLISHED names another)
 
@@ -501,14 +504,18 @@ def _load_generation(d, n, allow_other_engine):
     return blob['season'], blob['state']
 
 
-def settle_heap():
-    """Leave the long-lived world out of the cyclic collector's full passes (`gc.freeze`): without it,
-    full collections over the 50-season world (3.5 GB) took about 3 s of every 8 weeks; each found no
-    garbage (measured after loading and after weeks of play: the simulation's garbage is acyclic and freed
-    by reference counting). Done on loading and after each archived season, after collecting the young
-    generations. Cyclic garbage that reached the old generation before a freeze would be kept until the
-    process ends. Performance only: no simulated value depends on it."""
-    gc.collect(1)
+def settle_heap(full=False):
+    """Keep the long-lived world out of the cyclic collector's full passes (`gc.freeze`): without it,
+    full collections over the 50-season world (3.5 GB) took about 3 s of every 8 weeks and found no
+    garbage. Balanced, not cumulative: everything frozen before is unfrozen first, and collected once
+    (about 1 s on that world) whenever anything had been frozen, so nothing dropped since -- a replaced
+    observer snapshot, a world reloaded after a failed advance -- stays out of the collector's reach. A
+    first load in a fresh process holds no garbage and is simply frozen. Performance only: no simulated
+    value depends on it."""
+    had_frozen = gc.get_freeze_count() > 0
+    gc.unfreeze()
+    if full or had_frozen:
+        gc.collect()
     gc.freeze()
 
 

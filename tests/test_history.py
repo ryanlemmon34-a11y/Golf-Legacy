@@ -64,6 +64,7 @@ class IdentityTests(unittest.TestCase):
         s.snapshots[2027] = s.season_snapshot(2027)
         with tempfile.TemporaryDirectory() as d:
             arc = Archive(write_archive(s, d))
+            self.addCleanup(arc.close)
             self.assertEqual(sorted(arc.find(a.name)), sorted([a.id, b.id]))
             self.assertEqual([x.staff for x in arc.golfer_staff(a.id) if x.kind == 'coach'][-1], c1.id)
             self.assertEqual([x.staff for x in arc.golfer_staff(b.id) if x.kind == 'coach'][-1], c2.id)
@@ -87,6 +88,7 @@ class IdentityTests(unittest.TestCase):
             self.assertEqual(s.g[p.id].lifestyle, 'retired')                # retired from playing, not deleted
         with tempfile.TemporaryDirectory() as d:
             arc = Archive(write_archive(s, d))
+            self.addCleanup(arc.close)
             p = staff[0]
             roles = arc.roles(p.id)
             self.assertIn('golfer', roles)
@@ -303,6 +305,7 @@ class AttributionTests(unittest.TestCase):
         s.snapshots[2027] = s.season_snapshot(2027)
         with tempfile.TemporaryDirectory() as d:
             arc = Archive(write_archive(s, d))
+            self.addCleanup(arc.close)
             starts = {c['stint'].staff: c['starts'] for st_id in (first, other.id) for c in arc.staff_clients(st_id)
                       if c['stint'].golfer == g.id}
             self.assertEqual(starts[first], len(early))
@@ -327,6 +330,7 @@ class ArchiveAndSaveTests(unittest.TestCase):
         s.snapshots[2027] = s.season_snapshot(2027)
         with tempfile.TemporaryDirectory() as d:
             arc = Archive(write_archive(s, d))
+            self.addCleanup(arc.close)
             people = set(s.g) | set(s.staff.coaches) | set(s.staff.caddies)
             self.assertEqual(set(arc.people), people)
             self.assertEqual(len(arc.rel.stints), len(s.staff.rel.stints))
