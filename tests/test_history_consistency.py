@@ -92,23 +92,6 @@ class SnapshotTests(unittest.TestCase):
         s.close()
         w.close()
 
-    def test_an_archive_opened_while_a_season_is_being_published_is_whole(self):
-        """The session publishes season file and index rows first, the season list last: an Archive opened
-        in between sees one generation (the index is retried, then not used, never mixed)."""
-        d = self.copy(self.two, 'midway')
-        with A.Archive(d / 'archive') as full:
-            reference = full.weeks_at_number_one()
-        world = d / 'archive' / 'world.json'
-        text = world.read_text()
-        world.write_text(text.replace('2027, 2028', '2027'))           # as if the list were not yet updated
-        with mock.patch.object(A.time, 'sleep'):
-            a = A.Archive(d / 'archive')
-        self.assertEqual(a.years, [2027])
-        self.assertIsNone(a.index)                                     # the index (2027-28) is not used
-        self.assertLess(sum(a.weeks_at_number_one().values()), sum(reference.values()))
-        a.close()
-        world.write_text(text)
-
     def test_rollback_and_replay_never_mix_into_an_open_snapshot(self):
         d = self.copy(self.two, 'rollback')
         w = observer.World(d / 'archive')
@@ -119,14 +102,14 @@ class SnapshotTests(unittest.TestCase):
         s = Session.open(d, workers=1)                                 # recovery rolls the history back
         self.assertEqual(view(w, pid)['results'], before['results'])   # the snapshot's index is unchanged
         self.assertEqual(w.a.weeks_at_number_one(), before['no1'])
+        recap = w.a.recap(2028)
         w.a._years.clear()
-        with self.assertRaises(A.ArchiveChanged):                      # its 2028 file is gone: never stale
-            w.a.recap(2028)
+        self.assertEqual(w.a.recap(2028), recap)                       # its own 2028 file: whole, unchanged
+        old = w.a
         w.reload()
         self.assertEqual(w.a.years, [2027])
         self.assertTrue(all(r['year'] == 2027 for r in w.a.results(pid)))
         s.advance(52)                                                  # replayed and republished
-        old = w.a
         w.reload()
         self.assertEqual(w.a.years, [2027, 2028])
         self.assertIsNone(old.index)                                   # the replaced snapshot was closed
@@ -172,9 +155,10 @@ class SnapshotTests(unittest.TestCase):
         w = observer.World(d / 'archive')
         w.stats
         start = index_fds()
-        pub = d / 'archive' / 'PUBLISHED'
-        for i in range(12):                                            # twelve newly published generations
-            pub.write_text(f'{i}')
+        pub = d / 'archive' / 'MANIFEST.json'
+        text = pub.read_text()
+        for i in range(12):                                            # twelve newly published manifests
+            pub.write_text(text + ' ' * (i + 1))
             w.reload()
             observer.record(w, {}, 'most-wins')
         if start is not None:

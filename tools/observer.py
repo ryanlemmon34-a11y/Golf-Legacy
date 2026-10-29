@@ -73,6 +73,7 @@ class World:
         else:
             self.archive_dir = p
         self.lock = threading.Lock()
+        self.a, self._stats, self.behind = None, None, None
         self.reload()
 
     def submit(self, form):
@@ -94,26 +95,43 @@ class World:
             self.reload()
 
     def reload(self):
-        """Refresh policy: every page (and every advance) starts here. If what is published has changed
-        (a season was archived or recovery republished one, by this process or another), a new Archive is
-        opened -- one consistent snapshot of the published generation -- and the old one is closed; the
-        page is then drawn wholly from that snapshot, and says which seasons and generation it shows.
-        Records are brought up to date with the new seasons only (HistoryStats.extend; rebuilt if a
-        season was republished); they are built at all only when first asked for."""
-        stamp = published_stamp(self.archive_dir)
+        """Refresh policy: every page (and every advance) starts here, and the live world and its history
+        are always one committed generation. If another process committed since (an ordinary week, a
+        season's end, a recovery that went back to an earlier generation), the committed world is loaded
+        as committed -- never simulated or replayed -- together with that generation's published history
+        (Session.refresh; a publication someone left unfinished is completed when the lock is free). While
+        its owner is still publishing, the page keeps showing the previous generation, live world and
+        history alike, and says so. A changed history is opened as a new Archive (one snapshot), records are
+        brought up to date with it (HistoryStats.extend: new seasons only, or everything after a
+        recovery), and only then does it replace the old one, which is closed: a failure on the way leaves
+        the previous snapshot in place and the records to be rebuilt, never half-updated."""
+        self.behind = None
+        stamp = None
+        for _ in range(3):
+            if self.session is not None and not self.session.refresh():
+                self.behind = ('The world has moved on and its new history is still being published: this page '
+                               'shows the previous generation.')
+                return
+            stamp = published_stamp(self.archive_dir)
+            if self.session is None or stamp[2] is None or int(stamp[0]) == self.session.history_generation:
+                break                                   # (published again meanwhile: follow it)
         if stamp == getattr(self, '_stamp', None):
             return
         new = Archive(self.archive_dir) if stamp[1] else None   # nothing archived before the first season ends
-        old, self.a = getattr(self, 'a', None), new
-        self._stamp = new.stamp if new else stamp
         try:
-            if getattr(self, '_stats', None) is not None and self.a:
-                self._stats.extend(self.a)
-            elif not self.a:
-                self._stats = None
-        finally:
-            if old is not None:
-                old.close()
+            if getattr(self, '_stats', None) is not None and new is not None:
+                self._stats.extend(new)
+        except BaseException:
+            self._stats = None                          # rebuilt from a snapshot when next asked for
+            if new is not None:
+                new.close()
+            raise
+        old, self.a = getattr(self, 'a', None), new
+        self._stamp = new.stamp if new is not None else stamp
+        if new is None:
+            self._stats = None
+        if old is not None:
+            old.close()
 
     def close(self):
         if getattr(self, 'a', None) is not None:
@@ -181,11 +199,13 @@ def page(w, title, body):
 
 def history_note(w):
     """Which published history the page was drawn from (every part of a page comes from this one)."""
+    behind = f'<p class="muted">{esc(w.behind)}</p>' if getattr(w, 'behind', None) else ''
     if not getattr(w, 'a', None):
-        return '<p class="muted">No archived seasons yet.</p>'
+        return behind + '<p class="muted">No archived seasons yet.</p>'
     gen = (w.a.stamp[0] or '').strip() or '?'
-    return (f'<p class="muted">History: seasons {w.a.years[0]}–{w.a.years[-1]}, published generation '
-            f'{esc(gen)}.</p>')
+    live = f', world generation {w.session.generation}' if w.session else ''
+    return behind + (f'<p class="muted">History: seasons {w.a.years[0]}–{w.a.years[-1]}, published generation '
+                     f'{esc(gen)}{live}.</p>')
 
 
 # ---- pages --------------------------------------------------------------------------------------------------

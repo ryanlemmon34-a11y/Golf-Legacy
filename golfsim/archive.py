@@ -34,6 +34,7 @@ profiles. `Archive` reads it back and answers the questions a profile screen wil
 from __future__ import annotations
 
 import gzip
+import hashlib
 import json
 import sqlite3
 import time
@@ -187,11 +188,46 @@ class ArchiveWriter:
 STATE_FILES = ('people.json.gz', 'relations.json.gz', 'records.json.gz')
 
 
-def index_season(directory, year, chunk):
-    """Index one season (idempotent: the season's rows are replaced), exactly as it reads back from disk."""
+def index_season(directory, year, chunk, source=None):
+    """Index one season (idempotent: the season's rows are replaced), exactly as it reads back from disk.
+    `source`: the season file the rows come from (recorded with them: readers check it)."""
     from .archive_index import ArchiveIndex
     with ArchiveIndex(Path(directory) / 'index.sqlite') as idx:
-        idx.index_year(year, json.loads(json.dumps(chunk)))
+        idx.index_year(year, json.loads(json.dumps(chunk)), source=source)
+
+
+# ---- publication: immutable files selected by one manifest --------------------------------------------------
+MANIFEST = 'MANIFEST.json'
+MANIFEST_FORMAT = 'golf-legacy-manifest/1'
+TABLES = {'people': 'people.json.gz', 'relations': 'relations.json.gz', 'records': 'records.json.gz'}
+LEGACY_FILES = {'world': 'world.json', **TABLES}
+
+
+def read_manifest(directory):
+    """The published manifest (None for an archive written before manifests, or none published yet).
+    It names the one set of files that is the published history: the world table, the people,
+    relationships and records tables and every season's file, each written once under a name that
+    carries the generation that produced it and never rewritten. Replacing the manifest (atomically) is
+    the moment a publication becomes visible."""
+    try:
+        return parse_manifest((Path(directory) / MANIFEST).read_text())
+    except FileNotFoundError:
+        return None
+
+
+def parse_manifest(text):
+    m = json.loads(text)
+    if m.get('format') != MANIFEST_FORMAT:
+        raise ValueError(f'manifest format {m.get("format")} is not {MANIFEST_FORMAT}')
+    m['files']['years'] = {int(y): f for y, f in m['files']['years'].items()}
+    return m
+
+
+def legacy_files(directory):
+    """The file names of an archive written before manifests (fixed names, rewritten in place)."""
+    d = Path(directory)
+    years = json.loads((d / 'world.json').read_text()).get('years', []) if (d / 'world.json').exists() else []
+    return {**LEGACY_FILES, 'years': {y: f'years/{y}.json.gz' for y in years}}
 
 
 def write_archive(season, directory, years=None):
@@ -210,10 +246,15 @@ class ArchiveChanged(RuntimeError):
 
 
 def published_stamp(directory):
-    """What identifies the published history: the PUBLISHED generation and the season list (a session
-    publishes season files and index rows, then the tables, then the season list, then PUBLISHED;
-    recovery trims the index, then the season list)."""
+    """What identifies the published history: the manifest (its generation, seasons and files), or for an
+    archive written before manifests, the PUBLISHED generation and the season list."""
     d = Path(directory)
+    try:
+        text = (d / MANIFEST).read_text()
+        m = json.loads(text)
+        return str(m['generation']), tuple(m['years']), hashlib.sha1(text.encode()).hexdigest()
+    except FileNotFoundError:
+        pass
     try:
         pub = (d / 'PUBLISHED').read_text()
     except FileNotFoundError:
@@ -222,20 +263,55 @@ def published_stamp(directory):
         years = json.loads((d / 'world.json').read_text()).get('years')
     except FileNotFoundError:
         years = None
-    return pub, tuple(sorted(years or ()))
+    return pub, tuple(sorted(years or ())), None
 
 
 class Archive:
     """A world's history, read back: one consistent snapshot of what was published when it was opened.
-    Its files and its index agree on one published generation, and every answer is limited to its
-    seasons, however much the session publishes meanwhile (a newer generation is a new Archive). Every
-    answer refers to people, events and courses by id. Close it when replaced (`close`, or `with`)."""
+
+    With a manifest (every archive a session publishes): the files the manifest names, which are never
+    rewritten, so the people, relationships, records and seasons all belong to one published generation
+    whatever the publisher does meanwhile, or wherever it stopped; the index is used only if, in its
+    pinned snapshot, every season's rows came from exactly the season file the manifest names (else the
+    season files answer). Every answer is limited to the snapshot's seasons. An archive written before
+    manifests (tests, older worlds, read-only) is read as before. Every answer refers to people, events
+    and courses by id. Close it when replaced (`close`, or `with`)."""
 
     OPEN_ATTEMPTS = 10
 
     def __init__(self, directory):
         self.dir = Path(directory)
         self.index = None
+        self.manifest = None
+        if (self.dir / MANIFEST).exists():
+            self._open_manifest()
+        else:
+            self._open_legacy()
+
+    def _open_manifest(self):
+        for attempt in range(self.OPEN_ATTEMPTS):
+            index = None
+            try:
+                text = (self.dir / MANIFEST).read_text()        # read once: the files it names never change
+                self.manifest = m = parse_manifest(text)
+                self.files = m['files']
+                self._load_files()
+                if list(self.years) != sorted(m['years']):
+                    raise ValueError('manifest and world table disagree')
+                index = self._open_index()
+                break
+            except (OSError, ValueError, EOFError):     # a file collected after a newer publication: again
+                if index is not None:
+                    index.close()
+                if attempt == self.OPEN_ATTEMPTS - 1:
+                    raise
+                time.sleep(0.05 * (attempt + 1))
+        self.stamp = (str(m['generation']), tuple(m['years']), hashlib.sha1(text.encode()).hexdigest())
+        self.index = index
+        self._sigs = {y: self.files['years'][y] for y in self.years}
+
+    def _open_legacy(self):
+        self.files = legacy_files(self.dir)
         for attempt in range(self.OPEN_ATTEMPTS):
             index = None
             try:
@@ -263,25 +339,38 @@ class Archive:
         self._sigs = sigs
 
     def _load_files(self):
-        self.world = json.loads((self.dir / 'world.json').read_text())
+        if self.manifest is None:
+            self.files = legacy_files(self.dir)
+        self.world = json.loads((self.dir / self.files['world']).read_text())
         if self.world.get('format') != FORMAT:
             raise ValueError(f'archive format {self.world.get("format")} is not {FORMAT}')
-        self.people = {int(k): v for k, v in _read(self.dir / 'people.json.gz').items()}
-        self.rel = Relations.load(_read(self.dir / 'relations.json.gz'))
-        self.records = _read(self.dir / 'records.json.gz')
+        self.people = {int(k): v for k, v in _read(self.dir / self.files['people']).items()}
+        self.rel = Relations.load(_read(self.dir / self.files['relations']))
+        self.records = _read(self.dir / self.files['records'])
         self.years = sorted(self.world['years'])
         self._years = OrderedDict()                     # the few seasons decoded most recently (CACHE_SEASONS)
 
+    def year_path(self, y):
+        """The file holding season y in this snapshot."""
+        return self.dir / self.files['years'][y]
+
     def _open_index(self):
-        """The index as a reader pinned to this snapshot, if it covers exactly these seasons (else the
-        season files answer)."""
-        if not (self.dir / 'index.sqlite').exists():
+        """The index as a reader pinned to this snapshot, if its rows are this snapshot's (else the season
+        files answer). With a manifest: every season's rows must come from the file the manifest names
+        (recorded with them when indexed); rows of later seasons are outside the snapshot's bound. Without
+        one: the index must hold exactly these seasons."""
+        if not (self.dir / 'index.sqlite').exists() or not self.years:
             return None
         from .archive_index import ArchiveIndex
         idx = ArchiveIndex(self.dir / 'index.sqlite', reader=True)
         try:
             idx.snapshot()
-            if self.years and idx.years() == self.years:
+            if self.manifest is not None:
+                sources = idx.sources()
+                ok = all(sources.get(y) == self.files['years'][y] for y in self.years)
+            else:
+                ok = idx.years() == self.years
+            if ok:
                 idx.through = self.years[-1]
                 return idx
         except sqlite3.Error:                            # e.g. an index still being created
@@ -303,16 +392,17 @@ class Archive:
         self.close()
 
     def signature(self, y):
-        """What identifies a season file as written (size, modification time, inode): a season published
-        again (after a recovery fell back to an earlier checkpoint) has a new one. This snapshot's own."""
+        """What identifies a season as published: with a manifest, its file's name (written once; a season
+        published again after a recovery has a new one); before manifests, the file's size, modification
+        time and inode. This snapshot's own."""
         return self._sigs[y] if y in getattr(self, '_sigs', {}) else self._signature(y)
 
     def _signature(self, y):
         try:
-            st = (self.dir / 'years' / f'{y}.json.gz').stat()
-        except FileNotFoundError:
+            st = self.year_path(y).stat()
+        except (FileNotFoundError, KeyError):
             return None
-        return st.st_size, st.st_mtime_ns, st.st_ino
+        return self.files['years'][y] if self.manifest is not None else (st.st_size, st.st_mtime_ns, st.st_ino)
 
     CACHE_SEASONS = 4                # decoded seasons kept in memory (a season decodes to hundreds of MB late on)
 
@@ -323,7 +413,10 @@ class Archive:
             return self._years[y]
         if y in self._sigs and self._signature(y) != self._sigs[y]:
             raise ArchiveChanged(f'season {y} was removed or republished after this history was opened')
-        d = _read(self.dir / 'years' / f'{y}.json.gz')
+        try:
+            d = _read(self.year_path(y))
+        except FileNotFoundError:
+            raise ArchiveChanged(f'season {y} is no longer published (a newer history replaced it)') from None
         if y in self._sigs and self._signature(y) != self._sigs[y]:       # replaced while it was read
             raise ArchiveChanged(f'season {y} was republished while it was read')
         d['careers'] = {int(k): v for k, v in d['careers'].items()}

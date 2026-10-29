@@ -113,6 +113,7 @@ class HistoryStats:
 
     def __init__(self, archive):
         self.a = archive
+        self.complete = True
         self.starts = Starts()                   # pid -> [(year, week, event id, tour, tier, kind, pos)], in order
         self.seen = set()                        # seasons already read
         self.sig = {}                            # season -> its file's signature when read
@@ -122,10 +123,12 @@ class HistoryStats:
         """Bring the statistics up to date with `archive` (a newer reading of the same world): only the
         seasons not seen before are read, and people, relationships and records come from it. If the
         history did not simply grow -- a season read before is gone or was published again (a recovery
-        fell back to an earlier checkpoint) -- everything is read again, so no removed result stays."""
-        self.a = archive
+        fell back to an earlier checkpoint) -- everything is read again, so no removed result stays.
+        Recoverable: if reading fails part way, the statistics are marked incomplete and the next call
+        reads everything again (no season is half-counted or counted twice)."""
         sign = getattr(archive, 'signature', lambda y: None)
-        if any(y not in archive.years or sign(y) != self.sig.get(y) for y in self.seen):
+        if not getattr(self, 'complete', True) or \
+                any(y not in archive.years or sign(y) != self.sig.get(y) for y in self.seen):
             self.starts.clear()
             self.seen.clear()
             self.sig.clear()
@@ -137,6 +140,7 @@ class HistoryStats:
             new = list(archive.years)
         idx = getattr(archive, 'index', None)
         touched = set()
+        self.complete = False                        # until every new season is in
         for y in new:                                # season by season: nothing more than one season in memory
             if idx is not None:
                 editions, rows = self._from_index(archive, idx, y)
@@ -149,6 +153,8 @@ class HistoryStats:
         self.starts.settle(touched)
         self.seen.update(new)
         self.sig.update((y, sign(y)) for y in new)
+        self.a = archive
+        self.complete = True
         return new
 
     @staticmethod

@@ -33,15 +33,18 @@ advancing never touches its work).
 **History in the same transaction.** At season end, the season's history (its season file, and the
 people, relationships and records tables, and the list of archived seasons) is staged inside the new
 checkpoint generation, not written to the archive. Only once the generation is committed is it
-published to archive/ (season file and index first, the list of seasons last) and the published
-generation recorded (archive/PUBLISHED). A crash before the commit leaves the archive exactly as it was;
-a crash after it is repaired by publishing the committed generation's staged history again (on opening,
-before the next advance, or when a committed operation is retried), which is idempotent. A generation
-with no new season carries the history it stands on (hard links to the files of the generation before
-it) and every generation names the one that produced that history (history_gen; archive/PUBLISHED holds
-the one published). So when a damaged generation makes an earlier one current, the earlier one's own
-history -- seasons, people, relationships and records -- is published again and the later seasons are
-removed. So the running world, the committed checkpoint and the visible history always agree. The live simulation keeps only recent seasons (Season.prune_history), so
+published to archive/: each file under a name carrying the generation that produced it, never rewritten,
+then the index rows (each season's recorded with the file it came from), then one manifest
+(archive/MANIFEST.json) naming exactly those files, replaced atomically -- the moment readers see the new
+history, whole. A crash before the commit leaves the archive exactly as it was; a publisher stopped at any
+step after it leaves readers the previous manifest's history, whole, and is repaired by publishing the
+committed generation's history again (on opening, before the next advance, or when a committed operation
+is retried). A generation with no new season carries the history it stands on (hard links to the files of
+the generation before it) and every generation names the one that produced that history (history_gen; the
+manifest names the one published). So when a damaged generation makes an earlier one current, the earlier
+one's own history -- seasons, people, relationships and records -- is published as a new manifest and the
+later seasons leave the index. An archive from before manifests is migrated by the first session that
+owns it (its files adopted as they are). So the running world, the committed checkpoint and the visible history always agree. The live simulation keeps only recent seasons (Season.prune_history), so
 a checkpoint does not carry the whole history.
 """
 from __future__ import annotations
@@ -52,13 +55,15 @@ import hashlib
 import json
 import os
 import pickle
+import re
 import shutil
 import socket
 import threading
 import time
 from pathlib import Path
 
-from .archive import STATE_FILES, ArchiveWriter, _read, _write, index_season
+from .archive import (LEGACY_FILES, MANIFEST, MANIFEST_FORMAT, STATE_FILES, ArchiveWriter, _read, _write,
+                      legacy_files, parse_manifest, read_manifest)
 from .savegame import engine_commit, engine_id
 
 FORMAT = 'golf-legacy-session/1'
@@ -99,7 +104,7 @@ class Session:
             raise FileExistsError(f'{d} already holds a session')
         d.mkdir(parents=True, exist_ok=True)
         season = Season(world or generate_world(seed=seed), seed=seed, development=development, workers=workers)
-        writer = ArchiveWriter(d / 'archive', season)
+        writer = ArchiveWriter(d / 'archive', season, touch=False)   # published with the first commit
         pending = {'chunks': {}, 'world': writer.world, 'tables': writer.state_tables(season)}
         state = {'format': FORMAT, 'schema': SCHEMA, 'world_id': f'{seed}-{int(time.time())}', 'seed': seed,
                  'cursor': {'year': season.first_year, 'week': 1, 'phase': 'start'}, 'last_op': None,
@@ -129,9 +134,47 @@ class Session:
         except Busy:
             gen, season, state = _load_committed(d, allow_other_engine)
             s = cls(d, season, state, gen)
+        s.allow_other_engine = allow_other_engine
         if workers:
             s.season.workers = workers
         return s
+
+    # ---- following other processes ------------------------------------------------------------------------
+    def committed(self):
+        """(generation, history generation) of the world committed on disk now (two small files)."""
+        gen = _committed_generation(self.dir)
+        h = _meta(self.dir, gen).get('history_gen')
+        return gen, (gen if h is None else h)
+
+    @property
+    def history_generation(self):
+        h = _meta(self.dir, self.generation).get('history_gen')
+        return self.generation if h is None else h
+
+    def refresh(self):
+        """Bring this session to the world committed on disk, if another process committed since, together
+        with its history: the committed world is loaded as committed (nothing is simulated or replayed).
+        When the lock is free this is the same as starting an advance (`_sync`: a publication someone left
+        unfinished is completed). When another process holds it, the committed world is taken only if its
+        history is already published; otherwise nothing changes. Returns True when this session now holds
+        the committed world with its history published."""
+        gen, h = self.committed()
+        if gen == self.generation and _published(self.dir) == h:
+            return True
+        try:
+            with self._lock, _FileLock(self.dir / 'lock'):
+                self._sync()
+            return True
+        except Busy:
+            if _published(self.dir) != h:
+                return False                            # being published by its owner: not yet
+            if gen != self.generation:
+                workers = self.season.workers
+                gen, season, state = _load_committed(self.dir, getattr(self, 'allow_other_engine', False))
+                self.season.close()
+                Session.__init__(self, self.dir, season, state, gen)
+                self.season.workers = workers
+            return True
 
     @property
     def cursor(self):
@@ -208,7 +251,7 @@ class Session:
         if gen != self.generation:
             workers = self.season.workers
             self.season.close()
-            self.season, self.state = _load_generation(self.dir, gen, False)
+            self.season, self.state = _load_generation(self.dir, gen, getattr(self, 'allow_other_engine', False))
             self.season.workers = workers                 # this process's choice, not the saved one
             Session.__init__(self, self.dir, self.season, self.state, gen)
         self._recover_archive()
@@ -252,12 +295,23 @@ class Session:
             self.state['cursor'] = {'year': year, 'week': week + 1, 'phase': 'week'}
         return {'completed': (year, week), 'events': events, 'changes': changes, 'cursor': dict(self.state['cursor'])}
 
+    def _history_years(self):
+        """The archived seasons of the committed generation's history (from its staged or carried world
+        table; an older generation without one: the published history's)."""
+        p = self.dir / f'gen_{self.generation:06d}' / 'archive' / 'world.json'
+        if p.exists():
+            return json.loads(p.read_text())['years']
+        m = read_manifest(self.dir / 'archive')
+        return list(m['years']) if m is not None else sorted(legacy_files(self.dir / 'archive')['years'])
+
     def _stage_archive(self, year):
         """The season's history, held until the advance commits (then staged in its generation)."""
         s = self.season
         w = ArchiveWriter(self.dir / 'archive', s, touch=False)
         w.created = self.state['archive']['created']
         w.initial = set(self.state['archive']['initial'])
+        if not self._pending:                       # the seasons of the history this world stands on
+            w.world['years'] = self._history_years()
         p = self._pending or {'chunks': {}, 'world': w.world}
         p['chunks'][year] = w.year_chunk(s, year)
         p['tables'] = w.state_tables(s)
@@ -269,45 +323,30 @@ class Session:
     def _recover_archive(self):
         """Under the lock: make the published history the committed generation's. Every generation holds
         (or carries) the history it stands on and names the generation that produced it (history_gen):
-        if what is published is anything else -- a crash interrupted publishing, or the committed
-        generation is an earlier one because a newer one was damaged -- it is published again; then
-        seasons beyond the committed generation are removed."""
+        if the manifest names anything else -- publication stopped part way, the committed generation is
+        an earlier one because a newer one was damaged, or the archive predates manifests -- the committed
+        generation's history is published (a new manifest; nothing already published is rewritten). Index
+        tables added by later versions are then filled in, and files no manifest needs are removed."""
+        a = self.dir / 'archive'
         meta = _meta(self.dir, self.generation)
         h = meta.get('history_gen')
-        if h is None:                                   # generations from before histories were carried
-            if meta.get('archive_staged') and _published(self.dir) != self.generation:
-                _publish_archive(self.dir, self.generation)
-        elif _published(self.dir) != h:
+        published = _published(self.dir)
+        g = self.dir / f'gen_{self.generation:06d}' / 'archive'
+        has_history = (g / 'world.json').exists() or (a / MANIFEST).exists() or (a / 'world.json').exists()
+        if has_history and (not (a / MANIFEST).exists() or published != (self.generation if h is None else h)):
             _publish_archive(self.dir, self.generation)
-        self._trim_archive()
-
-    def _trim_archive(self):
-        """Seasons in the archive beyond the committed generation came from an advance that crashed before
-        committing: remove them (the retry writes them again, identically)."""
-        p = self.dir / 'archive' / 'world.json'
-        if not p.exists():
-            return
-        world = json.loads(p.read_text())
-        through = self.state['archive_through']
-        idx_path = self.dir / 'archive' / 'index.sqlite'
-        if idx_path.exists():
+        m = read_manifest(a)
+        if m is not None and (a / 'index.sqlite').exists():
+            from types import SimpleNamespace
             from .archive_index import ArchiveIndex
-            with ArchiveIndex(idx_path) as idx:
-                idx.drop_years_after(through if through is not None else -1)
-        beyond = lambda y: through is None or y > through
-        for f in (self.dir / 'archive' / 'years').glob('*.json.gz'):
-            if beyond(int(f.name.split('.')[0])):          # listed or not (world.json may be republished)
-                f.unlink()
-        extra = [y for y in world.get('years', []) if beyond(y)]
-        if extra:
-            world['years'] = [y for y in world['years'] if y not in extra]
-            _write_synced(p.with_name('world.json.tmp'), json.dumps(world).encode())
-            os.replace(p.with_name('world.json.tmp'), p)               # readers never see half a list
-        if idx_path.exists() and world.get('years'):       # indexes from before the weekly No. 1 table:
-            from types import SimpleNamespace               # filled once, by the archive's owner, under its lock
-            with ArchiveIndex(idx_path) as idx:
-                if not idx.derived_complete(world['years']):
-                    idx.backfill_derived(SimpleNamespace(years=world['years'], dir=self.dir / 'archive'))
+            with ArchiveIndex(a / 'index.sqlite') as idx:
+                if set(idx.years()) - set(m['years']):  # rows of no published season (never visible: bounded)
+                    idx.drop_years_after(m['years'][-1] if m['years'] else -1)
+                # indexes from before the weekly No. 1 table: filled once, by the archive's owner, under its lock
+                if m['years'] and not idx.derived_complete(m['years']):
+                    idx.backfill_derived(SimpleNamespace(years=m['years'],
+                                                         year_path=lambda y: a / m['files']['years'][y]))
+        _collect_unpublished(a)
 
     # ---- committing ---------------------------------------------------------------------------------------
     def _commit(self):
@@ -362,7 +401,7 @@ class Session:
             _publish_archive(self.dir, n)                               # committed: now the history shows it
             settle_heap(full=True)                                      # a season's garbage, once a season
         # (a generation that only carries the history it stands on publishes nothing: what is published
-        # is already its history; recovery republishes only when PUBLISHED names another)
+        # is already its history; recovery publishes again only when the manifest names another)
 
     def _carry_history(self, tmp):
         """A generation with no new season carries the committed generation's history files (hard links:
@@ -422,9 +461,13 @@ def _meta(d, n):
 
 
 def _published(d):
+    """The generation whose history is published (the manifest's; PUBLISHED before manifests)."""
     try:
+        m = read_manifest(d / 'archive')
+        if m is not None:
+            return m['generation']
         return int((d / 'archive' / 'PUBLISHED').read_text())
-    except (OSError, ValueError):
+    except (OSError, ValueError, KeyError):
         return None
 
 
@@ -436,24 +479,132 @@ def _copy_atomic(src, dst):
     os.replace(tmp, dst)
 
 
+def _publication_step(name):
+    """Called between the steps of a publication (fault-injection tests stop a publisher here)."""
+
+
+def _place(src, dst):
+    """Put a published file in place, atomically, never changing one that exists: a hard link to the
+    staged file where the file system allows (no copying), else a synced copy."""
+    if dst.exists():
+        return
+    tmp = dst.with_name(dst.name + '.tmp')
+    if tmp.exists():
+        tmp.unlink()
+    try:
+        os.link(src, tmp)
+    except OSError:
+        shutil.copyfile(src, tmp)
+        with open(tmp, 'rb') as f:
+            os.fsync(f.fileno())
+    os.replace(tmp, dst)
+
+
 def _publish_archive(d, n):
-    """Publish a committed generation's staged season history to the archive (idempotent): season
-    files and their index rows, the people, relationships and records tables, then the list of seasons
-    (readers see the new seasons only once everything they refer to is in place), then PUBLISHED."""
+    """Publish committed generation n's history as one new manifest (idempotent).
+
+    1. each season file n staged, under a name carrying n (years/YYYY.gNNNNNN.json.gz);
+    2. the index: those seasons' rows, each recorded with the file it came from, and any season whose
+       recorded file is not the one published;
+    3. the world, people, relationships and records tables of the history n stands on, under names
+       carrying the generation that produced it (history_gen);
+    4. the manifest, replaced atomically: only now do readers see the new history, whole;
+    5. index rows of seasons no longer published (a rollback) are dropped, and files that neither this
+       manifest nor the previous one names are removed.
+
+    Nothing a manifest names is ever rewritten, so a publisher stopped at any step leaves readers the
+    previous history, whole, and the next session to open the world publishes again. Seasons n did not
+    stage keep the files already published for them (an archive from before manifests: its files as they
+    are -- its index rows were indexed from exactly those files)."""
+    from .archive_index import ArchiveIndex
     g = d / f'gen_{n:06d}'
     meta = json.loads((g / 'meta.json').read_text())
+    h = meta.get('history_gen')
+    h = n if h is None else h
     a = d / 'archive'
     (a / 'years').mkdir(parents=True, exist_ok=True)
-    for y in meta['archive_staged']:
-        f = f'years/{y}.json.gz'
-        _copy_atomic(g / 'archive' / f, a / f)
-        index_season(a, y, _read(a / f))
-    for name in STATE_FILES:
-        _copy_atomic(g / 'archive' / name, a / name)
-    _copy_atomic(g / 'archive' / 'world.json', a / 'world.json')
-    h = meta.get('history_gen')
-    _write_synced(a / 'PUBLISHED.tmp', str(n if h is None else h).encode())
-    os.replace(a / 'PUBLISHED.tmp', a / 'PUBLISHED')
+    src = g / 'archive'
+    old = read_manifest(a)
+    legacy = old is None
+    base = legacy_files(a) if legacy else old['files']
+    world_src = src / 'world.json' if (src / 'world.json').exists() else a / base['world']
+    years = sorted(json.loads(world_src.read_text())['years'])
+    files = {'years': {}}
+    for y in years:
+        if y in meta.get('archive_staged', []):
+            files['years'][y] = f'years/{y}.g{n:06d}.json.gz'
+            _place(src / f'years/{y}.json.gz', a / files['years'][y])
+        else:
+            files['years'][y] = _published_season(a, y, h, base)
+    _publication_step('season files')
+    with ArchiveIndex(a / 'index.sqlite') as idx:
+        if legacy:
+            idx.adopt_sources({y: f for y, f in files['years'].items() if f == base['years'].get(y)})
+        sources = idx.sources()
+        for y in years:
+            if sources.get(y) != files['years'][y]:
+                idx.index_year(y, _read(a / files['years'][y]), source=files['years'][y])
+                _publication_step('index')
+    _publication_step('index done')
+    stem = {'world': ('world', '.json'), 'people': ('people', '.json.gz'), 'relations': ('relations', '.json.gz'),
+            'records': ('records', '.json.gz')}
+    for key, (name, ext) in stem.items():
+        files[key] = f'{name}.g{h:06d}{ext}'
+        staged = src / LEGACY_FILES[key]
+        _place(staged if staged.exists() else a / base[key], a / files[key])
+    _publication_step('tables')
+    manifest = {'format': MANIFEST_FORMAT, 'generation': h, 'published_by': n, 'years': years,
+                'files': {**files, 'years': {str(y): f for y, f in files['years'].items()}}}
+    if (a / MANIFEST).exists():
+        _copy_atomic(a / MANIFEST, a / 'MANIFEST.prev.json')       # its files stay for readers opening it
+    _write_synced(a / 'MANIFEST.tmp', json.dumps(manifest, indent=1).encode())
+    os.replace(a / 'MANIFEST.tmp', a / MANIFEST)                    # the publication
+    _publication_step('manifest')
+    with ArchiveIndex(a / 'index.sqlite') as idx:                   # rows of seasons no longer published
+        if set(idx.years()) - set(years):                           # (a rollback): readers of the previous
+            idx.drop_years_after(years[-1] if years else -1)        # manifest kept them until now
+    _collect_unpublished(a)
+
+
+def _published_season(a, y, h, base):
+    """The published file of season y in the history of generation h: the one the manifest names if a
+    generation no later than h produced it; else (a manifest lost or from a later, rolled-back generation)
+    the latest file of season y produced by a generation no later than h; else the file of an archive from
+    before manifests."""
+    def gen_of(name):
+        m = re.search(r'\.g(\d{6})\.json\.gz$', name)
+        return int(m.group(1)) if m else -1
+    named = base['years'].get(y)
+    if named and (a / named).exists() and gen_of(named) <= h:
+        return named
+    found = sorted(((gen_of(p.name), p.name) for p in (a / 'years').glob(f'{y}.g*.json.gz') if gen_of(p.name) <= h))
+    if found:
+        return f'years/{found[-1][1]}'
+    if (a / 'years' / f'{y}.json.gz').exists():
+        return f'years/{y}.json.gz'
+    raise IOError(f'season {y} of history generation {h} is neither staged nor published')
+
+
+def _collect_unpublished(a):
+    """Remove what no manifest needs: files neither the manifest nor the previous one names (the previous
+    one's stay for a reader that read it just before), files of an archive from before manifests, and
+    partial files. Never the index, the manifests or the lock."""
+    m = read_manifest(a)
+    if m is None:
+        return
+    keep = set()
+    for path in (a / MANIFEST, a / 'MANIFEST.prev.json'):
+        try:
+            mm = parse_manifest(path.read_text())
+        except (FileNotFoundError, ValueError):
+            continue
+        keep |= {f for k, f in mm['files'].items() if k != 'years'} | set(mm['files']['years'].values())
+    for p in list(a.glob('*')) + list((a / 'years').glob('*')):
+        rel = p.relative_to(a).as_posix()
+        if p.is_dir() or rel in keep or rel.startswith(('index.sqlite', 'MANIFEST', 'lock')):
+            continue
+        if rel.endswith(('.json', '.json.gz', '.tmp')) or rel in ('PUBLISHED',):
+            p.unlink()
 
 
 def _committed_generation(d):

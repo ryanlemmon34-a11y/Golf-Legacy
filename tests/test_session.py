@@ -20,6 +20,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from golfsim import session as SES                                    # noqa: E402
 from golfsim.population import generate_world                         # noqa: E402
 from golfsim.season import Season                                     # noqa: E402
+from golfsim.archive import read_manifest                             # noqa: E402
 from golfsim.session import Session, StaleCursor                      # noqa: E402
 
 SCALE = 0.12                     # a small world: the mechanics, not the population, are under test
@@ -180,8 +181,7 @@ class SessionTests(unittest.TestCase):
         self.assertEqual(s.cursor, {'year': 2028, 'week': 1, 'phase': 'start'})
         self.assertIn(2027, s.season.career_counts)
         self.assertEqual(s.state['archive_through'], 2027)
-        world = json.loads((self.dir / 'archive' / 'world.json').read_text())
-        self.assertEqual(world['years'], [2027])
+        self.assertEqual(read_manifest(self.dir / 'archive')['years'], [2027])
         juniors = s.season.juniors_added[2028]
         population = len(s.season.world.golfers)
         r = s.advance_one_week()                                        # 1 January 2028 runs once, then week 1
@@ -190,18 +190,27 @@ class SessionTests(unittest.TestCase):
         self.assertEqual(len(s.season.world.golfers), population)
         self.assertIn(2028, s.season.cash_start)
         self.assertEqual(fingerprint(s.season), fingerprint(direct(53)))
-        # an archive season written by an advance that never committed is removed on opening
-        (self.dir / 'archive' / 'years' / '2028.json.gz').write_bytes(b'x')
-        world['years'].append(2028)
-        (self.dir / 'archive' / 'world.json').write_text(json.dumps(world))
+        # leftovers no manifest names (a partial file, index rows of a season never published) go on opening
+        stray = self.dir / 'archive' / 'years' / '2028.g000099.json.gz'
+        stray.write_bytes(b'x')
+        from golfsim.archive_index import ArchiveIndex
+        with ArchiveIndex(self.dir / 'archive' / 'index.sqlite') as idx, idx.db:
+            idx.db.execute("INSERT INTO editions (event_id, year, week) VALUES ('2028:STRAY', 2028, 1)")
+            idx.db.execute("INSERT INTO meta VALUES ('source:2028', 'years/2028.g000099.json.gz')")
         s.close()
         t = Session.open(self.dir, workers=1)
-        self.assertEqual(json.loads((self.dir / 'archive' / 'world.json').read_text())['years'], [2027])
-        self.assertFalse((self.dir / 'archive' / 'years' / '2028.json.gz').exists())
+        self.assertEqual(read_manifest(self.dir / 'archive')['years'], [2027])
+        self.assertFalse(stray.exists())
         from golfsim.archive_index import ArchiveIndex
         with ArchiveIndex(self.dir / 'archive' / 'index.sqlite') as idx:
             self.assertEqual(idx.years(), [2027])
         t.close()
+
+
+def season_file(d, y):
+    """The published file of season y (named by the manifest)."""
+    a = Path(d) / 'archive'
+    return a / read_manifest(a)['files']['years'][y]
 
 
 def opened(test, archive):
@@ -211,15 +220,15 @@ def opened(test, archive):
 
 
 def archive_view(d):
-    """Everything the visible history holds: seasons listed and on disk, their contents, the index, and
-    the people, relationships and records tables."""
+    """Everything the visible history holds: the seasons the manifest lists and their contents, the
+    index, and the people, relationships and records tables (by content: file names carry generations)."""
     from golfsim.archive import _read
     from golfsim.archive_index import ArchiveIndex
     a = Path(d) / 'archive'
-    view = {'years': json.loads((a / 'world.json').read_text())['years'],
-            'seasons': {p.name: _read(p) for p in sorted((a / 'years').glob('*.json.gz'))}}
-    for f in ('people.json.gz', 'relations.json.gz', 'records.json.gz'):
-        view[f] = _read(a / f) if (a / f).exists() else None
+    m = read_manifest(a)
+    view = {'years': m['years'], 'seasons': {y: _read(a / f) for y, f in sorted(m['files']['years'].items())}}
+    for key, f in (('people', 'people.json.gz'), ('relations', 'relations.json.gz'), ('records', 'records.json.gz')):
+        view[f] = _read(a / m['files'][key])
     if (a / 'index.sqlite').exists():
         idx = ArchiveIndex(a / 'index.sqlite')
         view['index'] = (idx.years(), idx.db.execute('SELECT COUNT(*) FROM starts').fetchone()[0],
@@ -423,13 +432,14 @@ class TransactionTests(unittest.TestCase):
         s = self.at_season_end(2027)
         s.advance_one_week()                                            # 2027 published
         a = self.dir / 'archive'
-        names = ('people.json.gz', 'relations.json.gz', 'records.json.gz', 'world.json', 'PUBLISHED')
-        stamp = lambda: {f: ((a / f).stat().st_mtime_ns, (a / f).stat().st_ino) for f in names}
+        names = lambda: ['MANIFEST.json'] + [f for k, f in read_manifest(a)['files'].items() if k != 'years']
+        stamp = lambda: {f: ((a / f).stat().st_mtime_ns, (a / f).stat().st_ino) for f in names()}
         before, view = stamp(), archive_view(self.dir)
         s.advance(3)                                                    # 1 January and two weeks
         self.assertEqual(stamp(), before)
-        (a / 'people.json.gz').unlink()                                 # an interrupted publication
-        (a / 'PUBLISHED').write_text('-1')
+        people = a / read_manifest(a)['files']['people']
+        (a / 'MANIFEST.json').unlink()                                  # a publication lost before its manifest
+        people.unlink()
         s.advance_one_week()
         self.assertEqual(archive_view(self.dir), view)                  # repaired, exactly
         s.close()
@@ -477,7 +487,7 @@ class TransactionTests(unittest.TestCase):
         s.close()
         t = Session.open(self.dir, workers=1)
         led = t.season.ledgers[2027][g.id]
-        row = _read(self.dir / 'archive' / 'years' / '2027.json.gz')['careers'][str(g.id)]
+        row = _read(season_file(self.dir, 2027))['careers'][str(g.id)]
         self.assertEqual(t.season.places.home[g.id][0], dest)
         self.assertEqual((row['moving'], row['net']), (RES.MOVE_COST, round(led.net)))
         self.assertEqual(row['net_at_decision'] - row['net'], RES.MOVE_COST)

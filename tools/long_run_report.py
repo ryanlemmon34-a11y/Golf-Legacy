@@ -438,7 +438,8 @@ def main():
     dbg = LW.load_debug(out, a.seed)
     man = LW.load_manifest(out)
     arch = None
-    if (out / f'world_{a.seed}' / 'archive' / 'world.json').exists():
+    arch_dir = out / f'world_{a.seed}' / 'archive'
+    if (arch_dir / 'MANIFEST.json').exists() or (arch_dir / 'world.json').exists():
         from golfsim.archive import Archive
         arch = Archive(out / f'world_{a.seed}' / 'archive')
     tl = LW.analyse(d, min(12, d['years']))

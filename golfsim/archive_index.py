@@ -110,10 +110,14 @@ class ArchiveIndex:
         self.close()
 
     # ---- writing --------------------------------------------------------------------------------------------
-    def index_year(self, year, chunk):
-        """Index one archived season (its file's contents), replacing anything indexed for that year."""
+    def index_year(self, year, chunk, source=None):
+        """Index one archived season (its file's contents), replacing anything indexed for that year.
+        `source`: the season file it was read from, recorded in the same transaction (meta 'source:YYYY')
+        so a reader can check the rows are those of the file its manifest names."""
         with self.db:
             self._delete(year, '=')
+            if source is not None:
+                self.db.execute('INSERT OR REPLACE INTO meta VALUES (?, ?)', (f'source:{year}', source))
             rid = dict(self.db.execute('SELECT text, rid FROM routes'))
             site_rows, start_rows = [], []
             for e in chunk['events']:
@@ -163,12 +167,25 @@ class ArchiveIndex:
     def backfill_derived(self, archive):
         """Fill the schema-2 tables for seasons indexed before they existed, one season file at a time
         (derived data only: the season files are never touched). Run by the session that owns the archive,
-        under its lock."""
+        under its lock. `archive`: anything with `years` and `year_path(y)`."""
         from .archive import _read
         for y in archive.years:
             if not self.derived_complete([y]):
                 with self.db:
-                    self._derived(y, _read(archive.dir / 'years' / f'{y}.json.gz'))
+                    self._derived(y, _read(archive.year_path(y)))
+
+    def sources(self):
+        """{season: the season file its rows were indexed from} (seasons indexed before this was recorded
+        have none)."""
+        return {int(k.split(':')[1]): v for k, v in self.db.execute("SELECT key, value FROM meta WHERE key LIKE 'source:%'")}
+
+    def adopt_sources(self, files):
+        """Record the files seasons were indexed from, for an index written before sources were recorded
+        (its rows were indexed from exactly these legacy files, which are never rewritten again)."""
+        have = set(self.years())
+        with self.db:
+            self.db.executemany('INSERT OR REPLACE INTO meta VALUES (?, ?)',
+                                [(f'source:{y}', f) for y, f in files.items() if y in have])
 
     def career(self, pid):
         """[(year, season row)] for every season a golfer competed (as in the season files)."""
@@ -183,6 +200,7 @@ class ArchiveIndex:
         for t in ('editions', 'sites', 'starts', 'seasons', 'moments', 'number_one', 'careers'):
             self.db.execute(f'DELETE FROM {t} WHERE year {op} ?', (year,))
         self.db.execute(f"DELETE FROM meta WHERE key LIKE 'derived:%' AND CAST(value AS INT) {op} ?", (year,))
+        self.db.execute(f"DELETE FROM meta WHERE key LIKE 'source:%' AND CAST(substr(key, 8) AS INT) {op} ?", (year,))
         # (the routes table is a shared dictionary of route texts; unused entries are harmless)
 
     @classmethod
@@ -196,7 +214,8 @@ class ArchiveIndex:
         from .archive import _read
         try:
             for y in archive.years:
-                idx.index_year(y, _read(archive.dir / 'years' / f'{y}.json.gz'))
+                path = archive.year_path(y)
+                idx.index_year(y, _read(path), source=path.relative_to(archive.dir).as_posix())
         except BaseException:
             idx.close()
             raise
