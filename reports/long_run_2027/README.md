@@ -84,7 +84,7 @@ afterwards. The run's own directory in this session also still matches the expor
 
 The engine this world was simulated with (7334ffe) never recorded the lowest 36/54/72-hole tournament totals
 per layout (the record book had the field, nothing filled it): its records table has none. They are recorded
-from fa72a8e's successor on. `TOTALS_RECONSTRUCTED.md` rebuilds them from the archive with
+from d0b0576 on. `TOTALS_RECONSTRUCTED.md` rebuilds them from the archive with
 `tools/reconstruct_totals.py --engine-commit 7334ffe` (read-only; the world is unchanged): 1,285 totals (465 of
 36 holes, 379 of 54, 441 of 72), from every completed stroke-play total the season files keep. The archive does
 not record an edition's length, so it is taken from the standard calendar; `golfsim/calendar.py` is unchanged

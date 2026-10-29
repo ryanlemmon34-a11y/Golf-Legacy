@@ -131,9 +131,12 @@ class MemorySampler(threading.Thread):
             self.sample()
 
     def stop(self):
-        self.stop_flag.set()
-        self.join()
-        self.sample()
+        """Stop sampling (idempotent) and return the peaks."""
+        if not self.stop_flag.is_set():
+            self.stop_flag.set()
+            if self.is_alive():
+                self.join()
+            self.sample()
         return self.peak
 
 
@@ -177,34 +180,39 @@ def main():
     if a.prepare:
         return prepare(a)
     d = Path(a.dir) if a.dir else Path(tempfile.mkdtemp()) / 'world'
-    print(f'machine: {machine()}', flush=True)
-    args = [sys.executable, __file__, '--prepare', '--dir', str(d), '--seed', str(a.seed), '--retired', str(a.retired)]
-    args += ['--from-world', a.from_world] if a.from_world else []
-    args += ['--workers', str(a.workers)] if a.workers else []
-    prep = json.loads(subprocess.run(args, check=True, capture_output=True, text=True).stdout.strip().splitlines()[-1])
-    print('preparation, in its own process (not measured): ' + ', '.join(f'{k} {v:.1f} s' for k, v in prep.items())
-          + (' (first open: recovery and one-time index upgrades of the copy)' if a.from_world else ''), flush=True)
+    w = None
+    try:
+        print(f'machine: {machine()}', flush=True)
+        args = [sys.executable, __file__, '--prepare', '--dir', str(d), '--seed', str(a.seed), '--retired', str(a.retired)]
+        args += ['--from-world', a.from_world] if a.from_world else []
+        args += ['--workers', str(a.workers)] if a.workers else []
+        prep = json.loads(subprocess.run(args, check=True, capture_output=True, text=True).stdout.strip().splitlines()[-1])
+        print('preparation, in its own process (not measured): ' + ', '.join(f'{k} {v:.1f} s' for k, v in prep.items())
+              + (' (first open: recovery and one-time index upgrades of the copy)' if a.from_world else ''), flush=True)
 
-    from golfsim import session as SES
-    from golfsim.session import Session
-    import observer
-    try:
-        import resource                                   # POSIX only
-    except ImportError:
-        resource = None
-    t = time.perf_counter()
-    try:
-        w = observer.World(d, allow_other_engine=bool(a.from_world), workers=a.workers)
-    except TypeError:                                     # an older observer (comparisons on older code)
-        w = observer.World(d, allow_other_engine=True) if a.from_world else observer.World(d)
-        if a.workers:
-            w.session.season.workers = a.workers
-    print(f'cold open of the observer {time.perf_counter() - t:.1f} s; active golfers '
-          f'{len(w.session.season.active_golfers()):,}, people {len(w.session.season.world.golfers):,}; '
-          f'workers {w.session.season.workers}', flush=True)
-    _skips(a, w, observer, Session, SES, resource)
-    if not a.dir:
-        shutil.rmtree(d.parent, ignore_errors=True)
+        from golfsim import session as SES
+        from golfsim.session import Session
+        import observer
+        try:
+            import resource                               # POSIX only
+        except ImportError:
+            resource = None
+        t = time.perf_counter()
+        try:
+            w = observer.World(d, allow_other_engine=bool(a.from_world), workers=a.workers)
+        except TypeError:                                 # an older observer (comparisons on older code)
+            w = observer.World(d, allow_other_engine=True) if a.from_world else observer.World(d)
+            if a.workers:
+                w.session.season.workers = a.workers
+        print(f'cold open of the observer {time.perf_counter() - t:.1f} s; active golfers '
+              f'{len(w.session.season.active_golfers()):,}, people {len(w.session.season.world.golfers):,}; '
+              f'workers {w.session.season.workers}', flush=True)
+        _skips(a, w, observer, Session, SES, resource)
+    finally:                                              # the whole observer (session, workers, history
+        if w is not None:                                 # snapshot and its index connection), before any
+            (w.close if hasattr(w, 'close') else w.session.close)()   # temporary directory is removed
+        if not a.dir:
+            shutil.rmtree(d.parent, ignore_errors=True)
 
 
 def _skips(a, w, observer, Session, SES, resource):
@@ -231,29 +239,34 @@ def _skips(a, w, observer, Session, SES, resource):
             prof = cProfile.Profile()
             prof.enable()
         sampler = MemorySampler()
-        if sampler.ok:
-            sampler.start()
         patches = [mock.patch.object(Session, '_commit', timed('commit', real_commit)),
                    mock.patch.object(SES, '_publish_archive', timed('publish', real_publish))]
         if real_settle is not None:
             patches.append(mock.patch.object(SES, 'settle_heap', timed('settle', real_settle)))
-        t0 = time.perf_counter()
-        with contextlib.ExitStack() as stack:
+        mem = None
+        with contextlib.ExitStack() as stack:             # everything undone however the skip ends
+            if sampler.ok:
+                sampler.start()
+                stack.callback(sampler.stop)
+            if prof:
+                stack.callback(prof.disable)
             for patch in patches:
                 stack.enter_context(patch)
             real_reload = w.reload
             w.reload = timed('reload', real_reload)
+            stack.callback(setattr, w, 'reload', real_reload)
+            t0 = time.perf_counter()
             w.submit(form)
+            t1 = time.perf_counter()
+            if prof:
+                prof.disable()
+                prof.dump_stats(a.profile)
             w.reload = real_reload
-        t1 = time.perf_counter()
-        if prof:
-            prof.disable()
-            prof.dump_stats(a.profile)
-        observer.overview(w, {})                              # the page the observer returns to
-        t2 = time.perf_counter()
-        observer.record(w, {}, 'most-wins')                   # the first Records page (stats built lazily)
-        t3 = time.perf_counter()
-        mem = sampler.stop() if sampler.ok else None
+            observer.overview(w, {})                          # the page the observer returns to
+            t2 = time.perf_counter()
+            observer.record(w, {}, 'most-wins')               # the first Records page (stats built lazily)
+            t3 = time.perf_counter()
+            mem = sampler.stop() if sampler.ok else None
         submit = t1 - t0
         publish, settle, reload_ = parts.get('publish', 0.0), parts.get('settle', 0.0), parts.get('reload', 0.0)
         save = parts.get('commit', 0.0) - publish - settle
@@ -270,7 +283,6 @@ def _skips(a, w, observer, Session, SES, resource):
                   f'{mem["total_pss"]:,} MB; live workers seen {mem["workers"]}', flush=True)
         else:
             print('  memory: not measured on this platform', flush=True)
-    w.session.close()
 
 
 if __name__ == '__main__':
