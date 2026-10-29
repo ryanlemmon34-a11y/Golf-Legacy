@@ -35,7 +35,9 @@ observer, tools or the save code keep it so.
 
 ## What you can do
 
-- **World library** (`/worlds`): every world with its date, seed, compatibility and state; **Create** (a name
+- **World library** (`/worlds`): every world with its date, seed, starting year, compatibility and state;
+  **Remove…** moves a world to the trash (restore it, or delete it permanently by typing its name; never the
+  open world or during an operation); **Create** (a name, a starting year,
   and a seed: the whole world is generated; a new seed is suggested each time -- the same seed always makes the
   same world and, shot for shot, the same history, a different seed a different one), **Open** (resume), **Browse history** (read-only), **Copy**
   (never changes the original), **Report a problem**, **Close**, **Quit**.
@@ -50,7 +52,18 @@ observer, tools or the save code keep it so.
   Tours, Tournaments (filters: tour, kind), Seasons and season recaps, Records & frivolities, Moments.
   Every person, edition, tournament, course, nation and tour links to its page; the browser's Back button
   keeps your filters.
-- **A person's page**: one identity with a tab per career — *Playing career* (seasons, wins, moments),
+- **Stats** and **Prize money** (Basketball GM style): a season (the current one so far, or any archived one) or
+  all-time, all tours or one, sorted by any column (starts, wins, runner-up, top 2/5/10, cuts made, prize
+  money); every number opens the results behind it. Definitions are under the table.
+- **Shortlist**: ☆ Shortlist on any person, course, nation, tour, tournament or edition; the Shortlist page
+  lists them. Kept with the world (it travels with copies and problem reports).
+- **A person's page**: age (approximate: season year minus birth year) before the birth year; current ratings
+  with the archetype and signed changes (this season, last season; "unavailable" where no earlier record
+  exists); career honors (major, Premier Tour, Challenger, regional, mini tour, college national and
+  postseason champion, college, amateur championship and other wins), with counts, first and latest years
+  and links; a season-by-season table with age, every statistic linked to its results and *show each tour*
+  for the per-tour rows; coaches show their current clients as rows and a season-by-season staff table.
+  One identity with a tab per career — *Playing career* (seasons, wins, moments),
   *Results* (every start with the coach and caddie that week and how they got in), *Coaches & caddies*,
   *Coaching*, *Caddying* (each partnership with dates, starts together, wins and majors).
 - **An edition** (one year of a tournament) is separate from the **tournament** (all its editions), and a
@@ -148,7 +161,10 @@ it works on a temporary copy and never changes the world.
   longer (season 51 took about 190 s on our slower 4-CPU test machine, not yet measured on yours; see
   `docs/BACKLOG.md`). The first open of a world saved by older code
   can take a minute or two (its history index is upgraded once).
-- Records and frivolities use archived seasons only; the current season counts once it ends. Ages are
+- Records and frivolities use archived seasons only; the current season counts once it ends (Stats include
+  the current season so far).
+- Rating changes need recorded snapshots: worlds simulated before this version (and every world's first
+  season) show "unavailable" until a season has been archived by this version. Ages are
   season year minus birth year (birth dates are not recorded). Careers that began before the world are
   marked partial and left out of debut lists.
 - Dated coach and caddie partnerships come from the archive (through the last season end); during a season

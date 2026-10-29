@@ -180,6 +180,16 @@ from stints and editions. The archive grows by one season file a year instead of
 every profile, so centuries stay manageable. Narrative log lines are kept for display, but nothing is
 reconstructed from them.
 
+**Recorded since the observer's profile pass (29 October 2026; older archives lack them, and readers say
+so):** each season's career rows carry the golfer's ratings as the next season starts (`ratings`: overall,
+then the attributes in the order the world table's `rating_keys` gives; recorded after the season-end aging);
+each edition carries its kind and the money and cut it was played for (`kind`, `purse`, `cut_top`,
+`field_size`); each coach's and caddie's season row carries their career earnings so far (`earnings_total`).
+These are written by `archive.py` only (not simulation code: the engine fingerprint is unchanged). The
+observer's statistics (`tools/observer_stats.py`) recompute each event's payouts from these facts (older
+archives: the calendar's purses) and check them against every golfer's season prize money as paid: on the
+50-season world all 588,797 golfer-seasons reconcile.
+
 ### Queries (`archive.Archive`)
 
 | Question | Call |

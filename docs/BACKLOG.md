@@ -31,6 +31,31 @@ requirements are unchanged; no new long run, spending or calibration change is a
 5. **Complete the universe and release proof**: nation development, remaining autonomous pathway details,
    broad long-run validation. Nation-versus-nation events later; nationality and residence history kept.
 
+## Observer playtest increment (owner roadmap "Next observer UI increment", 29 October 2026)
+
+The owner runs the 100-year world himself, on its own folder and engine; this increment was developed on
+copies (a fresh world and the 50-season world) and changes no simulation code: the engine fingerprint is
+unchanged (e5c4c37e...), so worlds made by the previous version open and continue as "this engine".
+- **Advance seasons** and **Stop simulation** (owner request) -- implemented, tested (see below).
+- **Profiles**: ratings and archetype with signed changes (this season / last season against recorded
+  snapshots, "unavailable" without one; potential hidden); age before birth year and in every season row
+  (approximate, labelled); career honors by event-time classification; season-by-season with per-tour rows,
+  each figure linked to its results; coaches' current clients as rows; staff season by season; moments with
+  their course and layout -- implemented, tested.
+- **Statistics**: Stats and Prize money pages (season or all-time, all tours or one, sortable, linked);
+  per-tour prize money recomputed from each event's payouts and reconciled with the money paid (588,797 of
+  588,797 golfer-seasons on the 50-season world; 627 of 627 on a new one); built in a separate process in the
+  background (about 80 s for 50 seasons, once; then one season at a time) -- implemented, tested, measured.
+- **Shortlists** per world for every entity type; **world removal** to a trash with restore and deliberate
+  permanent deletion; **starting year** separate from a random or explicit seed -- implemented, tested.
+- New archive facts (archive.py only): season-start ratings, event-time purse/cut/field/kind, staff earnings
+  totals; worlds archived before them show "unavailable" for rating changes and use the calendar's purses
+  (checked by reconciliation).
+- Measured on the 50-season copy (this container): person pages 0.08-0.22 s, all-time Stats 2-2.5 s, one
+  season's Stats 0.2-0.3 s; pages stay fast while the statistics are built.
+- Open: rollups for courses, tours, nations and tournament series beyond their current pages; as-of views;
+  the comparative realism audit waits for the owner's multi-seed gameplay saves.
+
 ## Observer alpha pass (owner roadmap of 29 October 2026; review pin 832c55a)
 
 Status words: **implemented**, **tested** (automated tests, full suite), **measured** (timed on copies of

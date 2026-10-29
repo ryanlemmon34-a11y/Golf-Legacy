@@ -132,5 +132,22 @@ in the backlog: implemented, tested (automated), measured, unverified.
 | First records/frivolities: youngest/oldest major winner, youngest/oldest Premier debut, most starts without a win by tour; label incomplete history and age precision | "Start here" lists; scope filter (all, professional, Premier, major, any tour); partial/active flags; age = season year minus birth year, stated | implemented (archived seasons only) |
 | Diagnostic copy of a saved world | Zip with the committed save and every history file it needs, log, versions, seed, date, generations, file hashes and an issue note; optional index and previous checkpoint; local paths removed from the log; never uploaded | implemented, tested (the package reopens as the same world) |
 
+### Playtest increment (owner roadmap of 29 October 2026)
+
+| Requirement | Observer | Status |
+|---|---|---|
+| Current ratings, archetype, signed changes against an explicit baseline, unavailable without one, potential hidden | Ratings cards on the person page: now, this season (since its start), last season (start to start); recorded snapshots from the archive | implemented, tested |
+| Age before birth year; year and age in career rows; approximate labelled | "Age N*" with the note; season rows show year and age | implemented, tested |
+| Coach clients as linked rows with tour/status; history separate | Current clients table (tour, status, world rank, since); all partnerships; staff season by season (clients, starts served, client wins, weeks, reputation, earnings) | implemented, tested |
+| One person id through role changes; separate tabs | Playing / Results / Coaches & caddies / Coaching / Caddying tabs on one page | implemented; checked on the 50-season copy (5,233 people with both careers) |
+| Shortlists for every entity type, per world, persistent | ☆ Shortlist on people, courses, nations, tours, tournaments, editions; Shortlist page; kept in the world folder | implemented, tested |
+| Remove world with confirmation, reversible, guarded | Remove… to the trash; restore; delete permanently only by typing the name; refused for the open world or during an operation | implemented, tested |
+| Prize money leaderboard (year / all-time, tours) | Prize money page: gross tournament prize money; per tour recomputed and reconciled ("unknown" otherwise) | implemented, tested; reconciled on the 50-season copy |
+| Stats directory (year / all-time, tour / overall, sortable, linked) | Stats page with inclusive top-N, runner-up, cuts made of cut events, prize money; each figure opens its results | implemented, tested |
+| Moments show the course and layout | Venue column on moments (layout link), "not applicable" without one | implemented, tested |
+| Starting year separate from seed; random by default; both recorded | Create: starting year and seed (random suggested); shown in the library, recorded beside the world and in problem reports | implemented, tested |
+| Career honors (text trophy case) | Categories by each edition's classification when played; count, first, latest, links | implemented, tested |
+| Season and tour history, expandable, linked, partial current season | Season by season with *show each tour*; current season marked "so far" | implemented, tested |
+
 Not yet: as-of-year views, the university directory, nation development, era filters on records, charts and
-art, a packaged desktop app.
+art, a packaged desktop app; course / tour / nation season rollups beyond their existing pages.
