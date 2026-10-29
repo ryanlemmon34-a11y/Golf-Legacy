@@ -29,6 +29,7 @@ class PromotionTests(unittest.TestCase):
         for w in range(1, 53):
             s.advance_week(2027, w)
         cls.end = {g.id: (g.cash, g.backing, g.backer_funds) for g in s.world.golfers}
+        cls.led_end = {gid: (l.net, l.support, l.backer_support) for gid, l in s.ledgers[2027].items()}  # before winter
         cls.before = {g.id: (g.backer, g.cash, g.tour) for g in s.world.golfers}
         cls.status = {g.id: g.status for g in s.world.golfers}
         s.finish_year(2027)
@@ -110,14 +111,18 @@ class PromotionTests(unittest.TestCase):
             g, l = s.g[gid], led.get(gid)
             support, backer_support = (l.support, l.backer_support) if l else (0.0, 0.0)
             cash0 = s.cash_start[2027][gid]
-            moving = l.moving if l else 0.0                                  # a winter move is paid at the season's end
-            self.assertAlmostEqual(self.end[gid][0], cash0 + (l.net if l else 0.0) + moving, delta=0.01)
-            self.assertAlmostEqual(g.cash, cash0 + (l.net if l else 0.0), delta=0.01)   # and after it
-            self.assertAlmostEqual(self.end[gid][1], backing0 - support, delta=0.01)      # family money
+            # before the winter, against the ledger as it stood then; after it (a winter move is paid then,
+            # and any support it needs is drawn into the same year), against the final ledger
+            net_e, support_e, backer_e = self.led_end.get(gid, (0.0, 0.0, 0.0))
+            self.assertAlmostEqual(self.end[gid][0], cash0 + net_e, delta=0.01)
+            self.assertAlmostEqual(g.cash, cash0 + (l.net if l else 0.0), delta=0.01)
+            self.assertAlmostEqual(self.end[gid][1], backing0 - support_e, delta=0.01)    # family money
+            self.assertAlmostEqual(g.backing, self.end[gid][1] - (support - support_e), delta=0.01)
             put_up = s.backer_flows[2027][(gid, 'put_up')]
-            self.assertAlmostEqual(self.end[gid][2], funds0 + put_up - backer_support, delta=0.01)
+            self.assertAlmostEqual(self.end[gid][2], funds0 + put_up - backer_e, delta=0.01)
             back = s.backer_flows[2027][(gid, 'returned')]
-            self.assertAlmostEqual(g.backer_funds, self.end[gid][2] - back, delta=0.01)  # deals that ended
+            self.assertAlmostEqual(g.backer_funds, self.end[gid][2] - back - (backer_support - backer_e),
+                                   delta=0.01)                                # deals that ended, winter draws
             drawn += backer_support > 0
             backed += put_up > 0
             returned += back > 0
