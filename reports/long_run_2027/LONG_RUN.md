@@ -1,5 +1,6 @@
 # Long run: one world, every shot, seed 2027
 
+- Analysis written from the run's saved data by the report tools at `5169e9f`; the world was simulated by engine `7334ffe`. Re-generated analysis of the same world, not a new simulation.
 - Engine commit `7334ffef1cc7405e5a837d510f8236b9e83ed5e1`, engine id `b62fd89718dc6df366ec1859e65b2b7382933b11`, Python 3.13.17.
 - Hardware: Intel(R) Xeon(R) Processor @ 2.10GHz, 4 logical CPUs, Python 3.13.17, Linux.
 - Seasons 2027–2076 (50), full population, every shot simulated; started 2026-10-29 00:11:14. Run through the persistent session and the observer (a season skip each year, committed, published and reloaded).
@@ -178,11 +179,11 @@ Reaching No. 1 and the top ten is by **weekly world ranking**. Cohorts: the star
   - 2043: First full-time season at Challenger level
   - 2043: First win at Premier level
   - 2043: First win at Challenger level (4 that season)
-  - 2043: Won the Britannia Open (major No. 1)
-  - 2043: Won the Premier Tour Championship (major No. 2)
+  - 2043: Won the Premier Tour Championship (major No. 1)
+  - 2043: Won the Britannia Open (major No. 2)
   - 2044: First full-time season at Premier level
-  - 2045: Won the Premier Tour Championship (major No. 3)
-  - 2045: Won the Tour Masters (major No. 4)
+  - 2045: Won the Tour Masters (major No. 3)
+  - 2045: Won the Premier Tour Championship (major No. 4)
   - 2045: World No. 1 at a season's end for the first time (4 season ends in all)
   - 2047: Won the Britannia Open (major No. 5)
   - … 4 more milestones
