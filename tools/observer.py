@@ -167,7 +167,19 @@ class World:
             try:
                 stamp = None
                 for _ in range(3):
-                    if not self.session.refresh():
+                    try:
+                        ok = self.session.refresh()
+                    except Exception as e:                # e.g. publishing the committed history failed
+                        J.log(self.path, f'refresh failed: {e!r}')
+                        self.behind = (f'The saved world’s history could not be published ({type(e).__name__}: {e}); '
+                                       'these pages show the last published state. Nothing is lost: it is published '
+                                       'again on the next page or advance. Report a problem if this persists.')
+                        if self.live is not None:
+                            return
+                        self.live = capture(self.session)  # (opening: the committed world, without new history)
+                        stamp = published_stamp(self.archive_dir)
+                        break
+                    if not ok:
                         self.behind = ('The world has moved on and its new history is still being published: '
                                        'this page shows the previous generation.')
                         return

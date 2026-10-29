@@ -148,8 +148,14 @@ class App:
                 return
             except Exception as e:
                 J.log(w.path, f'advance failed: {e!r}\n{traceback.format_exc()}')
-                job.finish('failed', f'{type(e).__name__}: {e}. Nothing of this advance was kept: the world is at its '
-                                     f'last committed week, {O.date_text(s.cursor)} (generation {s.generation}).')
+                if s.generation != gen0:                  # committed; only publishing its history failed
+                    job.finish('failed', f'The advance was saved: the world is at {O.date_text(s.cursor)} '
+                                         f'(generation {s.generation}). Publishing its history failed '
+                                         f'({type(e).__name__}: {e}); it is kept in the saved world and published '
+                                         'again when the world is next opened or advanced.')
+                else:
+                    job.finish('failed', f'{type(e).__name__}: {e}. Nothing of this advance was kept: the world is '
+                                         f'at its last committed week, {O.date_text(s.cursor)} (generation {s.generation}).')
                 return
             finally:
                 J.clear_job(w.path)

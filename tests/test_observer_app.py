@@ -202,6 +202,36 @@ class ObserverAppTests(unittest.TestCase):
         app.jobs.wait(60)
         self.assertEqual(app.job()['state'], 'done')
 
+    def test_a_season_saved_but_not_yet_published_is_reported_as_saved_and_recovers(self):
+        """The owner's first Windows report: the season's end was committed, then publishing its history
+        failed. The message must say the advance was saved (not "nothing was kept"), pages must keep
+        working (showing the last published history, and saying so), and the history is published as
+        soon as publishing works again -- nothing lost."""
+        app, lib = self.app('unpublished')
+        w = self.opened(app, lib)
+        real = SES._publish_archive
+
+        def broken(d, n):
+            raise OSError(9, 'Bad file descriptor')
+        with mock.patch.object(SES, '_publish_archive', broken):
+            app.renderer.call(app.advance, form(w, 'season', op='season-end'))
+            app.jobs.wait(300)
+            j = app.job()
+            self.assertEqual(j['state'], 'failed')
+            self.assertIn('The advance was saved', j['message'])
+            self.assertIn('2028, week 1', j['message'])
+            self.assertNotIn('Nothing of this advance was kept', j['message'])
+            page = self.draw(app, '/')
+            self.assertNotIn('Something went wrong', page)
+            self.assertIn('could not be published', page)
+            self.assertIn('The advance was saved', page)               # the result banner, once
+        self.assertIs(SES._publish_archive, real)
+        page = self.draw(app, '/')                                      # publishing works again
+        self.assertIn('2028, week 1', page)
+        self.assertNotIn('could not be published', page)
+        self.assertEqual(app.world.a.years, [2027])
+        self.assertEqual(int(app.world.a.stamp[0]), app.world.live.history_generation)
+
     def test_an_observer_stopped_mid_advance_is_reported_and_nothing_half_written(self):
         lib = self.tmp / 'killed'
         lib.mkdir()
