@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import re
 
-RULES_VERSION = '2026-10-31'
+RULES_VERSION = '2026-11-01'
 RANKING_RULE = 'world-ranking-1'     # the world ranking's formula (unchanged since the world began; named now)
 VERSIONS = (
     ('2026-10-30', 'Winners\' exemptions count whatever a golfer\'s membership (a non-member champion earns a '
@@ -28,6 +28,8 @@ VERSIONS = (
                    'in week 51, day-level travel between events in one week); worlds started earlier keep the '
                    'classic calendar (v1) unchanged. A ledger of every major place (earned, used or lost) and each '
                    'golfer\'s highest Overall are recorded.'),
+    ('2026-11-01', 'USA Open champions keep their place for the ten editions after their win, through the tenth '
+                   'anniversary (it had ended a year early, after the ninth).'),
 )
 EARLIER = ('Seasons archived before rules versions were recorded were played under earlier rules. The '
            'differences that matter for reading old results: a winner without a Premier card held no '
@@ -142,8 +144,9 @@ RULES = {
         'earned) and how it ended: entered, withdrawn (injured or retired), declined (could not pay the trip) or '
         'expired (an amateur\'s place after turning professional). Champion and runner-up places are separate '
         'categories; an amateur title feeds the next edition its date allows (the Britannia Amateur, after the '
-        'USA Open, feeds next season\'s USA Open and Masters but this season\'s Britannia Open).',
-        '2026-10-31'),
+        'USA Open, feeds next season\'s USA Open and Masters but this season\'s Britannia Open). USA Open champions '
+        'hold their place for the ten editions after their win (U1).',
+        '2026-11-01'),
     'calendar': (
         'The calendar',
         'Each world plays one calendar version, recorded with every season. Classic (v1): majors in weeks 18, 24, '

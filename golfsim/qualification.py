@@ -179,10 +179,12 @@ class Route:
 
 
 def winners_of(series_ids, years_back, include_current=True):
-    """Champions of any listed series in the last `years_back` editions (current year if already played)."""
+    """Champions of any listed series in the `years_back` editions before this year's, plus this year's when
+    `include_current` and it has already been played. Without the current year (USA Open U1, "last 10 years"):
+    a champion of year Y holds the place through Y + 10 and loses it in Y + 11 (unless they win again)."""
     def select(ctx, year):
         out = []
-        first = year - years_back + (0 if include_current else 1)
+        first = year - years_back                          # the earliest edition counted
         for y in range(year, first - 1, -1):
             for sid in series_ids:
                 if y == year and not include_current:
