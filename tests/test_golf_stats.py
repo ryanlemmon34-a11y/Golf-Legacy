@@ -304,6 +304,28 @@ class GolfHistoryTests(unittest.TestCase):
         self.assertIn('No. 1 ·', body)
         self.assertIn(f'/golfer/{top}"', self.page('/rankings?kind=points'))
 
+    def test_the_qualification_toggle_works_both_ways(self):
+        import re
+        def toggle(body, label):
+            m = re.search(r'href="([^"]*)">' + label + '</a>', body)
+            self.assertIsNotNone(m, label)
+            return m.group(1).replace('&amp;', '&')
+        self.built()
+        default = self.page('/stats?show=golf&year=2028&sort=gir')
+        everyone = toggle(default, 'include everyone')
+        self.assertIn('min=0', everyone)
+        self.assertIn('year=2028', everyone)
+        self.assertIn('sort=gir', everyone)
+        body = self.page(everyone)
+        self.assertIn('at least 0 recorded rounds', body)
+        back = toggle(body, 'qualified only')
+        self.assertNotIn('min=', back)                                      # the minimum is dropped, not kept at 0
+        self.assertIn('year=2028', back)
+        again = self.page(back)
+        self.assertIn(f'at least {OG.QUALIFY["season_rounds"]} recorded rounds', again)
+        self.assertIn('include everyone', again)
+        self.assertIn('name="min" value="0"', body)                          # filters keep the choice
+
     def test_ranking_labels_agree_live_and_archive_only(self):
         """The position comes from the ranking recorded for the week shown, with or without a live world."""
         lv = self.w.live

@@ -162,6 +162,7 @@ def golf_table(w, q, data, path, keep, cur_note, single_season):
     chunk, pager = O.paged(rows, q, path)
     start = (max(1, int(O.one(q, 'page', '1') or 1)) - 1) * O.PAGE_SIZE
     keep = {k: v for k, v in keep.items() if k not in ('sort', 'page')}
+    base = {k: v for k, v in keep.items() if k != 'min'}          # the toggle sets or drops the minimum itself
     def th(k, label):
         mark = ' ▼' if k == sort else ''
         return f'<th class="n"><a href="{path}?{urlencode({**keep, "sort": k})}">{O.esc(label)}{mark}</a></th>'
@@ -174,8 +175,8 @@ def golf_table(w, q, data, path, keep, cur_note, single_season):
                     f'<td class="n">{r["golf_starts"]}</td><td class="n">{r["rounds"]}</td>'
                     + ''.join(f'<td class="n">{c}</td>' for c in figure_cells(r)) + '</tr>')
     qual = (f'Qualified: at least {qualify} recorded rounds ({unqualified:,} golfers with fewer left out; '
-            + (f'<a href="{path}?{urlencode({**keep, "sort": sort, "min": 0})}">include everyone</a>' if qualify else
-               f'<a href="{path}?{urlencode({**keep, "sort": sort})}">qualified only</a>')
+            + (f'<a href="{path}?{urlencode({**base, "sort": sort, "min": 0})}">include everyone</a>' if qualify else
+               f'<a href="{path}?{urlencode({**base, "sort": sort})}">qualified only</a>')
             + f'). Proposed thresholds: {QUALIFY["season_rounds"]} rounds for a season, {QUALIFY["career_rounds"]} '
               'all-time, for review.')
     return (f'<p>{cur_note} · {len(rows):,} golfers · {qual}</p>'

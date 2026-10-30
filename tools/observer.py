@@ -1585,7 +1585,9 @@ def stats_page(w, q, view='stats'):
                                                                   for t in tours])])
     show = one(q, 'show', '') if view == 'stats' else ''
     f = f.replace('<button>Apply</button>', f'<input type="hidden" name="sort" value="{esc(sort)}">'
-                  + ('<input type="hidden" name="show" value="golf">' if show == 'golf' else '') + '<button>Apply</button>')
+                  + ('<input type="hidden" name="show" value="golf">' if show == 'golf' else '')
+                  + (f'<input type="hidden" name="min" value="{esc(one(q, "min"))}">' if show == 'golf' and one(q, 'min')
+                     else '') + '<button>Apply</button>')
     if view == 'stats':
         base = {k: v[0] for k, v in q.items() if k in ('year', 'tour') and v and v[0]}
         f = ('<div class="tabs">' + ''.join(
