@@ -47,6 +47,7 @@ import observer_spoilers as SP                                        # noqa: E4
 import observer_views as V                                            # noqa: E402
 import observer_cohort as OC                                          # noqa: E402
 import observer_compare as OCMP                                       # noqa: E402
+import observer_goat as GOAT                                          # noqa: E402
 
 PAGE_SIZE = 100
 
@@ -2012,7 +2013,7 @@ PAGES = {'/': overview, '/rankings': rankings, '/search': search, '/golfers': go
          '/stats': stats_page, '/money': money_page, '/shortlist': shortlist_page, '/my-world': shortlist_page,
          '/rules': OH.rules_page,
          '/grand-slam': OH.grand_slam_page, '/views': V.views_page, '/cohort': OC.cohort_page,
-         '/compare': OCMP.compare_page}
+         '/compare': OCMP.compare_page, '/goat': GOAT.goat_page}
 
 
 def render(w, path, q):
