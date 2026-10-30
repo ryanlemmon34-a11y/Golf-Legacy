@@ -43,7 +43,7 @@ sys.path.insert(0, str(ROOT))
 
 from golfsim import golfstats as GS                                      # noqa: E402
 
-SCHEMA = 3
+SCHEMA = 4
 COLUMNS = ('starts', 'wins', 'runner_ups', 'top2', 'top5', 'top10', 'cut_events', 'cuts_made', 'qualifiers')
 GOLF = ('golf_starts',) + GS.FIELDS            # summed golf statistics counters (and the starts carrying them)
 ALL = COLUMNS + GOLF
@@ -52,12 +52,16 @@ EVENT_DRIVE_TIERS = (8, 20, 30, 40)            # event driving averages: the top
 EVENT_MIN_DRIVES = EVENT_DRIVE_TIERS[0]        # at least this many measured drives, kept for each tier (qualified
                                                # before limited: a record list never loses a qualified leader)
 TABLES = ('agg', 'season_prize', 'money', 'staff_year', 'long_drives', 'event_drives', 'margins', 'matches')
+ALL_TIME = ('agg_all', 'prize_all')            # every season summed (for all-time pages), with the seasons they hold
 DDL = """
 CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT);
 CREATE TABLE IF NOT EXISTS years(year INT PRIMARY KEY, source TEXT);
 CREATE TABLE IF NOT EXISTS agg(person INT, year INT, tour TEXT, starts INT, wins INT, runner_ups INT, top2 INT,
     top5 INT, top10 INT, cut_events INT, cuts_made INT, qualifiers INT, prize REAL, """ + ', '.join(
     f'{c} INT' for c in GOLF) + """, PRIMARY KEY(person, year, tour));
+CREATE TABLE IF NOT EXISTS agg_all(person INT, tour TEXT, """ + ', '.join(f'{c} INT' for c in ALL) + """,
+    prize REAL, prize_unknown INT, PRIMARY KEY(person, tour));
+CREATE TABLE IF NOT EXISTS prize_all(person INT PRIMARY KEY, prize REAL);
 CREATE TABLE IF NOT EXISTS long_drives(year INT, tour TEXT, person INT, event_id TEXT, week INT, tenths INT, round INT,
     hole INT);
 CREATE TABLE IF NOT EXISTS event_drives(year INT, tour TEXT, person INT, event_id TEXT, week INT, tenths INT, drives INT,
@@ -245,7 +249,7 @@ class StatsStore:
         have = self.db.execute("SELECT value FROM meta WHERE key='schema'").fetchone()
         if have is not None and have[0] != str(SCHEMA):    # derived: an older store is rebuilt from the history
             with self.db:
-                for t in TABLES + ('years', 'meta'):
+                for t in TABLES + ALL_TIME + ('years', 'meta'):
                     self.db.execute(f'DROP TABLE IF EXISTS {t}')
             self.db.executescript(DDL)
             have = None
@@ -258,6 +262,19 @@ class StatsStore:
 
     def sources(self):
         return {y: s for y, s in self.db.execute('SELECT year, source FROM years')}
+
+    def sum_all_time(self):
+        """agg_all / prize_all: every season held, summed per person (and tour), recorded with the seasons
+        and sources they were summed from (query uses them only when those are exactly the seasons asked)."""
+        cols = ', '.join(f'SUM({c})' for c in ALL)
+        with self.db:
+            self.db.execute('DELETE FROM agg_all')
+            self.db.execute('DELETE FROM prize_all')
+            self.db.execute(f'INSERT INTO agg_all SELECT person, tour, {cols}, SUM(prize), COUNT(*) - COUNT(prize) '
+                            'FROM agg GROUP BY person, tour')
+            self.db.execute('INSERT INTO prize_all SELECT person, SUM(prize) FROM season_prize GROUP BY person')
+            self.db.execute("INSERT OR REPLACE INTO meta VALUES ('all_time', ?)",
+                            (json.dumps(sorted(self.sources().items())),))
 
     def drop(self, year):
         with self.db:
@@ -300,7 +317,9 @@ def build(archive_dir, store_path):
             want = {y: season_source(a, y) for y in a.years}
             for y in set(have) - set(want):
                 store.drop(y)
+            changed = set(have) - set(want)
             for y in [y for y in a.years if have.get(y) != want[y]]:
+                changed.add(y)
                 d = a.year(y)
                 careers = d['careers']
                 status = {int(g): r.get('status') for g, r in careers.items()}
@@ -310,6 +329,8 @@ def build(archive_dir, store_path):
                           v.get('reputation'), v.get('earnings_total')) for k, v in d.get('staff_year', {}).items()]
                 store.put(y, want[y], agg, rec, paid, money, staff, season_records(d['events'], y))
                 a._years.clear()                         # (one decoded season at a time)
+            if changed or store.db.execute("SELECT 1 FROM meta WHERE key = 'all_time'").fetchone() is None:
+                store.sum_all_time()
         finally:
             store.close()
 
@@ -379,33 +400,62 @@ def live_tables(view):
     return agg, rec, money, paid
 
 
-def query(db, years=None, tour=None, live=None, live_year=None):
+def _all_time(db, years):
+    """Whether the all-time sums hold exactly these seasons, as the store now holds them."""
+    if years is None or not years:
+        return False
+    try:
+        row = db.execute("SELECT value FROM meta WHERE key = 'all_time'").fetchone()
+    except Exception:
+        return False
+    if row is None:
+        return False
+    held = dict(map(tuple, json.loads(row[0])))
+    if set(held) != set(years):
+        return False
+    now = dict(db.execute(f'SELECT year, source FROM years WHERE year IN ({",".join("?" * len(years))})', list(years)))
+    return all(now.get(y) == s for y, s in held.items())
+
+
+def query(db, years=None, tour=None, live=None, live_year=None, cols=ALL):
     """{person: {col: n, 'prize': x | None, 'prize_known': bool}} over archived `years` (None: all) and the
-    live season's tables if given. Overall (no tour): prize money actually paid; a tour: recomputed payouts
-    (None where they could not be reconciled)."""
-    out = defaultdict(lambda: dict.fromkeys(ALL, 0) | {'prize': 0.0, 'prize_known': True})
+    live season's tables if given, for the columns `cols` (all by default). Overall (no tour): prize money
+    actually paid; a tour: recomputed payouts (None where they could not be reconciled). Every archived
+    season at once reads the store's all-time sums when they hold exactly those seasons (the same sums)."""
+    cols = tuple(cols)
+    out = defaultdict(lambda: dict.fromkeys(cols, 0) | {'prize': 0.0, 'prize_known': True})
+    if db is None or (years is not None and not years):
+        db = _EMPTY
+    whole = db is not _EMPTY and _all_time(db, years)
     where, args = [], []
-    if years is not None:
+    if years is not None and not whole:
         where.append(f'year IN ({",".join("?" * len(years))})')
         args += list(years)
     if tour:
         where.append('tour = ?')
         args.append(tour)
     w = (' WHERE ' + ' AND '.join(where)) if where else ''
-    cols = ', '.join(f'SUM({c})' for c in ALL)
-    if db is None or (years is not None and not years):
-        db = _EMPTY
-    for row in db.execute(f'SELECT person, {cols}, SUM(prize), COUNT(*) - COUNT(prize) FROM agg{w} GROUP BY person', args):
+    sums = ', '.join(f'SUM({c})' for c in cols)
+    if whole:
+        q = f'SELECT person, {sums}, SUM(prize), SUM(prize_unknown) FROM agg_all{w} GROUP BY person'
+    else:
+        q = f'SELECT person, {sums}, SUM(prize), COUNT(*) - COUNT(prize) FROM agg{w} GROUP BY person'
+    n = len(cols)
+    for row in db.execute(q, args):
         r = out[row[0]]
-        for c, v in zip(ALL, row[1:]):
+        for c, v in zip(cols, row[1:n + 1]):
             r[c] += v or 0
         if tour:
             r['prize'] += row[-2] or 0.0
             r['prize_known'] &= row[-1] == 0
     if not tour:
-        pw = (' WHERE ' + where[0]) if years is not None else ''
-        for pid, prize in db.execute(f'SELECT person, SUM(prize) FROM season_prize{pw} GROUP BY person',
-                                     args[:len(years)] if years is not None else []):
+        if whole:
+            prizes = db.execute('SELECT person, prize FROM prize_all')
+        else:
+            pw = (' WHERE ' + where[0]) if years is not None else ''
+            prizes = db.execute(f'SELECT person, SUM(prize) FROM season_prize{pw} GROUP BY person',
+                                args[:len(years)] if years is not None else [])
+        for pid, prize in prizes:
             out[pid]['prize'] += prize or 0.0
     if live is not None:
         agg, rec = live[0], live[1]
@@ -413,7 +463,7 @@ def query(db, years=None, tour=None, live=None, live_year=None):
             if tour and t != tour:
                 continue
             r = out[gid]
-            for c in ALL:
+            for c in cols:
                 r[c] += a[c]
             if tour:
                 if rec.get(gid):

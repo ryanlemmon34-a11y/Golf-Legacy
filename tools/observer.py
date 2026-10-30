@@ -1569,13 +1569,9 @@ def stats_page(w, q, view='stats'):
         years, with_live = [], True
     else:
         years, with_live = [int(ysel)], False
-    data = ST.query(db, years, tour or None, live if with_live else None)
-    rows = [(pid, r) for pid, r in data.items() if r['starts'] or r['prize']]
-    if view == 'money':
-        rows = [(pid, r) for pid, r in rows if r['prize'] or not r['prize_known']]
-    keyf = {'name': lambda x: (w.name(x[0]), x[0]),
-            'prize': lambda x: (not x[1]['prize_known'], -(x[1]['prize'] or 0), x[0])}
-    rows.sort(key=keyf.get(sort, lambda x: (-(x[1].get(sort) or 0), -(x[1]['prize'] or 0), x[0])))
+    show = one(q, 'show', '') if view == 'stats' else ''
+    data = ST.query(db, years, tour or None, live if with_live else None,    # only the columns this page shows
+                    cols=ST.GOLF if show == 'golf' else ST.COLUMNS)
     tours = sorted(set(ST.tours_in(db)) | ({t for (_, t) in live[0]} if live else set()) - {''},
                    key=lambda t: (w.tours().get(t, {}).get('tier', 9), w.tours().get(t, {}).get('name', t)))
     yopts = [('all', 'all-time')] + ([(str(cur), f'{cur} (so far)')] if cur is not None else []) + \
@@ -1598,6 +1594,12 @@ def stats_page(w, q, view='stats'):
         scope_ += ' · ' + (w.tours().get(tour, {}).get('name', tour) if tour else 'all tours')
         return title, f + OG.golf_table(w, q, data, path, {k: v[0] for k, v in q.items() if v and v[0]}, esc(scope_),
                                         ysel != 'all')
+    rows = [(pid, r) for pid, r in data.items() if r['starts'] or r['prize']]
+    if view == 'money':
+        rows = [(pid, r) for pid, r in rows if r['prize'] or not r['prize_known']]
+    keyf = {'name': lambda x: (w.name(x[0]), x[0]),
+            'prize': lambda x: (not x[1]['prize_known'], -(x[1]['prize'] or 0), x[0])}
+    rows.sort(key=keyf.get(sort, lambda x: (-(x[1].get(sort) or 0), -(x[1]['prize'] or 0), x[0])))
     chunk, pager = paged(rows, q, path)
     start = (max(1, int(one(q, 'page', '1') or 1)) - 1) * PAGE_SIZE
     keep = {k: v[0] for k, v in q.items() if k not in ('sort', 'page') and v and v[0]}
