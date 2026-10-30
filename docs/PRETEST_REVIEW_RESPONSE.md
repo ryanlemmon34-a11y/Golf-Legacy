@@ -88,9 +88,31 @@ whole suite (see *Tests* below).
 5. **No-index fallback**: per-golfer entries (team, route, prize) are looked up by integer or string id alike, so
    results without the index keep their coach, caddie and route; tested against the indexed results.
 
+### 6. Review of e1b3ddf (five findings, each fixed in its own commit with a regression)
+1. **Zero-putt GIRs** (3eff45b): an ace or holed approach within par - 2 strokes (penalties included) never
+   touched the green, so it was counted as a missed green and a successful scramble. The hole's bookkeeping is
+   now `engine.tally_hole`, which counts it as a GIR with no putts. Deterministic cases (ace, holed approach,
+   albatross, penalty then holed, chip-in after a missed green) plus every zero-putt hole of 3,000 simulated
+   holes; the test assumption that a GIR needs a putt is gone. Definitions version 1 is the corrected one (no
+   world was played on the uncorrected capture).
+2. **Qualified driving averages** (c7bdf06): the store kept the top 100 event averages from 8 drives and the
+   page filtered to 20 afterwards, so short samples could hide every qualified performance. Lists are now kept
+   for each offered threshold (8, 20, 30, 40 drives), filtered before they are limited (store schema 3,
+   rebuilt from the season files on open). Test: 150 longer 9-drive averages ahead of one 25-drive performance.
+3. **Ranking labels without a live world** (939ccb6): browsing an archive, every profile said "unranked". The
+   position now comes from the ranking recorded for the week shown, and the label distinguishes a position,
+   "outside the recorded top 200", "unranked" (no points in the window) and "position not recorded". Tests:
+   the live table, the live snapshot, an archive-only world and the engine's top-100 order agree.
+4. **Replay entry** (7518a16): the tab opened the final round; a replay now starts at round one and keeps the
+   revealed round across round steps, sites, scorecards and back links.
+5. **Qualification toggle** (b065935): "qualified only" kept `min=0`; the toggle now sets or drops it and keeps
+   season, tour and sort. Tested both ways.
+
+None of these changes a shot, a random draw or a result (seed 21 still plays identically to 5bcc6ed).
+
 ## Proposed for review (not rules of the world)
 - **Qualification thresholds** (observer only, editable on the pages): Stats -- 20 recorded rounds for a season,
-  100 all-time; event driving average -- 20 measured drives (about two rounds); season -- 200; career -- 1,000.
+  100 all-time; event driving average -- 20 measured drives (about two rounds; lists kept for 8, 20, 30 and 40); season -- 200; career -- 1,000.
   Proposals, not real-world rules.
 - **Strokes gained** is shown labelled as the engine's own expected-strokes table; it is not a validated
   real-world baseline and should not be used for cross-era claims until one is agreed.
