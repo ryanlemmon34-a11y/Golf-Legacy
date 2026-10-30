@@ -1029,7 +1029,7 @@ def _season_history(w, q, pid, p, rows):
             'second place (ties included). Cuts: made / stroke-play events with a cut. Prize money is gross tournament '
             'prize money; per tour it is recomputed from each event’s payouts and shown only where it matches the '
             'money paid.')
-    if building:
+    if building and expand:
         note += f' Prize money by tour is being worked out ({building["done"]} of {building["total"]} seasons).'
     return (f'<h2>Season by season</h2><p>{toggle}</p>' + table(
         ['Season', 'Age*', 'Tour(s)', 'Status', 'Starts', 'Wins', 'Runner-up', 'Top 2', 'Top 5', 'Top 10', 'Cuts',

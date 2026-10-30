@@ -152,16 +152,27 @@ def season_rollup(rows):
 
 
 def cut_flags(w, rows, db=None):
-    """Mark each start with whether its event had a cut (stroke play with a cut): r['cut'] = 1 / 0 / None."""
+    """Mark each start with whether its event had a cut (stroke play with a cut): r['cut'] = 1 / 0 / None.
+    The format as played: the current season's editions, else the statistics store (built from the season
+    files), else the calendar's -- the store's own source for seasons archived before formats were recorded,
+    so a page reads the same before and after the store is built."""
+    cal = None
     for r in rows:
         r['cut'] = None
         if r['live']:
             e = w.live.editions[r['event']]
             r['cut'] = int(bool(e.get('cut_top')) and not e.get('match_play'))
-        elif db is not None:
-            m = ST.edition_money(db, r['event'])
-            if m is not None:
-                r['cut'] = int(bool(m[1]) and not m[3])
+            continue
+        m = ST.edition_money(db, r['event']) if db is not None else None
+        if m is not None:
+            r['cut'] = int(bool(m[1]) and not m[3])
+            continue
+        if cal is None:
+            from golfsim.course_library import default_library
+            cal = default_library().calendar.by_id
+        ser = cal.get(r['series'])
+        if ser is not None:
+            r['cut'] = int(bool(ser.cut_top) and not ser.match_play)
     return rows
 
 

@@ -90,6 +90,7 @@ class IndexedHistoryTests(unittest.TestCase):
     def test_the_observer_opens_cold_and_warm_and_its_pages_work(self):
         import observer
         w = observer.World(self.dir)                                     # cold: nothing read yet
+        self.addCleanup(w.close)
         title, html = observer.overview(w, {})
         self.assertIn('season recap', html)
         pid = board(w.stats, 'most-wins', n=1)[1][0]['person']

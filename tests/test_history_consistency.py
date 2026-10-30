@@ -72,6 +72,7 @@ class SnapshotTests(unittest.TestCase):
     def test_a_season_published_by_another_session_stays_out_until_reload(self):
         d = self.copy(self.base, 'publish')
         w = observer.World(d / 'archive')
+        self.addCleanup(w.close)
         pid = board(w.stats, 'most-starts', n=1)[1][0]['person']
         before = view(w, pid)
         s = Session.open(d, workers=1)                                 # a separate session publishes 2028
@@ -95,6 +96,7 @@ class SnapshotTests(unittest.TestCase):
     def test_rollback_and_replay_never_mix_into_an_open_snapshot(self):
         d = self.copy(self.two, 'rollback')
         w = observer.World(d / 'archive')
+        self.addCleanup(w.close)
         pid = board(w.stats, 'most-starts', n=1)[1][0]['person']
         before = view(w, pid)
         gen = int((d / 'CURRENT').read_text().split('"generation": ')[1].split(',')[0])
@@ -153,6 +155,7 @@ class SnapshotTests(unittest.TestCase):
     def test_reloads_release_their_connections(self):
         d = self.copy(self.base, 'reloads')
         w = observer.World(d / 'archive')
+        self.addCleanup(w.close)
         w.stats
         start = index_fds()
         pub = d / 'archive' / 'MANIFEST.json'
