@@ -18,6 +18,14 @@ import time
 from collections import defaultdict
 from pathlib import Path
 
+
+def _by_person(d, pid, default=None):
+    """(as observer_data.by_person: integer or string keys alike)"""
+    v = d.get(pid)
+    if v is None:
+        v = d.get(str(pid))
+    return default if v is None else v
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -48,9 +56,9 @@ class LiveView:
         out = []
         for eid, site, pos in self.by_person.get(pid, ()):
             e = self.editions[eid]
-            coach, caddie = e['team'].get(str(pid), (0, 0))
+            coach, caddie = _by_person(e['team'], pid, (0, 0))
             out.append({'year': int(eid.split(':')[0]), 'week': e['week'], 'event': eid, 'series': e['series'],
-                        'pos': pos, 'coach': coach, 'caddie': caddie, 'route': e['routes'].get(str(pid))})
+                        'pos': pos, 'coach': coach, 'caddie': caddie, 'route': _by_person(e['routes'], pid)})
         return out
 
 
@@ -119,6 +127,9 @@ def capture(session):
         cursor=session.cursor, generation=session.generation, history_generation=session.history_generation,
         history_years=sorted(archived), weeks_played=session.state.get('weeks_played'), engine=meta.get('engine'), commit=meta.get('commit'),
         written=meta.get('written'), year=year, people=people, wr=dict(s.wr_pos), am=dict(s.am_pos),
+        wr_avg=dict(getattr(s, 'wr_avg', {})), first_year=s.first_year,
+        rank_top={w_: list(rows) for w_, rows in getattr(s, 'rank_top', {}).get(year, {}).items()},
+        wr_seed=dict(getattr(s, 'wr_seed', {})),          # (seeded points: the world's first two seasons only)
         editions=editions, by_person=dict(by_person), schedule=schedule, series=series,
         coach_of=dict(st.coach_of), caddie_of=dict(st.caddie_of),
         birth=dict(pl.birth), home=dict(pl.home), first=dict(pl.first),

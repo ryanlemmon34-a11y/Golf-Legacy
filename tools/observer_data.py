@@ -52,21 +52,30 @@ def results(w, pid):
                 for k, site in enumerate(e['finish']):
                     for gid, pos, _ in site:
                         if gid == pid:
-                            coach, caddie = e['team'].get(str(pid), (0, 0))
+                            coach, caddie = by_person(e['team'], pid, (0, 0))
                             out.append({'year': y, 'week': e['week'], 'event': e['id'], 'series': e['series'],
                                         'name': e.get('name'), 'tour': e.get('tour'), 'tier': e.get('tier'),
                                         'category': e.get('category'), 'pos': pos, 'site': k, 'coach': coach,
-                                        'caddie': caddie, 'route': e['routes'].get(str(pid)),
+                                        'caddie': caddie, 'route': by_person(e['routes'], pid),
                                         'prize': _recorded_prize(e, k, pid), 'live': False})
     if w.live is not None:
         for eid, k, pos in w.live.by_person.get(pid, ()):
             e = w.live.editions[eid]
-            coach, caddie = e['team'].get(str(pid), (0, 0))
+            coach, caddie = by_person(e['team'], pid, (0, 0))
             out.append({'year': int(eid.split(':')[0]), 'week': e['week'], 'event': eid, 'series': e['series'],
                         'name': e['name'], 'tour': e['tour'], 'tier': e['tier'], 'category': e['category'], 'pos': pos,
-                        'site': k, 'coach': coach, 'caddie': caddie, 'route': e['routes'].get(str(pid)),
+                        'site': k, 'coach': coach, 'caddie': caddie, 'route': by_person(e['routes'], pid),
                         'prize': _recorded_prize(e, k, pid), 'live': True})
     return out
+
+
+def by_person(d, pid, default=None):
+    """A per-golfer entry of an edition (team, routes...) whether its keys are integers (an archived season as
+    the Archive decodes it) or strings (an edition record not yet archived, or read without decoding)."""
+    v = d.get(pid)
+    if v is None:
+        v = d.get(str(pid))
+    return default if v is None else v
 
 
 def _recorded_prize(e, site, pid):
@@ -75,7 +84,7 @@ def _recorded_prize(e, site, pid):
     prizes = e.get('prizes')
     if not prizes or site >= len(prizes):
         return None
-    return prizes[site].get(str(pid), prizes[site].get(pid, 0.0))
+    return by_person(prizes[site], pid, 0.0)
 
 
 def is_qualifying(r):

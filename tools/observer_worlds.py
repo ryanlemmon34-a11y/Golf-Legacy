@@ -70,7 +70,11 @@ def remove_world(lib, name):
     trash.mkdir(exist_ok=True)
     dst = trash / f'{name}--{time.strftime("%Y%m%d-%H%M%S")}'
     os.replace(src, dst)
-    (dst / REMOVED).write_text(json.dumps({'name': name, 'removed': time.strftime('%Y-%m-%d %H:%M:%S')}, indent=1))
+    try:                                       # the marker is what lists it in the trash: without it, put it back
+        (dst / REMOVED).write_text(json.dumps({'name': name, 'removed': time.strftime('%Y-%m-%d %H:%M:%S')}, indent=1))
+    except OSError:
+        os.replace(dst, src)
+        raise
     J.log(dst, f'removed from the library (restorable from {TRASH})')
     return dst
 
@@ -102,8 +106,11 @@ def restore_world(lib, folder):
     dst = Path(lib) / name
     if dst.exists():
         raise FileExistsError(f'A world named “{name}” exists again: remove or rename it first.')
-    (p / REMOVED).unlink()
-    os.replace(p, dst)
+    os.replace(p, dst)                         # if this fails (a file held open on Windows), the world stays in the
+    try:                                       # trash with its marker, listed and restorable later
+        (dst / REMOVED).unlink()
+    except OSError:
+        pass                                   # a leftover marker in a library world is ignored
     J.log(dst, 'restored from the trash')
     return dst
 

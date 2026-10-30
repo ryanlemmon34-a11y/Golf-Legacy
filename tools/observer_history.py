@@ -604,15 +604,15 @@ def rounds_view(w, q, e):
     if not full or not full.get('scores'):
         return ('<p class="muted">Round scores were not recorded for this edition (played before rules 2026-10-30): '
                 'only final positions and totals are kept, and rounds are never reconstructed from a total.</p>')
-    player = O.one(q, 'player')
-    if player and full.get('holes'):
-        return scorecard(w, full, int(player), base)
     site = int(O.one(q, 'site', '0') or 0)
     scores = full['scores'][site] if site < len(full['scores']) else {}
     n = max((len(v) for v in scores.values()), default=0)
     if not n:
         return '<p class="muted">No stroke-play rounds at this site (match play keeps final places only).</p>'
     k = max(1, min(n, int(O.one(q, 'round', str(n)) or n)))
+    player = O.one(q, 'player')
+    if player and full.get('holes'):
+        return scorecard(w, full, int(player), base, k, n)
     par = _layout_par(w, full['sites'][site]) if site < len(full['sites']) else None
     board = []
     for g, rs in scores.items():
@@ -648,28 +648,34 @@ def rounds_view(w, q, e):
             continue
         pos = rank[t]
         label = ('T' if count[t] > 1 else '') + str(pos)
-        name = w.person_link(g) + (f' <a href="{base}?{urlencode({"view": "rounds", "player": g, "site": site})}" '
+        name = w.person_link(g) + (f' <a href="{base}?{urlencode({"view": "rounds", "player": g, "site": site, "round": k})}" '
                                    'class="muted">card</a>' if has_holes else '')
         status = ''
         if k < n and len(rs) == k and len(rs) < n:
-            status = '<span class="muted">cut after this round</span>'
+            status = '<span class="muted">missed the cut after this round</span>'
         fin = final.get(g)
-        rows.append([label, name] + [str(x) for x in rs[:k]] + [str(t), f'{t - k * par:+d}' if par else '—', status
-                    + (f' · final {fin[1] or "MC"}' if fin and k < n else '')])
+        if k == n and fin and fin[1] is not None and fin[1] != pos:
+            status = f'final {fin[1]} (playoff)' if fin[1] <= 2 and count[t] > 1 else f'final {fin[1]}'
+        rows.append([label, name] + [str(x) for x in rs[:k]] + [str(t), f'{t - k * par:+d}' if par else '—', status])
     out.append(O.table(['Pos', 'Golfer'] + [f'R{i}' for i in range(1, k + 1)] + ['Total', 'To par', ''], rows,
                        numeric=tuple(range(2, 2 + k + 2))))
-    out.append('<p class="muted">Positions after a round are by total so far (ties share a place, “T”); the final '
-               'result also counts any playoff. Missed-cut players have only the rounds before the cut.'
+    if k == n and full.get('playoff') and site == 0:
+        out.append(f'<p>Playoff: {full["playoff"]} extra hole{"s" if full["playoff"] > 1 else ""}; '
+                   f'won by {w.person_link(next((g for g, p, _ in final.values() if p == 1), None))}.</p>')
+    out.append('<p class="muted">Positions after a round are by total so far (ties share a place, “T”); nothing after the '
+               'round shown is revealed (no final places, winner or later rounds) until the final round, where any '
+               'playoff decides the winner. Missed-cut players have only the rounds before the cut.'
                + (' “card”: a major\'s hole-by-hole scorecard.' if has_holes else '') + '</p>')
     return ''.join(out)
 
 
-def scorecard(w, full, gid, base):
+def scorecard(w, full, gid, base, through=None, n=None):
+    """A major's hole-by-hole card, through round `through` of the replay (no later round is shown)."""
     O = _o()
     site = next((i for i, s in enumerate(full.get('holes') or []) if str(gid) in s), None)
     if site is None:
         return '<p class="muted">No scorecard recorded for this golfer here.</p>'
-    holes = full['holes'][site][str(gid)]
+    holes = full['holes'][site][str(gid)][:through]
     pars = (full.get('pars') or [None])[site] if full.get('pars') else None
     head = ['Round'] + [str(i) for i in range(1, 19)] + ['Total']
     rows = []
@@ -681,7 +687,10 @@ def scorecard(w, full, gid, base):
             cls = '' if not pars else ('up' if s < pars[i] else 'down' if s > pars[i] else '')
             cells.append(f'<span class="{cls}">{s}</span>' if cls else str(s))
         rows.append([f'R{r}'] + cells + [str(sum(hs))])
-    return (f'<p><a href="{base}?view=rounds">← leaderboard</a></p><h2>Scorecard: {w.person_link(gid)}</h2>'
+    back = f'{base}?{urlencode({"view": "rounds", "round": through, "site": site})}' if through else f'{base}?view=rounds'
+    shown = (f'<p class="muted">Through round {through} of the replay.</p>'
+             if through and n and through < n else '')
+    return (f'<p><a href="{back}">← leaderboard</a></p><h2>Scorecard: {w.person_link(gid)}</h2>' + shown
             + O.table(head, rows, numeric=tuple(range(1, 20)))
             + '<p class="muted">Strokes per hole as played (under par in green, over par in red). Hole-by-hole scores are '
               'kept for majors only.</p>')
@@ -726,8 +735,11 @@ def record_context(w, name, rows):
         active = r.get('active')
         years = [y for y in (_year_of(e) for e in r.get('evidence', ())) if y]
         if name in ('longest-coach-partnerships', 'longest-caddie-partnerships'):
-            when = f'{O.when(tuple(r["start"]))} – ' + (O.when(tuple(r['end'])) if r.get('end') else 'now')
-            now = '<span class="up">together now: extending</span>' if r.get('current') else 'ended'
+            together = _together_now(w, name, r)
+            when = f'{O.when(tuple(r["start"]))} – ' + (O.when(tuple(r['end'])) if r.get('end') else
+                                                         'now' if together else 'this season')
+            now = ('<span class="up">together now: extending</span>' if together else
+                   'ended this season (after the archived count)' if r.get('current') else 'ended')
         elif name == 'weeks-at-number-one':
             span_ = _no1_span(w, pid)
             when = span_ or '—'
@@ -737,8 +749,10 @@ def record_context(w, name, rows):
                 now = 'competing, not No. 1 now' if active else 'closed (retired)'
         elif name in STREAKS:
             when = f'{min(years)}–{max(years)}' if years else '—'
-            if active and _streak_open(w, pid, STREAKS[name], r.get('evidence', [])):
-                now = '<span class="up">currently extending</span>'
+            state = _streak_open(w, pid, STREAKS[name], r.get('evidence', []), name) if active else False
+            if state:
+                now = '<span class="up">currently extending</span>' + (
+                    f' <span class="muted">(+{state - 1} this season, not yet counted)</span>' if state > 1 else '')
             else:
                 now = 'ended' + ('' if active else ' · retired')
         elif name in FIXED:
@@ -774,13 +788,52 @@ def _no1_span(w, pid):
     return f'{a[0]} wk {a[1]} – {b[0]} wk {b[1]}'
 
 
-def _streak_open(w, pid, scope, evidence):
-    """Whether the record run is still alive: it ends at the golfer's latest start in the scope."""
+def _streak_open(w, pid, scope, evidence, name):
+    """Whether the record run is still alive at the snapshot: it ends at the golfer's latest archived start
+    in the scope, and every start in the scope since (this season's, not yet archived) continues it.
+    Returns False, or 1 + the number of this season's starts that extended it."""
     st = w.stats
     if st is None or not evidence:
         return False
     ss = [s for s in st.starts[pid] if st.in_scope(s, scope)]
-    return bool(ss) and ss[-1][2] == evidence[-1]
+    if not ss or ss[-1][2] != evidence[-1]:
+        return False
+    keeps = (lambda pos: pos == 1) if name == 'consecutive-wins' else (lambda pos: pos is not None)
+    more = 0
+    for pos in _live_positions(w, pid, scope, st):
+        if not keeps(pos):
+            return False
+        more += 1
+    return 1 + more
+
+
+def _live_positions(w, pid, scope, st):
+    """The golfer's finishing positions this season (not yet archived) in a HistoryStats scope, in order."""
+    lv = w.live
+    if lv is None or (w.a and lv.year in w.a.years):
+        return []
+    out = []
+    for e in sorted(lv.editions.values(), key=lambda e: (e['week'], e['id'])):
+        kind = 'major' if e.get('category') == 'major' else e.get('kind', '')
+        if kind == 'qualifying' or not st.in_scope((lv.year, e['week'], e['id'], e.get('tour'), e.get('tier'), kind, None),
+                                                   scope):
+            continue
+        for site in e['finish']:
+            for g, pos, _ in site:
+                if g == pid:
+                    out.append(pos)
+    return out
+
+
+def _together_now(w, name, r):
+    """Whether an archived partnership still open at the last archived season is still going at the snapshot."""
+    if not r.get('current'):
+        return False
+    lv = w.live
+    if lv is None:
+        return True
+    now = lv.coach_of if name == 'longest-coach-partnerships' else lv.caddie_of
+    return now.get(r['person']) == r.get('staff')
 
 
 # ---- Career Grand Slam ------------------------------------------------------------------------------------------

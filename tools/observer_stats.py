@@ -18,6 +18,11 @@ Definitions (shown on the pages):
   where they disagree the per-tour figure is shown as unknown, never guessed. Season and all-time totals
   use the money actually paid.
 - Each edition counts once, under the tour it belonged to when it was played (majors under Majors).
+- **Golf statistics** (golfsim.golfstats, from the golf-statistics update on): each start's counters are summed per
+  person, season and tour, so any figure over any scope is a sum of counts over a sum of opportunities;
+  `golf_starts` counts the starts that carry them (coverage). Qualifying stages are not included.
+- **Records kept here** (per season, bounded): the longest drives and the best event driving averages
+  (top RECORD_KEEP per season and tour), every stroke-play winning margin and every match-play result.
 
 The store is a small SQLite file next to the world (observer_cache/), built one season at a time from the
 season files (in the background), and rebuilt for a season whose published file changes (a rollback).
@@ -36,13 +41,28 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-SCHEMA = 1
+from golfsim import golfstats as GS                                      # noqa: E402
+
+SCHEMA = 2
 COLUMNS = ('starts', 'wins', 'runner_ups', 'top2', 'top5', 'top10', 'cut_events', 'cuts_made', 'qualifiers')
+GOLF = ('golf_starts',) + GS.FIELDS            # summed golf statistics counters (and the starts carrying them)
+ALL = COLUMNS + GOLF
+RECORD_KEEP = 100                              # longest drives / event driving averages kept per season and tour
+EVENT_MIN_DRIVES = 8                           # an event driving average is kept from this many measured drives
+TABLES = ('agg', 'season_prize', 'money', 'staff_year', 'long_drives', 'event_drives', 'margins', 'matches')
 DDL = """
 CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT);
 CREATE TABLE IF NOT EXISTS years(year INT PRIMARY KEY, source TEXT);
 CREATE TABLE IF NOT EXISTS agg(person INT, year INT, tour TEXT, starts INT, wins INT, runner_ups INT, top2 INT,
-    top5 INT, top10 INT, cut_events INT, cuts_made INT, qualifiers INT, prize REAL, PRIMARY KEY(person, year, tour));
+    top5 INT, top10 INT, cut_events INT, cuts_made INT, qualifiers INT, prize REAL, """ + ', '.join(
+    f'{c} INT' for c in GOLF) + """, PRIMARY KEY(person, year, tour));
+CREATE TABLE IF NOT EXISTS long_drives(year INT, tour TEXT, person INT, event_id TEXT, week INT, tenths INT, round INT,
+    hole INT);
+CREATE TABLE IF NOT EXISTS event_drives(year INT, tour TEXT, person INT, event_id TEXT, week INT, tenths INT, drives INT);
+CREATE TABLE IF NOT EXISTS margins(year INT, tour TEXT, event_id TEXT, series TEXT, week INT, major INT, rounds INT,
+    winner INT, win_total INT, runner_total INT, margin INT, runners_up TEXT, playoff INT, field INT);
+CREATE TABLE IF NOT EXISTS matches(year INT, tour TEXT, event_id TEXT, series TEXT, week INT, stage TEXT, winner INT,
+    loser INT, result TEXT, holes INT, up INT, remaining INT);
 CREATE TABLE IF NOT EXISTS season_prize(person INT, year INT, prize REAL, reconciled INT, PRIMARY KEY(person, year));
 CREATE TABLE IF NOT EXISTS money(event_id TEXT PRIMARY KEY, year INT, purse INT, cut_top INT, field_size INT,
     match_play INT);
@@ -95,7 +115,7 @@ def season_tables(events, status, paid, calendar=None):
     events: edition records (archive.edition_record form); status: {gid: 'pro'|'amateur'|...} in-season;
     paid: {gid: season prize money actually paid}. Returns (agg {(gid, tour): {col: n, 'prize': x}},
     reconciled {gid: bool}, money {event_id: (purse, cut_top, field_size, match_play)})."""
-    agg = defaultdict(lambda: dict.fromkeys(COLUMNS, 0) | {'prize': 0.0})
+    agg = defaultdict(lambda: dict.fromkeys(ALL, 0) | {'prize': 0.0})
     computed = defaultdict(float)
     unknown = set()
     money = {}
@@ -112,7 +132,9 @@ def season_tables(events, status, paid, calendar=None):
         qualifying = e.get('kind') == 'qualifying' or e.get('tier') == 7
         tour = e.get('tour') or ''
         recorded = e.get('prizes')                   # paid as recorded (since rules 2026-10-30)
+        golf = e.get('golf')                         # golf statistics counters (when they were kept)
         for k, site in enumerate(e['finish']):
+            counters = golf[k] if golf and k < len(golf) else {}
             if recorded and k < len(recorded):
                 won = {int(g): x for g, x in recorded[k].items()}
             else:
@@ -131,6 +153,11 @@ def season_tables(events, status, paid, calendar=None):
                     a['qualifiers'] += 1
                     continue
                 a['starts'] += 1
+                c = counters.get(str(gid), counters.get(gid))
+                if c:
+                    a['golf_starts'] += 1
+                    for f, v in zip(GS.FIELDS, c):
+                        a[f] += v
                 if pos is not None:
                     a['wins'] += pos == 1
                     a['runner_ups'] += pos == 2
@@ -149,6 +176,56 @@ def season_tables(events, status, paid, calendar=None):
     return dict(agg), reconciled, money
 
 
+def _match_margin(text):
+    """(holes up, holes remaining) of a match result: '7&6' -> (7, 6), '2 up' -> (2, 0), '19 holes' (won at an
+    extra hole) -> (1, 0)."""
+    if '&' in text:
+        a, b = text.split('&')
+        return int(a), int(b)
+    if text.endswith(' up'):
+        return int(text[:-3]), 0
+    return 1, 0
+
+
+def season_records(events, year):
+    """The season's record rows: (long_drives, event_drives, margins, matches), from the editions' recorded
+    golf statistics, finishes and match results. Qualifying stages are left out; winning margins are for
+    single-site stroke-play editions (a multi-site edition has no single field to lead)."""
+    longs, avgs = defaultdict(list), defaultdict(list)
+    margins, matches = [], []
+    for e in events:
+        if e.get('kind') == 'qualifying' or e.get('tier') == 7:
+            continue
+        tour = e.get('tour') or ''
+        for k, site in enumerate(e.get('golf') or []):
+            for g, c in site.items():
+                if len(c) > GS.N and c[GS.N]:
+                    longs[tour].append((year, tour, int(g), e['id'], e['week'], c[GS.N], c[GS.N + 1], c[GS.N + 2]))
+                drives = c[GS.IDX['drives']]
+                if drives >= EVENT_MIN_DRIVES:
+                    avgs[tour].append((year, tour, int(g), e['id'], e['week'], c[GS.IDX['drive_tenths']], drives))
+        if e.get('match_play'):
+            for site in e.get('matches') or []:
+                for stage, win, lose, text, holes in site:
+                    up, rem = _match_margin(text)
+                    matches.append((year, tour, e['id'], e['series'], e['week'], stage, win, lose, text, holes, up, rem))
+            continue
+        if len(e['finish']) != 1:
+            continue
+        site = e['finish'][0]
+        win = next(((g, t) for g, p, t in site if p == 1 and t is not None), None)
+        rest = [(g, t) for g, p, t in site if t is not None and (win is None or g != win[0])]
+        if win is None or not rest:
+            continue
+        runner = min(t for _, t in rest)
+        margins.append((year, tour, e['id'], e['series'], e['week'], int(e.get('category') == 'major'), e.get('rounds'),
+                        win[0], win[1], runner, runner - win[1], json.dumps([g for g, t in rest if t == runner]),
+                        e.get('playoff') or 0, len(site)))
+    keep_long = [r for rows in longs.values() for r in sorted(rows, key=lambda r: (-r[5], r[2]))[:RECORD_KEEP]]
+    keep_avg = [r for rows in avgs.values() for r in sorted(rows, key=lambda r: (-r[5] / r[6], r[2]))[:RECORD_KEEP]]
+    return keep_long, keep_avg, margins, matches
+
+
 class StatsStore:
     """The SQLite store (one connection per thread: open one where it is used)."""
 
@@ -158,7 +235,14 @@ class StatsStore:
         self.db = sqlite3.connect(self.path, timeout=30)
         self.db.execute('PRAGMA journal_mode=WAL')
         self.db.executescript(DDL)
-        if self.db.execute("SELECT value FROM meta WHERE key='schema'").fetchone() is None:
+        have = self.db.execute("SELECT value FROM meta WHERE key='schema'").fetchone()
+        if have is not None and have[0] != str(SCHEMA):    # derived: an older store is rebuilt from the history
+            with self.db:
+                for t in TABLES + ('years', 'meta'):
+                    self.db.execute(f'DROP TABLE IF EXISTS {t}')
+            self.db.executescript(DDL)
+            have = None
+        if have is None:
             self.db.execute("INSERT INTO meta VALUES ('schema', ?)", (str(SCHEMA),))
         self.db.commit()
 
@@ -170,19 +254,22 @@ class StatsStore:
 
     def drop(self, year):
         with self.db:
-            for t in ('agg', 'season_prize', 'money', 'staff_year'):
+            for t in TABLES:
                 self.db.execute(f'DELETE FROM {t} WHERE year = ?', (year,))
             self.db.execute('DELETE FROM years WHERE year = ?', (year,))
 
-    def put(self, year, source, agg, reconciled, paid, money, staff=()):
+    def put(self, year, source, agg, reconciled, paid, money, staff=(), records=((), (), (), ())):
         with self.db:
-            for t in ('agg', 'season_prize', 'money', 'staff_year'):
+            for t in TABLES:
                 self.db.execute(f'DELETE FROM {t} WHERE year = ?', (year,))
             self.db.executemany('INSERT INTO staff_year VALUES (?,?,?,?,?,?,?)', staff)
             self.db.executemany(
-                'INSERT INTO agg VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
-                [(gid, year, tour, *(a[c] for c in COLUMNS), a['prize'] if reconciled.get(gid) else None)
-                 for (gid, tour), a in agg.items()])
+                f'INSERT INTO agg VALUES ({",".join("?" * (4 + len(ALL)))})',
+                [(gid, year, tour, *(a[c] for c in COLUMNS), a['prize'] if reconciled.get(gid) else None,
+                  *(a[c] for c in GOLF)) for (gid, tour), a in agg.items()])
+            for t, rows in zip(('long_drives', 'event_drives', 'margins', 'matches'), records):
+                if rows:
+                    self.db.executemany(f'INSERT INTO {t} VALUES ({",".join("?" * len(rows[0]))})', rows)
             self.db.executemany('INSERT INTO season_prize VALUES (?,?,?,?)',
                                 [(gid, year, paid.get(gid), int(bool(ok))) for gid, ok in reconciled.items()])
             self.db.executemany('INSERT OR REPLACE INTO money VALUES (?,?,?,?,?,?)',
@@ -214,7 +301,7 @@ def build(archive_dir, store_path):
                 agg, rec, money = season_tables(d['events'], status, paid)
                 staff = [(int(k.split(':')[1]), y, k.split(':')[0], v.get('rounds'), v.get('weeks'),
                           v.get('reputation'), v.get('earnings_total')) for k, v in d.get('staff_year', {}).items()]
-                store.put(y, want[y], agg, rec, paid, money, staff)
+                store.put(y, want[y], agg, rec, paid, money, staff, season_records(d['events'], y))
                 a._years.clear()                         # (one decoded season at a time)
         finally:
             store.close()
@@ -289,7 +376,7 @@ def query(db, years=None, tour=None, live=None, live_year=None):
     """{person: {col: n, 'prize': x | None, 'prize_known': bool}} over archived `years` (None: all) and the
     live season's tables if given. Overall (no tour): prize money actually paid; a tour: recomputed payouts
     (None where they could not be reconciled)."""
-    out = defaultdict(lambda: dict.fromkeys(COLUMNS, 0) | {'prize': 0.0, 'prize_known': True})
+    out = defaultdict(lambda: dict.fromkeys(ALL, 0) | {'prize': 0.0, 'prize_known': True})
     where, args = [], []
     if years is not None:
         where.append(f'year IN ({",".join("?" * len(years))})')
@@ -298,12 +385,12 @@ def query(db, years=None, tour=None, live=None, live_year=None):
         where.append('tour = ?')
         args.append(tour)
     w = (' WHERE ' + ' AND '.join(where)) if where else ''
-    cols = ', '.join(f'SUM({c})' for c in COLUMNS)
+    cols = ', '.join(f'SUM({c})' for c in ALL)
     if db is None or (years is not None and not years):
         db = _EMPTY
     for row in db.execute(f'SELECT person, {cols}, SUM(prize), COUNT(*) - COUNT(prize) FROM agg{w} GROUP BY person', args):
         r = out[row[0]]
-        for c, v in zip(COLUMNS, row[1:]):
+        for c, v in zip(ALL, row[1:]):
             r[c] += v or 0
         if tour:
             r['prize'] += row[-2] or 0.0
@@ -319,7 +406,7 @@ def query(db, years=None, tour=None, live=None, live_year=None):
             if tour and t != tour:
                 continue
             r = out[gid]
-            for c in COLUMNS:
+            for c in ALL:
                 r[c] += a[c]
             if tour:
                 if rec.get(gid):
@@ -350,10 +437,12 @@ def tours_in(db):
 def person_seasons(db, pid):
     """{year: {'tours': {tour: row}, 'prize': paid, 'reconciled': bool}} for one person (archived seasons)."""
     out = {}
-    for row in db.execute(f'SELECT year, tour, {", ".join(COLUMNS)}, prize FROM agg WHERE person = ?', (pid,)):
+    for row in db.execute(f'SELECT year, tour, {", ".join(COLUMNS)}, prize, {", ".join(GOLF)} FROM agg WHERE person = ?',
+                          (pid,)):
         y, t = row[0], row[1]
+        n = 2 + len(COLUMNS)
         out.setdefault(y, {'tours': {}, 'prize': None, 'reconciled': False})['tours'][t] = (
-            dict(zip(COLUMNS, row[2:-1])) | {'prize': row[-1]})
+            dict(zip(COLUMNS, row[2:n])) | {'prize': row[n]} | dict(zip(GOLF, row[n + 1:])))
     for y, prize, ok in db.execute('SELECT year, prize, reconciled FROM season_prize WHERE person = ?', (pid,)):
         s = out.setdefault(y, {'tours': {}, 'prize': None, 'reconciled': False})
         s['prize'], s['reconciled'] = prize, bool(ok)
