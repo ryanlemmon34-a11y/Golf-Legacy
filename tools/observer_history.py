@@ -79,13 +79,29 @@ def rights_section(w, year, major):
         when = r.get('awarded')
         body.append([w.person_link(gid), O.esc(r.get('state') or ''), cats,
                      O.esc('; '.join(r.get('sources') or []) or '—'),
-                     O.esc(f'{when[0]} week {when[1]}' if when else '—'), O.esc(r.get('result') or 'pending')])
+                     O.esc(f'{when[0]} week {when[1]}' if when else '—'), O.esc(r.get('result') or 'pending'),
+                     _place_money(O, r)])
     return ('<h2>Qualification ledger</h2><p>' + ' · '.join(f'{n} {O.esc(k)}' for k, n in tally.most_common())
-            + '</p>' + O.table(['Golfer', 'Place', 'Categories', 'Evidence', 'Earned', 'Outcome'], body)
+            + '</p>' + O.table(['Golfer', 'Place', 'Categories', 'Evidence', 'Earned', 'Outcome',
+                                'Money when the field was set'], body)
             + '<p class="muted">Every place this edition\'s rules gave: earned, or conditional (an amateur\'s place, '
               'which lapses on turning professional). Outcome: entered; withdrawn (injured or retired); declined (could '
               'not pay the trip); expired. Alternates and invitations that took places given up are listed as entered. '
-              'Evidence is the edition and result, ranking or award the category read, as recorded.</p>')
+              'Evidence is the edition and result, ranking or award the category read, as recorded. Money: what the '
+              'golfer could draw on (savings, backers, credit), what was set aside first (four weeks of living and '
+              'coaching costs, and entries already accepted that week), what remained to spend, the trip\'s cost '
+              '(travel and entry, and the caddie\'s week) and who paid it; "not recorded" for places decided '
+              'before this was kept.</p>')
+
+
+def _place_money(O, r):
+    m = r.get('money')
+    if not m:
+        return NOT_RECORDED
+    payer = {'golfer': 'the golfer', 'organizer': 'the organizer (travel and entry)', 'school': 'their school',
+             'club': 'their club'}.get(m.get('paid_by'), m.get('paid_by') or '—')
+    return (f'could draw {O.money(m["funds"])} · set aside {O.money(m["set_aside"])} · '
+            f'to spend {O.money(m["spendable"])} · trip {O.money(m["trip"])} · paid by {O.esc(payer)}')
 
 
 def rules_versions(w):

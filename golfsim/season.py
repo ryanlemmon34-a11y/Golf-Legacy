@@ -1169,7 +1169,7 @@ class Season:
                     self.declined[year][g.id].append(sid)
             return take
         if s.kind == 'major':
-            return [self.major_field(sid, year, week, pays)]
+            return [self.major_field(sid, year, week, pays, ed)]
         if sid == 'PT_PREMIER_TOUR_FINALS':
             rows = self.ctx.standing('PREMIER', year, week - 1)
             return [invite([self.g[gid] for gid in rows if self.g[gid].status == 'pro' and gid not in self.injured],
@@ -1326,7 +1326,7 @@ class Season:
     # ---- majors: every entrant has a recorded route ------------------------------------------------
     INAUGURAL_MASTERS = 90           # the world's first Masters has no past champions or results to draw on
 
-    def major_field(self, sid, year, week, pays=lambda g: True):
+    def major_field(self, sid, year, week, pays=lambda g: True, ed=None):
         """The major's field from its qualification routes. Each entrant's route is recorded in
         `entry_routes`. Golfers who are injured or retired withdraw and the next alternates (recorded
         as 'ALT') take their places; an invitation-only event without alternates simply plays with a
@@ -1337,10 +1337,22 @@ class Season:
         f = Q.build_field(sid, year, self.ctx)
         self.stage_log[(year, sid, 'field')] = f
         can_play = lambda gid: gid in self.g and gid not in self.injured and self.g[gid].lifestyle != 'retired'
+        cities = sorted({v.city for v in self.lib.venues(year)[ed.event_id]}) if ed is not None else []
+        money = {}                               # gid -> the money a place was decided on (observation only)
+
+        def facts(g):
+            if not cities or g.id in money:
+                return
+            committed = FIN.RESERVE_WEEKS * self.committed_weekly(g)
+            money[g.id] = {'funds': round(self.funds(g, year)), 'set_aside': round(committed + self._reserved.get(g.id, 0.0)),
+                           'spendable': round(self.spendable(g, year)),
+                           'trip': round(min(self.trip_cost(g, ed.series, c) for c in cities)),
+                           'paid_by': FIN.event_payer(g, ed.series) or 'golfer'}
 
         def ok(gid):
             if not can_play(gid):
                 return False
+            facts(self.g[gid])
             if not pays(self.g[gid]):
                 self.declined[year][gid].append(sid)
                 return False
@@ -1364,6 +1376,10 @@ class Season:
                     routes[gid] = 'INIT'
         self.entry_routes[(year, sid)] = routes
         self.lock_rights(sid, year, week, f, routes)
+        book = self.major_rights[year].get(sid, {})
+        for gid, m in money.items():                 # each place with the money it was decided on
+            if gid in book:
+                book[gid]['money'] = m
         return list(routes)
 
     # ---- the rights ledger: every major place, earned, used or lost ----------------------------------------
