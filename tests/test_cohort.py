@@ -210,9 +210,9 @@ class Cohorts(unittest.TestCase):
         pids = [r['person'] for r in old['rows']]
         idx = self.w.a.index
         real = idx.db
-        url = f'/cohort?event={quote(old["id"])}&sort=name'
+        url = f'/cohort?event={quote(old["id"])}&sort=prize'           # (the paid ones on the first page)
         shown = [int(x) for x in self.rows(self.page(url))]
-        gap = next(g for g in shown if any(r['events'] and r['prize'] for r in idx.seasons(g)))
+        gap = next(g for g in shown if any(r['events'] and r['year'] >= old['year'] for r in idx.seasons(g)))
 
         class Older:                                                    # that golfer's seasons without prize money
             def execute(self, sql, *a):

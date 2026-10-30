@@ -75,7 +75,8 @@ class CompleteHistory(unittest.TestCase):
         prof = self.page(f'/golfer/{champ}')
         self.assertIn(f'/event/{quote(archived[0][2])}"', prof)        # wins and moments on the profile
         stab = self.page(f'/golfer/{champ}?tab=season&year={self.y}')
-        self.assertIn(f'won the {self.y} {self.w.series_name(archived[0][3])}'.lower(), text(stab).lower())
+        self.assertIn(f'/event/{quote(archived[0][2])}"', stab)        # the season page names the win
+        self.assertIn(f'won the {self.w.series_name(archived[0][3])}'.lower(), text(stab).lower())
         rec = self.page('/records/youngest-major-champions')
         self.assertIn(f'/event/{quote(archived[0][2])}"', rec)
         ev = self.page(f'/event/{quote(archived[0][2])}')
