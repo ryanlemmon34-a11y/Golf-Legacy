@@ -609,7 +609,7 @@ def rounds_view(w, q, e):
     n = max((len(v) for v in scores.values()), default=0)
     if not n:
         return '<p class="muted">No stroke-play rounds at this site (match play keeps final places only).</p>'
-    k = max(1, min(n, int(O.one(q, 'round', str(n)) or n)))
+    k = max(1, min(n, int(O.one(q, 'round', '1') or 1)))    # a replay starts at round one: nothing ahead revealed
     player = O.one(q, 'player')
     if player and full.get('holes'):
         return scorecard(w, full, int(player), base, k, n)
@@ -634,7 +634,7 @@ def rounds_view(w, q, e):
            f'complete and nothing is simulated here. {steps}</p>']
     if len(full['sites']) > 1:
         out.append('<p>Site: ' + ' · '.join((f'<strong>{i + 1}</strong>' if i == site else
-                                             f'<a href="{base}?{urlencode({"view": "rounds", "site": i})}">{i + 1}</a>')
+                                             f'<a href="{base}?{urlencode({"view": "rounds", "site": i, "round": k})}">{i + 1}</a>')
                                             for i in range(len(full['sites']))) + '</p>')
     if cond and k - 1 < len(cond):
         wind, rain, pins = cond[k - 1]

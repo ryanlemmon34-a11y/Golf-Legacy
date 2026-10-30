@@ -69,6 +69,24 @@ class WorldFixes(unittest.TestCase):
         self.assertIn('Through round 1', card)
         self.assertIn('Winner:', self.page(f'/event/{eid}'))                 # the final result says who won
 
+    def test_opening_the_replay_starts_at_round_one_and_keeps_the_round(self):
+        eid = '2027:TOUR_MASTERS'
+        e = self.w.edition(eid)
+        winner = next(r['person'] for r in e['rows'] if r['pos'] == 1)
+        entry = self.page(f'/event/{eid}?view=rounds')                       # the tab's own link: no round given
+        self.assertIn('<strong>after round 1</strong>', entry)
+        self.assertNotIn('Winner:', entry)
+        self.assertNotIn('final ', entry.split('<tbody>')[1].split('</tbody>')[0])
+        self.assertNotIn('>R2<', entry)                                      # one round's column only
+        self.assertIn('round=1', entry.split('card</a>')[0].rsplit('href=', 1)[1])   # the card keeps round 1
+        card = self.page(f'/event/{eid}?view=rounds&player={winner}')        # a card opened without a round: round 1
+        self.assertIn('<td>R1</td>', card)
+        self.assertNotIn('<td>R2</td>', card)
+        self.assertIn('round=1', card.split('← leaderboard')[0])             # and back to the same round
+        r2 = self.page(f'/event/{eid}?view=rounds&round=2')
+        self.assertIn('<strong>after round 2</strong>', r2)
+        self.assertIn('round=2', r2.split('card</a>')[0].rsplit('href=', 1)[1])
+
     # 3 ------------------------------------------------------------------------------------------------------------
     def test_starts_and_their_list_share_one_scope(self):
         base = {'week': 3, 'series': 'S', 'name': 'x', 'tour': 'PT_AMERICAS', 'category': 'regular', 'site': 0,

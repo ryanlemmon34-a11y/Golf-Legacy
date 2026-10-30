@@ -124,7 +124,7 @@ class HistoryViewTests(unittest.TestCase):
         r1 = sorted(v[0] for v in e['scores'][0].values())
         leader = min(e['scores'][0], key=lambda g: (e['scores'][0][g][0], int(g)))
         self.assertIn(f'/golfer/{leader}"', body.split('<tbody>')[1].split('</tr>')[0])
-        final = self.page(f'/event/{eid}?view=rounds')
+        final = self.page(f'/event/{eid}?view=rounds&round={e["rounds"]}')
         missed = [g for g, p, _ in e['finish'][0] if p is None]
         if missed:
             self.assertIn('missed cut', final)
