@@ -41,6 +41,10 @@ import observer_stats as ST                                             # noqa: 
 SCALE = 0.02
 
 
+def arch_page(w, pid):
+    return O.render(w, f'/golfer/{pid}', {})[1]
+
+
 class CountingTests(unittest.TestCase):
     """The engine's counters, checked against their definitions on many simulated rounds."""
 
@@ -299,6 +303,36 @@ class GolfHistoryTests(unittest.TestCase):
         self.assertIn('Weight now', body)
         self.assertIn('No. 1 ·', body)
         self.assertIn(f'/golfer/{top}"', self.page('/rankings?kind=points'))
+
+    def test_ranking_labels_agree_live_and_archive_only(self):
+        """The position comes from the ranking recorded for the week shown, with or without a live world."""
+        lv = self.w.live
+        at = OG.last_played(self.w)
+        top = lv.rank_top[at[1]]
+        for i, (g, _, _) in enumerate(top[:50], 1):                         # live: the table and the snapshot agree
+            self.assertEqual(lv.wr[g], i)
+            self.assertEqual(OG.position_at(self.w, g, at), f'No. {i}')
+        arch = O.World(self.dir / 'archive')                                # archive only: no live world
+        self.addCleanup(arch.close)
+        self.assertIsNone(arch.live)
+        self.assertEqual(OG.last_played(arch), (2028, 52))
+        d = self.a.year(2028)
+        snap = d['ranking_points']['52']
+        order = d['rankings']['world']['52']                                # the engine's own order, top 100
+        for i, (g, avg, _) in enumerate(snap[:50], 1):
+            self.assertEqual(OG.position_at(arch, g, (2028, 52), avg), f'No. {i}')
+            self.assertEqual(order[i - 1], g)
+            self.assertEqual(OG.position_at(self.w, g, (2028, 52), avg), f'No. {i}')   # the live world, same week
+            self.assertIn(f'No. {i} ·', arch_page(arch, g))
+        none = [g for g in self.a.people if OG.ranking_at(arch, g, (2028, 52))['average'] == 0
+                and (self.a.people[g].get('golfer') or {}).get('status') == 'pro']
+        from unittest import mock
+        short = {'ranking_points': {'52': snap[:2]}}                         # a golfer with points below the record
+        with mock.patch.object(OG, '_season_file', return_value=short):
+            self.assertEqual(OG.position_at(arch, snap[5][0], (2028, 52), snap[5][1]), 'outside the recorded top 2')
+        self.assertTrue(none)
+        self.assertEqual(OG.position_at(arch, none[0], (2028, 52), 0.0), 'unranked (no points in the last 104 weeks)')
+        self.assertEqual(OG.position_at(arch, none[0], (2026, 52), 0.0), 'position not recorded')
 
     def test_old_seasons_read_not_recorded(self):
         e = self.w.edition(next(iter(self.live_results)))

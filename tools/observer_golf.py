@@ -283,6 +283,32 @@ def ranking_at(w, pid, at):
             'rows': window, 'missing': missing}
 
 
+def position_at(w, pid, at, average=None):
+    """The golfer's world ranking position at week `at`, as text: 'No. N' from the ranking recorded for that week
+    (the live table at the snapshot's week; otherwise the archived weekly snapshot), 'outside the recorded top
+    200' when they had points but the week's record stops above them, 'unranked' when they had no points in the
+    window, and 'position not recorded' for a week whose ranking was not kept."""
+    if w.live is not None and at == last_played(w):
+        pos = w.live.wr.get(pid)
+        return f'No. {pos}' if pos else 'unranked (no points in the last 104 weeks)'
+    y, wk = at
+    if not (w.a and y in w.a.years):
+        return 'position not recorded'
+    d = _season_file(w, y) or {}
+    snap = (d.get('ranking_points') or {}).get(str(wk))
+    if snap:
+        pos = next((i for i, (g, _, _) in enumerate(snap, 1) if g == pid), None)
+        if pos:
+            return f'No. {pos}'
+        if average is not None and average <= 0:
+            return 'unranked (no points in the last 104 weeks)'
+        return f'outside the recorded top {len(snap)}'
+    order = ((d.get('rankings') or {}).get('world') or {}).get(str(wk))
+    if order and pid in order:                          # older seasons kept the top 100's order only
+        return f'No. {order.index(pid) + 1}'
+    return 'position not recorded' + (f' (outside the recorded top {len(order)})' if order else '')
+
+
 def ranking_section(w, pid):
     """A golfer's world ranking now, with every counted start (points earned, weight now, points counted)."""
     O = _o()
@@ -290,11 +316,13 @@ def ranking_section(w, pid):
     if at is None or first_year(w) is None:
         return ''
     r = ranking_at(w, pid, at)
-    pos = w.live.wr.get(pid) if w.live is not None else None
-    if not r['rows'] and not pos:
+    label = position_at(w, pid, at, None if r['missing'] else r['average'])
+    if not r['rows']:
+        if r['missing'] and label.startswith('No.'):   # an older world: the position kept, not the points
+            return (f'<h2>World ranking points</h2><p>As of {at[0]} week {at[1]}: {label}. Points were not recorded for '
+                    f'{", ".join(map(str, r["missing"]))} (played before they were kept).</p>')
         return ''
-    head = (f'<h2>World ranking points</h2><p>As of {at[0]} week {at[1]}: '
-            + (f'No. {pos} · ' if pos else 'unranked · ')
+    head = (f'<h2>World ranking points</h2><p>As of {at[0]} week {at[1]}: {label} · '
             + f'average <strong>{r["average"]:.3f}</strong> = {r["total"]:.2f} points / {r["divisor"]} '
               f'({r["events"]} counted start{"s" if r["events"] != 1 else ""} in the last 104 weeks; the divisor is the '
               f'starts, at least 40 and at most 52) · <a href="/rules#world-ranking">how the ranking works</a></p>')
