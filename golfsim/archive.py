@@ -177,11 +177,14 @@ class ArchiveWriter:
         events = [edition_record(season, r) for r in season.results.values() if r.year == year]
         careers = {}
         from .ratings import ATTRIBUTE_KEYS
+        episodes = season.injury_episodes(year) if hasattr(season, 'injury_episodes') else {}
         for gid, row in snap.items():
             careers[gid] = {k: row.get(k) for k in ('tour', 'tier', 'status', 'lifestyle', 'events', 'wins', 'top10',
                                                     'cuts', 'majors', 'prize', 'net', 'wr_start', 'wr_end', 'am_start',
                                                     'am_end', 'injury_weeks', 'promoted', 'demoted', 'next_tour',
                                                     'zero_start_reason', 'zero_start_kind')}
+            if episodes.get(gid):                       # each injury of the season (onset, announced, out, back)
+                careers[gid]['injuries'] = episodes[gid]
             pk = getattr(season, 'peak_overall', {}).get(gid)
             if pk is not None:                          # highest Overall reached so far (value, year, week)
                 careers[gid]['peak'] = [round(pk[0], 1), pk[1], pk[2]]   # (as shown: one decimal)

@@ -143,6 +143,8 @@ def capture(session):
         birth=dict(pl.birth), home=dict(pl.home), first=dict(pl.first),
         moves={k: list(v) for k, v in pl.moves.items()}, courses=courses, tours=tours, records=records,
         prize={gid: led.prize for gid, led in s.ledgers.get(year, {}).items()},
+        injuries=dict(s.injury_episodes(year)) if hasattr(s, 'injury_episodes') else {},   # this season's, by golfer
+        injured_now=sorted(getattr(s, 'injured', {})),
         qual=_qual(s, year, session.cursor),
         **_status(s, year),
         captured=time.time())

@@ -394,6 +394,7 @@ class Season:
         self.travel_grants = defaultdict(list)               # year -> [major trips paid by the organizer, in kind]
         self.dev_acc = defaultdict(dict)                     # year -> gid -> development evidence (D.ACC_LEN numbers)
         self.creations = defaultdict(dict)                   # year -> gid -> how a golfer started (hidden facts too)
+        self.injury_lasting = defaultdict(dict)              # year -> 'week:gid' -> lasting losses of that injury
         for g in world.golfers:                              # the world starts mid-history: assume the season
             if g.lifestyle != 'retired':                     # before it was a typical one for their lifestyle
                 self.prior_rounds[g.id] = (self.first_year, D.EXPERIENCE_ROUNDS * (1.0 if g.lifestyle == 'full_time' else 0.5))
@@ -1841,6 +1842,7 @@ class Season:
         state.setdefault('travel_grants', defaultdict(list))   # major trips before the guarantee: none paid
         state.setdefault('dev_acc', defaultdict(dict))       # development evidence before it was kept: not recorded
         state.setdefault('creations', defaultdict(dict))
+        state.setdefault('injury_lasting', defaultdict(dict))   # lasting injury losses before they were kept
         state.setdefault('earned', {})                      # rebuilt from results when first needed
         state.setdefault('college', {})                     # college seasons before the ledger: not recorded
         state.setdefault('wr_seed', {})
@@ -2098,6 +2100,7 @@ class Season:
                         self.note_peaks(year, week, (g,))     # (a lasting injury can lower the ratings)
                         lost = D.serious_injury(g, weeks, rng, acc=self.dev_record(year, g.id))
                         if lost:
+                            self.injury_lasting[year][f'{week}:{g.id}'] = dict(lost)
                             text += ' — lasting damage: ' + ', '.join(f'{k.replace("_", " ")} −{v}' for k, v in lost.items())
                     self.log(g.id, year, week, text)
                     f = 0.0                                  # the time off rests them
@@ -2201,7 +2204,7 @@ class Season:
                   self.block_flags, self.cash_start, self.support_start, self.overall_start, self.rank_start, self.am_start,
                   self.staff_receipts, self.injuries, self.card_log, self.career_counts, self.transitions,
                   self.assignments, self.staff_year, self.unheld, self.rights, self.earned, self.card_reasons, self.snapshots,
-                  self.major_rights, self.travel_grants, self.dev_acc, self.creations,
+                  self.major_rights, self.travel_grants, self.dev_acc, self.creations, self.injury_lasting,
                   self.rank_top,
                   self.juniors_added, self.new_pros_added, self.stats, self.moments):
             for y in [y for y in d if isinstance(y, int) and old(y)]:
@@ -2954,6 +2957,19 @@ class Season:
         if r is None:
             r = self.dev_acc[year][gid] = [0.0] * D.ACC_LEN
         return r
+
+    def injury_episodes(self, year):
+        """{gid: [episode]} of a season's injuries, as recorded when each happened: onset week, kind, the weeks
+        announced, when the golfer can next enter an event (an injury at the end of week W announced as n weeks
+        keeps them out of the entries of weeks W+1 .. W+n+1), the event it happened at and any lasting losses."""
+        out = defaultdict(list)
+        lasting = self.injury_lasting.get(year, {})
+        for week, gid, kind, weeks, ev in self.injuries.get(year, []):
+            k = week + weeks + 2 - 1                          # entries open again in week W + n + 2
+            out[gid].append({'week': week, 'kind': kind, 'announced': weeks, 'out': weeks + 1,
+                             'available': [year + k // 52, k % 52 + 1], 'event': ev,
+                             'lasting': lasting.get(f'{week}:{gid}', {})})
+        return out
 
     def year_experience(self, gid, year):
         """Competitive experience from a season's rounds actually played (0-1): what the year-end

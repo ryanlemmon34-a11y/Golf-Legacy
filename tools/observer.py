@@ -1154,6 +1154,59 @@ def ratings_history(w, q, pid, p):
               'Hover a bar for its date and value.</p>')
 
 
+def injuries_section(w, pid, starts):
+    """Injuries as recorded: whether the golfer is injured now and when they can enter events again; each episode
+    with its onset, the weeks announced, the entries it actually kept them out of, when they could enter again,
+    their first start after it and any lasting losses. Seasons archived before episodes were recorded show their
+    announced injury weeks only ("episodes not recorded")."""
+    from golfsim.ratings import ATTRIBUTE_LABELS
+    eps, legacy = [], []
+    for y, r in OD.career_rows(w, pid):
+        if r.get('injuries'):
+            eps += [(y, e) for e in r['injuries']]
+        elif r.get('injury_weeks'):
+            legacy.append((y, r['injury_weeks']))
+    lv = w.live
+    if lv is not None:
+        eps += [(lv.cursor['year'], e) for e in (getattr(lv, 'injuries', None) or {}).get(pid, [])]
+    now_hurt = lv is not None and pid in set(getattr(lv, 'injured_now', None) or ())
+    if not eps and not legacy and not now_hurt:
+        return ''
+    played = sorted((r['year'], r['week']) for r in starts if not OD.is_qualifying(r))
+    out = ['<h2>Injuries</h2>']
+    if now_hurt:
+        cur = eps[-1][1] if eps else None
+        out.append('<p><span class="tag">injured now</span> '
+                   + (f'{esc(cur["kind"])} (week {cur["week"]}): announced as {cur["announced"]} week'
+                      f'{"s" if cur["announced"] != 1 else ""}; can enter events again from {cur["available"][0]} week '
+                      f'{cur["available"][1]}' if cur else 'the injury was recorded before episodes were kept') + '</p>')
+    rows = []
+    for y, e in sorted(eps, key=lambda x: (x[0], x[1]['week']), reverse=True):
+        back = tuple(e['available'])
+        ret = next((f'{a} week {b}' for a, b in played if (a, b) >= back), None)
+        future = lv is not None and back > (lv.cursor['year'], lv.cursor['week'])
+        lost = ', '.join(f'{esc(ATTRIBUTE_LABELS.get(k, k))} −{v}' for k, v in (e.get('lasting') or {}).items())
+        rows.append([f'{y} week {e["week"]}', esc(e['kind']), f'{e["announced"]}', f'{e["out"]}',
+                     f'{back[0]} week {back[1]}' + (' (expected)' if future else ''),
+                     esc(ret) if ret else '<span class="muted">not yet</span>',
+                     lost or '<span class="muted">none</span>',
+                     event_link(w, e['event']) if e.get('event') else '<span class="muted">—</span>'])
+    for y, n in sorted(legacy, reverse=True):
+        rows.append([f'{y}', '<span class="muted">episodes not recorded</span>', f'{n} (season total)',
+                     NOT_RECORDED_TEXT, NOT_RECORDED_TEXT, NOT_RECORDED_TEXT, NOT_RECORDED_TEXT, '—'])
+    out.append(table(['Injured', 'Injury', 'Weeks announced', 'Entries missed (weeks)', 'Could enter again',
+                      'First start back', 'Lasting effects', 'Where'], rows, numeric=(2, 3)))
+    out.append('<p class="muted">As the world recorded it: an injury is announced in weeks; it keeps the golfer out '
+               'of the next week\'s entries too, so "entries missed" is one more than announced. "First start back" is '
+               'their next start after they could enter again (not every golfer plays at once). Lasting effects are '
+               'the ratings a serious injury took for good. Seasons played before episodes were recorded show only '
+               'their injury weeks.</p>')
+    return ''.join(out)
+
+
+NOT_RECORDED_TEXT = '<span class="muted">not recorded</span>'
+
+
 def peak_line(w, pid, p):
     """The profile's Peak Overall: the highest recorded base Overall, when it was first recorded and the age then,
     with how much of the career the records cover (a partial record says "Recorded Peak Overall")."""
@@ -1325,7 +1378,8 @@ def ST_person_seasons(db, pid):
 def _playing(w, q, pid, p):
     rows = OD.results(w, pid)
     active = (p.get('golfer') or {}).get('lifestyle') not in (None, 'retired')
-    out = [OH.status_section(w, pid, p), _ratings(w, pid, p), ratings_history(w, q, pid, p), _honors(w, pid, rows, active),
+    out = [OH.status_section(w, pid, p), _ratings(w, pid, p), ratings_history(w, q, pid, p), injuries_section(w, pid, rows),
+           _honors(w, pid, rows, active),
            OH.grand_slam_line(w, pid), _season_history(w, q, pid, p, rows),
            OG.golf_section(w, pid, one(q, 'scope'))]
     wins = [r for r in rows if r['pos'] == 1 and not OD.is_qualifying(r)]

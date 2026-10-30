@@ -1,6 +1,7 @@
 """Player-facing views of the living world: a golfer's ratings over time (fixed-width bars per season, levels or
 changes, unknown seasons as gaps, a retired golfer's final playing ratings dated to the season they retired
-after, never a later season).
+after, never a later season); injuries as recorded (announced weeks, entries actually missed, when the golfer
+could enter again, their first start back, lasting effects; older seasons say "episodes not recorded").
 
 Run from the project folder:  python -m unittest tests.test_living_views -v
 """
@@ -91,6 +92,58 @@ class RatingsOverTime(unittest.TestCase):
         self.assertIn('<option value="power" selected>', part)
         self.assertRegex(part, r'class="rv">[+-]\d+\.\d<')                # signed changes
         self.assertIn('no earlier season to compare', part)              # (the first bar has nothing before it)
+
+
+    # ---- injuries -------------------------------------------------------------------------------------------
+    def injured_golfers(self):
+        import observer_data as OD
+        out = []
+        for g in sorted(self.w.live.people):
+            for y, r in OD.career_rows(self.w, g):
+                if r.get('injuries'):
+                    out.append((g, y, r))
+        return out
+
+    def test_each_episode_adds_up_and_keeps_the_golfer_out(self):
+        hurt = self.injured_golfers()
+        self.assertTrue(hurt)
+        for g, y, r in hurt[:60]:
+            self.assertEqual(sum(e['announced'] for e in r['injuries']), r['injury_weeks'], (g, y))
+            starts = {(x['year'], x['week']) for x in self.w.results(g)}
+            for e in r['injuries']:
+                self.assertEqual(e['out'], e['announced'] + 1)
+                k = e['week'] + e['announced'] + 1
+                self.assertEqual(tuple(e['available']), (y + k // 52, k % 52 + 1))
+                first = (y, e['week'] + 1)
+                blocked = [s for s in starts if first <= s < tuple(e['available'])]
+                self.assertEqual(blocked, [], (g, y, e))              # no start while they were out
+
+    def test_the_profile_shows_them(self):
+        g, y, r = self.injured_golfers()[0]
+        html = O.render(self.w, f'/golfer/{g}', {})[1]
+        part = html.split('<h2>Injuries</h2>')[1].split('</p>')[-2] if '<h2>Injuries</h2>' in html else ''
+        self.assertIn('<h2>Injuries</h2>', html)
+        e = r['injuries'][0]
+        self.assertIn(f'{y} week {e["week"]}', html)
+        self.assertIn(f'{e["available"][0]} week {e["available"][1]}', html)
+        self.assertTrue(part)
+
+    def test_older_seasons_say_episodes_not_recorded(self):
+        import observer_data as OD
+        g, y, r = self.injured_golfers()[0]
+        real = OD.career_rows
+        strip = lambda w, pid: [(yy, {k: v for k, v in rr.items() if k != 'injuries'}) for yy, rr in real(w, pid)]
+        with mock.patch.object(OD, 'career_rows', strip), mock.patch.object(self.w.live, 'injuries', {}):
+            html = O.render(self.w, f'/golfer/{g}', {})[1]
+        self.assertIn('episodes not recorded', html)
+        self.assertIn(f'{r["injury_weeks"]} (season total)', html)
+
+    def test_injured_now(self):
+        lv = self.w.live
+        if not lv.injured_now:
+            self.skipTest('nobody injured in this week of the test world')
+        g = lv.injured_now[0]
+        self.assertIn('<span class="tag">injured now</span>', O.render(self.w, f'/golfer/{g}', {})[1])
 
 
 if __name__ == '__main__':
