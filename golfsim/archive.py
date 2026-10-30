@@ -303,6 +303,8 @@ class ArchiveWriter:
             p = people.setdefault(k.id, {'name': k.name, 'country': k.country, 'born': k.born, 'hometown': None})
             p['caddie'] = {'reputation': k.reputation, 'background': k.background, 'status': k.status,
                            'earnings': round(k.earnings), 'seasons': k.seasons, 'history': k.history}
+            if getattr(k, 'skills', None):              # their working skills as they stand (recorded from 2026-11-01)
+                p['caddie']['skills'] = {s: round(v, 1) for s, v in k.skills.items()}
         places = getattr(season, 'places', None)
         for pid, p in people.items():                 # one geography per person, whatever their roles
             p['nationality'] = p['country']

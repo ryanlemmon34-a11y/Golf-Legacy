@@ -1,7 +1,9 @@
 """Player-facing views of the living world: a golfer's ratings over time (fixed-width bars per season, levels or
 changes, unknown seasons as gaps, a retired golfer's final playing ratings dated to the season they retired
 after, never a later season); injuries as recorded (announced weeks, entries actually missed, when the golfer
-could enter again, their first start back, lasting effects; older seasons say "episodes not recorded").
+could enter again, their first start back, lasting effects; older seasons say "episodes not recorded"); coach and
+caddie profiles (speciality, youth focus, capacity, a caddie's recorded skills; hidden teaching and scouting not
+shown) and every partnership's beginning, arrangement, work together and end as recorded.
 
 Run from the project folder:  python -m unittest tests.test_living_views -v
 """
@@ -144,6 +146,38 @@ class RatingsOverTime(unittest.TestCase):
             self.skipTest('nobody injured in this week of the test world')
         g = lv.injured_now[0]
         self.assertIn('<span class="tag">injured now</span>', O.render(self.w, f'/golfer/{g}', {})[1])
+
+
+    # ---- coaches and caddies --------------------------------------------------------------------------------
+    def test_a_coach_profile(self):
+        a = self.w.a
+        coach = min(pid for pid, p in a.people.items() if (p.get('coach') or {}).get('speciality')
+                    and a.staff_clients(pid, 'coach'))
+        info = a.people[coach]['coach']
+        html = O.render(self.w, f'/golfer/{coach}', parse_qs('tab=coaching'))[1]
+        self.assertIn(f'<dt>Speciality</dt><dd>{info["speciality"].replace("_", " ")}</dd>', html)
+        self.assertIn(f'<dt>Takes on</dt><dd>up to {info["clients"]} clients</dd>', html)
+        self.assertIn('not shown (hidden in the game', html)
+        self.assertFalse({'teaching', 'scouting'} & set(info))             # (never archived either)
+        st = a.staff_clients(coach, 'coach')[0]['stint']
+        row = re.search(rf'<a href="/golfer/{st.golfer}">[^<]*</a></td>.*?</tr>', html, re.S).group(0)
+        self.assertIn(O._began(st), row)
+        self.assertIn(f'{st.work:,.0f}', row)
+        if st.end:
+            self.assertIn(O._ended(st), row)
+        team = O.render(self.w, f'/golfer/{st.golfer}', parse_qs('tab=team'))[1]
+        self.assertIn(f'/golfer/{coach}"', team)                          # the golfer's side names them too
+
+    def test_a_caddie_profile(self):
+        a = self.w.a
+        cad = min(pid for pid, p in a.people.items() if (p.get('caddie') or {}).get('skills'))
+        sk = a.people[cad]['caddie']['skills']
+        self.assertEqual(len(sk), 6)
+        html = O.render(self.w, f'/golfer/{cad}', parse_qs('tab=caddying'))[1]
+        for k, v in sk.items():
+            self.assertIn(f'{k.replace("_", " ")} {v:.1f}', html)
+        missing = O._staff_card({'reputation': 50, 'seasons': 3}, 'caddie')
+        self.assertIn('not recorded (recorded from rules 2026-11-01)', missing)
 
 
 if __name__ == '__main__':

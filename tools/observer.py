@@ -1468,6 +1468,7 @@ def _staff(w, pid, role):
     out.append(f'<p>{esc(role.title())} · status {esc(info.get("status"))}'
                + (f' · reputation {esc(info.get("reputation"))}' if info.get('reputation') is not None else '')
                + (f' · {esc(info.get("background"))}' if info.get('background') else '') + '</p>')
+    out.append(_staff_card(info, role))
     stints = w.a.staff_clients(pid, role) if w.a and pid in w.a.people else []
     if w.live:
         now = sorted((g for g, s in (w.live.coach_of if role == 'coach' else w.live.caddie_of).items() if s == pid),
@@ -1482,13 +1483,19 @@ def _staff(w, pid, role):
             + '<p class="muted">Current assignments as of the date in the header. Dated partnerships below are the '
               'recorded history; results show the team at each event.</p>')
     if stints:
+        unit = 'weeks' if role == 'coach' else 'rounds'
         out.append(f'<h2>All partnerships (through {w.a.years[-1]})</h2>' + table(
-            ['Player', 'From', 'To', 'Starts together', 'Wins', 'Majors'],
+            ['Player', 'From', 'To', 'How it began', 'Arrangement', f'Worked together ({unit})', 'How it ended',
+             'Starts together', 'Wins', 'Majors'],
             [[w.person_link(c['stint'].golfer), when(c['stint'].start),
               when(c['stint'].end) if c['stint'].end else 'still together',
-              str(c['starts']), str(len(c['wins'])), str(len(c['majors']))] for c in stints], numeric=(3, 4, 5))
-            + '<p class="muted">Results during a partnership are the client’s achievements, association not proof of '
-              'cause. Starts together count the archived seasons.</p>')
+              _began(c['stint']), _arrangement(c['stint']), f'{c["stint"].work:,.0f}',
+              _ended(c['stint']) if c['stint'].end else '<span class="muted">—</span>',
+              str(c['starts']), str(len(c['wins'])), str(len(c['majors']))] for c in stints], numeric=(5, 7, 8, 9))
+            + '<p class="muted">As recorded when each partnership began and ended: who started it and why, the '
+              'arrangement (a coaching fee per year, a share of winnings, a tour bag), the time actually worked '
+              'together and who ended it and why. Results during a partnership are the client’s achievements, '
+              'association not proof of cause. Starts together count the archived seasons.</p>')
         out.append(_staff_seasons(w, pid, role, stints))
     if w.a and pid in w.a.people:
         hist = (w.a.people[pid].get(role) or {}).get('history') or []
@@ -1498,6 +1505,48 @@ def _staff(w, pid, role):
         out.append('<p class="muted">Dated partnerships are archived when the season ends; until then each result shows '
                    'the team that week.</p>')
     return ''.join(out)
+
+
+def _staff_card(info, role):
+    """A coach's or caddie's working profile as the world records it: a coach's speciality, whether they specialise
+    in young players and how many clients they take on; a caddie's skills (recorded from 2026-11-01). A coach's
+    teaching and scouting quality are hidden in the game's design and not shown."""
+    if not info:
+        return ''
+    rows = []
+    if role == 'coach':
+        if info.get('speciality'):
+            rows.append(('Speciality', esc(str(info['speciality']).replace('_', ' '))))
+        if info.get('youth') is not None:
+            rows.append(('Young players', 'a youth specialist' if info['youth'] else 'not a youth specialist'))
+        if info.get('clients'):
+            rows.append(('Takes on', f'up to {info["clients"]} clients'))
+        rows.append(('Teaching and scouting', '<span class="muted">not shown (hidden in the game\'s design)</span>'))
+    else:
+        if info.get('seasons') is not None:
+            rows.append(('Seasons worked', esc(info['seasons'])))
+        sk = info.get('skills')
+        rows.append(('Skills', ' · '.join(f'{esc(k.replace("_", " "))} {v:.1f}' for k, v in sk.items()) if sk else
+                     '<span class="muted">not recorded (recorded from rules 2026-11-01)</span>'))
+    return '<dl class="kv">' + ''.join(f'<dt>{k}</dt><dd>{v}</dd>' for k, v in rows) + '</dl>'
+
+
+def _began(s):
+    who = {'golfer': 'the player', 'coach': 'the coach (an approach)', 'caddie': 'the caddie', 'school': 'the school'}
+    text = who.get(s.started_by, s.started_by or 'not recorded')
+    return esc(text + (f': {s.reason_start}' if s.reason_start else ''))
+
+
+def _ended(s):
+    who = {'golfer': 'the player', 'staff': 'the coach or caddie', 'retirement': 'a retirement', 'school': 'the school'}
+    text = who.get(s.ended_by, s.ended_by or 'not recorded')
+    return esc(text + (f': {s.reason_end}' if s.reason_end else ''))
+
+
+def _arrangement(s):
+    if s.arrangement == 'fee' and s.terms:
+        return f'fee, {money(s.terms)} a year'
+    return esc((s.arrangement or 'not recorded').replace('share', 'a share of winnings'))
 
 
 def _staff_seasons(w, pid, role, stints):
