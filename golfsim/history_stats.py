@@ -27,6 +27,8 @@ Definitions (DEFINITIONS holds the wording shown to the user):
 """
 from __future__ import annotations
 
+import os
+import pickle
 from array import array
 from collections import defaultdict
 
@@ -63,6 +65,7 @@ class Starts:
     def add_editions(self, editions):
         """`editions`: [(year, week, event id, tour, tier, kind)] of seasons later than any already held;
         returns {event id: rank}."""
+        self.__dict__.pop('flags', None)
         ranks = {}
         for e in sorted(editions, key=lambda e: (e[0], e[1], e[2])):
             ranks[e[2]] = len(self.ed)
@@ -103,6 +106,21 @@ class Starts:
     def clear(self):
         self.ed.clear()
         self.by.clear()
+        self.__dict__.pop('flags', None)
+
+    def scoped(self, pid, scope, test):
+        """self[pid] restricted to the starts whose edition passes test(start, scope) -- a test of the
+        edition only (tour, tier, kind) -- worked out once per edition rather than once per start: the same
+        tuples in the same order."""
+        a = self.by.get(pid)
+        if a is None:
+            return []
+        flags = self.__dict__.setdefault('flags', {})
+        ok = flags.get(scope)
+        if ok is None or len(ok) != len(self.ed):
+            ok = flags[scope] = bytes(1 if test(e + (None,), scope) else 0 for e in self.ed)
+        ed, mask = self.ed, (1 << POS_BITS) - 1
+        return [ed[c >> POS_BITS] + (((c & mask) - 1) if c & mask else None,) for c in a if ok[c >> POS_BITS]]
 
 
 class HistoryStats:
@@ -155,7 +173,53 @@ class HistoryStats:
         self.sig.update((y, sign(y)) for y in new)
         self.a = archive
         self.complete = True
+        self.boards = {}                             # (record lists worked out again from this reading)
+        self.dirty = getattr(self, 'dirty', False) or bool(new)
         return new
+
+    # ---- a cache beside the world (derived: rebuilt from the archive whenever it does not match) ------------
+    CACHE_FORMAT = 1
+
+    def dump(self, path):
+        """Write the starts read so far, with each season's signature, for a later reading of this world."""
+        if not self.complete:
+            return
+        path = os.fspath(path)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        tmp = path + '.tmp'
+        with open(tmp, 'wb') as f:
+            pickle.dump({'format': self.CACHE_FORMAT, 'ed': self.starts.ed, 'by': self.starts.by,
+                         'seen': sorted(self.seen), 'sig': self.sig, 'sizes': _sizes(self.a, self.seen),
+                         'boards': dict(getattr(self, 'boards', {}))}, f,
+                        protocol=pickle.HIGHEST_PROTOCOL)
+        os.replace(tmp, path)
+        self.dirty = False
+
+    @classmethod
+    def from_cache(cls, path, archive):
+        """The statistics from a cache written by dump, brought up to date with `archive`; None if there is no
+        usable cache (missing, another format, or any season in it no longer published exactly as it was:
+        then nothing of it is trusted and everything is read again)."""
+        sign = getattr(archive, 'signature', None)
+        try:
+            with open(path, 'rb') as f:
+                data = pickle.load(f)
+        except Exception:
+            return None
+        if sign is None or not isinstance(data, dict) or data.get('format') != cls.CACHE_FORMAT:
+            return None
+        if any(y not in archive.years or sign(y) != data['sig'].get(y) for y in data['seen']):
+            return None
+        if data.get('sizes') != _sizes(archive, data['seen']):   # (season files are named alike in every world)
+            return None
+        st = cls.__new__(cls)
+        st.a, st.complete, st.dirty = archive, True, False
+        st.starts = Starts()
+        st.starts.ed, st.starts.by = data['ed'], data['by']
+        st.seen, st.sig = set(data['seen']), dict(data['sig'])
+        if not st.extend(archive):                   # no season published since: the lists worked out then hold
+            st.boards = dict(data.get('boards') or {})
+        return st
 
     @staticmethod
     def _classify(archive, series, tour, tier, category):
@@ -220,7 +284,7 @@ class HistoryStats:
         return sorted(rows, key=lambda r: ((-key(r) if reverse else key(r)), r['person']))[:n]
 
     def _scoped(self, pid, scope):
-        return [s for s in self.starts[pid] if self.in_scope(s, scope)]
+        return self.starts.scoped(pid, scope, self.in_scope)
 
     # ---- career totals ------------------------------------------------------------------------------------
     def most_wins(self, scope='all', n=25):
@@ -469,6 +533,23 @@ BOARDS = {   # name -> (title, function name, keyword arguments): the lists the 
 }
 
 
+def _sizes(archive, years):
+    """Each season file's size: with the signatures, what tells this world's history from another's."""
+    out = {}
+    for y in sorted(years):
+        try:
+            out[y] = archive.year_path(y).stat().st_size
+        except (OSError, AttributeError):
+            out[y] = None
+    return out
+
+
 def board(stats, name, n=25, **overrides):
+    """A record list, worked out once per reading of the history (stats.extend starts again)."""
     title, fn, kw = BOARDS[name]
-    return title, getattr(stats, fn)(n=n, **{**kw, **overrides})
+    memo = stats.__dict__.setdefault('boards', {})
+    key = (name, n, tuple(sorted(overrides.items())))
+    if key not in memo:
+        memo[key] = getattr(stats, fn)(n=n, **{**kw, **overrides})
+        stats.dirty = True                           # (kept with the cache next time it is written)
+    return title, [dict(r) for r in memo[key]]

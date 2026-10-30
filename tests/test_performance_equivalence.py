@@ -6,8 +6,10 @@ shortcut gives exactly what the code it replaced gave.
 - the planner's shared-prefix search picks the same plan, with the same value, as the per-mask loop;
 - the remembered prize forecast is refreshed when a prize is learned or the year changes;
 - one-pass rankings and fame summed only when it changes equal a full recomputation, week after week;
-- a season played with the shortcuts saves exactly the state and history of the same season played
-  again from the same save (and the equivalence check against the previous engine is in the report).
+- the observer's all-time sums equal the seasons summed (and are not used once a season changes); the
+  records cache and the remembered record lists equal a fresh reading, and are not trusted for a season
+  published again or for another world's files.
+The whole-season equivalence against the previous engine (saved state and history) is in the report.
 
 Run from the project folder:  python -m unittest tests.test_performance_equivalence -v
 """
@@ -211,6 +213,101 @@ class SeasonShortcuts(unittest.TestCase):
         state = se.__getstate__()
         self.assertNotIn('_pf_memo', state)                                  # derived: never saved
         self.assertNotIn('_fame_seen', state)
+
+
+class BrowsingShortcuts(unittest.TestCase):
+    """Two archived seasons of a small world: the observer's all-time sums and the records cache."""
+
+    @classmethod
+    def setUpClass(cls):
+        sys.path.insert(0, str(ROOT / 'tools'))
+        cls.tmp = Path(tempfile.mkdtemp())
+        s = Session.create(cls.tmp / 'w', seed=37, workers=1, world=generate_world(seed=37, scale=0.02))
+        s.advance(52 * 2 + 1)
+        s.close()
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls.tmp, ignore_errors=True)
+
+    def world(self):
+        import observer as O
+        w = O.World(self.tmp / 'w', workers=1)
+        w.reload()
+        self.addCleanup(w.close)
+        return w
+
+    def test_all_time_sums_equal_the_seasons_summed(self):
+        import observer_stats as ST
+        from unittest import mock
+        w = self.world()
+        db, b = w.statistics()
+        if db is None:
+            w._builder.wait(300)
+            db, b = w.statistics()
+        years = list(w.a.years)
+        self.assertTrue(ST._all_time(db, years))
+        for tour in (None, 'PT_AMERICAS', 'CO_US_D1'):
+            for cols in (ST.COLUMNS, ST.GOLF, ST.ALL):
+                fast = ST.query(db, years, tour, cols=cols)
+                with mock.patch.object(ST, '_all_time', lambda db, y: False):
+                    slow = ST.query(db, years, tour, cols=cols)
+                self.assertEqual(set(fast), set(slow))
+                for pid in fast:
+                    self.assertEqual([fast[pid][c] for c in cols], [slow[pid][c] for c in cols], pid)
+                    self.assertEqual(fast[pid]['prize_known'], slow[pid]['prize_known'])
+                    self.assertAlmostEqual(fast[pid]['prize'], slow[pid]['prize'], places=6)
+        self.assertFalse(ST._all_time(db, years[:1]))                       # another set of seasons: per season
+        y = years[-1]
+        src = db.execute('SELECT source FROM years WHERE year = ?', (y,)).fetchone()[0]
+        db.execute('UPDATE years SET source = ? WHERE year = ?', ('republished', y))
+        self.assertFalse(ST._all_time(db, years))                           # a season changed: not trusted
+        db.execute('UPDATE years SET source = ? WHERE year = ?', (src, y))
+        db.commit()
+
+    def test_records_cache_and_remembered_lists_equal_a_fresh_reading(self):
+        from golfsim.archive import Archive
+        from golfsim import history_stats as HS
+        w = self.world()
+        st = w.stats
+        self.assertTrue(w._history_cache().exists())
+        names = list(HS.BOARDS)
+        first = {n: HS.board(st, n, n=50) for n in names}
+        with Archive(self.tmp / 'w' / 'archive') as a:
+            fresh = HS.HistoryStats(a)
+            self.assertEqual({n: HS.board(fresh, n, n=50) for n in names}, first)
+            plain = {pid: [s for s in fresh.starts[pid] if fresh.in_scope(s, 'professional')] for pid in fresh.starts}
+            self.assertEqual({pid: fresh._scoped(pid, 'professional') for pid in fresh.starts}, plain)
+            st.dump(w._history_cache())
+            cached = HS.HistoryStats.from_cache(w._history_cache(), a)
+            self.assertIsNotNone(cached)
+            self.assertEqual({n: HS.board(cached, n, n=50) for n in names}, first)
+            self.assertEqual(dict(cached.starts.by), dict(fresh.starts.by))
+            with mock_signature(a, a.years[-1], 'years/republished.json.gz'):
+                self.assertIsNone(HS.HistoryStats.from_cache(w._history_cache(), a))   # republished: read again
+            with mock_size(a, a.years[0]):
+                self.assertIsNone(HS.HistoryStats.from_cache(w._history_cache(), a))   # another world's files
+
+
+def mock_signature(archive, year, value):
+    from unittest import mock
+    real = archive.signature
+    return mock.patch.object(archive, 'signature', lambda y: value if y == year else real(y))
+
+
+def mock_size(archive, year):
+    from unittest import mock
+    real = archive.year_path
+
+    class P:
+        def __init__(self, p):
+            self.p = p
+
+        def stat(self):
+            class S:
+                st_size = self.p.stat().st_size + 1
+            return S()
+    return mock.patch.object(archive, 'year_path', lambda y: P(real(y)) if y == year else real(y))
 
 
 if __name__ == '__main__':

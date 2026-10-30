@@ -257,6 +257,8 @@ class World:
         return self._live_stats[1]
 
     def close(self):
+        if self._stats is not None and self.a is not None:
+            self._save_history_cache()                   # seasons read since: next time from the cache
         if self._builder is not None:
             self._builder.stop()
         if self._stats_db is not None:
@@ -271,9 +273,33 @@ class World:
 
     @property
     def stats(self):
+        """The records' statistics over the published history: read from the cache beside the world when it
+        matches (each season's signature), else from the history, and the cache written again."""
         if self._stats is None and self.a:
-            self._stats = HistoryStats(self.a)
+            path = self._history_cache()
+            st = HistoryStats.from_cache(path, self.a) if path is not None else None
+            if st is None:
+                st = HistoryStats(self.a)
+                st.dirty = True
+            self._stats = st
+            self._save_history_cache()
         return self._stats
+
+    def _history_cache(self):
+        import observer_stats as ST
+        try:
+            p = ST.cache_path(self)                       # (per world: the store's own name with another ending)
+            return p.with_name(p.name.replace('stats.sqlite', 'history_stats.pkl')) if self.archive_dir else None
+        except Exception:
+            return None
+
+    def _save_history_cache(self):
+        st, path = self._stats, self._history_cache()
+        if st is not None and path is not None and getattr(st, 'dirty', False):
+            try:
+                st.dump(path)
+            except OSError:
+                pass                                     # a cache only: the statistics stand without it
 
     # -- one view over the published history and the current season ----------------------------------------
     def person(self, pid):
@@ -1579,7 +1605,6 @@ def stats_page(w, q, view='stats'):
     f = filters(path, q, [('year', 'Season', yopts),
                           ('tour', 'Tour', [('', 'all tours')] + [(t, w.tours().get(t, {}).get('name', t.replace('_', ' ').title()))
                                                                   for t in tours])])
-    show = one(q, 'show', '') if view == 'stats' else ''
     f = f.replace('<button>Apply</button>', f'<input type="hidden" name="sort" value="{esc(sort)}">'
                   + ('<input type="hidden" name="show" value="golf">' if show == 'golf' else '')
                   + (f'<input type="hidden" name="min" value="{esc(one(q, "min"))}">' if show == 'golf' and one(q, 'min')
