@@ -1,7 +1,7 @@
 # Roadmap v14 build: what is in it, how to try it, and what is left
 
-**Build**: branch `build/v14` (GitHub: Golf-Legacy), code as of commit `1023dc5` (this report and the guides
-are documentation commits after it). It starts from the playtest build `7d8e6ed` (branch `main`, unchanged) and
+**Build**: branch `build/v14` (GitHub: Golf-Legacy), engine and observer code as of commit `1023dc5` (the commits
+after it change only documentation and one test). It starts from the playtest build `7d8e6ed` (branch `main`, unchanged) and
 includes the performance branch `perf/season-speed` (outcome-identical changes, reviewed separately in
 `docs/PERFORMANCE_REVIEW.md`). Nothing was merged into `main`; the paused world, the playtest installation and
 every save were left alone; no long simulation was run; nothing was bought or sent anywhere.
@@ -84,7 +84,7 @@ before fields), and its course library validates.
 | `test_calendar_v2` | 22 |
 | `test_performance_equivalence` (performance branch) | 7 |
 
-**Whole suite** on the final code (`1023dc5`, every module, 6 at a time): 37 modules, 497 tests; 36 modules
+**Whole suite** on the final code (`1023dc5`, every module, 6 at a time): 37 modules, 437 tests; 36 modules
 passed (1 test skipped by design). `test_history_consistency` failed once: its last check rendered a profile three
 times in a row right after a republished season, while the statistics were being rebuilt in the background, so
 the renders could differ under load (a timing race in the test, not in the observer: the page correctly says
