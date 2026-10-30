@@ -143,10 +143,20 @@ def capture(session):
         birth=dict(pl.birth), home=dict(pl.home), first=dict(pl.first),
         moves={k: list(v) for k, v in pl.moves.items()}, courses=courses, tours=tours, records=records,
         prize={gid: led.prize for gid, led in s.ledgers.get(year, {}).items()},
+        qual=_qual(s, year, session.cursor),
         **_status(s, year),
         captured=time.time())
     view.capture_seconds = round(time.perf_counter() - t0, 2)
     return view
+
+
+def _qual(s, year, cursor):
+    """This season's majors' qualification as it stands (observer_qual.standing; never stops a capture)."""
+    try:
+        import observer_qual as OQ
+        return OQ.standing(s, year, cursor['week'] if cursor.get('year') == year else 53)
+    except Exception:                                    # (a view only)
+        return None
 
 
 def _status(s, year):

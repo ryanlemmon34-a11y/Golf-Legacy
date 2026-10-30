@@ -48,6 +48,7 @@ import observer_views as V                                            # noqa: E4
 import observer_cohort as OC                                          # noqa: E402
 import observer_compare as OCMP                                       # noqa: E402
 import observer_goat as GOAT                                          # noqa: E402
+import observer_qual as OQ                                            # noqa: E402
 
 PAGE_SIZE = 100
 
@@ -565,7 +566,8 @@ def page(w, title, body, job=None, notices=()):
     search = ('<form action="/golfers"><input name="q" placeholder="Search people" aria-label="Search people"></form>'
               if w is not None else '')
     nav = ('<nav aria-label="Sections"><h4>World</h4><a href="/">Overview</a><a href="/calendar">Calendar</a>'
-           '<a href="/rankings">Rankings</a><a href="/stats">Stats</a><a href="/money">Prize money</a>'
+           '<a href="/rankings">Rankings</a><a href="/qualification">Qualification</a><a href="/stats">Stats</a>'
+           '<a href="/money">Prize money</a>'
            '<h4>Explore</h4><a href="/golfers">Golfers</a><a href="/coaches">Coaches</a><a href="/caddies">Caddies</a>'
            '<a href="/courses">Courses</a><a href="/nations">Nations</a><a href="/tours">Tours</a>'
            '<a href="/tournaments">Tournaments</a>' + my_world_link(w) + '<a href="/views">Saved views</a>'
@@ -1482,7 +1484,9 @@ def series(w, q, sid):
     info = w.series_info(sid)
     eds = sorted(w.editions_of(sid), key=lambda e: e['year'], reverse=True)
     head = (f'<p>{tour_link(w, info.get("tour"))} · tier {esc(info.get("tier"))} · {esc(info.get("kind"))} · '
-            f'{esc(info.get("category"))}{shortlist_button(w, "series", sid)}</p>') if info else ''
+            f'{esc(info.get("category"))}'
+            + (f' · <a href="/qualification?major={quote(sid)}">qualification</a>' if info.get('kind') == 'major' else '')
+            + f'{shortlist_button(w, "series", sid)}</p>') if info else ''
     if not eds:
         return w.series_name(sid), head + '<p class="muted">No editions played yet.</p>'
     venues = {}
@@ -2013,7 +2017,8 @@ PAGES = {'/': overview, '/rankings': rankings, '/search': search, '/golfers': go
          '/stats': stats_page, '/money': money_page, '/shortlist': shortlist_page, '/my-world': shortlist_page,
          '/rules': OH.rules_page,
          '/grand-slam': OH.grand_slam_page, '/views': V.views_page, '/cohort': OC.cohort_page,
-         '/compare': OCMP.compare_page, '/goat': GOAT.goat_page}
+         '/compare': OCMP.compare_page, '/goat': GOAT.goat_page, '/qualification': OQ.qualification_page,
+         '/standings': OQ.standings_page}
 
 
 def render(w, path, q):
