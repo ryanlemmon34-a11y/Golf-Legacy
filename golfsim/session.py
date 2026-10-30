@@ -63,7 +63,7 @@ import threading
 import time
 from pathlib import Path
 
-from .archive import (LEGACY_FILES, MANIFEST, MANIFEST_FORMAT, STATE_FILES, ArchiveWriter, _read, _write,
+from .archive import (LEGACY_FILES, MANIFEST, MANIFEST_FORMAT, STATE_FILES, ArchiveWriter, GzipChunks, _read, _write,
                       legacy_files, parse_manifest, read_manifest)
 from .savegame import engine_commit, engine_id
 
@@ -362,7 +362,7 @@ class Session:
         tmp.mkdir()
         pool = self.season.__dict__.pop('_pool', None)
         try:
-            with gzip.open(tmp / 'state.pkl.gz', 'wb', compresslevel=3) as f:
+            with GzipChunks(tmp / 'state.pkl.gz', 3) as f:     # compressed on threads while it is pickled
                 pickle.dump({'season': self.season, 'state': self.state}, f, protocol=pickle.HIGHEST_PROTOCOL)
         finally:
             if pool is not None:

@@ -49,11 +49,77 @@ from .history import Relations
 FORMAT = 'golf-legacy-archive/1'
 
 
+class GzipChunks:
+    """A write-only binary file that gzips what is written to it on threads: the bytes are cut into blocks,
+    each block is compressed on a thread (zlib releases the interpreter lock, so blocks are compressed while
+    the writer goes on producing the next ones) and the blocks are written in order as consecutive gzip
+    members. A gzip file may hold several members and every gzip reader (Python's gzip module, gzip tools)
+    returns them in sequence, so reading gives exactly the bytes written: only the encoding differs from
+    one member written by one thread. Members carry no timestamp (mtime 0)."""
+
+    BLOCK = 4 << 20
+
+    def __init__(self, path, level, threads=None):
+        import os
+        from collections import deque
+        from concurrent.futures import ThreadPoolExecutor
+        self.level = level
+        self.threads = threads or max(1, min(4, os.cpu_count() or 1))
+        self.f = open(path, 'wb')
+        self.pool = ThreadPoolExecutor(self.threads)
+        self.buf = bytearray()
+        self.pending = deque()
+
+    def write(self, data):
+        view = memoryview(data).cast('B')
+        n = len(view)
+        if self.buf:                                          # fill the block being gathered first
+            take = min(n, self.BLOCK - len(self.buf))
+            self.buf += view[:take]
+            view = view[take:]
+            if len(self.buf) >= self.BLOCK:
+                self._submit()
+        while len(view) >= self.BLOCK:                        # a large write: several blocks at once
+            self._submit(bytes(view[:self.BLOCK]))
+            view = view[self.BLOCK:]
+        if len(view):
+            self.buf += view
+        return n
+
+    def _submit(self, block=None):
+        if block is None:
+            block, self.buf = bytes(self.buf), bytearray()
+        self.pending.append(self.pool.submit(gzip.compress, block, self.level, mtime=0))
+        while len(self.pending) > 2 * self.threads:          # bounded: a few blocks in flight
+            self.f.write(self.pending.popleft().result())
+
+    def close(self):
+        try:
+            if self.buf or not self.pending and self.f.tell() == 0:
+                self._submit()                                # (an empty file is still one valid member)
+            while self.pending:
+                self.f.write(self.pending.popleft().result())
+        finally:
+            self.pool.shutdown(wait=True, cancel_futures=True)
+            self.f.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, kind, value, tb):
+        if kind is None:
+            self.close()
+        else:                                                 # an error while writing: nothing more is written
+            self.pool.shutdown(wait=True, cancel_futures=True)
+            self.f.close()
+        return False
+
+
 def _write(path, obj):
     tmp = path.with_suffix(path.suffix + '.tmp')
     text = json.dumps(obj, separators=(',', ':'))        # the C encoder (json.dump streams through the slow
-    with gzip.open(tmp, 'wt', compresslevel=6) as f:    # pure-Python one); the same text, a little larger file
-        f.write(text)
+    with GzipChunks(tmp, 6) as f:                        # pure-Python one), compressed on threads
+        f.write(text.encode('utf-8'))
     tmp.replace(path)
 
 
