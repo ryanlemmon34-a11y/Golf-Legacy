@@ -952,7 +952,8 @@ def golfer(w, q, pid):
         if 'golfer' not in roles:
             out.append(OH.residence_section(w, pid, p, geo))
     if a and a.index and tab == 'playing':
-        moments_ = a.index.moments(person=pid)
+        moments_ = [m for m in a.index.moments(person=pid)       # (a hidden edition's moments left out)
+                    if not (m.get('event') and SP.hidden(w, m['event'], m.get('week')))]
         if moments_:
             out.append('<h2>Moments</h2>' + table(['Season', 'What', 'Event', 'Venue'], [
                 [esc(m['year']), esc(m['kind']), event_link(w, m['event']), venue_link(w, m.get('layout'))]
@@ -1393,7 +1394,7 @@ def event(w, q, eid):
     if hid:
         out.append(f'<p>Field {len(rows):,} · {OH.rules_note(w, e["year"])}</p><p><span class="tag">Results hidden</span> '
                    f'<span class="muted">Watch it round by round; the winner and final places stay hidden until you '
-                   f'reveal them.</span> {SP.watch_link(w, eid, "Watch from round 1") if SP.watched(w, eid) else ""} '
+                   f'reveal them.</span> {(SP.watch_link(w, eid) + " · " + SP.restart_link(w, eid)) if SP.watched(w, eid) else ""} '
                    f'{SP.reveal_button(eid)}</p>')
     elif replay:
         out.append(f'<p>Field {len(rows):,} · {OH.rules_note(w, e["year"])} · <span class="muted">the winner and final '
@@ -1407,7 +1408,8 @@ def event(w, q, eid):
                                                            ('stats', 'Statistics')))
                + '</div>')
     if hid and view != 'rounds':                       # the final result and statistics give the winner away
-        out.append(f'<p>The final result and statistics of this edition are hidden. {SP.watch_link(w, eid)} '
+        out.append(f'<p>The final result and statistics of this edition are hidden. {SP.watch_link(w, eid)}'
+                   + (f' · {SP.restart_link(w, eid)}' if SP.watched(w, eid) else '') + ' '
                    f'{SP.reveal_button(eid)}</p><p class="muted">Revealing it is kept (every page then shows it); '
                    'Show results in the header shows every result.</p>')
         return f'{eid.split(":")[0]} {e.get("name") or w.series_name(sid)}', ''.join(out)
@@ -1423,7 +1425,7 @@ def event(w, q, eid):
                                                 for k in range(len(e['sites']))], 'playoff': e.get('playoff'),
                                      'rounds': e.get('rounds')}
     for k in range(len(e['sites'])):                   # every playoff, at every site, with everyone in it
-        lines = OH.playoff_lines(w, full, k)
+        lines = OH.playoff_lines(w, full, k, OH._layout_par(w, full['sites'][k]) if k < len(full.get('sites') or ()) else None)
         if lines:
             out.append((f'<h3>Site {k + 1}</h3>' if multi else '') + lines)
     tag = lambda r: (f' <span class="tag">{esc(OH.playoff_status(full, r["site"], r["person"]))}</span>'
@@ -1547,7 +1549,10 @@ def course(w, q, cid):
     recs = {lid: r for lid, r in w.records_table().items() if lid.split(':')[0] == cid}
     for lid, r in recs.items():
         cr = r.get('course_record')
-        if cr:
+        if cr and SP.hidden(w, cr['event_id']):
+            out.append(f'<p class="muted">{esc(lid.split(":")[1])} layout record: set in an edition whose results are '
+                       f'hidden · {SP.watch_link(w, cr["event_id"])}</p>')
+        elif cr:
             out.append(f'<p>{esc(lid.split(":")[1])} layout record: {cr["score"]} by {w.person_link(cr.get("golfer_id"))} '
                        f'({event_link(w, cr["event_id"])})</p>')
         totals = r.get('lowest_totals') or {}
@@ -1555,8 +1560,9 @@ def course(w, q, cid):
             since = r.get('totals_since')
             out.append(f'<p class="muted">{esc(lid.split(":")[1])} lowest tournament totals'
                        + (f' (recorded since {since})' if since else '') + ': ' + '; '.join(
-                           f'{h} holes {m["score"]} ({m["to_par"]:+d}) by {w.person_link(m.get("golfer_id"))}, '
-                           f'{event_link(w, m["event_id"])}' for h, m in sorted(totals.items(), key=lambda x: int(x[0])))
+                           (f'{h} holes: hidden · {SP.watch_link(w, m["event_id"])}' if SP.hidden(w, m['event_id']) else
+                            f'{h} holes {m["score"]} ({m["to_par"]:+d}) by {w.person_link(m.get("golfer_id"))}, '
+                            f'{event_link(w, m["event_id"])}') for h, m in sorted(totals.items(), key=lambda x: int(x[0])))
                        + '</p>')
     out.append(OH.course_use(w, cid))
     eds = sorted(w.course_editions(cid), key=lambda e: (e['year'], e['event']), reverse=True)
@@ -1606,7 +1612,7 @@ def nation(w, q, code):
         wins = []
         for pid, ss in w.stats.starts.items():
             if (w.person(pid) or {}).get('country') == code:
-                wins += [(s[0], s[2], pid) for s in ss if s[5] == 'major' and s[6] == 1]
+                wins += [(s[0], s[2], pid) for s in ss if s[5] == 'major' and s[6] == 1 and not SP.hidden(w, s[2])]
         out.append('<h2>Major wins (archived seasons)</h2>' + (table(['Season', 'Major', 'Champion'], [
             [str(y), event_link(w, e), w.person_link(pid)] for y, e, pid in sorted(wins, reverse=True)], numeric=(0,))
             if wins else '<p class="muted">None.</p>'))
@@ -1910,12 +1916,20 @@ def record(w, q, name):
         if scope:
             title += f' — {SC.LABEL if hs_scope == "premier" else w.tours().get(scope, {}).get("name", scope)}'
     flag = lambda r: '<span class=tag>partial</span>' if r['partial'] else ''
+    # Hide results: a record set by a single hidden result (a youngest winner, a drought ended...) would name that
+    # result's winner, so its row is left out; a count keeps its row but not the hidden editions behind it
+    held = 0
+    if SP.state(w)['hide'] and name in OH.FIXED:
+        keep = [r for r in rows if not any(SP.hidden(w, e) for e in r['evidence'])]
+        held, rows = len(rows) - len(keep), keep
     context = OH.record_context(w, name, rows)
     value = (lambda r: money(r['value'])) if name == 'most-prize' else (lambda r: esc(r['value']))
     def evidence(r):
-        ev = r['evidence']
+        ev = [e for e in r['evidence'] if not SP.hidden(w, e)]
+        gone = len(r['evidence']) - len(ev)
         more = f' <span class="muted">+{len(ev) - 3} more</span>' if len(ev) > 3 else ''
-        return ', '.join(event_link(w, e) for e in ev[:3]) + more
+        return (', '.join(event_link(w, e) for e in ev[:3]) + more
+                + (f' <span class="muted">({gone} hidden)</span>' if gone else ''))
     unit = OH.UNITS.get(name)
     return title, (SP.aggregate_note(w, 'the records') + f + f'<p class="muted">{span(w.a.years)}'
                    + (f'. Counted in {esc(unit)}' if unit else '')
@@ -1928,7 +1942,9 @@ def record(w, q, name):
                        [[str(i), w.person_link(r['person']) + (f' · with {w.person_link(r["staff"])}' if r.get('staff') else ''),
                          value(r), flag(r), when_, now, evidence(r)]
                         for i, (r, (when_, now)) in enumerate(zip(rows, context), 1)],
-                       numeric=(0, 2)) + ('' if rows else '<p class="muted">Nobody qualifies yet.</p>'))
+                       numeric=(0, 2)) + ('' if rows else '<p class="muted">Nobody qualifies yet.</p>')
+                   + (f'<p class="muted">Results are hidden: {held} row{"s" if held != 1 else ""} set by a hidden '
+                      'result left out.</p>' if held else ''))
 
 
 def moments(w, q):

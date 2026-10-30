@@ -338,8 +338,13 @@ def ranking_section(w, pid):
         head += (f'<p class="muted">Points were not recorded for {", ".join(map(str, r["missing"]))} (played before they '
                  'were kept): the average above leaves those starts out and is not the ranking of the time.</p>')
     rows = []
+    import observer_spoilers as SP
     for y, wk, eid, pos_, pts, age, wt, _ in reversed(r['rows']):
         what = (O.event_link(w, eid) if eid else '<span class="muted">seeded when the world began</span>')
+        if eid and SP.hidden(w, eid, wk):                # the points would give the place away
+            rows.append([f'{y} wk {wk}', what, SP.mask(w, eid, wk, ''), '<span class="muted">hidden</span>', f'{age} wk',
+                         f'{wt:.3f}', '<span class="muted">hidden</span>'])
+            continue
         rows.append([f'{y} wk {wk}' if y else '—', what, O.esc(pos_ or ('—' if eid is None else 'MC')),
                      f'{pts:.2f}', f'{age} wk', f'{wt:.3f}', f'{pts * wt:.2f}'])
     return head + O.table(['When', 'Event', 'Pos', 'Points earned', 'Age', 'Weight now', 'Counted'], rows,
@@ -415,10 +420,19 @@ def golf_record(w, q, name):
     cov += f' (of {O.span(years, False)}); the current season counts once it ends.'
     active = lambda pid: ((w.person(pid) or {}).get('golfer') or {}).get('lifestyle') not in (None, 'retired')
     now_text = lambda pid: 'competing' if active(pid) else 'closed (retired)'
+    import observer_spoilers as SP
+    held = [0]
+
+    def shown(eid, wk):
+        """Hide results: a row from a hidden edition names a result of it (a margin's winner, a match): left out."""
+        if SP.hidden(w, eid, wk):
+            held[0] += 1
+            return False
+        return True
     rows, head, numeric, note = [], [], (), ''
     if name == 'longest-drive':
         q_ = f'SELECT person, year, event_id, week, tenths, round, hole FROM long_drives WHERE {where} ORDER BY tenths DESC, person LIMIT 100'
-        for i, (pid, y, eid, wk, t, rd, hole) in enumerate(db.execute(q_, args), 1):
+        for i, (pid, y, eid, wk, t, rd, hole) in enumerate((r for r in db.execute(q_, args) if shown(r[2], r[3])), 1):
             rows.append([str(i), w.person_link(pid), f'{t / 10:.1f}', f'{y} wk {wk}', O.event_link(w, eid),
                          _venue(w, eid), f'R{rd}, hole {hole}', 'fixed (a single shot)'])
         head, numeric = ['#', 'Golfer', 'Yards', 'When', 'Event', 'Course', 'Round, hole', 'Now'], (0, 2)
@@ -431,7 +445,7 @@ def golf_record(w, q, name):
                                                            sorted(tiers, key=lambda t: (t != QUALIFY['event_drives'], t))]))
         q_ = (f'SELECT person, year, event_id, week, tenths, drives FROM event_drives WHERE {where} AND tier = ? '
               'ORDER BY CAST(tenths AS REAL) / drives DESC, person LIMIT 100')
-        for i, (pid, y, eid, wk, t, n) in enumerate(db.execute(q_, args + [mn]), 1):
+        for i, (pid, y, eid, wk, t, n) in enumerate((r for r in db.execute(q_, args + [mn]) if shown(r[2], r[3])), 1):
             rows.append([str(i), w.person_link(pid), f'{t / 10 / n:.1f}', str(n), f'{y} wk {wk}', O.event_link(w, eid),
                          _venue(w, eid), 'fixed (one event)'])
         head, numeric = ['#', 'Golfer', 'Yards per drive', 'Drives', 'When', 'Event', 'Course', 'Now'], (0, 2, 3)
@@ -481,7 +495,8 @@ def golf_record(w, q, name):
         q_ = (f'SELECT year, event_id, week, winner, win_total, runner_total, margin, runners_up, playoff, field FROM margins '
               f'WHERE {where} AND rounds = ? AND field >= ?' + (' AND major = 1' if major else '')
               + ' ORDER BY margin DESC, year, event_id LIMIT 100')
-        for i, (y, eid, wk, win, wt, rt, m, ru, po, fld) in enumerate(db.execute(q_, args + [int(rounds), min_field]), 1):
+        for i, (y, eid, wk, win, wt, rt, m, ru, po, fld) in enumerate(
+                (r for r in db.execute(q_, args + [int(rounds), min_field]) if shown(r[1], r[2])), 1):
             age = _age(w, win, y)
             rows.append([str(i), w.person_link(win), str(m), f'{wt} / {rt}',
                          ', '.join(w.person_link(g) for g in json.loads(ru)), f'{y} wk {wk}', O.event_link(w, eid),
@@ -498,7 +513,8 @@ def golf_record(w, q, name):
         fields.append(('stage', 'Matches', [('', 'all matches'), ('final', 'finals only')]))
         q_ = (f'SELECT year, event_id, week, stage, winner, loser, result, holes, up, remaining FROM matches WHERE {where}'
               + (" AND stage = 'final'" if stage == 'final' else '') + ' ORDER BY up DESC, remaining DESC, year LIMIT 100')
-        for i, (y, eid, wk, stg, win, lose, res, holes, up, rem) in enumerate(db.execute(q_, args), 1):
+        for i, (y, eid, wk, stg, win, lose, res, holes, up, rem) in enumerate(
+                (r for r in db.execute(q_, args) if shown(r[1], r[2])), 1):
             rows.append([str(i), w.person_link(win), O.esc(res), w.person_link(lose), O.esc(stg), f'{holes} holes',
                          f'{y} wk {wk}', O.event_link(w, eid), _venue(w, eid)])
         head = ['#', 'Winner', 'Result', 'Beaten', 'Round', 'Scheduled', 'When', 'Event', 'Course']
@@ -509,7 +525,9 @@ def golf_record(w, q, name):
     f = O.scope_buttons(f'/golf-records/{name}', q, tour) + O.filters(f'/golf-records/{name}', q, fields)
     return title, (f + f'<p class="muted">{O.esc(cov)} Counted in {O.esc(unit)}.</p>'
                    + (O.table(head, rows, numeric=numeric) if rows else '<p class="muted">Nobody qualifies yet.</p>')
-                   + f'<p class="muted">{note} Definitions: <a href="/rules#golf-statistics">golf statistics</a>.</p>')
+                   + f'<p class="muted">{note} Definitions: <a href="/rules#golf-statistics">golf statistics</a>.'
+                   + (f' Results are hidden: {held[0]} row{"s" if held[0] != 1 else ""} from hidden editions left out.'
+                      if held[0] else '') + '</p>')
 
 
 def _min(q, default, floor):

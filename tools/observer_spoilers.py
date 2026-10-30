@@ -117,10 +117,17 @@ def reveal(w, eid):
 
 
 def watch_link(w, eid, label=None):
+    """Resume: the replay at the round last watched (round one if none)."""
     k = watched(w, eid)
     r = k if isinstance(k, int) and k > 0 else 1
     text = label or ('Watch' if r == 1 else f'Resume at round {r}')
     return f'<a href="/event/{quote(eid)}?view=rounds&amp;round={r}">{esc(text)}</a>'
+
+
+def restart_link(w, eid, label='Watch from round 1'):
+    """Restart: the replay at round one, whatever was watched before (what was watched stays remembered, so
+    Resume still returns to it; going back reveals nothing)."""
+    return f'<a href="/event/{quote(eid)}?view=rounds&amp;round=1">{esc(label)}</a>'
 
 
 def mask(w, eid, week, html):
@@ -162,6 +169,24 @@ def header(w):
     return ('<form method="post" action="/spoilers" class="inline spoilers"><input type="hidden" name="hide" value="1">'
             f'<select name="from" aria-label="Which results to hide">{opts}</select>'
             '<button title="Hide winners and final results until you reveal them">Hide results</button></form>')
+
+
+def hidden_wins(w, pid):
+    """[(year, tournament name)] of a golfer's wins whose results are hidden now."""
+    if not state(w)['hide'] or w is None:
+        return []
+    import observer_data as OD
+    return [(r['year'], w.series_name(r['series'])) for r in OD.results(w, pid)
+            if r.get('pos') == 1 and hidden(w, r['event'], r['week'])]
+
+
+def redact(w, pid, text, wins=None):
+    """`text` (a status line, a card reason, a decision) unless it names one of the golfer's hidden wins ("won the
+    2030 Texas Open"): then 'hidden'."""
+    for year, name in (hidden_wins(w, pid) if wins is None else wins):
+        if text and f'{year} {name}' in str(text):
+            return '<span class="muted">hidden (names a result you have not revealed)</span>'
+    return text
 
 
 def aggregate_note(w, what='These figures'):

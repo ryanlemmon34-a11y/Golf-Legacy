@@ -774,12 +774,23 @@ def evidence(route, gid, year, ctx, wins=None):
     return out
 
 
+def _complete(route, ctx, year):
+    """Whether every edition a qualifying route draws its places from has been played (in this view)."""
+    eds = [src for src in route.source if src[0] not in ('wins', 'standing', 'ranking', 'points', 'award')]
+    return bool(eds) and all((sid, year + off) in ctx.results for sid, off in eds)
+
+
 def earned_exemptions(major, year, ctx):
-    """({gid: [route codes]}, [pending route codes]): who is exempt into `major` on the facts `ctx` holds (a view
-    as of a qualifying stage). A route decided by a cut-off not yet published is pending -- nobody holds it
-    yet: a projected ranking never stands in for it, so it never takes away anyone's qualifying attempt."""
+    """({gid: [route codes]}, [pending route codes]): who already holds a place in `major` on the facts `ctx`
+    holds (a view as of a qualifying stage) -- every exemption category whose facts are known, and every place a
+    qualifying event already played has awarded (a qualifying-series event: its leading finishers not exempt
+    otherwise, allocated exactly as the field will be: exemptions first, then the qualifying routes in the
+    rules' order, a place passing down when its finisher is already in). A route decided by a cut-off not yet
+    published is pending -- nobody holds it yet: a projected ranking never stands in for it, so it never takes
+    away anyone's qualifying attempt. Places from qualifying events still to come are not counted either."""
     out, pending = {}, []
-    for route in rules_for(ctx.version)[major]:
+    rules = rules_for(ctx.version)[major]
+    for route in rules:
         if route.kind != 'exempt':
             continue
         try:
@@ -790,6 +801,29 @@ def earned_exemptions(major, year, ctx):
         for gid in ids:
             if _eligible(ctx, gid, route, year):
                 out.setdefault(gid, []).append(route.code)
+    in_field = set(out)
+    for route in rules:                                  # places already awarded by qualifying events played
+        if route.kind != 'qualifying' or not route.source or not _complete(route, ctx, year):
+            continue
+        try:
+            groups = route.select(ctx, year)
+        except FutureSnapshot:
+            pending.append(route.code)
+            continue
+        if groups and isinstance(groups[0], int):
+            groups = [groups]
+        per = route.site_spots or (route.spots,) * len(groups)
+        for i, group in enumerate(groups):
+            spots = per[i] if i < len(per) else per[-1]
+            taken = 0
+            for gid in group:
+                if taken >= spots:
+                    break
+                if gid in in_field or not _eligible(ctx, gid, route, year):
+                    continue                             # (as in build_field: the place passes down)
+                out.setdefault(gid, []).append(route.code)
+                in_field.add(gid)
+                taken += 1
     return out, pending
 
 
