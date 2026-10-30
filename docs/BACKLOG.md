@@ -64,6 +64,13 @@ from each week's own ranking; Save view saves the view as shown after a browser 
 **Next priorities (owner roadmap, after the stabilization pass)**: believable career and financial decisions;
 evolving nations; richer staff relationship history (and My World digesting staff relationship changes).
 
+**Owner decision (30 October 2026): remove the classic calendar (v1) in the next updates.** It must not be used
+again: the reference calendar (v2) is the only calendar. To settle when the work is specified: what happens to
+worlds saved on v1 (the paused playthrough, the 50-season test world) -- browse their history only, or migrate a
+copy at a season boundary -- and retiring the v1 code paths, the v1/v2 comparison tools and the v1 equivalence
+tests. The owner's playthrough "Test 1 10.30" (v2, 57 seasons, release V1.10.30.26, seed 360013, saved by engine
+55a2527f) replaces the 50-season world as the reference world for checks.
+
 Awaiting the owner's decision: the zero-start recommendations (`docs/ZERO_START_REVIEW.md`: the full-time /
 working decision when a full-time amateur cannot afford their cheapest event; amateur cost or event density by
 region); the performance options (per-golfer random streams, incremental checkpoints, outcome-equivalent engines,
