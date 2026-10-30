@@ -102,7 +102,7 @@ def ranking_total(rows, now):
         if age >= RANK_WEEKS:
             continue
         n += 1
-        tot += pts * ranking_weight(age)
+        tot += pts * (1.0 if age < RANK_FULL else 1 - (age - RANK_FULL) / (RANK_WEEKS - RANK_FULL))
     return tot, n
 
 

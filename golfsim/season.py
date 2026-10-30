@@ -410,16 +410,29 @@ class Season:
     # ---- rankings -------------------------------------------------------------------------------
     def update_rankings(self, year, week):
         now = self.abs_week(year, week)
+        weeks, full = PR.RANK_WEEKS, PR.RANK_FULL
+        span = weeks - full
+
         def table(entries, divisor, counts=None):
+            # prestige.ranking_total, in one pass that also drops expired rows: the same rows in the same
+            # order with the same arithmetic, so exactly the same totals
+            lo, hi = divisor
             out = {}
             for gid, rows in entries.items():
                 if not rows:
                     continue                                 # every point expired: no average
-                keep = [r for r in rows if now - r[0] < PR.RANK_WEEKS]
-                rows[:] = keep
-                tot, n = PR.ranking_total(keep, now)
+                tot, n, expired = 0.0, 0, False
+                for aw, pts in rows:
+                    age = now - aw
+                    if age >= weeks:
+                        expired = True
+                        continue
+                    n += 1
+                    tot += pts * (1.0 if age < full else 1 - (age - full) / span)
+                if expired:
+                    rows[:] = [r for r in rows if now - r[0] < weeks]
                 if tot > 0:
-                    out[gid] = tot / PR.ranking_divisor(n, divisor)
+                    out[gid] = tot / min(hi, max(lo, n))
                     if counts is not None:
                         counts[gid] = n
             return out
@@ -438,12 +451,23 @@ class Season:
         self.ctx.amateur_rankings[(year, week)] = am_ids[:1000]
 
     def update_fame(self, year, week):
+        """Fame: the points of the last FAME_WEEKS weeks. A golfer's sum is worked out again only when their
+        rows changed since it was last worked out (a row added, or the oldest one expiring); otherwise it
+        is the same sum of the same rows (the remembered state is derived, never saved)."""
         now = self.abs_week(year, week)
+        seen = self.__dict__.get('_fame_seen')
+        if seen is None:
+            seen = self._fame_seen = {}                      # gid -> (rows, oldest week) when last summed
+        W = PR.FAME_WEEKS
         for gid, rows in self.fame_log.items():
             if not rows:
                 continue                                     # long expired (fame already 0)
-            rows[:] = [(aw, pts) for aw, pts in rows if now - aw < PR.FAME_WEEKS]
+            last = seen.get(gid)
+            if last is not None and last[0] == len(rows) and now - last[1] < W and gid in self.fame:
+                continue                                     # nothing added, nothing expired
+            rows[:] = [(aw, pts) for aw, pts in rows if now - aw < W]
             self.fame[gid] = sum(pts for _, pts in rows)
+            seen[gid] = (len(rows), min((aw for aw, _ in rows), default=now))
 
     def player_prestige(self, gid):
         return PR.player_prestige(self.fame.get(gid, 0.0), self.legacy[gid])
@@ -1441,6 +1465,8 @@ class Season:
         state = self.__dict__.copy()
         state.pop('_pool', None)
         state.pop('_active', None)                           # rebuilt from world.golfers
+        state.pop('_pf_memo', None)                          # derived caches (prize_forecast, update_fame):
+        state.pop('_fame_seen', None)                        # rebuilt as they are used
         if state.get('lib') is default_library():
             state['lib'] = 'default'
             state.pop('cal', None)
@@ -2406,6 +2432,9 @@ class Season:
         from seasons away from that level has faded first (evidence_events), so a comeback is judged
         mostly on what they do now."""
         year = self.year if year is None else year
+        memo = self.__dict__.get('_pf_memo')
+        if memo is not None:
+            memo[1].pop(gid, None)                           # their forecasts change with this evidence
         rec = self.prize_record.setdefault(gid, {}).setdefault(tier, [FIN.PRIOR_PRIZE_SHARE, 0, year])
         if len(rec) == 2:
             rec.append(year)
@@ -2418,9 +2447,25 @@ class Season:
         won at each level (evidence from another level translated by LEVEL_STEP per level, and counting
         for less), plus a weak prior. `cautious`: what can be counted on -- only what they have won at
         this level, shrunk by how few events that is (a new card is not yet an income).
-        Amateurs take no prize money."""
+        Amateurs take no prize money.
+
+        Remembered per golfer until their prize record changes (learn_prize) or the year does (evidence
+        fades by season): the same arithmetic, worked out once instead of for every event weighed."""
         if g.status == 'amateur':
             return 0.0
+        memo = self.__dict__.get('_pf_memo')
+        if memo is None or memo[0] != self.year:
+            memo = self._pf_memo = (self.year, {})
+        mine = memo[1].get(g.id)
+        if mine is None:
+            mine = memo[1][g.id] = {}
+        key = (tier, cautious)
+        v = mine.get(key)
+        if v is None:
+            v = mine[key] = self._prize_forecast(g, tier, cautious)
+        return v
+
+    def _prize_forecast(self, g, tier, cautious):
         rec = self.prize_record.get(g.id, {})
         if cautious:                                         # only what they have shown at this level
             r = rec.get(tier)
