@@ -78,11 +78,14 @@ nav { width:200px; flex:none; padding:12px 16px; border-right:1px solid var(--li
 nav h4 { margin:14px 0 4px; font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); }
 nav a { display:block; padding:2px 0; }
 .layout { display:flex; }
-main { padding:16px 24px; flex:1; min-width:0; max-width:1150px; }
+main { padding:16px 32px; flex:1; min-width:0; }   /* wide screens: the page uses the width it has */
+main p, main > ul, main > ol, main li, dl.kv, .banner { max-width:110ch; }   /* prose at a reading width */
+main td p, main td li { max-width:none; }
+main td { max-width:80ch; } main td:has(table, .scroll, svg) { max-width:none; }   /* a text column wraps at a reading width instead of running across a wide screen */
 a { color:var(--accent); text-decoration:none; } a:hover { text-decoration:underline; }
 a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
 .scroll { overflow-x:auto; }
-table { border-collapse:collapse; width:100%; margin:8px 0 18px; }
+table { border-collapse:collapse; width:auto; min-width:min(100%, 760px); margin:8px 0 18px; }   /* columns as wide as they need: a short table is not stretched across a wide screen */
 th, td { text-align:left; padding:4px 8px; border-bottom:1px solid var(--line); vertical-align:top; }
 th { font-size:12px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); }
 td.n, th.n { text-align:right; font-variant-numeric:tabular-nums; }
@@ -571,8 +574,9 @@ def page(w, title, body, job=None, notices=()):
            '<h4>Explore</h4><a href="/golfers">Golfers</a><a href="/coaches">Coaches</a><a href="/caddies">Caddies</a>'
            '<a href="/courses">Courses</a><a href="/nations">Nations</a><a href="/tours">Tours</a>'
            '<a href="/tournaments">Tournaments</a>' + my_world_link(w) + '<a href="/views">Saved views</a>'
-           '<h4>History</h4><a href="/seasons">Seasons</a><a href="/records">Records &amp; frivolities</a>'
+           '<h4>History</h4><a href="/seasons">Seasons</a><a href="/records">Record Book</a>'
            '<a href="/grand-slam">Career Grand Slam</a><a href="/moments">Moments</a><a href="/cohort">Where are they now</a>'
+           '<a href="/compare">Compare careers</a><a href="/goat">GOAT Lab</a>'
            '<a href="/rules">Rules</a>'
            '<h4>Worlds</h4><a href="/worlds">World library</a><a href="/export">Report a problem</a>'
            '<a href="/job">Last operation</a></nav>')
@@ -970,6 +974,7 @@ def golfer(w, q, pid):
     out.append(f'<p class="lead">Age {age_text(w, p.get("born"))} · born {esc(p.get("born"))} · '
                f'{nation_link(p.get("country"))} · {esc(", ".join(roles))}'
                + (' · <span class="tag">career began before the archive</span>' if initial else '')
+               + (' · <span class="tag">retired</span>' if OD.playing_status(p.get('golfer'))[0] == 'retired' else '')
                + (f' · <a href="/compare?ids={pid}">compare</a>' if 'golfer' in roles else '')
                + '</p>' + shortlist_button(w, 'person', pid))
     geo = w.geography(pid)
@@ -1914,7 +1919,7 @@ def records(w, q):
                'once it ends. Ages are the season\'s year minus the birth year (birth dates are not recorded), so an age '
                'can be a year out. Careers that began before the archive are marked partial and left out of debut lists.</p>'
                if w.a else no_history())
-    return 'Records & frivolities', (through + '<h2>Start here</h2><ul>' + first + '</ul><h2>Golf statistics and '
+    return 'Record Book', (through + '<h2>Start here</h2><ul>' + first + '</ul><h2>Golf statistics and '
                                      'margins</h2><ul>' + OG.records_list() + '</ul><h2>All lists</h2><ul>' + rest +
                                      '</ul><h2>Definitions</h2><dl>' + ''.join(
                                          f'<dt>{esc(k)}</dt><dd class="muted">{esc(v)}</dd>' for k, v in DEFINITIONS.items())

@@ -251,6 +251,63 @@ class MyWorld(unittest.TestCase):
         with self.ranked({8: 12, 9: 8}):
             self.assertEqual(MW.new_count(self.w), 0)
 
+    def test_a_retirement_is_one_dated_event(self):
+        lv = self.w.live
+        y = lv.cursor['year']                                           # retired in the winter after last season
+        gone = sorted(g for g, p in lv.people.items() if p.get('lifestyle') == 'retired'
+                      and any(r['year'] == y - 1 and r.get('lifestyle') != 'retired' for r in self.w.a.index.seasons(g)))
+        self.assertTrue(gone)
+        pid = gone[0]
+        items = lambda start: [(a, b, re.sub(r'<[^>]+>', '', h)) for a, b, k, h in
+                               MW.digest(self.w, [('person', pid, '', '')], start) if k == 'status']
+        once = [(y, 1, f'{self.w.name(pid)}: retired after the {y - 1} season')]
+        self.assertEqual(items((y, 0)), once)
+        self.assertEqual(items((y, 1)), [])                             # read since: not announced again
+        with mock.patch.object(lv, 'cursor', {**lv.cursor, 'year': y + 1, 'week': 5}):
+            self.assertEqual(items((y, 30)), [])                        # a season later: still not again
+            self.assertEqual(items((y, 0)), once)                       # the same event, the same date
+        with mock.patch.object(self.w, 'live', None):                   # the history alone shows it too
+            self.assertEqual(items((y, 0)), once)
+
+    def test_retired_status_is_shown_one_way(self):
+        import observer_data as OD
+        self.assertEqual(OD.playing_status({'status': 'pro', 'lifestyle': 'retired'}),
+                         ('retired', 'retired, last a professional'))
+        self.assertEqual(OD.playing_status({'status': 'amateur', 'lifestyle': 'retired'}),
+                         ('retired', 'retired, last an amateur'))
+        self.assertEqual(OD.playing_status({'status': 'pro', 'lifestyle': 'full_time'}), ('active', 'professional'))
+        lv = self.w.live
+        pid = min(g for g, p in lv.people.items() if p.get('lifestyle') == 'retired' and p.get('status') == 'pro')
+        html = self.page(f'/golfer/{pid}')
+        self.assertIn('<span class="tag">retired</span>', html)
+        self.assertIn('<dt>Status</dt><dd>retired, last a professional</dd>', html)
+        import observer_history as OH
+        eid = next(iter(lv.editions))                                   # a completed slam and one major short
+        active = min(g for g, p in lv.people.items() if p.get('lifestyle') == 'full_time' and p.get('status') == 'pro')
+        firsts = {sid: (lv.cursor['year'], eid) for sid in OH.MAJOR_SERIES}
+        fake = {pid: {'complete': (lv.cursor['year'], eid), 'firsts': firsts},
+                active: {'complete': None, 'firsts': dict(list(firsts.items())[:3])}}
+        with mock.patch.object(OH, 'grand_slams', lambda w: fake):
+            slam = self.page('/grand-slam')
+        done, short = slam.split('<h2>One major short</h2>')
+        self.assertIn('<th title="Sort by this column">Now</th>', done)
+        self.assertRegex(done, rf'href="/golfer/{pid}">[^<]*</a></td><td>retired</td>')
+        self.assertIn('<th title="Sort by this column">Now</th>', short)
+        self.assertRegex(short, rf'href="/golfer/{active}">[^<]*</a></td><td>active</td>')
+
+    def test_desktop_menu_and_record_book(self):
+        html = O.page(self.w, 'Overview', '')                          # the page shell, with its menu
+        nav = html.split('<nav')[1].split('</nav>')[0]
+        for href, label in (('/goat', 'GOAT Lab'), ('/compare', 'Compare careers'), ('/my-world', 'My World'),
+                            ('/records', 'Record Book')):
+            self.assertIn(f'href="{href}"', nav)
+            self.assertIn(label, nav)
+        self.assertNotIn('frivolities', nav)
+        self.assertEqual(O.render(self.w, '/records', {})[0], 'Record Book')   # the page's title
+        import observer_views as V
+        self.assertEqual(V.page_name('/records'), 'Record Book')
+        self.assertIn('main { padding:16px 32px; flex:1; min-width:0; }', html)   # no content-width cap
+
     def test_not_simulation_state(self):
         before = {p.relative_to(self.path).as_posix(): p.stat().st_mtime_ns for p in self.path.rglob('*') if p.is_file()}
         self.follow(('person', self.no1, 'Rivals'))

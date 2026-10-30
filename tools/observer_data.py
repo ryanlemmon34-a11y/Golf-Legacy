@@ -92,6 +92,20 @@ def _recorded_prize(e, site, pid):
     return by_person(prizes[site], pid, 0.0)
 
 
+STATUS_NAMES = {'pro': 'professional', 'amateur': 'amateur', 'club_pro': 'club professional'}
+
+
+def playing_status(golfer):
+    """('active' | 'retired', label) for a golfer as they are now: one rule for every page. A retired golfer is
+    retired whatever status they last held (that status is kept in the label: "retired, last a professional");
+    otherwise the label is their status. `golfer`: a person's golfer facts ({'status', 'lifestyle', ...})."""
+    g = golfer or {}
+    st = STATUS_NAMES.get(g.get('status'), g.get('status') or 'status not recorded')
+    if g.get('lifestyle') == 'retired':
+        return 'retired', f'retired, last {"an" if st[:1] in "aeiou" else "a"} {st}'
+    return 'active', st
+
+
 def is_qualifying(r):
     return r.get('tier') == 7
 

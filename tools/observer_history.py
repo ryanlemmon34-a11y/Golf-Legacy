@@ -241,7 +241,8 @@ def status_section(w, pid, p):
     rows = []
     tour = gs.get('tour')
     tier = (w.tours().get(tour) or {}).get('tier') if tour else None
-    rows.append(('Status', O.esc(STATUS.get(gs.get('status'), gs.get('status') or '—'))))
+    import observer_data as OD
+    rows.append(('Status', O.esc(OD.playing_status(gs)[1])))     # (retired, with the status last held)
     rows.append(('Lifestyle', O.esc(LIFESTYLE.get(gs.get('lifestyle'), gs.get('lifestyle') or '—'))))
     if gs.get('lifestyle') != 'retired':
         if tour:
@@ -1064,18 +1065,20 @@ def grand_slam_page(w, q):
     O = _o()
     gs = grand_slams(w)
     done = sorted(((d['complete'], pid, d) for pid, d in gs.items() if d['complete']), key=lambda x: (x[0][0], x[0][1]))
+    import observer_data as OD
+    now = lambda pid: OD.playing_status((w.person(pid) or {}).get('golfer'))[0]
     rows = []
     for (y, eid), pid, d in done:
         born = (w.person(pid) or {}).get('born')
         partial = w.a and pid in w.a.people and w.a.people[pid].get('initial')
-        rows.append([w.person_link(pid), O.event_link(w, eid), O.age_text(w, born, y),
+        rows.append([w.person_link(pid), now(pid), O.event_link(w, eid), O.age_text(w, born, y),
                      ', '.join(O.event_link(w, e) for _, e in sorted(d['firsts'].values()))
                      + (' <span class="tag">partial: majors before the archive unknown</span>' if partial else '')])
     three = sorted(((len(d['firsts']), pid, d) for pid, d in gs.items() if len(d['firsts']) == 3), key=lambda x: x[1])
-    body = (O.table(['Golfer', 'Completed at', 'Age*', 'First win of each major'], rows, numeric=(2,)) if rows
+    body = (O.table(['Golfer', 'Now', 'Completed at', 'Age*', 'First win of each major'], rows, numeric=(3,)) if rows
             else '<p class="muted">Nobody has won all four majors yet.</p>')
-    body += '<h2>One major short</h2>' + (O.table(['Golfer', 'Missing'], [
-        [w.person_link(pid), O.esc(', '.join(w.series_name(s) for s in MAJOR_SERIES if s not in d['firsts']))]
+    body += '<h2>One major short</h2>' + (O.table(['Golfer', 'Now', 'Missing'], [
+        [w.person_link(pid), now(pid), O.esc(', '.join(w.series_name(s) for s in MAJOR_SERIES if s not in d['firsts']))]
         for _, pid, d in three]) if three else '<p class="muted">Nobody.</p>')
     return 'Career Grand Slam', ('<p>Winners of all four majors (Tour Masters, Premier Tour Championship, USA Open, '
                                  'Britannia Open): completed by the first win of the fourth different major. Observed '

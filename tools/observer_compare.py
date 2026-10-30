@@ -53,9 +53,10 @@ def seasons(w, pid):
         res = w.live.results(pid)
         if lp is not None and (res or lp.get('lifestyle') != 'retired'):
             cat = lambda r: (w.edition(r['event']) or {}).get('category')
+            counted = [r for r in res if cat(r) not in ('qualifier', 'q_school')]   # (as archived seasons count)
             out[y] = {'age': (y - born) if born else None, 'tour': lp.get('tour'), 'status': lp.get('status'),
-                      'starts': len(res), 'wins': sum(1 for r in res if r['pos'] == 1 and cat(r) not in ('qualifier', 'q_school')),
-                      'top10': sum(1 for r in res if r['pos'] is not None and r['pos'] <= 10),
+                      'starts': len(res), 'wins': sum(1 for r in counted if r['pos'] == 1),
+                      'top10': sum(1 for r in counted if r['pos'] is not None and r['pos'] <= 10),
                       'majors': majors.get(y, 0),
                       'prize': w.live.prize.get(pid, 0.0), 'wr_end': None, 'overall': (snaps.get(y) or [None])[0],
                       'source': 'so far'}

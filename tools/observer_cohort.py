@@ -183,6 +183,8 @@ def follow(w, pids, since):
         best = min((r['wr_end'] for r in rows if r.get('wr_end')), default=None)
         levels = [(tours.get(r.get('tour'), {}).get('tier', 9), r.get('tour')) for r in played
                   if r.get('status') in ('pro', 'club_pro')]
+        if live_starts and live and live.get('status') in ('pro', 'club_pro') and live.get('tour'):
+            levels.append((tours.get(live['tour'], {}).get('tier', 9), live['tour']))   # this season so far
         level = min(levels) if levels else None
         last = max([r['year'] for r in played] + ([cur] if live_starts else []), default=None)
         kind, text = _now(w, pid, live, last)

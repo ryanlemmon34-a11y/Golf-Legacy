@@ -30,7 +30,7 @@ MAX_SAVED = 200
 
 # list pages whose view is remembered (exact paths) and list pages under a prefix (each remembered by its path)
 LISTS = {'/rankings': 'World ranking', '/golfers': 'Golfers', '/coaches': 'Coaches', '/caddies': 'Caddies',
-         '/records': 'Records', '/moments': 'Moments', '/tournaments': 'Tournaments', '/calendar': 'Calendar',
+         '/records': 'Record Book', '/moments': 'Moments', '/tournaments': 'Tournaments', '/calendar': 'Calendar',
          '/courses': 'Courses', '/nations': 'Nations', '/tours': 'Tours', '/seasons': 'Seasons', '/stats': 'Stats',
          '/money': 'Prize money', '/grand-slam': 'Career Grand Slam', '/cohort': 'Where are they now',
          '/goat': 'GOAT Lab', '/compare': 'Compare careers'}

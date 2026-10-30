@@ -168,9 +168,18 @@ def _status_changes(w, pid, start, add):
     for a, b in zip(rows, rows[1:]):
         if _after(start, b['year'], 1) and (s := say(a, b)):
             add(b['year'], 1, 'status', f'{w.person_link(pid)}: {O.esc(s)} (season {b["year"]})')
+    if not rows:
+        return
     live = w.live.people.get(pid) if w.live else None
-    if live and rows and w.live.cursor['year'] > rows[-1]['year'] and _after(start, w.live.cursor['year'], 1):
-        if s := say(rows[-1], live):
+    last = rows[-1]                                    # (a season row: their status before that winter)
+    now_ = live or ((w.person(pid) or {}).get('golfer'))
+    if now_ and now_.get('lifestyle') == 'retired' and last.get('lifestyle') != 'retired':
+        y = last['year'] + 1                           # one dated event: retired in the winter after their last
+        if _after(start, y, 1):                        # season, whenever (and however often) it is read
+            add(y, 1, 'status', f'{w.person_link(pid)}: retired after the {last["year"]} season')
+        return
+    if live and w.live.cursor['year'] > last['year'] and _after(start, w.live.cursor['year'], 1):
+        if s := say(last, live):
             add(w.live.cursor['year'], 1, 'status', f'{w.person_link(pid)}: {O.esc(s)} (season {w.live.cursor["year"]})')
 
 

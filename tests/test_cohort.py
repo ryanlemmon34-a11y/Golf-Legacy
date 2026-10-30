@@ -193,6 +193,18 @@ class Cohorts(unittest.TestCase):
             self.assertEqual(fol[g]['prize'], sum(r['prize'] or 0 for r in rows) + lv.prize.get(g, 0.0))
         self.assertEqual(OC.follow(self.w, many, old['year']), {g: fol[g] for g in many})   # (a refresh: the same)
 
+    def test_highest_level_counts_this_season(self):
+        lv = self.w.live
+        e = next(e for e in lv.editions.values() if e['finish'] and e.get('tier') == 1)   # a Premier field this season
+        pids = [g for site in e['finish'] for g, _, _ in site]
+        fol = OC.follow(self.w, pids, lv.cursor['year'])                # (no archived season in the window)
+        tours = self.w.tours()
+        pros = [g for g in pids if lv.people[g].get('status') == 'pro' and lv.people[g].get('tour')]
+        self.assertTrue(pros)
+        for g in pros:
+            t = lv.people[g]['tour']
+            self.assertEqual(fol[g]['level'], (tours.get(t, {}).get('tier', 9), t), g)
+
     def test_a_season_that_did_not_record_prize_money_is_not_zero(self):
         old = self.field()
         pids = [r['person'] for r in old['rows']]

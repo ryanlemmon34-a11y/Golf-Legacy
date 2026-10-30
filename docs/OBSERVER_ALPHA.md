@@ -85,7 +85,7 @@ it too makes earlier worlds "another engine"; start the next long run on it so i
   or closing the window never loses a finished season. One operation at a time.
 - **Explore**: Overview, Calendar (this season, played / scheduled / not held), Rankings (world, amateur),
   Golfers / Coaches / Caddies directories (filters: name, nation, tour, status; sorting), Courses, Nations,
-  Tours, Tournaments (filters: tour, kind), Seasons and season recaps, Records & frivolities, Moments.
+  Tours, Tournaments (filters: tour, kind), Seasons and season recaps, the Record Book (formerly Records & frivolities), Moments.
   Every person, edition, tournament, course, nation and tour links to its page; the browser's Back button
   keeps your filters.
 - **Stats** and **Prize money** (Basketball GM style): a season (the current one so far, or any archived one) or
@@ -94,7 +94,7 @@ it too makes earlier worlds "another engine"; start the next long run on it so i
   tab: scoring average, driving distance, fairways, greens in regulation, scrambling, sand saves, putts per
   round and per GIR, birdies and bogeys per round, strokes gained (the engine's table), with rounds and starts
   beside them and a qualification (proposed: 20 rounds in a season, 100 all-time; "include everyone" lifts it).
-- **Golf records** (Records & frivolities → *Golf statistics and margins*): longest drives (round and hole),
+- **Golf records** (Record Book → *Golf statistics and margins*): longest drives (round and hole),
   the best driving average in an event, a season and a career (with sample thresholds), the largest stroke-play
   winning margins (regulation; every tied runner-up listed; a playoff counts as zero; choose 72/54/36/18 holes,
   majors only, a minimum field) and the largest match-play wins (holes up and to play; finals apart).
@@ -253,7 +253,7 @@ the failure, reproduce with the engine commit it names, and never change your or
    then Back to where you were.
 6. *To end of season*, then press *Stop after this week* after a few weeks: the banner says how many weeks
    were kept; the date matches.
-7. *To end of season* again and let it finish: Seasons shows 2027 with its majors; Records & frivolities lists
+7. *To end of season* again and let it finish: Seasons shows 2027 with its majors; the Record Book lists
    are filled (youngest/oldest major champion, youngest/oldest Premier debut, most starts without a win —
    pick a tour); an event from week 10 reads the same as before the season ended.
 8. Quit with the Quit button; start the .bat again; Open the world: same date, same history.
@@ -284,7 +284,7 @@ it works on a temporary copy and never changes the world.
   longer (season 51 took about 190 s on our slower 4-CPU test machine, not yet measured on yours; see
   `docs/BACKLOG.md`). The first open of a world saved by older code
   can take a minute or two (its history index is upgraded once).
-- Records and frivolities use archived seasons only; the current season counts once it ends (Stats include
+- The Record Book uses archived seasons only; the current season counts once it ends (Stats include
   the current season so far).
 - Rating changes need recorded snapshots: worlds simulated before this version (and every world's first
   season) show "unavailable" until a season has been archived by this version. Ages are

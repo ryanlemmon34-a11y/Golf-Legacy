@@ -79,6 +79,21 @@ class Compare(unittest.TestCase):
         self.assertFalse(t['prize_known'])
         self.assertIn('unknown', __import__('observer').money(t['prize'], t['prize_known']))
 
+    def test_this_seasons_top_10s_leave_qualifying_out(self):
+        idx = self.w.a.index                                            # a qualifying stage the archive recorded
+        qual = idx.db.execute("SELECT event_id FROM editions WHERE category IN ('qualifier', 'q_school') LIMIT 1").fetchone()[0]
+        real = self.w.live.results(self.a)
+        fake = real + [{'year': self.w.live.cursor['year'], 'week': 1, 'event': qual, 'series': '', 'pos': 3,
+                        'coach': 0, 'caddie': 0, 'route': None}]
+        from unittest import mock
+        with mock.patch.object(self.w.live, 'results', lambda pid: fake if pid == self.a else real):
+            got = C.seasons(self.w, self.a)[self.w.live.cursor['year']]
+        cat = lambda r: (self.w.edition(r['event']) or {}).get('category')
+        counted = [r for r in real if cat(r) not in ('qualifier', 'q_school')]
+        self.assertEqual(got['top10'], sum(1 for r in counted if r['pos'] is not None and r['pos'] <= 10))
+        self.assertEqual(got['wins'], sum(1 for r in counted if r['pos'] == 1))
+        self.assertEqual(got['starts'], len(fake))                     # (a start is still a start)
+
     def test_three_kinds_of_overall_are_kept_apart(self):
         html = self.page(f'/compare?ids={self.a},{self.b}')
         lp = self.w.live.people[self.a]
