@@ -90,6 +90,7 @@ def totals(w, pid, ss):
          'top10': sum(s.get('top10') or 0 for s in ss.values() if s.get('top10') is not None),
          'top10_seasons': sum(1 for s in ss.values() if s.get('top10') is not None),
          'prize': sum(s.get('prize') or 0 for s in ss.values()),
+         'prize_known': all(s.get('prize') is not None for s in played.values()),   # (not a missing season as $0)
          'best_wr': min((s['wr_end'] for s in ss.values() if s.get('wr_end')), default=None),
          'first': min(ss) if ss else None, 'last': max(played) if played else None}
     return t
@@ -171,7 +172,7 @@ def compare_page(w, q):
             '<span class="muted">not recorded</span>' if not tot[p]['top10_seasons'] else
             f'{tot[p]["top10"]} <span class="muted">(in the {tot[p]["top10_seasons"]} of {len(data[p])} seasons that '
             'record it)</span>'),
-        row('Prize money', lambda p: O.money(tot[p]['prize'])),
+        row('Prize money', lambda p: O.money(tot[p]['prize'], tot[p]['prize_known'])),
         row('Best world ranking', lambda p: f'No. {tot[p]["best_wr"]}' if tot[p]['best_wr'] else '—', 'at a season’s end'),
         row('Weeks at world No. 1', lambda p: (str(no1.get(p, 0)) if no1 is not None else
                                                '<a href="/records/weeks-at-number-one">see Records</a>')),

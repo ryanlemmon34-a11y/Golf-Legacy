@@ -54,6 +54,16 @@ they now; My World; career comparisons; the GOAT Lab; qualification evidence (ea
 views, `docs/STANDINGS_AND_RIGHTS.md`, the zero-start investigation by region and circuit with
 recommendations); exact-result browsing speedups.
 
+Stabilization pass (HAL's review of 0d4576b; report section in `docs/V15_BUILD_REPORT.md`): the global Hide
+results setting removed (every view reads the complete history; ordinary replay and "Watch from round 1" kept;
+old settings files ignored; a My World period possibly marked read while hidden offered for review); GOAT formula
+arity rules and safe evaluation; one Recorded Peak (the profile's) for the GOAT Lab and cohorts over the whole
+career, archive-only included; cohort prize money with the current season, counted once; My World ranking bands
+from each week's own ranking; Save view saves the view as shown after a browser sort.
+
+**Next priorities (owner roadmap, after the stabilization pass)**: believable career and financial decisions;
+evolving nations; richer staff relationship history (and My World digesting staff relationship changes).
+
 Awaiting the owner's decision: the zero-start recommendations (`docs/ZERO_START_REVIEW.md`: the full-time /
 working decision when a full-time amateur cannot afford their cheapest event; amateur cost or event density by
 region); the performance options (per-golfer random streams, incremental checkpoints, outcome-equivalent engines,

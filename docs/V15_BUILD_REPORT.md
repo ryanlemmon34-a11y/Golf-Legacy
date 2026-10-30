@@ -1,11 +1,124 @@
 # Build v15: what is in it, how to try it, and what is left
 
-**Reviewed**: HAL's read-only review of commit `07cecee` (`main`, the v14 build). **Build**: branch `build/v15`
-from `07cecee`; `main` is unchanged. Each item below is its own commit with its tests. Your paused world, its
+**Reviewed**: HAL's read-only review of commit `07cecee` (`main`, the v14 build), then HAL's review of `0d4576b`
+(the stabilization pass, next section). **Build**: branch `build/v15` from `07cecee`, merged into `main` after
+the stabilization pass with your approval. Each item below is its own commit with its tests. Your paused world, its
 history and the original installation were not touched: everything was run on disposable test worlds or on a
 copy of the 50-season world (`world_2027`, made by engine 7334ffe; the original was only read, and its files
 are unchanged: same 71 files, sizes and modification times before and after). No long simulation was run and
 no playthrough resumed; nothing was bought or sent anywhere.
+
+## Stabilization pass (HAL's review of 0d4576b)
+
+**Build**: `build/v15`, commits `9164d35` (Hide results removed), `8fb37c7` (the five findings) and the
+commit carrying this report (a comparison total, an exact speedup of the peak read, the documents); merged
+into `main` with your approval ("you can push all of the changes to the main"). No newer commits existed when the pass began. No simulation state, tournament outcome or archived history
+was changed: every change is in the observer (`tools/observer*.py`), which only reads a world. Your paused
+playthrough was not resumed, no long simulation was started, the original 50-season save was only read (same
+files, sizes and modification times before and after) and its calendar was not migrated.
+
+### Hide results: removed
+
+**Removed** (code, tests and documentation): the header's *Hide results* control and its `/spoilers` route; the
+`observer_spoilers` module (the per-world setting and its boundary, each event's reveal state and remembered round,
+*Reveal final*, the resume-at-round link, the hidden-result counters, masking and redaction); every use of it --
+season recaps (majors and champions, leading winners, moments), the Career Grand Slam line and page, records set
+by a single result, golf records (longest drives, event driving averages, margins, match-play wins and their
+"rows left out" counts), ranking-points rows, a golfer's season page and status lines naming a win, the
+tournament summaries and calendar, course, nation and tour pages, the overview, a profile's results, cohorts,
+comparisons, qualification projections, My World's held-back counts,
+and the GOAT Lab's majors and Grand Slam components; the aggregate-page warnings; `tests/test_spoilers.py`; the
+documentation of the setting. No other global spoiler mechanism replaces it.
+
+**Every view uses the complete recorded results**: profiles, recaps, records, cohorts, comparisons,
+qualification, My World and the GOAT Lab read the same history whatever an old setting said. The GOAT Lab's
+majors and Career Grand Slam components count exactly the Grand Slam page's majors (tested with the old setting
+planted, hiding everything).
+
+**Replay kept**: an event page opens on its final result; *Rounds* shows the leaderboard after any round chosen
+(nothing after that round: no winner, final places or later rounds), scorecards up to that round, a playoff at
+the final round, and *Watch from round 1*, which always opens round one. The replay is now stateless (nothing is
+remembered or written), so restart and the final result cannot disagree; "resume" existed only for hiding and
+went with it.
+
+**Old settings files** (`observer_spoilers.json` from earlier builds) are never applied, never written and never
+deleted; a world with one opens normally (a malformed file is ignored). **My World**: the only use of the old file
+is its date boundary. If the digest was marked read after hiding began, items in that period may never have been
+seen, so My World shows one line -- "items from <week> to <week> may not have been shown" -- with *Review that
+period* (the digest for exactly that window, every item in it) and *Dismiss*. The read marker is not rewritten,
+nothing is flooded back as unread or counted again as new, and the shortlist is kept.
+
+### The five findings
+
+| | Finding | Fix | Regression tests (each fails on the previous code) |
+|---|---|---|---|
+| A | `sqrt(1,2)` and `min(1)` passed validation, then raised a TypeError | Per-function value counts (sqrt and log one; min and max 2-8), checked before anything is evaluated, with a message naming the function and the count ("sqrt() takes exactly 1 value (given 2)"); evaluation errors (division by zero, log of 0 or a negative, square root of a negative, complex powers, overflow, non-finite results) leave that career out and are counted. The restricted evaluator is unchanged. | `test_goat`: wrong counts (8 formulas, nested ones included), 15 impossible values, valid formulas with exact results; the page with wrong counts, with every career impossible and with some careers impossible -- it always renders. |
+| B | GOAT peaks read only the last archived season and the live snapshot | `observer_data.recorded_peaks`: the profile's `recorded_peak` for many golfers at once (every archived season's noted peak and start-of-season rating, the current snapshot; the highest value, its earliest date), read in bulk and kept per reading of the history. The GOAT Lab and cohorts both use it; nothing is invented. | `test_goat_peaks`: four archived seasons; golfers whose last season was the first, reopened archive-only (no live snapshot): the GOAT value and its contribution to a custom score (weight 2 on Peak only) equal the profile's peak; the same with a live world; the batch helper equals the profile's for 400 golfers, live and archive-only. `test_cohort`: an older index shows no peak, as the profile does. |
+| C | Cohort prize money ignored the current season | The current season so far is added once; once that season is archived it is counted from its row only. A season row without prize money makes the figure "partial", never a silent $0. | `test_cohort`: a first-season paid winner (field of a current-season event), amateurs paid nothing ($0, known), a multi-season career (archived rows + this season), a season without prize money (partial), a refresh (identical), and a real season end (week 51 -> 52 -> archived: counted once, the same after a reload, and not added again if the snapshot still names the archived season). |
+| D | My World used today's ranking for any current-season week | Each end of the window reads the ranking published that week: the current season's weekly snapshots or the archived season (week 0 = the previous season's final ranking). If a week's ranking was not recorded, nothing is claimed (never another week's ranking in its place). | `test_myworld`: No. 12 -> No. 8 ("now in the top 10"), reaching No. 1, losing No. 1, leaving the top 10, in and out within the window (no item), a missing week, the season boundary (last season's No. 1 now No. 30), marking the digest read and a later week bringing exactly one new item. |
+| E | Save view kept the query from before a browser column sort | The sort script updates the form with the address it writes. | `test_views` (Chromium via Node Playwright): Golfers filtered (name, status), server-sorted, page 2; sort a column in the browser; name and save without reloading; leave; reopen from *Saved views*: same order, filters, sort and page; refresh, Back and Forward keep it. |
+
+**Also fixed in this pass**: a golfer with no finance ledger in the current season has been paid nothing (the
+archive records $0 when the season ends); profiles, comparisons and the season page said "not recorded" and now
+say $0, as cohorts do. A comparison's career prize total with a season that did not record prize money now
+reads "unknown" (as the profile's career total does) instead of counting it as $0. The statistics store could
+raise a UNIQUE error when two readers opened a new store at the same moment (seen once in the suite); its schema
+row is now written idempotently.
+
+### Validation
+
+- **Whole suite** (every module, six at a time, 18 minutes): **47 modules, 509 tests, all passed** (1 skipped by
+  design, as before: `test_observer_profiles`). It ran on `8fb37c7` plus the comparison's prize total (its new
+  test ran in it). After it, one exact speedup went into the batch peak read (a career row containing neither a
+  noted peak nor ratings is not decoded); the four modules that use it were run again on the final code:
+  `test_goat_peaks` 3, `test_cohort` 10, `test_goat` 11 and `test_compare` 6 tests, all passed.
+- **The new tests fail on the previous code** (a separate checkout of `9164d35` with the new test files): A 3 of 3
+  (`sqrt(wins, 2)` broke the page with a TypeError; complex values escaped), B 3 of 3 (the retired golfer's
+  archive-only peak was missing instead of 46.7; the GOAT row said "missing"), C 5 of 5 (a first-season winner
+  showed $0; this season's money was missing; an older index showed another season's peak), D 4 of 4 (no band
+  change within a season; today's No. 2 used for last season's final week, where the golfer was No. 1), E 1 of 1
+  (the saved query lacked the browser sort).
+- **Kept working** (in the passing suite): the Britannia qualifying-series places and the playoff par
+  (`test_review_v15`), every playoff participant in the records (`test_playoffs`), the replay and *Watch from
+  round 1* (`test_complete_history`, which plants an old setting hiding everything and checks 18 pages).
+- **The 50-season copy** (disposable copies only), browsed read-only (whole world, and its archive alone) and with
+  the live snapshot (a second copy opened as a session, which upgrades that copy's index: 243 s before the first
+  page): 18 pages each -- overview, a champion's profile, the GOAT Lab (default, Peak weighted, retired careers,
+  wrong value counts, every career impossible, some impossible), two cohorts, a comparison, My World, a recap,
+  the Grand Slam page, a records list and a replay -- with an old Hide results file planted: no page failed and
+  none hides or mentions hiding. For 250 careers (the GOAT top 150 and 100 from the middle), majors (Grand Slam
+  page, GOAT Lab, comparison, cohort), wins (Stats, comparison, cohort), prize money (Stats, comparison, cohort)
+  and peak (profile, GOAT Lab, cohort) agree in all three modes. The batch peak equals the profile's for every
+  golfer sampled (400 per mode, and 500 of all 49,378 people). That world's engine recorded neither peaks nor round
+  scores, so Peak reads "not recorded" for its retired golfers everywhere (active golfers have the current
+  rating, as their profiles show) and its replay says round scores were not recorded.
+- **Your original world**: only read; its 71 files have the same sizes and modification times as before the pass.
+
+### Remaining discrepancies and limitations
+
+- **Prize money precision**: an archived season is kept in whole dollars, the current season's ledger in cents,
+  so a cohort or profile figure can drop by less than $1 when its season is archived (seen in the season-end
+  test: $11,874,635.18 so far, $11,874,635 archived).
+- **Unknown prize money is presented two ways**: a cohort shows the partial sum marked "partial"; a profile's and a
+  comparison's career totals show "unknown". The same fact, worded differently. (Every season row written so far
+  records prize money; this arises only for an incomplete archive.)
+- **GOAT score rounding**: the score and each contribution are rounded to one decimal separately, so they can
+  differ by 0.1 (1.5 x 46.7: score 70.0, contribution +70.1). Display only; the ranking uses the exact values.
+- **Peak cost on long histories**: the first all-tours GOAT ranking that uses Peak reads every career row once
+  per reading of the history: 8.8 s on the 50-season copy (no peaks to decode), about 40 s estimated for a
+  50-season world from the current engine (63 microseconds per row measured on a four-season world). The default
+  weights do not use Peak; repeat views take milliseconds.
+- **My World ranking bands**: a world's first season has no start-of-season ranking kept (the seeded ranking is
+  not a snapshot), so its "this season" window shows no band changes; an archived season from before ranking
+  points were kept uses its top-100 order. A save from before weekly snapshots were kept compares only against
+  the current table.
+- **Replay on old histories**: *Watch from round 1* is still offered where round scores were not recorded; the
+  page then says so (nothing is reconstructed).
+- **Tests** use small worlds (2-5 % population); the four-season archive test takes 5-9 minutes. The 50-season
+  checks were run by hand (above), not as unit tests.
+- **Not in this pass** (no interface features were added): My World still does not digest staff relationship
+  changes; it is on the roadmap with richer staff relationship history. Next priorities: believable career and
+  financial decisions, evolving nations, richer staff relationship history (`docs/BACKLOG.md`).
 
 ## The four review findings
 
@@ -15,6 +128,10 @@ no playthrough resumed; nothing was bought or sent anywhere.
 | **B.** Hide results leaked winners in season recaps and the Career Grand Slam | Edition-level reveal rules applied to recaps (majors and champions, leading winners, moments), the Grand Slam line and page, records set by one hidden result, golf records, ranking points, a golfer's season page and status lines naming a hidden win. Aggregate pages keep their note (the possibility of inferring results from totals, already disclosed). | `test_review_v15`: a hidden major winner (recap, profile moments, season page, youngest-champions record, margins list); a hidden fourth major completing a Career Grand Slam (line and page; revealed again once watched). |
 | **C.** A playoff's tie was shown against one round's par (283 on par 72 → +211) | The par of every regulation round (−5); older archives use the edition's round count. Display only. | `test_review_v15`: four-round and two-round playoffs; an older archive without extra holes or round scores. |
 | **D.** "Watch from round 1" resumed at the remembered round | A separate restart link always opens round 1; Resume returns to the round last watched; neither reveals anything. | `test_review_v15`: after watching round 3, restart opens round 1 while the event page still resumes at round 3. |
+
+*Superseded by the stabilization pass*: Hide results (finding B) and the remembered round behind "Resume"
+(finding D) have been removed; every view shows the complete history, and "Watch from round 1" still always
+opens round one. Findings A and C stand, with their tests.
 
 ## Features, in the order asked (each a separate commit)
 
@@ -140,9 +257,10 @@ are identical to `main`: tested over two season ends). Your current installation
 
 ## Recommended next validation pass
 
-1. Open a **copy** of your paused world in v15 read-only: check Hide results on recaps, the Grand Slam page and
-   My World; use saved views and "Back to" while browsing; open a college championship's "where is this field
-   now?".
+1. Open a **copy** of your paused world in v15 read-only: recaps, the Grand Slam page, My World (if the world
+   used the old Hide results setting, the one-line review notice) and an event's replay with *Watch from round
+   1*; sort a list in the browser, *Save view*, reopen it; use "Back to" while browsing; open a college
+   championship's "where is this field now?"; in the GOAT Lab try a formula with a wrong number of values.
 2. On a new reference-calendar world, play to week 27 and check one Britannia qualifying-series winner's
    profile: no regional or final qualifying entry, the place in the field.
 3. Decide on the zero-start recommendations and the performance options; a measured season on your laptop with

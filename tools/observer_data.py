@@ -291,7 +291,9 @@ def recorded_peaks(w, pids):
                     for pid, y, blob in idx.db.execute(
                             f'SELECT person, year, row FROM careers WHERE person IN ({",".join("?" * len(chunk))})'
                             + idx.upto(), chunk):
-                        rows.setdefault(pid, []).append((y, json.loads(zlib.decompress(blob))))
+                        raw = zlib.decompress(blob)
+                        if b'"peak"' in raw or b'"ratings"' in raw:   # (a row with neither holds no candidate)
+                            rows.setdefault(pid, []).append((y, json.loads(raw)))
             elif idx is None:                          # (no index: each season file once, as playing_career reads)
                 want = set(todo)
                 for y in a.years:

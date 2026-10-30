@@ -69,6 +69,16 @@ class Compare(unittest.TestCase):
                              sum(1 for m in OH.major_wins(self.w) if m[4] == pid))
         self.assertIn('the highest recorded', html)
 
+    def test_a_season_without_prize_money_is_not_counted_as_zero(self):
+        ss = C.seasons(self.w, self.a)
+        t = C.totals(self.w, self.a, ss)
+        self.assertTrue(t['prize_known'])
+        y = next(y for y, s in ss.items() if s.get('starts') and s['source'] == 'archived')
+        ss[y] = dict(ss[y], prize=None)                                 # a season that did not record it
+        t = C.totals(self.w, self.a, ss)
+        self.assertFalse(t['prize_known'])
+        self.assertIn('unknown', __import__('observer').money(t['prize'], t['prize_known']))
+
     def test_three_kinds_of_overall_are_kept_apart(self):
         html = self.page(f'/compare?ids={self.a},{self.b}')
         lp = self.w.live.people[self.a]
