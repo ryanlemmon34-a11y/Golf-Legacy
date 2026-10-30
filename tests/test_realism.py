@@ -30,8 +30,11 @@ SEASON = Season(generate_world(seed=11), seed=11, development=True, workers=1)
 
 
 def set_record(s, g, share):
-    """A proven earnings record (20 events) at the golfer's own level."""
+    """A proven earnings record (20 events) at the golfer's own level. (Written directly, so the forecasts
+    remembered from the old record are dropped -- the engine changes a record only through learn_prize,
+    which does the same.)"""
     s.prize_record[g.id] = {tier(g) if g.tour in TOUR_BY_KEY else 4: [share, 20]}
+    s.__dict__.pop('_pf_memo', None)
 
 
 def tier(g):

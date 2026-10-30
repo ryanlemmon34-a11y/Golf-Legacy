@@ -54,28 +54,57 @@ shrinks; the serial part is what decides season 100.
 
 ## Results
 
-(Filled in from the final runs: see *Measured, end to end* below.)
+Measured, end to end (`tools/benchmark_skip.py`: one season skipped as the observer does it, on a disposable copy;
+two runs each, alternating baseline 7d8e6ed and branch; 4 workers):
+
+| Skip one season | Baseline (s) | Branch (s) | Change |
+|---|---|---|---|
+| Season 1 (fresh world, 6,971 active golfers) | 116.3 / 113.3 | 112.2 / 111.9 | -3 % |
+| Season 51 (50-season copy, 13,152 active, 43,683 people) | 214.2 / 213.0 | 202.6 / 204.4 | -5 % |
+| of which: season-end save, season 51 | 20.5 / 19.8 | 15.7 / 15.0 | -24 % |
+| of which: simulate, season 51 | 179.0 / 178.3 | 170.5 / 173.8 | -3 % |
+
+| Peak memory (exact peak RSS) | Baseline | Branch |
+|---|---|---|
+| Season 1, main process | 730 MB | 770 MB |
+| Season 51, main process | 2,578 MB | 2,640 MB (+2 %: remembered forecasts and the compression threads' buffers) |
+| Season 51, all processes (PSS) | 4,135 MB | 4,256 MB |
+
+History browsing (season 51 copy): Stats 4.9 s -> 0.4 s, Prize money 5.4 s -> 1.1 s, golf statistics 4.6 s -> 0.9 s;
+Records: the first page after the statistics are cached 9.5-15 s -> 0.2 s (the very first opening of a copied
+world still builds the cache once: 14 s above).
+
+**Against the two-minute goal.** On this 4-CPU machine season 1 takes about 112 s and season 51 about 203 s. The
+owner's laptop log (16 logical CPUs, playtest build) shows a skip growing by about 2 s a season, from 53 s in
+season 1 to about 105 s by season 24; continued in a straight line that reaches about 250 s by season 100. The
+exact-result changes here remove about 5 % at season 51 (mostly the save) and do not change that trend: the
+growing part is the main process's one-at-a-time work, which grows with the number of people the world holds.
+Reaching two minutes at season 100 needs one of the decisions below; nothing here reduced the simulation.
 
 ## Correctness evidence
 
 - Season 1 (fresh world) and season 51 (50-season copy): **identical saved state** (53 MB and 244 MB
   decompressed) and **identical history** (6 and 56 files) to the baseline after the same season.
 - Season 1 with 2 workers against the baseline with 4: one byte differs -- the saved worker count itself;
-  everything simulated is identical.
+  everything simulated is identical. (Final runs: season 1 and season 51 state identical, 52,966,950 and
+  243,781,198 bytes; history files differ only in gzip encoding.)
 - The planner's new search against the old per-mask loop: identical choice and value on 230,000 random plans.
 - Exports equal `dataclasses.asdict`; threaded gzip reads back byte for byte (pickle and JSON); rankings, fame
   and forecasts equal a full recomputation week by week; the store's all-time sums equal the seasons summed
   (all 42,947 people at season 51) and are not used once any season changes; the records cache and remembered
   lists equal a fresh reading (all 28 lists and scoped ones at season 51) and are not trusted for a
   republished season or another world's files.
-- `tests/test_performance_equivalence.py` (7 tests) and the whole suite (see the report).
+- `tests/test_performance_equivalence.py` (7 tests) and the whole suite on the branch: 30 of 31 modules passed;
+  `test_realism` failed one test because its helper writes a golfer's prize record directly, bypassing
+  `learn_prize` (which clears that golfer's remembered forecasts), for two copies of the same golfer. The engine
+  changes the record only through `learn_prize`; the helper now clears the memo too (fixed on the branch).
 
 ## Memory and disk
 
 - Checkpoints: the same pickle, compressed in 4 MB members (about 0.05 % larger at season 51: 79.40 vs 79.37 MB).
 - New derived files, rebuilt whenever they do not match the history: `observer_cache/history_stats.pkl`
   (61 MB at season 51, grows with the number of starts) and the statistics store's all-time tables (a few MB).
-- Peak memory: unchanged within measurement (see the end-to-end table).
+- Peak memory: up about 2 % at season 51 (table above).
 
 ## Compatibility
 

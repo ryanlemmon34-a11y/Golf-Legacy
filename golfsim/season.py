@@ -338,7 +338,8 @@ class Season:
         self.cash_start = {}                                 # year -> gid -> cash on 1 January
         self.support_start = {}                              # year -> gid -> (family money, backers' money) then
         self.prize_share = {}                                # gid -> share of a purse they tend to win (all levels)
-        self.prize_record = {}                               # gid -> {tier: [share of purse they tend to win
+        self.prize_record = {}                               # (changed only by learn_prize: forecasts are remembered)
+                                                             # gid -> {tier: [share of purse they tend to win
                                                              #   at that level of competition, events]}
         self.snapshots = {}                                  # year -> gid -> completed-season evidence
         self.rank_start, self.am_start = {}, {}              # year -> world / amateur ranking on 1 January
