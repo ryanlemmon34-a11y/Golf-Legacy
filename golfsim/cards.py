@@ -3,6 +3,9 @@
 Premier Tour (300 members across three circuits)
     keep        top 200 on the season's Premier money list (all Premier events and majors);
                 winners of a Premier event this season or last; major champions of the last 5 years
+    earn        a professional without a Premier card earns one the same way (winner_exemptions: a
+                winner's exemption does not depend on membership), or by Premier money that would have
+                kept a member's card; they join the Premier circuit their home Challenger tour feeds
     lose        everyone else drops to their region's Challenger tour
     promoted    Challenger Tour Americas top 25, Europe top 20, Asia and Japan top 8, Latin America &
                 Canada top 5; Premier Tour Q-School final top 5 and ties; Europe Q-School final top 20
@@ -46,6 +49,33 @@ def home_mini(g):
     return options[g.id % len(options)]
 
 
+def premier_circuit(g):
+    """The Premier circuit a professional joins on earning a card outside the money-list pathways: the
+    one their home Challenger tour promotes to."""
+    return CHALLENGER_TO_PREMIER[home_challenger(g)][1]
+
+
+def winner_exemptions(season, year, through=None):
+    """{gid: why} Premier Tour exemptions earned by winning, held in season `year` whatever the winner's
+    membership: a major in the five seasons before it, a Premier event in the two before it. With
+    through=year, wins of `year` itself so far count too (an exemption is earned the week it is won).
+    A later major's reason replaces an earlier one; a Premier event's never replaces a major's."""
+    last = year - 1 if through is None else through
+    out = {}
+    for (sid, y), _ in season.ctx.results.items():
+        if y > last or y < year - 5:
+            continue
+        s = season.cal.by_id.get(sid)
+        w = season.ctx.winner(sid, y) if s else None
+        if w is None:
+            continue
+        if s.kind == 'major':
+            out[w] = f'won the {y} {s.name}'
+        elif s.tier == 1 and y >= year - 2 and w not in out:
+            out[w] = f'won the {y} {s.name}'
+    return out
+
+
 def home_lower(g):
     return REGIONAL_BY_COUNTRY.get(g.country) or home_mini(g)
 
@@ -85,28 +115,31 @@ def apply_cards(season, year):
     for g in pros:
         members[g.tour].append(g)
 
-    # Exemptions: Premier winners this season or last, major champions of the last 5 years
-    exempt = set()
-    for (sid, y), sites in ctx.results.items():
-        s = season.cal.by_id.get(sid)
-        if s is None or not sites:
-            continue
-        w = ctx.winner(sid, y)
-        if w is None:
-            continue
-        if s.kind == 'major' and year - 4 <= y <= year:
-            exempt.add(w)
-        elif s.tier == 1 and year - 1 <= y <= year:
-            exempt.add(w)
+    # Exemptions held next season: Premier winners this season or last, major champions of the last 5 years
+    exempt = winner_exemptions(season, year + 1)
 
     # ---- Premier Tour -------------------------------------------------------------------------
     premier = [g for g in pros if g.tour in PREMIER_TOURS]
     order = by_money('PREMIER', premier)
     for i, g in enumerate(order):
         if i < PREMIER_KEEP or g.id in exempt:
-            assign(g, g.tour, 'kept card' if i < PREMIER_KEEP else 'winner exemption')
+            assign(g, g.tour, 'kept card' if i < PREMIER_KEEP else f'winner exemption: {exempt[g.id]}')
         else:
             assign(g, home_challenger(g), 'lost Premier card')
+    # Professionals without a card who earned one anyway (2090 world audit: a three-time major champion
+    # stayed a Challenger member for a decade): a winner's exemption, or Premier money that would have
+    # kept a member's card. The money list itself was never limited to members.
+    pm = money[('PREMIER', year)]
+    last_kept = order[min(PREMIER_KEEP, len(order)) - 1] if order else None
+    for g in pros:
+        if g.tour in PREMIER_TOURS:
+            continue
+        if g.id in exempt:
+            assign(g, premier_circuit(g), f'Premier card earned: {exempt[g.id]}')
+        elif last_kept is not None and pm.get(g.id) and \
+                season.standing_key(pm, g.id) < season.standing_key(pm, last_kept.id):
+            assign(g, premier_circuit(g), f'Premier card earned: ${pm[g.id]:,.0f} in Premier events and majors, '
+                                          f'more than the last member to keep a card')
     for tour, n in (('PT_EUROPE', 10), ('PT_ASIA_PACIFIC', 5)):
         for g in by_money(tour, members[tour])[:n]:
             if new[g.id][1] == tour:

@@ -32,7 +32,10 @@ Moves
                   lives (hiring itself ignores where people live: touring caddies travel); a coach to where
                   most of their players live. Staff have no household finances: their moves cost nothing.
 Nothing here grants a tour card, a membership or a qualifying right: those follow nationality and
-results, wherever a golfer lives.
+results, wherever a golfer lives. The one thing residence opens is local amateur golf (rules 'open-amateur',
+'amateur-home-circuit'): an amateur may play the ordinary amateur events of the circuit where they live as
+well as their own country's, and an amateur who moves takes up the circuit of their new home. National
+championships still follow nationality.
 """
 from __future__ import annotations
 
@@ -386,6 +389,13 @@ def review_moves(season, year, snap):
         elif changed:
             why += '; after a change of status'
         _record(season, g.id, year, 53, to, why)
+        if g.status == 'amateur':                    # open amateur golf is local: the new home's circuit
+            from .careers import amateur_series
+            circuit = amateur_series(g, best)
+            if circuit != g.tour:
+                season.log(g.id, year, 53, f'Now plays amateur golf on the {TOUR_BY_KEY[circuit].name}, '
+                                           'where they live')
+                g.tour = circuit
 
 
 def staff_moves(season, year):

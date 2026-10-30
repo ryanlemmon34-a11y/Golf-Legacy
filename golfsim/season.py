@@ -56,6 +56,7 @@ AMATEUR_CAP = {1: 4, 2: 8, 3: 8, 4: 8}          # most amateurs (sponsor invitat
 COLLEGE_WINDOWS = {k: TOUR_BY_KEY[k].weeks for k in ('CO_US_D1', 'CO_US_SMALL', 'CO_INTL')}
 # golfers at college in the USA (wherever they are from) can play that country's amateur events
 COLLEGE_AMATEUR_SERIES = {'CO_US_D1': 'AM_NORTH_AMERICA', 'CO_US_SMALL': 'AM_NORTH_AMERICA'}
+TOUR_COUNTRIES = {k: frozenset(c for c, _ in t.countries) for k, t in TOUR_BY_KEY.items()}
 ELITE_AMATEUR_REGIONS = {'LATIN_AMERICA_AMATEUR': ('Latin America',), 'AFRICA_AMATEUR': ('Africa',),
                          'EUROPEAN_AMATEUR': ('Europe',), 'ASIA_PACIFIC_AMATEUR': ('Asia', 'Oceania')}
 QS_AMERICAS = ('North America', 'Latin America')
@@ -190,6 +191,8 @@ def play_site(task):
     pins = 0.3 + 0.4 * task['prestige'] / 100
     cond = {r: Conditions(wind_mph=max(0.0, wind + rng.gauss(0, 2.5)), rain=rng.random() < 0.08,
                           pin_difficulty=pins) for r in range(1, task['rounds'] + 1)}
+    out['conditions'] = [[round(c.wind_mph, 1), int(c.rain), round(c.pin_difficulty, 2)]
+                         for _, c in sorted(cond.items())]          # each round's weather and pins (archived)
     cut_after = 2 if task['cut_top'] and task['rounds'] > 2 else None
     board, playoff = play_event(golfers, course, rng, cut_top=task['cut_top'] or len(golfers),
                                 prestige=task['prestige'] / 100, cond_by_round=cond, rounds_n=task['rounds'],
@@ -218,6 +221,12 @@ class EventResult:
     field_strength: float = 0.0
     playoff: int = 0
     team: dict = field(default_factory=dict)   # gid -> (coach id, caddie id) that week (0 = none)
+    # Kept for the archive (results from saves before these were kept have none: see edition_record)
+    scores: list = field(default_factory=list)       # per site: {gid: [stroke-play round scores, in order]}
+    prizes: list = field(default_factory=list)       # per site: {gid: prize money paid} (paid golfers only)
+    conditions: list = field(default_factory=list)   # per site: [[wind mph, rain 0/1, pin difficulty] per round]
+    holes: list = field(default_factory=list)        # majors, per site: {gid: [[strokes per hole] per round]}
+    pars: list = field(default_factory=list)         # majors, per site: each hole's par (for the scorecards)
 
     def winner(self, site=0):
         rows = self.finish[site] if self.finish else []
@@ -313,6 +322,8 @@ class Season:
         self.unheld = defaultdict(list)                      # year -> event ids with no entrants
         self.moments = defaultdict(list)                     # year -> special moments (aces, playoffs, records)
         self.rights = {}                                     # year -> gid -> (Premier playing rights, why)
+        self.earned = {}                                     # year -> gid -> winner's exemption held (why)
+        self.college = {}                                    # gid -> [seasons enrolled in college] (ledger)
         self.week_access = defaultdict(_dd_counter)          # year -> gid -> weeks by access outcome (ACCESS)
         self.denied_run = Counter()                          # gid -> consecutive weeks shut out of full fields
         self.max_denied_run = defaultdict(Counter)           # year -> gid -> longest such run
@@ -436,7 +447,7 @@ class Season:
             return st == 'pro' or (st == 'amateur' and g.country == s.host_country and self.am_pos.get(g.id, 9999) <= 300)
         if tier == 1:
             if st == 'pro':
-                return mtier <= 2 or self.wr_pos.get(g.id, 9999) <= 500
+                return mtier <= 2 or self.wr_pos.get(g.id, 9999) <= 500 or g.id in self.winners_now()
             return st == 'amateur' and self.am_pos.get(g.id, 9999) <= 25
         if tier == 2:
             return st == 'pro' and (mtier <= 2 or (mtier <= 4 and g.country in countries))
@@ -455,12 +466,15 @@ class Season:
 
     def series_amateur(self, g, tour):
         """Whether an amateur belongs to an amateur series (tier 6) -- for its ordinary events and its
-        championship alike: its members, amateurs from its countries, and college golfers studying in
-        them (a Swede at a US college plays North American amateur golf)."""
+        championship alike: its members, amateurs from its countries, amateurs living in them, and
+        college golfers studying in them (a Swede at a US college plays North American amateur golf, and
+        still does after graduating if they stay). National championships follow nationality instead
+        (special_field); see rules 'open-amateur'."""
         if g.status != 'amateur':
             return False
-        countries = {c for c, _ in TOUR_BY_KEY[tour].countries}
-        return g.tour == tour or g.country in countries or COLLEGE_AMATEUR_SERIES.get(g.tour) == tour
+        countries = TOUR_COUNTRIES[tour]
+        return (g.tour == tour or g.country in countries or COLLEGE_AMATEUR_SERIES.get(g.tour) == tour
+                or self.home_country(g) in countries)
 
     def entry_ticket(self, g, s):
         """A golfer's place in the entry queue for this season's edition of an event (a fair draw: it
@@ -479,8 +493,11 @@ class Season:
             return (19, strength)
         if s.tier == 1 and g.tour in PREMIER_TOURS:
             # Premier events: playing rights first, home circuit next; the conditional categories are
-            # reordered by this season's Premier money (a reshuffle), the exempt ones by world ranking
+            # reordered by this season's Premier money (a reshuffle), the exempt ones by world ranking.
+            # A win during the season is an exemption from that week on.
             r = self.rights.get(self.year, {}).get(g.id, ('conditional',))[0]
+            if r != 'exempt' and g.id in self.winners_now():
+                r = 'exempt'
             cls = 2 * RIGHTS.index(r) + (0 if g.tour == s.tour else 1)
             if r in ('graduate', 'conditional'):
                 m = self.money.get(('PREMIER', self.year), {})
@@ -488,6 +505,10 @@ class Season:
             else:
                 strength = (0.0, strength)
             return (cls, strength, self.entry_ticket(g, s))
+        if s.tier == 1 and g.status == 'pro' and g.id in self.winners_now():
+            # a winner's exemption held without a Premier card (not yet a member, or a card earned at
+            # the season's end): exempt, as a member from another circuit is
+            return (1, (0.0, strength), self.entry_ticket(g, s))
         if self._visitor(g.id, s):
             # a Premier member not in a Premier field: a bounded number of places alongside the residents
             # (PREMIER_VISITOR_SHARE; _bump keeps the bound), by world ranking
@@ -755,9 +776,10 @@ class Season:
                 continue
             if self.development and self.plans.get(g.id, {}).get(week, ('play',))[0] != 'play':
                 continue                                     # a training or rest week in their plan
-            key = (g.status, g.tour, g.country, self.wr_pos.get(g.id, 9999) <= 500,
+            key = (g.status, g.tour, g.country, self.home_country(g), self.wr_pos.get(g.id, 9999) <= 500,
                    self.am_pos.get(g.id, 9999) <= 25, self.am_pos.get(g.id, 9999) <= 300,
-                   g.id if g.status == 'club_pro' else 0)      # club pros: their own diary and drives
+                   g.id if g.status == 'club_pro' else 0,      # club pros: their own diary and drives
+                   g.id in self.winners_now())
             evs = open_to.get(key)
             if evs is None:
                 evs = open_to[key] = [ed for ed in regular if self.eligible(g, ed.series, week)]
@@ -878,7 +900,10 @@ class Season:
     def entry_route(self, g, s, late=False):
         """How a golfer got into a regular event, with their status at entry (kept in history)."""
         if s.tier == 1 and g.tour in PREMIER_TOURS:
-            r = f'PREMIER {self.rights_of(g.id, self.year).upper() or "MEMBER"}'
+            r = self.rights_of(g.id, self.year)
+            r = f'PREMIER {"EXEMPT" if g.id in self.winners_now() else r.upper() or "MEMBER"}'
+        elif s.tier == 1 and g.status == 'pro' and g.id in self.winners_now():
+            r = 'WINNER EXEMPTION (not a member)'
         elif self._visitor(g.id, s):
             r = 'PREMIER MEMBER (visitor places)'
         elif g.status == 'amateur' and s.tier <= 4:
@@ -1422,6 +1447,8 @@ class Season:
         for k in ('_caddie_week', '_caddie_paid'):           # this week's bookings (empty between weeks)
             state.setdefault(k, set())
         state.setdefault('_reserved', Counter())
+        state.setdefault('earned', {})                      # rebuilt from results when first needed
+        state.setdefault('college', {})                     # college seasons before the ledger: not recorded
         if 'prize_record' not in state:                     # saves from before earnings kept their level:
             tier = lambda gid: next((TOUR_BY_KEY[g.tour].tier for g in (state['g'].get(gid),)   # their
                                      if g is not None and g.tour in TOUR_BY_KEY), 4)            # tour's
@@ -1471,6 +1498,9 @@ class Season:
             res.finish.append(finish)
             res.playoff = max(res.playoff, o['playoff'])
             self.ctx.add_result(sid, year, [(gid, pos) for gid, pos, _ in finish], site=site)
+            w = self.ctx.winner(sid, year) if (s.kind == 'major' or s.tier == 1) and year in self.earned else None
+            if w is not None and (s.kind == 'major' or w not in self.earned[year]):
+                self.earned[year][w] = f'won the {year} {s.name}'   # exempt from this week on (cards.winner_exemptions)
             rec = self.records.get(course)
             prior = rec.rounds                               # rounds on this layout before this event
             pars = [h.par for h in course.holes]
@@ -1566,6 +1596,17 @@ class Season:
             elif s.match_play and site == 0:
                 self.champions[sid].append((year, res.winner(0), None))
             won = self.pay_out(s, finish, year)
+            scores, holes = defaultdict(list), defaultdict(list)
+            for gid, rd, score, hs, _ in sorted(o['rounds'], key=lambda x: x[1]):
+                scores[gid].append(score)
+                if s.kind == 'major':
+                    holes[gid].append(list(hs))
+            res.scores.append(dict(scores))
+            res.prizes.append({gid: round(x, 2) for gid, x in won.items()})
+            res.conditions.append(o.get('conditions'))
+            if s.kind == 'major':
+                res.holes.append(dict(holes))
+                res.pars.append(pars)
             if s.purse:
                 for gid, pos, _ in finish:
                     if self.g[gid].status == 'pro':           # learn what this player tends to win
@@ -1736,7 +1777,7 @@ class Season:
                   self.backer_flows, self.move_log, self.move_blocked, self.activity_counts,
                   self.block_flags, self.cash_start, self.support_start, self.overall_start, self.rank_start, self.am_start,
                   self.staff_receipts, self.injuries, self.card_log, self.career_counts, self.transitions,
-                  self.assignments, self.staff_year, self.unheld, self.rights, self.card_reasons, self.snapshots,
+                  self.assignments, self.staff_year, self.unheld, self.rights, self.earned, self.card_reasons, self.snapshots,
                   self.juniors_added, self.new_pros_added, self.stats, self.moments):
             for y in [y for y in d if isinstance(y, int) and old(y)]:
                 del d[y]
@@ -1771,6 +1812,7 @@ class Season:
         for gid in self.legacy:
             self.legacy[gid] *= PR.LEGACY_DECAY
         self.snapshots[year] = snap = self.season_snapshot(year)
+        self.record_college(year, snap)
         for gid, row in snap.items():                        # what they have earned for next season, in their history
             places = row['secured'] + row.get('secured_if', [])
             if places:
@@ -1804,6 +1846,18 @@ class Season:
         RES.settle(self, year, 53)                           # arrivals' places; college bases (school-paid)
         self._active = None
 
+    def record_college(self, year, snap):
+        """The college eligibility ledger (rules 'college-eligibility'): each season a golfer spent enrolled,
+        recorded once however often this runs. Who left college more than a season ago leaves the ledger
+        (their seasons stay in the archive)."""
+        for gid, row in snap.items():
+            if row['tour'].startswith('CO_'):
+                used = self.college.setdefault(gid, [])
+                if year not in used:
+                    used.append(year)
+        for gid in [gid for gid, used in self.college.items() if used[-1] < year - 1]:
+            del self.college[gid]
+
     def start_finances(self, year):
         """Sponsor contracts for the season, from each professional's prestige at its start
         (paid weekly), and the cash each golfer starts the year with (for reconciliation)."""
@@ -1835,18 +1889,11 @@ class Season:
         major in the last five; full = top FULL_STATUS on last season's Premier money list; graduate =
         earned the card from a Challenger tour or a Q-School; conditional = everyone else who kept a
         card. The world's first season has no money list: members are seeded by world ranking."""
+        from .cards import winner_exemptions
         rights = self.rights[year] = {}
         members = [g for g in self.world.golfers if g.tour in PREMIER_TOURS and g.lifestyle == 'full_time']
-        exempt = {}
-        for (sid, y), _ in self.ctx.results.items():
-            s = self.cal.by_id.get(sid)
-            w = self.ctx.winner(sid, y) if s else None
-            if w is None:
-                continue
-            if s.kind == 'major' and year - 5 <= y < year:
-                exempt[w] = f'won the {y} {s.name}'
-            elif s.tier == 1 and year - 2 <= y < year and w not in exempt:
-                exempt[w] = f'won the {y} {s.name}'
+        exempt = winner_exemptions(self, year)
+        self.earned[year] = dict(exempt)                     # held by members and non-members alike
         reasons = self.card_reasons.get(year, {})
         m = self.money.get(('PREMIER', year - 1))
         if m is not None:
@@ -1869,6 +1916,15 @@ class Season:
             else:
                 rights[g.id] = ('conditional', f'{p} on the {year - 1} Premier money list' if m is not None and p
                                 else why or 'no money-list place')
+
+    def winners_now(self):
+        """{gid: why} winner's exemptions into Premier fields held this season, whatever the golfer's
+        membership (cards.winner_exemptions), including wins so far this season."""
+        e = self.earned.get(self.year)
+        if e is None:                                        # (a save from before exemptions were kept)
+            from .cards import winner_exemptions
+            e = self.earned[self.year] = winner_exemptions(self, self.year, through=self.year)
+        return e
 
     def rights_of(self, gid, year):
         r = self.rights.get(year, {}).get(gid)
@@ -2000,7 +2056,8 @@ class Season:
                 continue
             key = (g.tour, g.country, self.home_country(g), g.status, g.lifestyle, self.wr_pos.get(g.id, 9999) <= 500,
                    self.am_pos.get(g.id, 9999) <= 25, self.am_pos.get(g.id, 9999) <= 300,
-                   g.id if g.status == 'club_pro' else 0)      # club pros: their own diary and drives
+                   g.id if g.status == 'club_pro' else 0,      # club pros: their own diary and drives
+                   g.id in self.winners_now())
             if key not in cache:                             # every eligible event, best first
                 cache[key] = [sorted(((self.base_value(g, e, CITY_BY_NAME[city[e.event_id]].country), e.event_id, e)
                                       for e in by_week[w] if self.eligible(g, e.series, w)), reverse=True)

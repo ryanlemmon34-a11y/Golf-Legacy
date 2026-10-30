@@ -226,14 +226,14 @@ def candidates(year, seed, profiles, scale=1.0):
     return out
 
 
-def _make_golfer(i, row, year, seed, profiles, taken):
+def _make_golfer(i, row, year, seed, profiles, taken, in_use=None):
     country, age, pot, peak, cur, status, aging = row
     prof = profiles[country]
     grng = random.Random(f'{seed}:golfer:{i}')
     arch = _pick_archetype(prof.style, grng)
     attrs = _build_attrs(cur, arch, prof.style, age, peak, grng)
     pers = _personality(arch, cur, grng)
-    g = Golfer(make_name(country, grng, taken), attrs, pers, archetype=arch, id=i, country=country,
+    g = Golfer(make_name(country, grng, taken, in_use), attrs, pers, archetype=arch, id=i, country=country,
                born=year - age, hometown=grng.choice(CITIES_BY_COUNTRY[country]).name, status=status,
                height_cm=int(round(grng.gauss(180, 6.5) + 0.12 * (attrs['power'] - 60))),
                hand='L' if grng.random() < 0.07 else 'R',
@@ -281,8 +281,9 @@ def generate_world(year=2027, seed=2027, nation_profiles=None, scale=1.0):
 JUNIOR_SHARE = 1 / 31.25          # share of a nation's candidates who are 18 in any one year (see _age)
 
 
-def junior_class(year, seed, profiles, start_id, taken):
-    """This year's 18-year-olds from every nation (amateurs: college or amateur golf)."""
+def junior_class(year, seed, profiles, start_id, taken, in_use=None):
+    """This year's 18-year-olds from every nation (amateurs: college or amateur golf). Names: see
+    names.make_name (`taken`: every name used so far; `in_use`: those of people active now)."""
     rows = []
     for country, prof in profiles.items():
         n = max(0, round(prof.pool * CANDIDATES_PER_POOL * JUNIOR_SHARE))
@@ -300,7 +301,8 @@ def junior_class(year, seed, profiles, start_id, taken):
             if _keep_young(cur, 18, crng.random(), crng.gauss(0, SCOUTING_SD)):
                 rows.append((country, 18, pot, peak, cur, 'amateur', aging))
     rows.sort(key=lambda r: -r[4])
-    golfers = [_make_golfer(start_id + i, row, year, f'{seed}:j{year}', profiles, taken) for i, row in enumerate(rows)]
+    golfers = [_make_golfer(start_id + i, row, year, f'{seed}:j{year}', profiles, taken, in_use)
+               for i, row in enumerate(rows)]
     rng = random.Random(f'{seed}:junior-tours:{year}')
     am_series = {c: k for k, t in TOUR_BY_KEY.items() if t.tier == 6 for c, _ in t.countries}
     for g in golfers:
@@ -312,7 +314,7 @@ NEW_PRO_SCALE = 5.5               # aspiring professionals a year, in birth coho
 NEW_PRO_AGES = (21, 22, 23, 24, 25, 26)
 
 
-def new_professionals(year, seed, profiles, start_id, taken):
+def new_professionals(year, seed, profiles, start_id, taken, in_use=None):
     """This year's new professionals from outside the tracked amateur game.
 
     The junior class follows one route into professional golf in detail (college and national amateur
@@ -348,7 +350,8 @@ def new_professionals(year, seed, profiles, start_id, taken):
             if crng.random() < _keep_probability('pro', age, cur):
                 rows.append((country, age, pot, peak, cur, 'pro', aging))
     rows.sort(key=lambda r: -r[4])
-    golfers = [_make_golfer(start_id + i, row, year, f'{seed}:p{year}', profiles, taken) for i, row in enumerate(rows)]
+    golfers = [_make_golfer(start_id + i, row, year, f'{seed}:p{year}', profiles, taken, in_use)
+               for i, row in enumerate(rows)]
     for g in golfers:
         g.turned_pro = year
     return golfers

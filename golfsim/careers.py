@@ -28,7 +28,7 @@ import math
 import random
 
 from .calendar import TOUR_BY_KEY
-from .cards import home_challenger, home_lower, home_mini
+from .cards import home_challenger, home_lower, home_mini, premier_circuit, winner_exemptions
 from .development import EXPERIENCE_ROUNDS, init_ceilings
 from . import finance as FIN
 from . import prestige as PR
@@ -41,8 +41,11 @@ AMATEUR_BY_REGION = {'North America': 'AM_NORTH_AMERICA', 'Latin America': 'AM_L
                      'Africa': 'AM_AFRICA', 'Middle East': 'AM_ASIA', 'Asia': 'AM_ASIA', 'Oceania': 'AM_OCEANIA'}
 
 
-def amateur_series(g):
-    return AMATEUR_SERIES.get(g.country, AMATEUR_BY_REGION[COUNTRIES[g.country].region])
+def amateur_series(g, home=None):
+    """An amateur's home circuit: the one for the country they live in (`home`; rules
+    'amateur-home-circuit'), or their nationality's when where they live is unknown."""
+    c = home or g.country
+    return AMATEUR_SERIES.get(c, AMATEUR_BY_REGION[COUNTRIES[c].region])
 
 
 def _sig(x):
@@ -332,6 +335,7 @@ def decide(season, year, snap):
     counts = {}
 
     trans = season.transitions.setdefault(year, [])
+    exempt = winner_exemptions(season, year + 1)          # winners' exemptions held next season
 
     def note(kind, g, **why):
         """Count the decision and record it with its reasons (for reports and checks)."""
@@ -364,12 +368,13 @@ def decide(season, year, snap):
                     turn_pro(season, g, year, row.get('am_end') or 99999,
                              'after college' if graduating else
                              'late, after years as an amateur' if g.lifestyle == 'part_time' and age >= 27
-                             else 'from the amateur ranks')
+                             else 'from the amateur ranks', exempt.get(g.id))
                     note('turned pro' if not (g.lifestyle == 'part_time' and age >= 27) else 'comeback', g,
                          p=round(p_pro, 4), am_rank=row.get('am_end'), graduating=graduating)
                 elif graduating:
-                    g.tour, g.lifestyle = amateur_series(g), 'part_time'
-                    log(g.id, year, 53, 'College eligibility ended; kept playing as an amateur alongside a job')
+                    g.tour, g.lifestyle = amateur_series(g, season.home_country(g)), 'part_time'
+                    log(g.id, year, 53, 'College eligibility ended (the season they turned 22); kept playing as '
+                                        f'an amateur alongside a job, on the {TOUR_BY_KEY[g.tour].name} where they live')
                     note('college to amateur', g, p=round(1 - p_pro, 4), am_rank=row.get('am_end'))
                 elif g.lifestyle == 'full_time' and age >= 19:
                     p_job = p_amateur_job(season, g, row, year)
@@ -416,7 +421,7 @@ def decide(season, year, snap):
                 log(g.id, year, 53, f'Stopped chasing the tour at {age} and became a club professional ({reason})')
                 note('became club pro', g, **why)
             elif r < p_club + p_am:
-                g.status, g.lifestyle, g.tour = 'amateur', 'part_time', amateur_series(g)
+                g.status, g.lifestyle, g.tour = 'amateur', 'part_time', amateur_series(g, season.home_country(g))
                 log(g.id, year, 53, f'Stopped chasing the tour at {age}, took a job and regained amateur status ({reason})')
                 note('back to amateur', g, **why)
             else:
@@ -430,22 +435,38 @@ def decide(season, year, snap):
     return counts
 
 
-def turn_pro(season, g, year, am_rank, how):
+def turn_pro(season, g, year, am_rank, how, exemption=None):
+    """An amateur turns professional: their first tour by amateur ranking -- or the Premier Tour, when
+    they hold a winner's exemption (an amateur major champion: cards.winner_exemptions)."""
     g.status, g.lifestyle, g.turned_pro = 'pro', 'full_time', year + 1
     rng = random.Random(f'{season.seed}:backers:{year}:{g.id}')
     g.backer = FIN.backer_deal(g.age(year) + 1, amateur_standing(am_rank if am_rank < 99999 else None),
                                rng.random(), rng.random())
     g.backer_stale, g.backer_patience = 0, rng.random()
-    if am_rank <= 15:
+    if exemption:
+        g.tour = premier_circuit(g)
+        season.card_reasons.setdefault(year + 1, {})[g.id] = f'Premier card earned: {exemption}'
+    elif am_rank <= 15:
         g.tour = home_challenger(g)
     elif am_rank <= 60:
         g.tour = home_lower(g)
     else:
         g.tour = home_mini(g)
     season.log(g.id, year, 53, f'Turned professional {how} (amateur ranking {am_rank if am_rank < 99999 else "unranked"}), '
-               f'starting on the {TOUR_BY_KEY[g.tour].name}'
+               f'starting on the {TOUR_BY_KEY[g.tour].name}' + (f" (a winner's exemption: {exemption})" if exemption else '')
                + (f', with backers putting up ${g.backer:,.0f} a season for a share of winnings' if g.backer
                   else ', paying their own way'))
+
+
+def names_in_use(season):
+    """Names held by people active now -- golfers who have not retired, working coaches and caddies. A new
+    person's name is one never used if the banks allow, else one no active person holds: a retired person's
+    name can recur in a later generation, as in life (2090 world audit: requiring a name unused in all
+    history exhausted the banks, and three in four names had a middle initial by 2089). People are told
+    apart by id, birth year and nationality, never by name alone."""
+    st = season.staff
+    return ({g.name for g in season.world.golfers if g.lifestyle != 'retired'}
+            | {p.name for p in list(st.coaches.values()) + list(st.caddies.values()) if p.status == 'active'})
 
 
 def add_new_professionals(season, year):
@@ -454,7 +475,7 @@ def add_new_professionals(season, year):
     from .population import new_professionals
     start = season.world.next_id
     taken = {g.name for g in season.world.golfers} | season.staff.taken
-    arrivals = new_professionals(year, season.seed, season.world.nations, start, taken)
+    arrivals = new_professionals(year, season.seed, season.world.nations, start, taken, names_in_use(season))
     season.world.next_id = start + len(arrivals)
     rng = random.Random(f'{season.seed}:new-pros:{year}')
     for g in arrivals:
@@ -480,7 +501,7 @@ def add_juniors(season, year):
     from .population import junior_class
     start = season.world.next_id                     # ids come from the world's single person registry
     taken = {g.name for g in season.world.golfers} | season.staff.taken
-    juniors = junior_class(year, season.seed, season.world.nations, start, taken)
+    juniors = junior_class(year, season.seed, season.world.nations, start, taken, names_in_use(season))
     season.world.next_id = start + len(juniors)
     rng = random.Random(f'{season.seed}:juniors:{year}')
     for g in juniors:

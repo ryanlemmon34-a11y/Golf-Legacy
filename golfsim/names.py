@@ -2,7 +2,8 @@
 
 Names are drawn from per-language banks of given names and family names. Some countries mix banks
 (South Africa: English and Afrikaans; Malaysia: Malay, Chinese and Indian; Belgium: Dutch and French).
-Any full name matching a famous real golfer is rejected, and every name in the world is unique.
+Any full name matching a famous real golfer is rejected, and no two people active at the same time share a
+name (careers.names_in_use: a retired person's name can recur in a later generation).
 Names are shown given-name first everywhere, as golf media do.
 """
 from __future__ import annotations
@@ -349,22 +350,161 @@ FAMOUS = frozenset(n.lower() for n in (
     'Adilson da Silva', 'Alexandre Rocha', 'Jhonattan Vegas', 'Fernando Valenzuela', 'Rafael Nadal'))
 
 
-def make_name(country, rng, taken):
-    """A unique fictional name for a golfer from `country` (`taken`: names already in the world)."""
+# More names for the banks the largest golfing nations draw on (2090 world audit: by 2089 three in four
+# names carried a middle initial because these ran short). Used for people who arrive after a world began
+# (make_name with `in_use`), so a seed's starting world keeps exactly the names it always had.
+EXTRA = {
+    'en_us': (
+        ('Aiden', 'Bennett', 'Brooks', 'Camden', 'Carter', 'Chandler', 'Christian', 'Clayton', 'Colton', 'Dalton',
+         'Dawson', 'Dillon', 'Easton', 'Eli', 'Elliott', 'Emmett', 'Evan', 'Finn', 'Garrison', 'Graham', 'Grayson',
+         'Griffin', 'Hayes', 'Holden', 'Hudson', 'Isaac', 'Jace', 'Jalen', 'Jameson', 'Jonah', 'Keaton', 'Lane',
+         'Levi', 'Lucas', 'Marshall', 'Miles', 'Nolan', 'Noah', 'Pierce', 'Quinn', 'Reid', 'Rhett', 'Sawyer',
+         'Silas', 'Tate', 'Weston', 'Zane', 'Marcus', 'Terrell', 'Darius', 'Andre', 'Malik', 'Isaiah', 'Elijah',
+         'Gabriel', 'Adrian', 'Mateo', 'Julian', 'Victor', 'Andres', 'Rafael', 'Xavier', 'Dominic', 'Jasper'),
+        ('Abbott', 'Atkins', 'Ballard', 'Barrett', 'Beckett', 'Blackwell', 'Bowman', 'Bradford', 'Brennan', 'Burke',
+         'Carlisle', 'Chambers', 'Cline', 'Conway', 'Crawford', 'Cross', 'Cunningham', 'Delaney', 'Dennison',
+         'Donovan', 'Dougherty', 'Drake', 'Ellington', 'Emerson', 'Farrell', 'Fitzpatrick', 'Fleming', 'Gibbs',
+         'Goodwin', 'Graves', 'Griffith', 'Hale', 'Hammond', 'Hardin', 'Harmon', 'Hartman', 'Hawkins', 'Hendricks',
+         'Holt', 'Hopkins', 'Huffman', 'Ingram', 'Jennings', 'Keller', 'Kendrick', 'Kirby', 'Lambert', 'Larkin',
+         'Lawson', 'Lowery', 'Maddox', 'Malone', 'Mann', 'Marsh', 'McAllister', 'McCoy', 'McDaniel', 'Mercer',
+         'Merritt', 'Monroe', 'Nash', 'Newman', 'Nichols', 'Norris', 'Oakley', 'Osborne', 'Pace', 'Patton',
+         'Prescott', 'Randall', 'Reese', 'Rhodes', 'Rivers', 'Rollins', 'Salazar', 'Shelton', 'Sherwood',
+         'Slater', 'Stafford', 'Stanton', 'Sterling', 'Sutton', 'Thornton', 'Townsend', 'Walton', 'Warner',
+         'Webster', 'Whitfield', 'Wilder', 'Winslow', 'Wolfe', 'Woodard', 'Washington', 'Jefferson', 'Banks',
+         'Freeman', 'Nguyen', 'Tran', 'Patel', 'Garcia', 'Martinez', 'Rodriguez', 'Hernandez', 'Lopez', 'Ramirez',
+         'Flores', 'Rivera', 'Reyes', 'Cruz', 'Chen', 'Park')),
+    'en_uk': (
+        ('Adam', 'Alastair', 'Benedict', 'Bradley', 'Cameron', 'Connor', 'Dominic', 'Ethan', 'Finley', 'Frederick',
+         'Gabriel', 'Isaac', 'Jacob', 'Jasper', 'Leo', 'Liam', 'Louis', 'Mason', 'Miles', 'Noah', 'Oscar', 'Patrick',
+         'Reuben', 'Sebastian', 'Theo', 'Tristan', 'Zachary', 'Harvey', 'Ralph'),
+        ('Baxter', 'Bradshaw', 'Bramley', 'Burrows', 'Chapman', 'Coates', 'Dawson', 'Elliott', 'Gibson', 'Goddard',
+         'Hardy', 'Hayward', 'Holmes', 'Hopkins', 'Kemp', 'Knight', 'Lambert', 'Lowe', 'Marshall', 'Mason',
+         'Newton', 'Osborne', 'Payne', 'Ramsden', 'Read', 'Sharp', 'Slater', 'Spencer', 'Stone', 'Sutton', 'Tucker',
+         'Webb', 'West', 'Whitehead', 'Wilkinson', 'Woodward', 'Ashton', 'Barker', 'Dyson', 'Gould', 'Harper',
+         'Lister', 'Nicholson', 'Pearson', 'Royle', 'Stubbs', 'Townsend')),
+    'aus': (
+        ('Archie', 'Brayden', 'Callan', 'Declan', 'Dylan', 'Elijah', 'Flynn', 'Heath', 'Jarrah', 'Jesse', 'Kai',
+         'Liam', 'Logan', 'Marcus', 'Max', 'Noah', 'Oscar', 'Patrick', 'Reuben', 'Rhys', 'Seb', 'Toby', 'Xavier',
+         'Aaron', 'Caleb', 'Damien', 'Ethan', 'Harvey', 'Jordan', 'Kieran', 'Mason', 'Nathan', 'Owen', 'Taj'),
+        ('Atherton', 'Barlow', 'Birch', 'Callaghan', 'Dawson', 'Doherty', 'Elliott', 'Fenton', 'Gallagher', 'Hammond',
+         'Healy', 'Jamieson', 'Kerrigan', 'Lawler', 'Maddern', 'McGregor', 'Nicholls', "O'Brien", 'Pearce',
+         'Quinlan', 'Rankin', 'Sheridan', 'Toohey', 'Upton', 'Walsh', 'Wheatley', 'Brennan', 'Cockburn', 'Donnelly',
+         'Ellery', 'Fitzgerald', 'Gleeson', 'Hennessy', 'Kennedy', 'Macklin', 'Morrissey', 'Prendergast', 'Tully')),
+    'jp': (
+        ('Haruki', 'Itsuki', 'Asahi', 'Minato', 'Yamato', 'Sora', 'Hinata', 'Rintaro', 'Kotaro', 'Shinnosuke',
+         'Ryota', 'Kenta', 'Yusuke', 'Kazuya', 'Tomohiro', 'Masato', 'Hideto', 'Takeshi', 'Tetsuya', 'Yuma', 'Koki',
+         'Shunsuke', 'Yuya', 'Takuya', 'Naoya', 'Ryuji', 'Toshiki', 'Akihiro', 'Junpei', 'Kyohei', 'Soma', 'Eita',
+         'Haruma', 'Rui', 'Tsubasa', 'Yuji', 'Makoto', 'Atsushi'),
+        ('Nakano', 'Ono', 'Tamura', 'Takeuchi', 'Kaneko', 'Wada', 'Nakayama', 'Ishida', 'Ueda', 'Morita', 'Hara',
+         'Shibata', 'Sakai', 'Kudo', 'Yokoyama', 'Miyazaki', 'Miyamoto', 'Uchida', 'Takagi', 'Ando', 'Taniguchi',
+         'Ohno', 'Maruyama', 'Imai', 'Takada', 'Fujimoto', 'Murata', 'Ueno', 'Sugiyama', 'Masuda', 'Sugawara',
+         'Hirano', 'Otsuka', 'Chiba', 'Kubo', 'Matsui', 'Iwasaki', 'Sakurai', 'Kinoshita', 'Noguchi', 'Matsuo',
+         'Kikuchi', 'Nomura', 'Arai', 'Kawaguchi', 'Hirata', 'Oda', 'Kojima', 'Sano', 'Kubota', 'Shimada', 'Iwata',
+         'Yano', 'Hattori', 'Higuchi', 'Tsuchiya', 'Kitamura', 'Kawakami', 'Nagai')),
+    'kr': (
+        ('Min-ho', 'Ji-hwan', 'Seong-jin', 'Hyun-soo', 'Jin-woo', 'Tae-yang', 'Joon-ho', 'Sang-woo', 'Kyu-min',
+         'Yeon-woo', 'Ha-jun', 'Eun-woo', 'Si-woo', 'Yoon-ho', 'Jae-hyun', 'Seung-woo', 'Dong-wook', 'Min-seok',
+         'Woo-hyun', 'Hyun-jin', 'Ki-hoon', 'Jong-min', 'Sung-hoon', 'Young-ho', 'Chan-woo', 'Jun-ho', 'Tae-min',
+         'Ho-jin', 'Jin-seo', 'Seok-min', 'Kwang-hyun', 'Bum-soo', 'Ji-sung', 'Myung-ho', 'Won-jun', 'Jae-min',
+         'Do-hyun', 'Gi-tae', 'Hae-sung', 'Jun-young', 'Kang-min', 'Sun-woo', 'Yong-jun', 'Hee-chan'),
+        ('Bae', 'Noh', 'Ha', 'Kwak', 'Seong', 'Cha', 'Joo', 'Woo', 'Min', 'Na', 'Ryu', 'Jin', 'Chae', 'Won',
+         'Byun', 'Do', 'Gil', 'Yeo', 'Kong', 'Hyun')),
+    'th': (
+        ('Arnon', 'Boonchu', 'Chaiwat', 'Chatchai', 'Ekachai', 'Jirapat', 'Kasem', 'Kriangsak', 'Manop', 'Narong',
+         'Nopparat', 'Pairoj', 'Panya', 'Pongsak', 'Prasert', 'Sakda', 'Sombat', 'Sompong', 'Sutthipong', 'Teerapat',
+         'Thanakorn', 'Thanawat', 'Wichai', 'Wisit', 'Yuthana', 'Apichart', 'Chakrit', 'Kritsada', 'Nattawut',
+         'Rungroj', 'Supachai', 'Weerapong', 'Kanin', 'Pakorn', 'Siwakorn', 'Tanakrit'),
+        ('Bunnag', 'Chaisiri', 'Chotiwat', 'Inthasorn', 'Jaroensuk', 'Kamolrat', 'Limsakul', 'Meechai', 'Nakprasert',
+         'Ounsiri', 'Panyarat', 'Phothong', 'Ruangsri', 'Sangthong', 'Sirisombat', 'Somboon', 'Srisawat',
+         'Suksawat', 'Thongdee', 'Udomsak', 'Wannasiri', 'Wongchai', 'Anantachai', 'Boonsong', 'Chuenchom',
+         'Kaewmanee', 'Lertpanya', 'Maneerat', 'Pattanakul', 'Rattanaporn', 'Saelim', 'Thepsuwan')),
+    'da': (
+        ('Andreas', 'Bjørn', 'Casper', 'Daniel', 'Elias', 'Gustav', 'Henrik', 'Jakob', 'Jens', 'Kristian', 'Lucas',
+         'Malthe', 'Martin', 'Morten', 'Niels', 'Noah', 'Oscar', 'Peter', 'Sebastian', 'Simon', 'Steffen', 'Tobias',
+         'Troels', 'Ulrik', 'Valdemar', 'Viktor', 'William', 'Aksel', 'Alfred', 'Carl', 'Jeppe', 'Lars', 'Mikael',
+         'Nikolaj', 'Philip', 'Claus', 'Johan'),
+        ('Frandsen', 'Svendsen', 'Knudsen', 'Jakobsen', 'Mikkelsen', 'Lauridsen', 'Clausen', 'Simonsen', 'Laursen',
+         'Kjeldsen', 'Frederiksen', 'Henriksen', 'Eriksen', 'Østergaard', 'Nørgaard', 'Christoffersen', 'Gregersen',
+         'Brandt', 'Friis', 'Lindholm', 'Overgaard', 'Thygesen', 'Winther', 'Krogh', 'Iversen', 'Jeppesen',
+         'Bertelsen', 'Danielsen', 'Holst', 'Kofoed', 'Riis', 'Storm', 'Toft', 'Villadsen')),
+    'sv': (
+        ('Albert', 'Anton', 'Arvid', 'Carl', 'Daniel', 'David', 'Edvin', 'Elliot', 'Felix', 'Gabriel', 'Gunnar',
+         'Harald', 'Hjalmar', 'Ivar', 'Jacob', 'Joel', 'Kasper', 'Leo', 'Liam', 'Love', 'Magnus', 'Malte', 'Marcus',
+         'Melker', 'Noah', 'Olle', 'Otto', 'Pontus', 'Rickard', 'Samuel', 'Simon', 'Sixten', 'Vincent', 'Wilhelm',
+         'Folke', 'Göran'),
+        ('Axelsson', 'Abrahamsson', 'Berg', 'Blomqvist', 'Dahlberg', 'Ek', 'Falk', 'Forsman', 'Hedlund',
+         'Hermansson', 'Holm', 'Isaksson', 'Jakobsson', 'Lund', 'Lundberg', 'Lundgren', 'Lundqvist', 'Magnusson',
+         'Mattsson', 'Nordin', 'Nordström', 'Nyberg', 'Ström', 'Söderberg', 'Sundberg', 'Sundström', 'Wikström',
+         'Åberg', 'Öberg', 'Berggren', 'Dahlgren', 'Hellström', 'Lindström', 'Mårtensson', 'Norberg', 'Sandström',
+         'Viklund', 'Westberg')),
+    'zh': (
+        ('Hongyu', 'Jiawei', 'Xiaolong', 'Zhiyuan', 'Yuxuan', 'Haoyu', 'Ziyang', 'Boyang', 'Chenxi', 'Guanyu',
+         'Haotian', 'Jiaming', 'Jinpeng', 'Kaiwen', 'Mingxuan', 'Ruihao', 'Shengli', 'Tianhao', 'Weijie', 'Wenbo',
+         'Xiangyu', 'Xinyu', 'Yanbin', 'Yicheng', 'Yuhang', 'Zehao', 'Zhenhua', 'Zixuan', 'Zhaoyang', 'Qiang',
+         'Gang', 'Ning', 'Bin', 'Liang', 'Yong', 'Fan', 'Hang', 'Qi'),
+        ('Peng', 'Zeng', 'Xiao', 'Tian', 'Dong', 'Pan', 'Yuan', 'Cai', 'Jiang', 'Yu', 'Du', 'Ye', 'Cheng', 'Wei',
+         'Su', 'Ding', 'Ren', 'Shen', 'Yao', 'Lu', 'Cui', 'Zhong', 'Tan', 'Fan', 'Jin', 'Shi', 'Liao', 'Jia', 'Xia',
+         'Fu', 'Fang', 'Bai', 'Zou', 'Meng', 'Xiong', 'Qin', 'Qiu', 'Hou', 'Yin', 'Xue', 'Yan', 'Duan', 'Lei', 'Kong',
+         'Mao', 'Gu', 'Shao', 'Wan', 'Qian', 'Dai')),
+    'no': (
+        ('Adrian', 'Alexander', 'Anders', 'Bendik', 'Brage', 'Daniel', 'Elias', 'Emil', 'Erlend', 'Filip', 'Fredrik',
+         'Gaute', 'Gunnar', 'Harald', 'Isak', 'Jonas', 'Jørgen', 'Kasper', 'Lars', 'Leon', 'Lucas', 'Mathias',
+         'Marius', 'Noah', 'Oskar', 'Petter', 'Rasmus', 'Ruben', 'Sigurd', 'Simen', 'Snorre', 'Steinar', 'Sverre',
+         'Theodor', 'Thomas', 'Trond', 'Vetle', 'Viktor', 'William', 'Øystein'),
+        ('Bakke', 'Berge', 'Brekke', 'Dahle', 'Fjeld', 'Foss', 'Gundersen', 'Haugland', 'Hovland', 'Jacobsen',
+         'Knutsen', 'Lund', 'Lunde', 'Myhre', 'Nygaard', 'Ødegaard', 'Rasmussen', 'Ruud', 'Sæther', 'Sandvik',
+         'Skogen', 'Solheim', 'Svendsen', 'Tangen', 'Thorsen', 'Vik', 'Aas', 'Bjerke', 'Engen', 'Fossum', 'Hauge',
+         'Iversen', 'Kvam', 'Lien', 'Mathisen', 'Nordby', 'Rønning', 'Strøm', 'Tveit')),
+    'it': (
+        ('Alberto', 'Antonio', 'Carlo', 'Cristian', 'Daniele', 'Dario', 'Enrico', 'Fabio', 'Giulio', 'Jacopo',
+         'Manuel', 'Mattia', 'Nicola', 'Paolo', 'Roberto', 'Samuele', 'Simone', 'Valerio', 'Vittorio'),
+        ('Amato', 'Barone', 'Bellini', 'Benedetti', 'Bernardi', 'Cattaneo', "D'Angelo", 'De Santis', 'Fabbri',
+         'Farina', 'Ferri', 'Fiore', 'Grasso', 'Longo', 'Marchetti', 'Monti', 'Morelli', 'Palumbo', 'Parisi',
+         'Pellegrini', 'Sala', 'Serra', 'Testa', 'Valentini', 'Villa', 'Vitale')),
+    'in': (
+        ('Abhinav', 'Akash', 'Amit', 'Anand', 'Ankit', 'Arnav', 'Ayaan', 'Deepak', 'Dhruv', 'Gaurav', 'Harsh',
+         'Jai', 'Kunal', 'Mihir', 'Nikhil', 'Pranav', 'Raghav', 'Rajat', 'Sameer', 'Tanmay', 'Varun', 'Vivek',
+         'Yash', 'Neel'),
+        ('Agarwal', 'Bhat', 'Desai', 'Ghosh', 'Hegde', 'Jain', 'Kulkarni', 'Mishra', 'Pandey', 'Pandit', 'Rathore',
+         'Sethi', 'Shetty', 'Sinha', 'Srinivasan', 'Tiwari', 'Trivedi', 'Venkatesh', 'Yadav', 'Kohli')),
+}
+BX = {b: (tuple(dict.fromkeys(given + EXTRA.get(b, ((), ()))[0])), tuple(dict.fromkeys(family + EXTRA.get(b, ((), ()))[1])))
+      for b, (given, family) in B.items()}
+
+
+def make_name(country, rng, taken, in_use=None):
+    """A fictional name for a golfer from `country`. `taken`: every name used so far in the world.
+
+    The starting world (`in_use` None) draws from the original banks and never repeats a name. Later
+    arrivals (`in_use`: the names of people active now) draw from the larger banks: a name never used if
+    one turns up, else one no active person holds (a retired person's name recurring, as names do across
+    generations). A middle initial is the last resort (as some real tour players have)."""
     mix = NATION_BANKS[country]
-    for _ in range(500):
+    banks = B if in_use is None else BX
+
+    def draw():
         bank = rng.choices([b for b, _ in mix], [w for _, w in mix])[0]
-        given, family = B[bank]
-        name = f'{rng.choice(given)} {rng.choice(family)}'
+        given, family = banks[bank]
+        return f'{rng.choice(given)} {rng.choice(family)}'
+
+    def take(name):
+        taken.add(name)
+        if in_use is not None:
+            in_use.add(name)
+        return name
+    for _ in range(500):
+        name = draw()
         if name.lower() not in FAMOUS and name not in taken:
-            taken.add(name)
-            return name
-    # Large countries can run short: add a middle initial (as real tour players do).
+            return take(name)
+    if in_use is not None:
+        for _ in range(500):
+            name = draw()
+            if name.lower() not in FAMOUS and name not in in_use:
+                return take(name)
     for _ in range(2000):
         bank = rng.choices([b for b, _ in mix], [w for _, w in mix])[0]
-        given, family = B[bank]
+        given, family = banks[bank]
         name = f'{rng.choice(given)} {chr(65 + rng.randrange(26))}. {rng.choice(family)}'
         if name not in taken:
-            taken.add(name)
-            return name
+            return take(name)
     raise RuntimeError(f'could not name a golfer from {country}')
