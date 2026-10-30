@@ -217,6 +217,49 @@ def career_rows(w, pid):
     return [(r['year'], r) for r in idx.seasons(pid)]
 
 
+def recorded_peak(w, pid):
+    """The highest Overall recorded for a golfer, or None: {'value', 'year', 'week' (when first recorded at that
+    value: 0 = the season's start, 52 = its end before aging), 'source' ('noted' -- the engine's prospective peak,
+    'start of season' -- an archived start-of-season rating, 'current'), 'since' (first season of the engine's
+    noting for this golfer, or None), 'snapshots' (seasons with a start-of-season rating), 'first' (first season
+    this golfer was in the world's records), 'initial' (career began before the world's records), 'complete'
+    (noting covers the whole career)}. Only recorded ratings: never potential, guessed development or a
+    present rating moved into the past. A value equal to one decimal keeps its earliest date."""
+    cands = []
+    lp = w.live.people.get(pid, {}) if w.live else {}
+    rows = career_rows(w, pid)
+    noted = [(y, r['peak']) for y, r in rows if r.get('peak')]
+    if lp.get('peak'):
+        noted.append((None, lp['peak']))
+    for _, pk in noted:
+        cands.append((round(pk[0], 1), pk[1], pk[2], 'noted'))
+    keys = (w.a.world.get('rating_keys') if w.a else None) or ['overall']
+    i = keys.index('overall') if 'overall' in keys else 0
+    snaps = rating_snapshots(w, pid)
+    for y, r in snaps.items():
+        cands.append((round(r[i], 1), y, 0, 'start of season'))
+    if lp.get('ratings'):
+        c = w.live.cursor
+        cands.append((round(lp['ratings'][0], 1), c['year'], c['week'], 'current'))
+    if not cands:
+        return None
+    top = max(v for v, *_ in cands)
+    v, y, wk, src = min((c for c in cands if c[0] == top), key=lambda c: (c[1], c[2]))
+    first = rows[0][0] if rows else (w.live.cursor['year'] if lp else None)
+    initial = bool(w.a and pid in w.a.people and w.a.people[pid].get('initial')) or bool(lp.get('initial'))
+    # since: the first season the engine was noting this golfer's peak (a season archived with it, or the
+    # running world's start of noting); complete: noting began before they arrived, or with the world itself
+    began = [y for y, r in rows if r.get('peak')]
+    if lp.get('peak') and getattr(w.live, 'peak_since', None) is not None:
+        began.append(w.live.peak_since)
+    since = max(min(began), first) if began and first is not None else (min(began) if began else None)
+    world_first = w.live.first_year if w.live else (w.a.years[0] if w.a and w.a.years else None)
+    complete = (not initial and since is not None and first is not None
+                and (min(began) < first or min(began) == world_first))
+    return {'value': v, 'year': y, 'week': wk, 'source': src, 'since': since, 'snapshots': sorted(snaps),
+            'first': first, 'initial': initial, 'complete': complete}
+
+
 def rating_snapshots(w, pid):
     """{year: [overall, attrs...]}: ratings at the start of each season (recorded when the season before it
     was archived), in the archive's rating_keys order."""

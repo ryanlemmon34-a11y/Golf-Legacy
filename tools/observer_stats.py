@@ -21,6 +21,9 @@ Definitions (shown on the pages):
 - **Golf statistics** (golfsim.golfstats, from the golf-statistics update on): each start's counters are summed per
   person, season and tour, so any figure over any scope is a sum of counts over a sum of opportunities;
   `golf_starts` counts the starts that carry them (coverage). Qualifying stages are not included.
+- **Overall** (the base rating, as the profile shows it): each season file's ratings, recorded when the season was
+  archived (after its season-end aging), so a season's row is the next season's start-of-season Overall; a
+  retired golfer's last row is their Overall when they retired. Never an event count: not filtered by tour.
 - **Records kept here** (per season, bounded): the longest drives and the best event driving averages
   (top RECORD_KEEP per season and tour), every stroke-play winning margin and every match-play result.
 
@@ -43,7 +46,7 @@ sys.path.insert(0, str(ROOT))
 
 from golfsim import golfstats as GS                                      # noqa: E402
 
-SCHEMA = 4
+SCHEMA = 5
 COLUMNS = ('starts', 'wins', 'runner_ups', 'top2', 'top5', 'top10', 'cut_events', 'cuts_made', 'qualifiers')
 GOLF = ('golf_starts',) + GS.FIELDS            # summed golf statistics counters (and the starts carrying them)
 ALL = COLUMNS + GOLF
@@ -51,7 +54,7 @@ RECORD_KEEP = 100                              # longest drives / event driving 
 EVENT_DRIVE_TIERS = (8, 20, 30, 40)            # event driving averages: the top RECORD_KEEP among the editions with
 EVENT_MIN_DRIVES = EVENT_DRIVE_TIERS[0]        # at least this many measured drives, kept for each tier (qualified
                                                # before limited: a record list never loses a qualified leader)
-TABLES = ('agg', 'season_prize', 'money', 'staff_year', 'long_drives', 'event_drives', 'margins', 'matches')
+TABLES = ('agg', 'season_prize', 'money', 'staff_year', 'long_drives', 'event_drives', 'margins', 'matches', 'overall')
 ALL_TIME = ('agg_all', 'prize_all')            # every season summed (for all-time pages), with the seasons they hold
 DDL = """
 CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT);
@@ -75,6 +78,7 @@ CREATE TABLE IF NOT EXISTS money(event_id TEXT PRIMARY KEY, year INT, purse INT,
     match_play INT);
 CREATE TABLE IF NOT EXISTS staff_year(person INT, year INT, kind TEXT, rounds REAL, weeks INT, reputation REAL,
     earnings_total REAL, PRIMARY KEY(person, year, kind));
+CREATE TABLE IF NOT EXISTS overall(person INT, year INT, value REAL, PRIMARY KEY(person, year));
 CREATE INDEX IF NOT EXISTS agg_year ON agg(year, tour);
 CREATE INDEX IF NOT EXISTS agg_tour ON agg(tour);
 """
@@ -282,11 +286,12 @@ class StatsStore:
                 self.db.execute(f'DELETE FROM {t} WHERE year = ?', (year,))
             self.db.execute('DELETE FROM years WHERE year = ?', (year,))
 
-    def put(self, year, source, agg, reconciled, paid, money, staff=(), records=((), (), (), ())):
+    def put(self, year, source, agg, reconciled, paid, money, staff=(), records=((), (), (), ()), overall=()):
         with self.db:
             for t in TABLES:
                 self.db.execute(f'DELETE FROM {t} WHERE year = ?', (year,))
             self.db.executemany('INSERT INTO staff_year VALUES (?,?,?,?,?,?,?)', staff)
+            self.db.executemany('INSERT INTO overall VALUES (?,?,?)', overall)
             self.db.executemany(
                 f'INSERT INTO agg VALUES ({",".join("?" * (4 + len(ALL)))})',
                 [(gid, year, tour, *(a[c] for c in COLUMNS), a['prize'] if reconciled.get(gid) else None,
@@ -299,6 +304,24 @@ class StatsStore:
             self.db.executemany('INSERT OR REPLACE INTO money VALUES (?,?,?,?,?,?)',
                                 [(eid, year, *m[:3], int(m[3])) for eid, m in money.items()])
             self.db.execute('INSERT OR REPLACE INTO years VALUES (?, ?)', (year, source))
+
+
+def season_overall(careers, year, keys):
+    """[(person, year, Overall)] from a season file's ratings (recorded after that season's aging)."""
+    if not keys or 'overall' not in keys:
+        return []
+    i = keys.index('overall')
+    return [(int(g), year, r['ratings'][i]) for g, r in careers.items() if r.get('ratings')]
+
+
+def overall_start(db, year):
+    """{person: Overall at the start of `year`} (recorded with the season before it), for those recorded."""
+    return dict(db.execute('SELECT person, value FROM overall WHERE year = ?', (year - 1,)))
+
+
+def overall_last(db):
+    """{person: (Overall, season)}: each person's latest recorded Overall and the season that recorded it."""
+    return {p: (v, y) for p, y, v in db.execute('SELECT person, MAX(year), value FROM overall GROUP BY person')}
 
 
 def season_source(archive, y):
@@ -327,7 +350,8 @@ def build(archive_dir, store_path):
                 agg, rec, money = season_tables(d['events'], status, paid)
                 staff = [(int(k.split(':')[1]), y, k.split(':')[0], v.get('rounds'), v.get('weeks'),
                           v.get('reputation'), v.get('earnings_total')) for k, v in d.get('staff_year', {}).items()]
-                store.put(y, want[y], agg, rec, paid, money, staff, season_records(d['events'], y))
+                store.put(y, want[y], agg, rec, paid, money, staff, season_records(d['events'], y),
+                          season_overall(careers, y, a.world.get('rating_keys')))
                 a._years.clear()                         # (one decoded season at a time)
             if changed or store.db.execute("SELECT 1 FROM meta WHERE key = 'all_time'").fetchone() is None:
                 store.sum_all_time()

@@ -77,12 +77,18 @@ def capture(session):
     archived = set(session._history_years())
     people = {}
     from golfsim.ratings import ATTRIBUTE_KEYS
+    peaks = getattr(s, 'peak_overall', {})
+    initial = set((session.state.get('archive') or {}).get('initial') or ())   # golfers who were there at the start
     for g in s.world.golfers:
         people[g.id] = {'name': g.name, 'country': g.country, 'born': g.born, 'status': g.status,
-                        'lifestyle': g.lifestyle, 'tour': g.tour, 'turned_pro': g.turned_pro, 'roles': ['golfer']}
+                        'lifestyle': g.lifestyle, 'tour': g.tour, 'turned_pro': g.turned_pro, 'roles': ['golfer'],
+                        'initial': g.id in initial}
         if g.lifestyle != 'retired':                 # current ratings (overall, then the attributes)
             people[g.id]['ratings'] = (round(g.overall, 1),) + tuple(round(g.attrs[k], 1) for k in ATTRIBUTE_KEYS)
             people[g.id]['archetype'] = g.archetype
+        pk = peaks.get(g.id)
+        if pk is not None:                            # highest Overall so far: (value, year, week reached by)
+            people[g.id]['peak'] = (round(pk[0], 1), pk[1], pk[2])
     for kind, table in (('coach', st.coaches), ('caddie', st.caddies)):
         for c in table.values():
             p = people.setdefault(c.id, {'name': c.name, 'country': c.country, 'born': c.born, 'roles': []})
@@ -127,7 +133,7 @@ def capture(session):
         cursor=session.cursor, generation=session.generation, history_generation=session.history_generation,
         history_years=sorted(archived), weeks_played=session.state.get('weeks_played'), engine=meta.get('engine'), commit=meta.get('commit'),
         written=meta.get('written'), year=year, people=people, wr=dict(s.wr_pos), am=dict(s.am_pos),
-        wr_avg=dict(getattr(s, 'wr_avg', {})), first_year=s.first_year,
+        wr_avg=dict(getattr(s, 'wr_avg', {})), first_year=s.first_year, peak_since=getattr(s, 'peak_since', None),
         rank_top={w_: list(rows) for w_, rows in getattr(s, 'rank_top', {}).get(year, {}).items()},
         wr_seed=dict(getattr(s, 'wr_seed', {})),          # (seeded points: the world's first two seasons only)
         editions=editions, by_person=dict(by_person), schedule=schedule, series=series,

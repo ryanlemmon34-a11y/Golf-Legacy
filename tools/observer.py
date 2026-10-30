@@ -958,12 +958,13 @@ def _ratings(w, pid, p):
     cur = lp.get('ratings')
     snaps = OD.rating_snapshots(w, pid)
     y = now_year(w)
+    peak = peak_line(w, pid, p)
     if cur is None:
         if snaps:
             last = max(snaps)
             return (f'<h2>Ratings</h2><p class="muted">No current ratings (not competing). Last recorded at the start of '
-                    f'{last}: overall {snaps[last][0]}.</p>')
-        return ''
+                    f'{last}: overall {snaps[last][0]}.</p>' + peak)
+        return ('<h2>Ratings</h2>' + peak) if peak else ''
     now = dict(zip(['overall', *ATTRIBUTE_KEYS], cur))
     base = dict(zip(keys, snaps[y])) if y in snaps else None
     prev = dict(zip(keys, snaps[y - 1])) if (y - 1) in snaps else None
@@ -992,8 +993,45 @@ def _ratings(w, pid, p):
     return (f'<h2>Ratings</h2><p>Overall <strong>{now["overall"]:.1f}</strong> · this season '
             f'{delta(now["overall"], base and base.get("overall"))} · last season '
             f'{delta(base and base.get("overall"), prev and prev.get("overall"))}'
-            + (f' · archetype {esc(arche)}' if arche else '') + '</p>'
+            + (f' · archetype {esc(arche)}' if arche else '') + '</p>' + peak
             + f'<div class="rgrid">{"".join(cards)}</div><p class="muted">{note}</p>')
+
+
+def peak_line(w, pid, p):
+    """The profile's Peak Overall: the highest recorded base Overall, when it was first recorded and the age then,
+    with how much of the career the records cover (a partial record says "Recorded Peak Overall")."""
+    pk = OD.recorded_peak(w, pid)
+    if pk is None:
+        return ''
+    y, wk = pk['year'], pk['week']
+    when = (f'the start of {y}' if wk == 0 else f'the end of the {y} season' if wk >= 52 else f'{y}, week {wk}')
+    if pk['source'] == 'current':
+        when = f'now ({y}, week {wk})'
+    born = p.get('born')
+    age = f', age {y - born}*' if born else ''
+    label = 'Peak Overall' if pk['complete'] else 'Recorded Peak Overall'
+    if pk['complete']:
+        cover = (f'covers the whole career: ratings are noted from {pk["first"]}, when this golfer arrived, just '
+                 'before every lasting injury and at every season’s end before and after aging (the only times they '
+                 'can fall), so the peak is exact')
+    elif pk['since'] is not None:
+        cover = (f'noted since {pk["since"]} (before every lasting injury and at every season’s end, before and '
+                 'after aging)'
+                 + (f'; before that, start-of-season ratings from {pk["snapshots"][0]}' if pk['snapshots']
+                    and pk['snapshots'][0] < pk['since'] else '')
+                 + ('; the career began before the world’s records, so an earlier peak is not known' if pk['initial']
+                    else '; earlier seasons were played before peaks were kept' if pk['first'] is not None
+                    and pk['first'] < pk['since'] else ''))
+    elif pk['snapshots']:
+        cover = (f'from start-of-season ratings only ({span(pk["snapshots"], False)})'
+                 + (' and the current rating' if pk['source'] == 'current' or (w.live and w.live.people.get(pid, {})
+                                                                                .get('ratings')) else '')
+                 + ': the peak between them is not known')
+    else:
+        cover = 'only the current rating is recorded: the peak may have been higher'
+    return (f'<p>{label} <strong>{pk["value"]:.1f}</strong> · first recorded at {esc(when)}{age}</p>'
+            f'<p class="muted">The base Overall (no form, staff or play effects); a value reached again keeps its first '
+            f'date. Coverage: {esc(cover)}. {esc(AGE_NOTE)}</p>')
 
 
 def _honors(w, pid, rows, active):
@@ -1674,18 +1712,38 @@ def stats_page(w, q, view='stats'):
     rows = [(pid, r) for pid, r in data.items() if r['starts'] or r['prize']]
     if view == 'money':
         rows = [(pid, r) for pid, r in rows if r['prize'] or not r['prize_known']]
-    keyf = {'name': lambda x: (w.name(x[0]), x[0]),
-            'prize': lambda x: (not x[1]['prize_known'], -(x[1]['prize'] or 0), x[0])}
-    rows.sort(key=keyf.get(sort, lambda x: (-(x[1].get(sort) or 0), -(x[1]['prize'] or 0), x[0])))
+    ov, ov_label, ov_note = (overall_column(w, db, ysel, cur, [pid for pid, _ in rows]) if view == 'stats'
+                             else ({}, '', ''))
+    desc = (one(q, 'dir', '') or ('asc' if sort == 'name' else 'desc')) == 'desc'
+    value = {'name': lambda x: w.name(x[0]) or '',
+             'prize': lambda x: x[1]['prize'] if x[1]['prize_known'] else None,
+             'overall': lambda x: ov[x[0]][0] if x[0] in ov else None}.get(sort, lambda x: x[1].get(sort) or 0)
+    # the whole result set, before paging: ties by prize money then id (in either direction); missing values last
+    rows.sort(key=lambda x: (-(x[1]['prize'] or 0), x[0]))
+    known = [x for x in rows if value(x) is not None]
+    known.sort(key=value, reverse=desc)                   # (stable: the tie order above is kept)
+    rows = known + [x for x in rows if value(x) is None]
     chunk, pager = paged(rows, q, path)
     start = (max(1, int(one(q, 'page', '1') or 1)) - 1) * PAGE_SIZE
-    keep = {k: v[0] for k, v in q.items() if k not in ('sort', 'page') and v and v[0]}
+    keep = {k: v[0] for k, v in q.items() if k not in ('sort', 'page', 'dir') and v and v[0]}
     cols = STAT_COLUMNS if view == 'stats' else (('prize', 'Prize money', None), ('starts', 'Starts', None),
                                                  ('wins', 'Wins', 'win'))
-    head = '<tr><th class="n">#</th><th><a href="{}">Golfer</a></th><th>Nation</th>'.format(
-        f'{path}?{urlencode({**keep, "sort": "name"})}') + ''.join(
-        f'<th class="n"><a href="{path}?{urlencode({**keep, "sort": k})}">{esc(label)}{" ▼" if k == sort else ""}</a></th>'
-        for k, label, _ in cols) + '</tr>'
+
+    def sort_link(k, label):
+        """A column heading: sorts by it (descending first; name ascending); the active one shows its direction
+        and turns it around."""
+        first = 'asc' if k == 'name' else 'desc'
+        if k == sort:
+            nxt = 'asc' if desc else 'desc'
+            mark = ' ▼' if desc else ' ▲'
+        else:
+            nxt, mark = first, ''
+        args = {**keep, 'sort': k, **({'dir': nxt} if nxt != first else {})}
+        return (f'<a href="{path}?{urlencode(args)}"' + (f' aria-sort="{"descending" if desc else "ascending"}"'
+                                                         if k == sort else '') + f'>{esc(label)}{mark}</a>')
+    head = ('<tr><th class="n">#</th><th>' + sort_link('name', 'Golfer') + '</th><th>Nation</th>'
+            + (f'<th class="n" title="{esc(ov_note)}">' + sort_link('overall', ov_label) + '</th>' if ov_label else '')
+            + ''.join(f'<th class="n">{sort_link(k, label)}</th>' for k, label, _ in cols) + '</tr>')
     yfilter = None if ysel == 'all' else ysel
     body = []
     for i, (pid, r) in enumerate(chunk, start + 1):
@@ -1698,6 +1756,11 @@ def stats_page(w, q, view='stats'):
                                           outcome='made-cut') if r['cut_events'] else '—')
             else:
                 cells.append(results_link(pid, str(r[k]), year=yfilter, tour=tour, outcome=outcome))
+        if ov_label:
+            v = ov.get(pid)
+            cells.insert(0, '<span class="muted">—</span>' if v is None else
+                         f'{v[0]:.1f}' + (f' <span class="muted" title="last recorded ({esc(v[2])})">†</span>'
+                                          if v[1] == 'last' else ''))
         body.append(f'<tr><td class="n">{i}</td><td>{w.person_link(pid)}</td>'
                     f'<td>{nation_link((w.person(pid) or {}).get("country"))}</td>'
                     + ''.join(f'<td class="n">{c}</td>' for c in cells) + '</tr>')
@@ -1706,7 +1769,42 @@ def stats_page(w, q, view='stats'):
     other = ('<a href="/money">Prize money leaderboard</a>' if view == 'stats' else '<a href="/stats">All statistics</a>')
     return title, (f + f'<p>{esc(scope)} · {len(rows):,} golfers · {other}</p>'
                    + f'<div class="scroll"><table>{head}{"".join(body)}</table></div>' + pager
-                   + f'<p class="muted">{STATS_NOTE}</p>')
+                   + f'<p class="muted">{STATS_NOTE}' + (f' {esc(ov_note)}' if ov_note else '') + '</p>')
+
+
+def overall_column(w, db, ysel, cur, pids):
+    """({pid: (Overall, 'current' | 'last' | 'start', when)}, heading, note) for the Stats page. All-time and the
+    current season: the current Overall of everyone competing, and the last recorded Overall (marked) of anyone
+    retired or not in the running world. A past season: the Overall recorded at that season's start, missing where
+    none was recorded (never today's rating). The base rating (no form or staff effect), the same whatever the
+    tour scope: it is not an event count."""
+    import observer_stats as ST
+    out = {}
+    if db is None:
+        return out, 'Overall', 'Overall: recorded ratings are being worked out from the history.'
+    if ysel == 'all' or (cur is not None and ysel == str(cur)):
+        people = w.live.people if w.live else {}
+        last = ST.overall_last(db)
+        for pid in pids:
+            r = (people.get(pid) or {}).get('ratings')
+            if r:
+                out[pid] = (r[0], 'current', 'now')
+            elif pid in last:
+                v, y = last[pid]
+                out[pid] = (v, 'last', f'recorded with the {y} season')
+        when = f' ({w.live.cursor["year"]}, week {w.live.cursor["week"]})' if w.live else ''
+        return out, 'Overall', (f'Overall: the current base rating{when} (no form or staff effect); † last recorded '
+                                'Overall for golfers retired or not competing (their rating when it was last saved). '
+                                'A rating, not an event count: the same whatever the tour.')
+    y = int(ysel)
+    start = ST.overall_start(db, y)
+    for pid in pids:
+        if pid in start:
+            out[pid] = (start[pid], 'start', f'start of {y}')
+    return out, f'Overall (start of {y})', (f'Overall (start of {y}): the base rating recorded at the start of the {y} '
+                                             'season (after the previous season-end aging), not its end; — where none '
+                                             'was recorded (the world’s first season, or seasons archived before '
+                                             'ratings were kept). A rating, not an event count: the same whatever the tour.')
 
 
 def money_page(w, q):

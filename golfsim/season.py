@@ -421,6 +421,25 @@ class Season:
         self.wr_seed = {}                                    # gid -> [[abs week, points]]: pre-history (archived once)
         self._seed_world()
         RES.settle(self, self.first_year, 0)                 # everyone's birthplace and where they live
+        self.peak_overall = {}                               # gid -> (highest Overall, year, week): note_peaks
+        self.peak_since = self.first_year
+        self.note_peaks(self.first_year, 0, [g for g in self.world.golfers if g.lifestyle != 'retired'])
+
+    def note_peaks(self, year, week, golfers=None):
+        """Record each golfer's highest Overall (the base rating, no form or staff effect) with when it was first
+        reached (an Overall equal to one decimal keeps the earliest). Within a season ratings only rise, except
+        at a lasting injury; the season-end aging can move them either way. So noting them when the world
+        begins, just before every lasting injury, at every season's end (before retirements and aging) and again
+        after aging (the next season's start) keeps the exact peak: between those moments ratings only rise, and
+        the current rating covers the rest. Observation only: no random draw, no effect on the simulation."""
+        peaks = self.peak_overall
+        for g in (golfers if golfers is not None else self.active_golfers()):
+            if g.lifestyle == 'retired' and golfers is None:
+                continue
+            v = g.overall
+            p = peaks.get(g.id)
+            if p is None or round(v, 1) > round(p[0], 1):     # (as shown: an equal Overall keeps the earlier date)
+                peaks[g.id] = (v, year, week)
 
     # ---- people and starting state --------------------------------------------------------------
     def refresh_people(self, year):
@@ -1557,6 +1576,9 @@ class Season:
         state.setdefault('college', {})                     # college seasons before the ledger: not recorded
         state.setdefault('wr_seed', {})
         state.setdefault('rank_top', defaultdict(dict))     # ranking snapshots before they were kept: not recorded
+        if 'peak_overall' not in state:                      # saves from before peaks were kept: kept from now on
+            state['peak_overall'] = {}
+            state['peak_since'] = state.get('year')
         if 'prize_record' not in state:                     # saves from before earnings kept their level:
             tier = lambda gid: next((TOUR_BY_KEY[g.tour].tier for g in (state['g'].get(gid),)   # their
                                      if g is not None and g.tour in TOUR_BY_KEY), 4)            # tour's
@@ -1797,6 +1819,7 @@ class Season:
                     self.injuries[year].append((week, g.id, kind, weeks, self._week_event.get(g.id)))
                     text = f'Injured ({kind}), out for {weeks} week{"s" if weeks > 1 else ""}'
                     if self.development:
+                        self.note_peaks(year, week, (g,))     # (a lasting injury can lower the ratings)
                         lost = D.serious_injury(g, weeks, rng)
                         if lost:
                             text += ' — lasting damage: ' + ', '.join(f'{k.replace("_", " ")} −{v}' for k, v in lost.items())
@@ -1953,6 +1976,7 @@ class Season:
             self.log(gid, year, 53, f'{TOUR_BY_KEY[frm].name if frm in TOUR_BY_KEY else "—"} → {TOUR_BY_KEY[to].name} ({why})')
         if self.development:
             from . import careers
+            self.note_peaks(year, 52)                        # the season's ratings, before retirements and aging
             self.career_counts[year] = careers.decide(self, year, snap)
             rng = random.Random(_seed(self.seed, year, 'aging'))
             for g in self.world.golfers:
@@ -1969,6 +1993,8 @@ class Season:
             RES.staff_moves(self, year)
         RES.settle(self, year, 53)                           # arrivals' places; college bases (school-paid)
         self._active = None
+        if self.development:                                 # after aging (it can raise the mental game) and arrivals
+            self.note_peaks(year + 1, 0, [g for g in self.world.golfers if g.lifestyle != 'retired'])
 
     def record_college(self, year, snap):
         """The college eligibility ledger (rules 'college-eligibility'): each season a golfer spent enrolled,
