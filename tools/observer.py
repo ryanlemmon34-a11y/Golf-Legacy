@@ -1136,7 +1136,7 @@ def _season_history(w, q, pid, p, rows):
     born = p.get('born')
     expand = one(q, 'tours') == '1'
     cur_year = w.live.cursor['year'] if w.live else None
-    live_prize = w.live.prize.get(pid) if w.live else None
+    live_prize = w.live.prize.get(pid, 0.0) if w.live else None   # (no ledger yet: paid nothing, as archived)
     live_rec = (w.live_statistics() or [None, {}])[1] if w.live else {}
     out = []
     career = dict.fromkeys(OD.ST.COLUMNS, 0)

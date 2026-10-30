@@ -163,18 +163,25 @@ it too makes earlier worlds "another engine"; start the next long run on it so i
   leaders, world No. 1s, Premier cards earned, career changes, Grand Slams, moments, the final ranking.
 - **Saved views** (v15): every list keeps its season, scope, filters, sort, direction and page (and a column
   sorted in the browser) in its address; opening it again from the menu shows the view you left (with "default
-  view" one click away); a profile or event page offers "Back to" the last list view; *Save view* names one,
-  kept with the world (all of them on *Saved views*).
+  view" one click away); a profile or event page offers "Back to" the last list view; *Save view* names the
+  view as shown (a column just sorted in the browser included), kept with the world (all on *Saved views*).
 - **Where are they now** (v15): any edition's field (every entrant, missed cuts included), a tour's golfers in a
   season, a turning-pro class or an age group, followed through the rest of their careers -- now (retired, club
-  professional, amateur, which tour), seasons, wins, majors, best ranking, highest level, prize money, peak.
+  professional, amateur, which tour), seasons, wins, majors, best ranking, highest level, prize money (this
+  season's so far included, each season counted once; "partial" where a season did not record it) and the same
+  Recorded Peak Overall a profile shows.
 - **My World** (v15): the shortlist in groups you name, with a digest of recorded facts since you last marked it
   read (wins, top 10s in majors and Premier events, tour and status changes, moments, ranking bands, followed
-  tournaments', tours' and courses' editions); a quiet count in the menu, no pop-ups.
+  tournaments', tours' and courses' editions); a quiet count in the menu, no pop-ups. A ranking band change
+  compares the world ranking published in the window's first week with the one published in its last (nothing
+  is claimed for a week whose ranking was not recorded).
 - **Compare careers** (v15): up to four golfers -- now, current Overall, Peak Overall, totals, season by season
   and at the same age (the Overall snapshot at each season's start), with "not recorded" where it was not.
 - **GOAT Lab** (v15): rank careers by your weights over ten components (or a formula of them), with each
-  component's definition, scope and coverage, partial careers and missing figures marked.
+  component's definition, scope and coverage, partial careers and missing figures marked. Formula functions:
+  min and max (2 to 8 values), sqrt and log (one value); a wrong count is reported and the weights are used
+  instead; a career whose value cannot be worked out (a division by zero, the log of 0) is left out and counted.
+  Peak Overall is the profile's Recorded Peak over the whole recorded career, with or without a live world.
 - **Qualification** (v15): this season's majors as they stand -- earned and conditional places, what is still
   pending a list or qualifying (with the weeks), and projections marked as information only; *Standings locks*
   shows when each tour's money list locks and when cards and rights take effect.

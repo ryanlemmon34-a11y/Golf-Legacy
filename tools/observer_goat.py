@@ -31,12 +31,14 @@ COMPONENTS = {
     'weeks_no1': ('Weeks at No. 1', 'Weeks at world No. 1', 'the Records page', 'archived seasons', 0.2),
     'top10_seasons': ('Top-10 seasons', 'Seasons ending inside the world top 10', 'the archived season-end rankings',
                       'archived seasons', 1.0),
-    'peak': ('Peak Overall', 'Recorded Peak Overall (the highest base Overall the engine noted)',
-             'the current snapshot, else the last archived season', 'missing where not recorded', 0.0),
+    'peak': ('Peak Overall', 'Recorded Peak Overall (the highest base Overall recorded in the career)',
+             'the profile\'s Recorded Peak (archived seasons and the current snapshot)', 'missing where not recorded',
+             0.0),
     'slam': ('Career Grand Slam', '1 if all four majors won, else 0', 'the Career Grand Slam page',
              'every major recorded', 10.0),
 }
 FUNCS = {'min': min, 'max': max, 'sqrt': math.sqrt, 'log': math.log}
+ARITY = {'min': (2, 8), 'max': (2, 8), 'sqrt': (1, 1), 'log': (1, 1)}   # (fewest, most) values each takes
 OPS = {ast.Add: operator.add, ast.Sub: operator.sub, ast.Mult: operator.mul, ast.Div: operator.truediv,
        ast.Pow: operator.pow, ast.USub: operator.neg, ast.UAdd: operator.pos}
 MAX_FORMULA = 400
@@ -54,6 +56,8 @@ def compile_formula(text):
         raise FormulaError(f'the formula is longer than {MAX_FORMULA} characters')
     try:
         tree = ast.parse(text, mode='eval')
+    except RecursionError:
+        raise FormulaError('the formula is nested too deeply') from None
     except SyntaxError as e:
         raise FormulaError(f'not a formula ({e.msg})') from None
 
@@ -73,13 +77,19 @@ def compile_formula(text):
         if isinstance(n, ast.UnaryOp) and type(n.op) in OPS:
             check(n.operand)
             return
-        if (isinstance(n, ast.Call) and isinstance(n.func, ast.Name) and n.func.id in FUNCS and not n.keywords
-                and 1 <= len(n.args) <= 8):
+        if isinstance(n, ast.Call) and isinstance(n.func, ast.Name) and n.func.id in FUNCS and not n.keywords:
             for a in n.args:
                 check(a)
+            lo, hi = ARITY[n.func.id]
+            if not lo <= len(n.args) <= hi:
+                want = f'exactly {lo} value' if lo == hi else f'{lo} to {hi} values'
+                raise FormulaError(f'{n.func.id}() takes {want} (given {len(n.args)})')
             return
         raise FormulaError('only numbers, component names, + - * / **, parentheses and min, max, sqrt, log are allowed')
-    check(tree)
+    try:
+        check(tree)
+    except RecursionError:
+        raise FormulaError('the formula is nested too deeply') from None
     return tree
 
 
@@ -102,8 +112,8 @@ def evaluate(tree, values):
         return FUNCS[n.func.id](*[ev(a) for a in n.args])
     try:
         v = ev(tree)
-    except (ArithmeticError, ValueError, OverflowError):
-        return None
+    except (ArithmeticError, ValueError, OverflowError, TypeError, RecursionError):   # (a division by zero, a
+        return None                                    # log of 0, a square root of a negative, a complex power...)
     return v if isinstance(v, float) and math.isfinite(v) else None
 
 
@@ -126,7 +136,7 @@ def _o():
     return O
 
 
-def careers(w, scope):
+def careers(w, scope, with_peak=True):
     """{pid: {component: value or None}}, plus {pid: [missing component names]}: every golfer with a recorded start."""
     import observer_history as OH
     import observer_stats as ST
@@ -150,33 +160,22 @@ def careers(w, scope):
         for pid, n in idx.db.execute('SELECT person, COUNT(*) FROM seasons WHERE wr_end BETWEEN 1 AND 10'
                                      + idx.upto() + ' GROUP BY person'):
             top10s[pid] = n
-    peaks = _peaks(w)
+    import observer_data as OD
     out, missing = {}, {}
     for pid, r in data.items():
         if not r.get('starts') and not majors.get(pid):
             continue
         v = {'majors': majors.get(pid, 0), 'wins': r['wins'], 'top10': r['top10'], 'runner_ups': r['runner_ups'],
              'starts': r['starts'], 'prize_m': (r['prize'] / 1e6) if r['prize_known'] else None,
-             'weeks_no1': no1.get(pid, 0), 'top10_seasons': top10s.get(pid, 0), 'peak': peaks.get(pid),
+             'weeks_no1': no1.get(pid, 0), 'top10_seasons': top10s.get(pid, 0), 'peak': None,
              'slam': 1 if pid in slams else 0}
         out[pid] = v
-        missing[pid] = [k for k, x in v.items() if x is None]
+    if with_peak:                                      # (the profile's Recorded Peak, whole career: worked out only
+        for pid, pk in OD.recorded_peaks(w, out).items():   # when a weight or the formula uses it)
+            out[pid]['peak'] = pk[0] if pk else None
+    for pid, v in out.items():
+        missing[pid] = [k for k, x in v.items() if x is None and (k != 'peak' or with_peak)]
     return out, missing
-
-
-def _peaks(w):
-    """{pid: Recorded Peak Overall value} as the engine noted it: the current snapshot, else the last archived season."""
-    out = {}
-    if w.a:
-        last = w.a.year(w.a.years[-1])['careers']
-        for pid, r in last.items():
-            if r.get('peak'):
-                out[pid] = r['peak'][0]
-    if w.live is not None:
-        for pid, p in w.live.people.items():
-            if p.get('peak'):
-                out[pid] = p['peak'][0]
-    return out
 
 
 def goat_page(w, q):
@@ -199,7 +198,8 @@ def goat_page(w, q):
         except FormulaError as e:
             error = str(e)
     status = O.one(q, 'status', '') or ''
-    vals, missing = careers(w, scope)
+    uses_peak = (_uses(tree, 'peak') if tree is not None else bool(wt['peak']))
+    vals, missing = careers(w, scope, with_peak=uses_peak)
     rows, failed = [], 0
     for pid, v in vals.items():
         if status:
@@ -298,6 +298,6 @@ def _definitions(w, scope):
             + f'</tbody></table></div><p class="muted">Coverage: {O.esc(cov)}. “Wins” in all tours counts college, '
               'amateur and club-professional events too; Majors + Premier counts every major and Premier event. '
               'A career that began before the world’s records is partial: its earlier achievements are not in any '
-              'figure. Peak Overall: the engine’s noted peak (a profile may also show start-of-season ratings from '
-              'before peaks were kept). Formula functions: min, max, sqrt, log; a formula that cannot be worked '
-              'out for a career leaves that career out (counted above the table).</p>')
+              'figure. Peak Overall: the same Recorded Peak a profile shows, over the whole recorded career. Formula '
+              'functions: min and max (2 to 8 values), sqrt and log (one value); a formula that cannot be worked out '
+              'for a career leaves that career out (counted above the table).</p>')

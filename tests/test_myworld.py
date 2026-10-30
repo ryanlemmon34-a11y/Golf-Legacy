@@ -1,6 +1,7 @@
 """My World: the shortlist in groups and a digest of recorded facts for what is followed -- complete and only what
 the history recorded, a quiet count in the menu, "mark as read", older shortlist files still read, no simulation
-state, and for a world that used the removed Hide results setting: nothing held back, and the period that may
+state, ranking bands read from the ranking recorded for each week (never today's ranking in an earlier week's
+place), and for a world that used the removed Hide results setting: nothing held back, and the period that may
 have been marked read unseen offered for review (the read marker untouched, nothing counted twice).
 
 Run from the project folder:  python -m unittest tests.test_myworld -v
@@ -14,6 +15,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 from urllib.parse import parse_qs, urlparse
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -46,6 +48,9 @@ class MyWorld(unittest.TestCase):
         winners = [g for e in lv.editions.values() for g, p, _ in (e['finish'][0] if e['finish'] else []) if p == 1]
         cls.winner = max(set(winners), key=winners.count)              # someone with wins this season
         cls.eid = next(e['id'] for e in lv.editions.values() if e.get('tour') == 'PT_AMERICAS')
+        inside = {r[0] for rows in lv.rank_top.values() for r in rows}  # a professional outside every recorded top
+        cls.mover = min(g for g, p in lv.people.items() if g not in inside and p.get('status') == 'pro'   # 200
+                        and p.get('lifestyle') != 'retired')
 
     @classmethod
     def tearDownClass(cls):
@@ -146,6 +151,18 @@ class MyWorld(unittest.TestCase):
         self.assertEqual(tuple(O.shortlist_seen(self.w)), seen)
         self.assertEqual(O.shortlist(self.w)[0][:2], ('tour', 'PT_AMERICAS'))   # (the shortlist kept)
 
+    def test_an_unreadable_old_settings_file_is_ignored(self):
+        self.follow(('tour', 'PT_AMERICAS'))
+        O.mark_read(self.w)
+        seen = O.shortlist_seen(self.w)
+        for text in ('{not json', '[]', '{"hide": true}', '{"from": "all"}', '{"from": [2030]}', '{"from": null}',
+                     '{"from": ["a", 1]}'):
+            (self.path / MW.OLD_SPOILERS).write_text(text)
+            self.assertIsNone(MW.hidden_period(self.w, seen), text)
+            html = self.page('/my-world')                               # the page opens, nothing held back
+            self.assertNotIn('may not have been shown', html)
+            self.assertIn('recorded items since last read', html)
+
     def test_no_notice_without_old_hiding_or_before_it(self):
         self.follow(('tour', 'PT_AMERICAS'))
         O.mark_read(self.w)
@@ -153,6 +170,86 @@ class MyWorld(unittest.TestCase):
         y, wk = self.w.live.cursor['year'], self.w.live.cursor['week']
         plant_old_hiding(self.path, since=(y, wk + 5))                  # hiding began after the last read
         self.assertIsNone(MW.hidden_period(self.w, O.shortlist_seen(self.w)))
+
+    # ---- ranking bands: each end of the window from that week's own ranking ----------------------------------------
+    def ranked(self, places, pid=None):
+        """The current season's weekly rankings as recorded, with one golfer moved to the place given for each week
+        (None: that week's ranking left out, as if it had not been recorded)."""
+        lv = self.w.live
+        pid = pid or self.mover
+        top = {wk: [list(r) for r in rows if r[0] != pid] for wk, rows in lv.rank_top.items()}
+        for wk, at in places.items():
+            if at is None:
+                top.pop(wk, None)
+            else:
+                top.setdefault(wk, [list(r) for r in lv.rank_top[max(lv.rank_top)] if r[0] != pid])
+                top[wk].insert(at - 1, [pid, 0.0, 0])
+        return mock.patch.object(lv, 'rank_top', top)
+
+    def bands(self, start, until=None, pid=None):
+        """The digest's ranking items for a followed golfer: [(year, week, text)]."""
+        pid = pid or self.mover
+        got = MW.digest(self.w, [('person', pid, '', '')], start, until)
+        return [(y, wk, re.sub(r'<[^>]+>', '', h)) for y, wk, k, h in got if k == 'ranking']
+
+    def test_entering_and_leaving_the_top_10_and_reaching_no_1_within_a_season(self):
+        y = self.w.live.cursor['year']
+        self.assertEqual(MW.now(self.w), (y, 8))
+        name = self.w.name(self.mover)
+        with self.ranked({2: 12, 4: 8, 6: 1, 8: 15}):
+            self.assertEqual(self.bands((y, 2), (y, 4)),                # No. 12 -> No. 8
+                             [(y, 4, f'{name} is now in the top 10 of the world ranking (No. 8)')])
+            self.assertEqual(self.bands((y, 4), (y, 6)), [(y, 6, f'{name} is now world No. 1')])
+            self.assertEqual(self.bands((y, 6)), [(y, 8, f'{name} is no longer world No. 1 (now No. 15)')])
+            self.assertEqual(self.bands((y, 4)),
+                             [(y, 8, f'{name} dropped out of the top 10 of the world ranking (now No. 15)')])
+            self.assertEqual(self.bands((y, 2)), [])                    # in and out again: no change over the window
+            self.assertEqual(self.bands((y, 4), (y, 4)), [])
+
+    def test_a_missing_ranking_is_not_replaced_by_another_weeks(self):
+        y = self.w.live.cursor['year']
+        with self.ranked({2: None, 4: 8, 8: 60}):
+            self.assertEqual(self.bands((y, 2), (y, 4)), [])            # week 2 not recorded: nothing claimed
+            self.assertEqual(self.bands((y, 2)), [])
+            self.assertEqual(len(self.bands((y, 4))), 1)                # both weeks recorded: the change
+        with self.ranked({8: None, 4: 8}):                              # the latest week: the live table itself
+            now = self.w.live.wr.get(self.mover)
+            got = self.bands((y, 4))
+            self.assertEqual(len(got), 1)
+            self.assertIn('dropped out of the top 10', got[0][2])
+            self.assertIn(f'(now No. {now})' if now else '(now outside the top 100)', got[0][2])
+
+    def test_a_season_boundary_reads_the_archived_ranking(self):
+        import observer_golf as OG
+        y = self.w.live.cursor['year']
+        last = OG._rankings(self.w, y - 1)['ranking_points']['52']
+        champ = last[0][0]                                              # No. 1 when last season ended
+        name = self.w.name(champ)
+        self.assertEqual(MW._rank_at(self.w, y, 0, champ), (True, 1))   # week 0: last season's final ranking
+        self.assertEqual(MW._rank_at(self.w, y - 1, 52, champ), (True, 1))
+        with self.ranked({8: 30}, pid=champ):
+            self.assertEqual(self.bands((y, 0), pid=champ), [(y, 8, f'{name} is no longer world No. 1 (now No. 30)')])
+        with self.ranked({8: 1}, pid=champ):
+            self.assertEqual(self.bands((y, 0), pid=champ), [])         # No. 1 then and now: nothing
+
+    def test_marking_the_digest_read_then_a_later_week(self):
+        y = self.w.live.cursor['year']
+        lv = self.w.live
+        self.follow(('person', self.mover))
+        with self.ranked({8: 12}):
+            O.mark_read(self.w)
+            self.assertEqual(tuple(O.shortlist_seen(self.w)), (y, 8))
+            self.assertEqual(MW.new_count(self.w), 0)
+        with self.ranked({8: 12, 9: 8}), mock.patch.object(lv, 'cursor', {**lv.cursor, 'year': y, 'week': 10}):
+            self.assertEqual(MW.now(self.w), (y, 9))                    # a week later: No. 12 -> No. 8
+            self.assertEqual(MW.new_count(self.w), 1)
+            name = self.w.name(self.mover)
+            self.assertIn(f'{name} is now in the top 10 of the world ranking (No. 8)',
+                          re.sub(r'<[^>]+>', '', self.page('/my-world')))
+            O.mark_read(self.w)
+            self.assertEqual(MW.new_count(self.w), 0)                   # read: not offered again
+        with self.ranked({8: 12, 9: 8}):
+            self.assertEqual(MW.new_count(self.w), 0)
 
     def test_not_simulation_state(self):
         before = {p.relative_to(self.path).as_posix(): p.stat().st_mtime_ns for p in self.path.rglob('*') if p.is_file()}

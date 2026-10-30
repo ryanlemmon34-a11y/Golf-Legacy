@@ -265,6 +265,69 @@ def recorded_peak(w, pid):
             'first': first, 'initial': initial, 'complete': complete}
 
 
+def recorded_peaks(w, pids):
+    """{pid: (value, year, week) or None}: recorded_peak's value and its first date for many golfers at once -- the
+    same candidates (every archived season's noted peak and start-of-season rating, the current snapshot's noted
+    peak and rating) and the same choice (the highest value to one decimal, its earliest date). The archived part is
+    worked out once per reading of the history; nothing is invented where nothing was recorded."""
+    pids = list(pids)
+    a = w.a
+    arch = {}
+    if a is not None:
+        memo = a.__dict__.get('_peak_memo')
+        if memo is None:
+            memo = a._peak_memo = {}
+        todo = [p for p in pids if p not in memo]
+        if todo:
+            keys = a.world.get('rating_keys')
+            i = keys.index('overall') if keys and 'overall' in keys else 0
+            rows = {}                                  # career_rows for each, read in bulk
+            idx = a.index
+            if idx is not None and idx.derived_complete(a.years):
+                import json
+                import zlib
+                for k in range(0, len(todo), 500):
+                    chunk = todo[k:k + 500]
+                    for pid, y, blob in idx.db.execute(
+                            f'SELECT person, year, row FROM careers WHERE person IN ({",".join("?" * len(chunk))})'
+                            + idx.upto(), chunk):
+                        rows.setdefault(pid, []).append((y, json.loads(zlib.decompress(blob))))
+            elif idx is None:                          # (no index: each season file once, as playing_career reads)
+                want = set(todo)
+                for y in a.years:
+                    for pid, r in a.year(y)['careers'].items():
+                        if pid in want:
+                            rows.setdefault(pid, []).append((y, r))
+            # (an older index's short season rows carry neither a noted peak nor ratings: nothing to read)
+            for pid in todo:
+                cands = []
+                if pid in a.people:
+                    for y, r in rows.get(pid, ()):
+                        if r.get('peak'):
+                            pk = r['peak']
+                            cands.append((round(pk[0], 1), pk[1], pk[2]))
+                        if keys and r.get('ratings'):
+                            cands.append((round(r['ratings'][i], 1), y + 1, 0))
+                memo[pid] = cands
+        arch = {p: memo[p] for p in pids}
+    out = {}
+    for pid in pids:
+        cands = list(arch.get(pid, ()))
+        lp = w.live.people.get(pid, {}) if w.live else {}
+        if lp.get('peak'):
+            pk = lp['peak']
+            cands.append((round(pk[0], 1), pk[1], pk[2]))
+        if lp.get('ratings'):
+            c = w.live.cursor
+            cands.append((round(lp['ratings'][0], 1), c['year'], c['week']))
+        if not cands:
+            out[pid] = None
+            continue
+        top = max(v for v, _, _ in cands)
+        out[pid] = min((c for c in cands if c[0] == top), key=lambda c: (c[1], c[2]))
+    return out
+
+
 def rating_snapshots(w, pid):
     """{year: [overall, attrs...]}: ratings at the start of each season (recorded when the season before it
     was archived), in the archive's rating_keys order."""

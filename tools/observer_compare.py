@@ -57,7 +57,7 @@ def seasons(w, pid):
                       'starts': len(res), 'wins': sum(1 for r in res if r['pos'] == 1 and cat(r) not in ('qualifier', 'q_school')),
                       'top10': sum(1 for r in res if r['pos'] is not None and r['pos'] <= 10),
                       'majors': majors.get(y, 0),
-                      'prize': w.live.prize.get(pid), 'wr_end': None, 'overall': (snaps.get(y) or [None])[0],
+                      'prize': w.live.prize.get(pid, 0.0), 'wr_end': None, 'overall': (snaps.get(y) or [None])[0],
                       'source': 'so far'}
     return out
 

@@ -157,13 +157,16 @@ def follow(w, pids, since):
                     for pid, r in w.a.year(y)['careers'].items():
                         if pid in want:
                             seasons[pid].append({**r, 'year': y})
-    peaks = _peaks(w, pids)
+    import observer_data as OD
+    peaks = OD.recorded_peaks(w, pids)                 # (the profile's Recorded Peak, for each member)
     majors = defaultdict(int)
     for y, wk, eid, sid, win in OH.major_wins(w):
         if y >= since:
             majors[win] += 1
     tours = w.tours()
     cur = w.live.cursor['year'] if w.live else None
+    if w.a and cur in w.a.years:                       # (the season is archived: counted once, from its rows)
+        cur = None
     out = {}
     for pid in pids:
         rows = seasons.get(pid, [])
@@ -174,6 +177,9 @@ def follow(w, pids, since):
         wins += sum(1 for r in live_starts if r['pos'] == 1
                     and (w.edition(r['event']) or {}).get('category') not in ('qualifier', 'q_school'))
         prize = sum(r.get('prize') or 0 for r in rows)
+        prize_known = all(r.get('prize') is not None for r in played)     # (a season that did not record it)
+        if live_starts:                                # the current season so far (a golfer with no ledger this
+            prize += w.live.prize.get(pid, 0.0)        # season has been paid nothing: the archive records 0 too)
         best = min((r['wr_end'] for r in rows if r.get('wr_end')), default=None)
         levels = [(tours.get(r.get('tour'), {}).get('tier', 9), r.get('tour')) for r in played
                   if r.get('status') in ('pro', 'club_pro')]
@@ -182,46 +188,9 @@ def follow(w, pids, since):
         kind, text = _now(w, pid, live, last)
         p = w.person(pid) or {}
         out[pid] = {'seasons': len(played) + (1 if live_starts and cur not in {r['year'] for r in played} else 0),
-                    'wins': wins, 'majors': majors.get(pid, 0), 'best_wr': best, 'prize': prize,
+                    'wins': wins, 'majors': majors.get(pid, 0), 'best_wr': best, 'prize': prize, 'prize_known': prize_known,
                     'level': level, 'last': last, 'now': kind, 'now_text': text, 'peak': peaks.get(pid),
                     'born': p.get('born'), 'country': p.get('country')}
-    return out
-
-
-def _peaks(w, pids):
-    """{pid: (value, year, week)}: the Recorded Peak Overall (the current season's snapshot, else the last season
-    archived with one)."""
-    out = {}
-    if w.live is not None:
-        for pid in pids:
-            pk = (w.live.people.get(pid) or {}).get('peak')
-            if pk:
-                out[pid] = tuple(pk)
-    rest = [pid for pid in pids if pid not in out]
-    if not rest or not w.a:
-        return out
-    import sqlite3
-    idx = w.a.index
-    try:
-        if idx is None:
-            raise sqlite3.OperationalError('no index')
-        import json
-        import zlib
-        for i in range(0, len(rest), 500):
-            chunk = rest[i:i + 500]
-            for pid, row in idx.db.execute(
-                    f'SELECT c.person, c.row FROM careers c WHERE c.person IN ({",".join("?" * len(chunk))})'
-                    + idx.upto('c.year') + ' AND c.year = (SELECT MAX(year) FROM careers d WHERE d.person = c.person'
-                    + idx.upto('d.year') + ')', chunk):
-                pk = json.loads(zlib.decompress(row)).get('peak')
-                if pk:
-                    out[pid] = tuple(pk)
-    except sqlite3.OperationalError:                   # an older index: the last season archived only (one file)
-        last = w.a.year(w.a.years[-1])['careers']
-        for pid in rest:
-            pk = (last.get(pid) or {}).get('peak')
-            if pk:
-                out[pid] = tuple(pk)
     return out
 
 
@@ -310,7 +279,8 @@ def cohort_page(w, q):
             f'<td class="n">{O.results_link(pid, str(f["wins"]), outcome="win") if f["wins"] else "0"}</td>'
             f'<td class="n">{f["majors"]}</td><td class="n">{f["best_wr"] or "—"}</td>'
             f'<td>{O.tour_link(w, lvl[1]) if lvl else "<span class=muted>none as a professional</span>"}</td>'
-            f'<td class="n">{O.money(f["prize"])}</td>'
+            f'<td class="n">{O.money(f["prize"])}'
+            + ('' if f['prize_known'] else ' <span class="muted">(partial: a season did not record it)</span>') + '</td>'
             f'<td class="n">{_peak(f["peak"])}</td></tr>')
     counts = defaultdict(int)
     for pid in then:

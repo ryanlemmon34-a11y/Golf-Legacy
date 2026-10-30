@@ -191,6 +191,41 @@ const { chromium } = require('playwright');
 })().catch(e => { console.error(e); process.exit(1); });
 """
 
+SAVE_JS = r"""
+const { chromium } = require('playwright');
+(async () => {
+  const base = process.argv[2], out = {};
+  const b = await chromium.launch(), pg = await b.newPage();
+  const names = () => pg.$$eval('table.sortable tbody tr td:first-child', c => c.map(x => x.textContent));
+  await pg.goto(base + '/golfers?q=e&status=full_time&sort=name&page=2');   // filters, a sort and a page
+  out.before = await names();
+  await pg.click('table.sortable th:nth-child(1)');            // re-sorted in the browser: by name, descending
+  await pg.click('table.sortable th:nth-child(1)');
+  out.sorted = await names();
+  out.url = pg.url();
+  out.form_query = await pg.inputValue('form.viewsave input[name=query]');
+  await pg.fill('form.viewsave input[name=name]', 'E golfers reversed');
+  await Promise.all([pg.waitForNavigation(), pg.click('form.viewsave button')]);   // saved without reloading first
+  out.saved_url = pg.url();
+  out.after_save = await names();
+  await pg.goto(base + '/calendar');                           // leave
+  await pg.goto(base + '/views');
+  await Promise.all([pg.waitForNavigation(), pg.click('main a:has-text("E golfers reversed")')]);
+  out.reopened_url = pg.url();
+  out.reopened = await names();
+  out.reopened_aria = await pg.getAttribute('table.sortable th:nth-child(1)', 'aria-sort');
+  await pg.reload();                                           // refresh
+  out.refreshed = await names();
+  await pg.goBack();                                           // Back: the saved views page
+  out.back_url = pg.url();
+  await pg.goForward();
+  out.forward_url = pg.url();
+  out.forward = await names();
+  await b.close();
+  console.log(JSON.stringify(out));
+})().catch(e => { console.error(e); process.exit(1); });
+"""
+
 
 def node_playwright():
     import subprocess
@@ -232,6 +267,51 @@ class BrowserSort(unittest.TestCase):
         self.assertIn('tsort=0.0.d', out['menu_url'])                   # the menu: the address and order restored
         self.assertEqual(out['menu_aria'], 'descending')
         self.assertEqual(out['menu'], out['sorted'])
+
+
+@unittest.skipUnless(node_playwright(), 'Node.js with Playwright not available')
+class BrowserSaveView(unittest.TestCase):
+    """In a real browser (Chromium): a list sorted in the browser, then named and saved without reloading, is saved
+    as it is shown -- filters, sort, page and the browser's column sort -- and reopens in that order (after leaving,
+    on refresh, and with Back and Forward)."""
+
+    def test_sort_then_save_then_reopen(self):
+        import json
+        import subprocess
+        tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, tmp, True)
+        s = Session.create(tmp / 'lib' / 'demo', seed=31, workers=1, world=generate_world(seed=31, scale=0.05))
+        s.advance(3)
+        s.close()
+        app = OA.App(tmp / 'lib', workers=1)
+        httpd = OA.start_server(app, 0)
+        self.addCleanup(app.shutdown)
+        self.addCleanup(httpd.server_close)
+        self.addCleanup(httpd.shutdown)
+        app.renderer.call(app._install, tmp / 'lib' / 'demo', None)
+        script = tmp / 'save.js'
+        script.write_text(SAVE_JS)
+        r = subprocess.run(['node', str(script), f'http://localhost:{httpd.server_address[1]}'], capture_output=True,
+                           text=True, timeout=300, cwd=tmp)
+        self.assertEqual(r.returncode, 0, r.stderr[-2000:])
+        out = json.loads(r.stdout.strip().splitlines()[-1])
+        want = {'q': ['e'], 'status': ['full_time'], 'sort': ['name'], 'page': ['2'], 'tsort': ['0.0.d']}
+        self.assertEqual(parse_qs(urlparse(out['url']).query), want)
+        self.assertTrue(out['before'] and out['sorted'] != out['before'])
+        self.assertEqual(sorted(out['sorted']), sorted(out['before']))  # the same page, re-ordered
+        self.assertEqual(parse_qs(out['form_query']), want)             # the form holds the view as shown
+        saved = [x for x in V.state(app.world)['saved'] if x['name'] == 'E golfers reversed']
+        self.assertEqual(len(saved), 1)
+        self.assertEqual((saved[0]['path'], parse_qs(saved[0]['query'])), ('/golfers', want))
+        self.assertEqual(parse_qs(urlparse(out['saved_url']).query), want)   # back on the list, as it was
+        self.assertEqual(out['after_save'], out['sorted'])
+        self.assertEqual(parse_qs(urlparse(out['reopened_url']).query), want)
+        self.assertEqual(out['reopened'], out['sorted'])               # reopened: the same order
+        self.assertEqual(out['reopened_aria'], 'descending')
+        self.assertEqual(out['refreshed'], out['sorted'])
+        self.assertTrue(urlparse(out['back_url']).path == '/views')
+        self.assertEqual(parse_qs(urlparse(out['forward_url']).query), want)
+        self.assertEqual(out['forward'], out['sorted'])
 
 
 if __name__ == '__main__':

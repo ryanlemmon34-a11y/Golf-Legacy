@@ -112,7 +112,7 @@ def digest(w, items, start, until=None):
                 if _after(start, m['year'], m['week']):
                     add(m['year'], m['week'], 'moment', f'{link}: {O.esc(m["kind"])} at the {O.event_link(w, m["event"])}'
                         if m.get('event') else f'{link}: {O.esc(m["kind"])}', m.get('event'))
-        _ranking_band(w, pid, start, add)
+        _ranking_band(w, pid, start, add, until)
     for sid in by.get('series', ()):
         for e in w.editions_of(sid):
             if _after(start, e['year'], e['week']):
@@ -174,32 +174,62 @@ def _status_changes(w, pid, start, add):
             add(w.live.cursor['year'], 1, 'status', f'{w.person_link(pid)}: {O.esc(s)} (season {w.live.cursor["year"]})')
 
 
-def _rank_at(w, y, wk, pid):
-    if w.live is not None and (y, wk) >= (w.live.cursor['year'], 0):
-        r = w.live.wr.get(pid)
-        return r
+def _ranking_week(w, y, wk):
+    """[pid, ...] in rank order: the world ranking published after week `wk` of season `y` (week 0: the end of the
+    season before), from the current season's weekly snapshots or the archived season; None if none was recorded
+    for that week (never another week's ranking in its place)."""
+    if wk <= 0:
+        y, wk = y - 1, 52
+    if w.live is not None and y == w.live.cursor['year'] and not (w.a and y in w.a.years):
+        top = getattr(w.live, 'rank_top', None) or {}
+        rows = top.get(wk) or top.get(str(wk))
+        if rows:
+            return [r[0] for r in rows]
+        if (y, wk) == now(w):                          # (the latest week's ranking is the live table itself)
+            return sorted(w.live.wr, key=w.live.wr.get)
+        return None
     if w.a and y in w.a.years:
-        lst = w.a.ranking(y, max(1, min(52, wk)))
-        return lst.index(pid) + 1 if pid in lst else None
+        import observer_golf as OG
+        got = OG._rankings(w, y) or {}
+        snap = (got.get('ranking_points') or {}).get(str(wk))   # (top 200, in rank order)
+        if snap:
+            return [r[0] for r in snap]
+        order = (got.get('rankings') or {}).get('world', {}).get(str(wk))   # (top 100: older seasons)
+        return list(order) if order else None
     return None
+
+
+def _rank_at(w, y, wk, pid):
+    """(known, rank or None): a golfer's place in the ranking published after that week -- (True, None) when the
+    ranking is recorded and they are not in it, (False, None) when no ranking was recorded for that week."""
+    lst = _ranking_week(w, y, wk)
+    if lst is None:
+        return False, None
+    return True, (lst.index(pid) + 1 if pid in lst else None)
 
 
 def _band(r):
     return next((i for i, (n, _) in enumerate(BANDS) if r is not None and r <= n), len(BANDS))
 
 
-def _ranking_band(w, pid, start, add):
-    """A change of world-ranking band between the start of the window and now (bands: No. 1, top 10, 50, 100)."""
-    y, wk = now(w)
-    a, b = _rank_at(w, start[0], start[1], pid), _rank_at(w, y, wk, pid)
+def _ranking_band(w, pid, start, add, until=None):
+    """A change of world-ranking band between the start of the window and its end (now, or `until`), each from the
+    ranking published that week (bands: No. 1, top 10, 50, 100); nothing when either week's ranking was not
+    recorded."""
+    y, wk = min(tuple(until), now(w)) if until else now(w)
+    (ka, a), (kb, b) = _rank_at(w, start[0], start[1], pid), _rank_at(w, y, wk, pid)
+    if not (ka and kb):
+        return
     ba, bb = _band(a), _band(b)
     if ba == bb or (y, wk) <= tuple(start):
         return
     if bb < ba:
-        add(y, wk, 'ranking', f'{w.person_link(pid)} is now in {BANDS[bb][1]} of the world ranking (No. {b})')
+        add(y, wk, 'ranking', f'{w.person_link(pid)} is now world No. 1' if bb == 0 else
+            f'{w.person_link(pid)} is now in {BANDS[bb][1]} of the world ranking (No. {b})')
     else:
-        add(y, wk, 'ranking', f'{w.person_link(pid)} dropped out of {BANDS[ba][1]} of the world ranking'
-            + (f' (now No. {b})' if b else ''))
+        add(y, wk, 'ranking', (f'{w.person_link(pid)} is no longer world No. 1' if ba == 0 else
+                               f'{w.person_link(pid)} dropped out of {BANDS[ba][1]} of the world ranking')
+            + (f' (now No. {b})' if b else ' (now outside the top 100)'))
 
 
 def _tour_editions(w, key, start):
@@ -253,10 +283,13 @@ def hidden_period(w, seen):
         old = json.loads((w.path / OLD_SPOILERS).read_text())
     except (OSError, ValueError):
         return None
-    since = old.get('from') if isinstance(old, dict) else None
-    if not since or O.shortlist_flags(w).get('hidden_period_dismissed'):
+    try:                                               # (a file it cannot read as a date is ignored)
+        since = tuple(int(x) for x in old['from'])
+    except (TypeError, ValueError, KeyError):
         return None
-    start = tuple(since) if tuple(since) != (0, 0) else ((min(w.a.years) if w.a else now(w)[0]), 0)
+    if len(since) != 2 or O.shortlist_flags(w).get('hidden_period_dismissed'):
+        return None
+    start = since if since != (0, 0) else ((min(w.a.years) if w.a else now(w)[0]), 0)
     if tuple(seen) <= start:
         return None
     return start, tuple(seen)

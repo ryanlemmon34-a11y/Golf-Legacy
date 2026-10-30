@@ -360,8 +360,7 @@ def season_view(w, q, pid, p):
             facts.append(('Winner’s exemption', O.esc(e)))
         if pid in w.live.wr:
             facts.append(('World ranking now', O.esc(w.live.wr[pid])))
-        prize = w.live.prize.get(pid)
-        facts.append(('Prize money so far', O.money(prize) if prize is not None else NOT_RECORDED))
+        facts.append(('Prize money so far', O.money(w.live.prize.get(pid, 0.0))))   # (no ledger: paid nothing)
     else:
         facts = [('Age*', O.age_text(w, born, y)), ('Tour', O.tour_link(w, row.get('tour'))),
                  ('Status', O.esc(STATUS.get(row.get('status'), row.get('status')))),

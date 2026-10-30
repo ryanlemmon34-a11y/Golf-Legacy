@@ -279,6 +279,8 @@ SORT_JS = """<script>
       u.searchParams.set('tsort', tables().indexOf(table) + '.' + i + '.' + (dir === 'ascending' ? 'a' : 'd'));
       u.searchParams.delete('default');
       history.replaceState(history.state, '', u.pathname + u.search + u.hash);
+      Array.prototype.forEach.call(document.querySelectorAll('form.viewsave input[name=query]'),
+                                   function (f) { f.value = u.search.slice(1); });   // (Save view saves this view)
       fetch('/views/last', {method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded'},
                             body: 'url=' + encodeURIComponent(u.pathname + u.search), keepalive: true});
     } catch (e) {}

@@ -23,6 +23,7 @@ from golfsim.population import generate_world                         # noqa: E4
 from golfsim.session import Session                                   # noqa: E402
 import observer as O                                                  # noqa: E402
 import observer_cohort as OC                                          # noqa: E402
+import observer_data as OD                                            # noqa: E402
 
 
 def plant_old_hiding(world_dir, since=(0, 0)):
@@ -86,7 +87,10 @@ class Cohorts(unittest.TestCase):
                                              self.w.live.cursor['year'] not in {r['year'] for r in got if r['events']}
                                              else 0),
                              sum(1 for r in got if r['events']))
-            self.assertEqual(f['prize'], sum(r['prize'] or 0 for r in got))
+            live_prize = self.w.live.prize.get(pid, 0.0) if self.w.live.results(pid) else 0.0
+            self.assertEqual(f['prize'], sum(r['prize'] or 0 for r in got) + live_prize)   # this season's so far too
+            pk = OD.recorded_peak(self.w, pid)                           # the profile's Recorded Peak
+            self.assertEqual(f['peak'], (pk['value'], pk['year'], pk['week']) if pk else None)
             self.assertEqual(f['best_wr'], min((r['wr_end'] for r in got if r['wr_end']), default=None))
             live = self.w.live.people[pid]                               # where they are now: today's snapshot
             kind = f['now']
@@ -141,21 +145,123 @@ class Cohorts(unittest.TestCase):
         self.assertIn('<td>1 ·', table)                                 # the winner's finish, shown
         self.assertNotIn('hidden', table)
 
-    def test_an_older_index_shows_peaks_as_not_recorded(self):
+    def test_an_older_index_shows_the_profiles_peak(self):
         e = self.field()
+        pids = [r['person'] for r in e['rows']]
+        a = self.w.a
+        a.__dict__.pop('_peak_memo', None)
+        self.addCleanup(a.__dict__.pop, '_peak_memo', None)
+        with mock.patch.object(a.index, 'derived_complete', lambda years: False), mock.patch.object(self.w, 'live', None):
+            peaks = OC.follow(self.w, pids, e['year'])
+            for pid in pids:                                            # an index from before the full rows: the
+                pk = OD.recorded_peak(self.w, pid)                      # profile records no peak, and neither does
+                self.assertIsNone(pk)                                   # the cohort (never another season's value)
+                self.assertIsNone(peaks[pid]['peak'])
+
+    def test_this_seasons_prize_money_counts(self):
+        lv = self.w.live
+        paid = [e for e in lv.editions.values() if e['finish'] and e.get('category') not in ('qualifier', 'q_school')
+                and any(p == 1 and lv.prize.get(g) for g, p, _ in e['finish'][0])]
+        self.assertTrue(paid)
+        e = paid[0]                                                     # a field from this season: no archived season
+        win = next(g for g, p, _ in e['finish'][0] if p == 1)
+        url = f'/cohort?event={quote(e["id"])}'
+        fol = OC.follow(self.w, [g for site in e['finish'] for g, _, _ in site], lv.cursor['year'])
+        self.assertGreater(fol[win]['prize'], 0)                        # a first-season paid winner
+        self.assertEqual(fol[win]['prize'], lv.prize[win])
+        self.assertGreaterEqual(fol[win]['wins'], 1)
+        self.assertEqual(fol[win]['seasons'], 1)
+        self.assertTrue(fol[win]['prize_known'])
+        self.assertIn(f'<td class="n">{O.money(lv.prize[win])}</td>', self.member_row(self.page(url), win))
+        ams = sorted(g for g, p in lv.people.items() if p.get('status') == 'amateur' and lv.results(g)
+                     and not lv.prize.get(g))[:20]
+        self.assertTrue(ams)
+        for g, f in OC.follow(self.w, ams, lv.cursor['year']).items():  # an amateur paid nothing: $0, and known
+            self.assertEqual(f['prize'], 0)
+            self.assertTrue(f['prize_known'])
+            self.assertEqual(f['seasons'], 1)
+        for g in (win, ams[0]):                                         # the golfer's season page says the same
+            season = self.page(f'/golfer/{g}?tab=season&year={lv.cursor["year"]}')
+            got = re.search(r'Prize money so far</[^>]+>\s*<[^>]+>(.*?)</', season, re.S).group(1)
+            self.assertEqual(got, O.money(lv.prize.get(g, 0.0)))
+        old = self.field()                                              # a multi-season career
+        fol = OC.follow(self.w, [r['person'] for r in old['rows']], old['year'])
+        many = [g for g, f in fol.items() if f['seasons'] >= 3 and lv.results(g)]
+        self.assertTrue(many)
+        for g in many[:10]:
+            rows = [r for r in self.w.a.index.seasons(g) if r['year'] >= old['year']]
+            self.assertEqual(fol[g]['prize'], sum(r['prize'] or 0 for r in rows) + lv.prize.get(g, 0.0))
+        self.assertEqual(OC.follow(self.w, many, old['year']), {g: fol[g] for g in many})   # (a refresh: the same)
+
+    def test_a_season_that_did_not_record_prize_money_is_not_zero(self):
+        old = self.field()
+        pids = [r['person'] for r in old['rows']]
         idx = self.w.a.index
         real = idx.db
+        url = f'/cohort?event={quote(old["id"])}&sort=name'
+        shown = [int(x) for x in self.rows(self.page(url))]
+        gap = next(g for g in shown if any(r['events'] and r['prize'] for r in idx.seasons(g)))
 
-        class Old:
+        class Older:                                                    # that golfer's seasons without prize money
             def execute(self, sql, *a):
-                if 'FROM careers' in sql:
-                    raise sqlite3.OperationalError('no such table: careers')
-                return real.execute(sql, *a)
-        with mock.patch.object(idx, 'db', Old()), mock.patch.object(self.w, 'live', None):
-            peaks = OC._peaks(self.w, [r['person'] for r in e['rows']])
-        last = self.w.a.year(self.w.a.years[-1])['careers']
-        for pid in (r['person'] for r in e['rows']):
-            self.assertEqual(peaks.get(pid), tuple(last[pid]['peak']) if (last.get(pid) or {}).get('peak') else None)
+                cur = real.execute(sql, *a)
+                if 'FROM seasons WHERE person IN' not in sql:
+                    return cur
+                return [r[:7] + (None,) + r[8:] if r[0] == gap else r for r in cur]
+        with mock.patch.object(idx, 'db', Older()):
+            fol = OC.follow(self.w, pids, old['year'])
+            html = self.page(url)
+        self.assertFalse(fol[gap]['prize_known'])                       # unknown, not silently $0
+        self.assertTrue(all(f['prize_known'] for g, f in fol.items() if g != gap))
+        self.assertIn('partial: a season did not record it', self.member_row(html, gap))
+
+    def member_row(self, html, pid):
+        return re.search(rf'<tr><td><a href="/golfer/{pid}">.*?</tr>', html, re.S).group(0)
+
+
+class SeasonEnd(unittest.TestCase):
+    """Prize money across a season end: the season counted once -- from the live snapshot while it is played, from
+    its archived row once it ends -- and the same after a refresh."""
+
+    def test_prize_money_across_the_season_end(self):
+        tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, tmp, True)
+        s = Session.create(tmp / 'w', seed=71, workers=1, world=generate_world(seed=71, scale=0.02))
+        s.advance(51)                                                   # to the last week of the first season
+        s.close()
+        w = O.World(tmp / 'w', workers=1)
+        w.reload()
+        y = w.live.cursor['year']
+        self.assertEqual(w.live.cursor['week'], 52)
+        paid = sorted(g for g, v in w.live.prize.items() if v)[:60]
+        self.assertTrue(paid)
+        before = OC.follow(w, paid, y)
+        for g in paid:
+            self.assertEqual(before[g]['prize'], w.live.prize[g])
+        w.close()
+        s = Session.open(tmp / 'w', workers=1)
+        s.advance(1)                                                    # week 52: the season ends and is archived
+        s.close()
+        w = O.World(tmp / 'w', workers=1)
+        self.addCleanup(w.close)
+        w.reload()
+        self.assertEqual(w.live.cursor['year'], y + 1)
+        self.assertIn(y, w.a.years)
+        after = OC.follow(w, paid, y)
+        for g in paid:
+            row = next(r for r in w.a.index.seasons(g) if r['year'] == y)
+            self.assertEqual(after[g]['prize'], row['prize'] + w.live.prize.get(g, 0.0))   # once, from the archive
+            self.assertGreaterEqual(round(after[g]['prize']), round(before[g]['prize']))   # (archived: whole dollars)
+            self.assertEqual(after[g]['seasons'], 1)
+        w.reload()                                                      # a refresh: the same figures
+        self.assertEqual(OC.follow(w, paid, y), after)
+        live = w.live                                                   # the snapshot still naming the archived
+        with mock.patch.object(live, 'cursor', {'year': y, 'week': 52}), \
+                mock.patch.object(live, 'prize', {g: before[g]['prize'] for g in paid}):   # season: not added again
+            again = OC.follow(w, paid, y)
+        for g in paid:
+            row = next(r for r in w.a.index.seasons(g) if r['year'] == y)
+            self.assertEqual(again[g]['prize'], row['prize'])
 
 
 if __name__ == '__main__':

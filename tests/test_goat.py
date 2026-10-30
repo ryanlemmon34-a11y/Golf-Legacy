@@ -50,6 +50,30 @@ class Formulas(unittest.TestCase):
         self.assertEqual(G.evaluate(G.compile_formula('2*majors + wins'), {'majors': 2, 'wins': 3, 'peak': None}), 7.0)
         self.assertEqual(G.evaluate(G.compile_formula('peak + 1'), {'peak': None}), 1.0)   # missing counts as 0
 
+    def test_each_function_takes_its_own_number_of_values(self):
+        for bad, said in (('sqrt(1, 2)', 'sqrt() takes exactly 1 value (given 2)'),
+                          ('log(wins, 10)', 'log() takes exactly 1 value (given 2)'),
+                          ('sqrt()', 'sqrt() takes exactly 1 value (given 0)'),
+                          ('min(1)', 'min() takes 2 to 8 values (given 1)'),
+                          ('max(wins)', 'max() takes 2 to 8 values (given 1)'),
+                          ('max(' + ', '.join(['1'] * 9) + ')', 'max() takes 2 to 8 values (given 9)'),
+                          ('2 * sqrt(majors, wins) + 1', 'sqrt() takes exactly 1 value (given 2)'),
+                          ('min(max(wins), 3)', 'max() takes 2 to 8 values (given 1)')):
+            with self.assertRaises(G.FormulaError, msg=bad) as cm:
+                G.compile_formula(bad)
+            self.assertEqual(str(cm.exception), said)
+        for ok, want in (('sqrt(16)', 4.0), ('log(1)', 0.0), ('min(wins, majors)', 2.0),
+                         ('max(1, 2, 3, 4, 5, 6, 7, 8)', 8.0), ('max(wins, 10) + sqrt(majors * 8)', 14.0)):
+            self.assertEqual(G.evaluate(G.compile_formula(ok), {'wins': 3, 'majors': 2}), want, ok)
+
+    def test_impossible_values_leave_a_career_out(self):
+        v = {'wins': 3, 'majors': 0, 'peak': None}
+        for f in ('wins / majors', 'wins / (majors - majors)', '1 / peak',          # division by zero (missing: 0)
+                  'sqrt(-1)', 'sqrt(majors - wins)', 'log(0)', 'log(majors)', 'log(-wins)',   # outside the domain
+                  '(-8) ** 0.5', 'sqrt((-8) ** 0.5)', 'min((-1) ** 0.5, 2)', 'log((-wins) ** 0.5)',   # complex values
+                  'wins ** 100', '10 ** 10 ** 10', '1e308 * 10'):                    # too large, not finite
+            self.assertIsNone(G.evaluate(G.compile_formula(f), v), f)
+
     def test_weights(self):
         wt = G.weights({'w_majors': ['abc'], 'w_wins': ['2.5'], 'w_peak': ['inf'], 'w_slam': ['nan']})
         self.assertEqual(wt['majors'], G.COMPONENTS['majors'][4])
@@ -120,6 +144,24 @@ class Lab(unittest.TestCase):
         self.assertEqual(self.ids(bad), self.ids(self.page('/goat')))  # the weighted sum instead
         none = self.page('/goat?' + urlencode({'formula': 'wins / (majors - majors)'}))
         self.assertIn('could not be worked out', none)
+
+    def test_a_formula_that_cannot_be_used_never_breaks_the_page(self):
+        plain = self.ids(self.page('/goat'))
+        for f, said in (('sqrt(wins, 2)', 'sqrt() takes exactly 1 value (given 2)'),
+                        ('min(wins)', 'min() takes 2 to 8 values (given 1)')):
+            html = self.page('/goat?' + urlencode({'formula': f}))
+            self.assertIn(f'Formula not used: {said}', html)
+            self.assertEqual(self.ids(html), plain)                     # the weighted sum instead
+        vals, _ = G.careers(self.w, SC.MAJORS_PREMIER)
+        html = self.page('/goat?' + urlencode({'formula': 'sqrt(-1 - wins)'}))   # no career can be worked out
+        self.assertIn(f'{len(vals)} careers left out', html)
+        self.assertIn(' 0 careers ·', html)
+        html = self.page('/goat?' + urlencode({'formula': 'log(wins) + sqrt((-wins) ** 0.5)'}))
+        self.assertIn(' 0 careers ·', html)                             # (a complex value: left out, not an error)
+        html = self.page('/goat?' + urlencode({'formula': 'log(wins)'}))   # careers without a win left out
+        n = sum(1 for v in vals.values() if v['wins'])
+        self.assertIn(f' {n:,} careers ·', html)
+        self.assertIn(f'{len(vals) - n} career{"s" if len(vals) - n != 1 else ""} left out', html)
 
     def test_coverage_and_missing_figures(self):
         html = self.page('/goat?' + urlencode({'w_prize_m': 1, 'w_peak': 1, 'status': ''}))
