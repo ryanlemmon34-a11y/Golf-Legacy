@@ -124,9 +124,25 @@ def capture(session):
         birth=dict(pl.birth), home=dict(pl.home), first=dict(pl.first),
         moves={k: list(v) for k, v in pl.moves.items()}, courses=courses, tours=tours, records=records,
         prize={gid: led.prize for gid, led in s.ledgers.get(year, {}).items()},
+        **_status(s, year),
         captured=time.time())
     view.capture_seconds = round(time.perf_counter() - t0, 2)
     return view
+
+
+def _status(s, year):
+    """This season's standing facts (worlds from engines that kept them; empty otherwise): Premier playing
+    rights and why, winner's exemptions held (wins so far included), why each holds this season's card,
+    the college eligibility ledger, and the rules version the engine plays by."""
+    from golfsim.cards import winner_exemptions
+    from golfsim.rules import RULES_VERSION
+    earned = s.__dict__.get('earned', {}).get(year)
+    if earned is None:                                   # computed here, never stored: capture only reads
+        earned = winner_exemptions(s, year, through=year)
+    return {'rights': {g: tuple(r) for g, r in s.rights.get(year, {}).items()}, 'earned': dict(earned),
+            'card_reasons': dict(s.card_reasons.get(year, {})),
+            'college': {g: list(v) for g, v in s.__dict__.get('college', {}).items()},
+            'rules_version': RULES_VERSION}
 
 
 def _generation_meta(session):

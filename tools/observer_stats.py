@@ -11,11 +11,12 @@ Definitions (shown on the pages):
 - **Cuts**: stroke-play events with a cut only; "made / cut events". Events without a cut and match play
   have no cut to make.
 - **Prize money** is gross tournament prize money (not net, sponsorship, job or staff income). Each event's
-  payouts are recomputed from its purse, cut and field (as recorded when it was played; older archives: the
-  calendar's) and the finishing order, with the engine's payout table (ties share, amateurs take nothing),
-  and checked against every golfer's season prize money as actually paid: where they disagree the
-  per-tour figure is shown as unknown, never guessed. Season and all-time totals use the money actually
-  paid.
+  payouts are those recorded when it was paid (since rules 2026-10-30); for seasons played before payouts
+  were recorded they are recomputed from its purse, cut and field (as recorded when it was played; older
+  archives: the calendar's) and the finishing order, with the engine's payout table (ties share, amateurs
+  take nothing). Either way they are checked against every golfer's season prize money as actually paid:
+  where they disagree the per-tour figure is shown as unknown, never guessed. Season and all-time totals
+  use the money actually paid.
 - Each edition counts once, under the tour it belonged to when it was played (majors under Majors).
 
 The store is a small SQLite file next to the world (observer_cache/), built one season at a time from the
@@ -110,12 +111,16 @@ def season_tables(events, status, paid, calendar=None):
         money[e['id']] = (purse, cut_top, field_size, mp)
         qualifying = e.get('kind') == 'qualifying' or e.get('tier') == 7
         tour = e.get('tour') or ''
-        for site in e['finish']:
-            try:
-                won = payouts(purse, cut_top, field_size, site, lambda g: None if g not in status
-                              else status[g] == 'amateur') if purse is not None else None
-            except KeyError:
-                won = None
+        recorded = e.get('prizes')                   # paid as recorded (since rules 2026-10-30)
+        for k, site in enumerate(e['finish']):
+            if recorded and k < len(recorded):
+                won = {int(g): x for g, x in recorded[k].items()}
+            else:
+                try:
+                    won = payouts(purse, cut_top, field_size, site, lambda g: None if g not in status
+                                  else status[g] == 'amateur') if purse is not None else None
+                except KeyError:
+                    won = None
             for gid, pos, _ in site:
                 if won is None:
                     unknown.add(gid)

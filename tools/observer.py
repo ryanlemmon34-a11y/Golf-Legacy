@@ -40,6 +40,7 @@ from golfsim.history_stats import BOARDS, DEFINITIONS, SCOPES, HistoryStats, boa
 import observer_jobs as J                                            # noqa: E402
 from observer_live import capture                                    # noqa: E402
 import observer_data as OD                                            # noqa: E402
+import observer_history as OH                                         # noqa: E402
 
 PAGE_SIZE = 100
 
@@ -49,6 +50,8 @@ CSS = """
 table.mini { margin:0; font-size:13px; } table.mini td, table.mini th { padding:1px 4px; border:none; }
 form.inline { display:inline; margin-left:8px; } form.inline button { font-size:13px; padding:1px 8px; }
 .up { color:var(--accent); } .down { color:#b3412f; } p.lead { font-size:16px; }
+table.sortable th { cursor:pointer; } table.sortable th[aria-sort=ascending]::after { content:" ▲"; }
+table.sortable th[aria-sort=descending]::after { content:" ▼"; }
 :root { --bg:#fbfaf7; --fg:#1d2420; --muted:#5c6660; --line:#d9dcd6; --accent:#1f6b45; --panel:#ffffff;
   --warn-bg:#fff4d6; --warn-fg:#5a4300; --err-bg:#fde4e1; --err-fg:#7a1b12; --ok-bg:#e3f3e8; --ok-fg:#14502f; }
 @media (prefers-color-scheme: dark) { :root { --bg:#141816; --fg:#e8ece9; --muted:#9aa59f; --line:#2c3430;
@@ -513,7 +516,7 @@ def page(w, title, body, job=None, notices=()):
            '<a href="/courses">Courses</a><a href="/nations">Nations</a><a href="/tours">Tours</a>'
            '<a href="/tournaments">Tournaments</a><a href="/shortlist">Shortlist</a>'
            '<h4>History</h4><a href="/seasons">Seasons</a><a href="/records">Records &amp; frivolities</a>'
-           '<a href="/moments">Moments</a>'
+           '<a href="/grand-slam">Career Grand Slam</a><a href="/moments">Moments</a><a href="/rules">Rules</a>'
            '<h4>Worlds</h4><a href="/worlds">World library</a><a href="/export">Report a problem</a>'
            '<a href="/job">Last operation</a></nav>')
     banners = ''.join(f'<div class="banner {esc(kind)}" role="status">{text}</div>' for kind, text in notices)
@@ -523,7 +526,7 @@ def page(w, title, body, job=None, notices=()):
             f'<style>{CSS}</style></head><body><header><strong>Golf Legacy</strong>{world}'
             f'<span class="date">{esc(date)}</span>{search}{advance_controls(w, job)}</header>'
             f'<div class="layout">{nav}<main>{banners}<h1>{esc(title)}</h1>{body}'
-            f'{history_note(w) if w is not None else ""}</main></div>{POLL_JS if running else ""}</body></html>')
+            f'{history_note(w) if w is not None else ""}</main></div>{POLL_JS if running else ""}{OH.SORT_JS}</body></html>')
 
 
 def history_note(w):
@@ -539,11 +542,13 @@ def history_note(w):
 
 
 def table(headers, rows, numeric=()):
-    """headers: [label]; rows: [[cell html]]; numeric: column indexes right-aligned."""
-    h = ''.join(f'<th{" class=n" if i in numeric else ""}>{esc(x)}</th>' for i, x in enumerate(headers))
+    """headers: [label]; rows: [[cell html]]; numeric: column indexes right-aligned. Every table sorts by any
+    column in the browser (numbers as numbers, missing values last; on a paged list, the page shown)."""
+    h = ''.join(f'<th{" class=n" if i in numeric else ""} title="Sort by this column">{esc(x)}</th>'
+                for i, x in enumerate(headers))
     body = ''.join('<tr>' + ''.join(f'<td{" class=n" if i in numeric else ""}>{c}</td>' for i, c in enumerate(r)) + '</tr>'
                    for r in rows)
-    return f'<div class="scroll"><table><tr>{h}</tr>{body}</table></div>'
+    return f'<div class="scroll"><table class="sortable"><thead><tr>{h}</tr></thead><tbody>{body}</tbody></table></div>'
 
 
 def paged(rows, q, path, size=PAGE_SIZE):
@@ -768,8 +773,15 @@ def directory(w, q, role='golfer'):
             continue
         rows.append((pid, p, st))
     wr = w.live.wr if w.live else {}
+    clients = {}
+    if w.live and role in ('coach', 'caddie'):
+        for g, s_ in (w.live.coach_of if role == 'coach' else w.live.caddie_of).items():
+            clients[s_] = clients.get(s_, 0) + 1
+    rep_of = lambda r: (r[1].get(role) or {}).get('reputation') if role in ('coach', 'caddie') else None
     key = {'name': lambda r: (r[1]['name'], r[0]), 'born': lambda r: (-(r[1].get('born') or 0), r[0]),
-           'rank': lambda r: (wr.get(r[0], 10 ** 9), r[1]['name'], r[0])}.get(sort, lambda r: (r[1]['name'], r[0]))
+           'rank': lambda r: (wr.get(r[0], 10 ** 9), r[1]['name'], r[0]),
+           'reputation': lambda r: (rep_of(r) is None, -(rep_of(r) or 0), r[1]['name'], r[0]),
+           'clients': lambda r: (-clients.get(r[0], 0), r[1]['name'], r[0])}.get(sort, lambda r: (r[1]['name'], r[0]))
     rows.sort(key=key)
     nations = sorted({p.get('country') for _, p, _ in rows} | ({nation} if nation else set()) - {None})
     path = {None: '/golfers', 'golfer': '/golfers', 'coach': '/coaches', 'caddie': '/caddies'}[role]
@@ -779,14 +791,12 @@ def directory(w, q, role='golfer'):
         fields.append(('tour', 'Tour now', [('', 'any')] + sorted(((k, t.get('name', k)) for k, t in w.tours().items()),
                                                                  key=lambda x: x[1])))
     fields.append(('status', 'Status now', [('', 'any')] + [(s, s) for s in statuses]))
-    fields.append(('sort', 'Sort', [(k, t) for k, t in (('rank', 'world ranking'), ('name', 'name'), ('born', 'youngest first'))
-                                    if role == 'golfer' or k != 'rank']))
+    fields.append(('sort', 'Sort', [(k, t) for k, t in (('rank', 'world ranking'), ('name', 'name'), ('born', 'youngest first'),
+                                                       ('reputation', 'reputation'), ('clients', 'clients now'))
+                                    if (role == 'golfer' and k in ('rank', 'name', 'born'))
+                                    or (role in ('coach', 'caddie') and k != 'rank') or (role is None and k in ('name', 'born'))]))
     chunk, pager = paged(rows, q, path)
     if role in ('coach', 'caddie'):
-        clients = {}
-        if w.live:
-            for g, s in (w.live.coach_of if role == 'coach' else w.live.caddie_of).items():
-                clients[s] = clients.get(s, 0) + 1
         body = table(['Name', 'Nation', 'Born', 'Status', 'Reputation', 'Clients now', 'Also'], [
             [w.person_link(pid), nation_link(p.get('country')), esc(p.get('born')), esc(st),
              esc(p.get(role, {}).get('reputation', '')), str(clients.get(pid, 0)) if w.live else '',
@@ -830,9 +840,10 @@ def age_text(w, born, year=None):
 
 
 def money(x, known=True):
+    """Dollars, the world's one currency: $1,234,567 (-$1,234 below zero); unknown kept apart from zero."""
     if not known or x is None:
         return '<span class="muted" title="could not be reconciled with the money paid">unknown</span>'
-    return f'${x:,.0f}'
+    return f'-${-x:,.0f}' if x < 0 else f'${x:,.0f}'
 
 
 def results_link(pid, label, **filters):
@@ -850,6 +861,8 @@ def golfer(w, q, pid):
     tab = one(q, 'tab', 'playing' if 'golfer' in roles else 'coaching' if 'coach' in roles else 'caddying')
     tabs = [('playing', 'Playing career', 'golfer'), ('results', 'Results', 'golfer'), ('team', 'Coaches & caddies', 'golfer'),
             ('coaching', 'Coaching', 'coach'), ('caddying', 'Caddying', 'caddie')]
+    if tab == 'season':
+        tabs.insert(1, ('season', f'Season {esc(one(q, "year", ""))}', 'golfer'))
     out = []
     a = w.a
     initial = a and pid in a.people and a.people[pid].get('initial')
@@ -864,26 +877,26 @@ def golfer(w, q, pid):
     gs = p.get('golfer')
     if gs and w.live and pid in w.live.people:
         coach, caddie = w.live.coach_of.get(pid), w.live.caddie_of.get(pid)
-        out.append(f'<p>Now: {esc(gs.get("status"))}, {esc(gs.get("lifestyle"))}, {tour_link(w, gs.get("tour"))}'
-                   + (f', world No. {w.live.wr[pid]}' if pid in w.live.wr else '')
-                   + (f' · coach {w.person_link(coach)}' if coach else '') + (f' · caddie {w.person_link(caddie)}' if caddie else '')
-                   + '</p>')
+        now = [f'world No. {w.live.wr[pid]}'] if pid in w.live.wr else []
+        now += ([f'coach {w.person_link(coach)}'] if coach else []) + ([f'caddie {w.person_link(caddie)}'] if caddie else [])
+        if now:
+            out.append('<p>Now: ' + ' · '.join(now) + '</p>')
     out.append('<div class="tabs">' + ''.join(
-        f'<a href="/golfer/{pid}?tab={k}" class="{"on" if k == tab else ""}">{t}</a>' for k, t, r in tabs if r in roles) + '</div>')
+        f'<a href="/golfer/{pid}?tab={k}{"&year=" + quote(one(q, "year", "")) if k == "season" else ""}" '
+        f'class="{"on" if k == tab else ""}">{t}</a>' for k, t, r in tabs if r in roles) + '</div>')
     if tab == 'playing':
         out.append(_playing(w, q, pid, p))
-        if geo and geo['moves']:
-            out.append('<h2>Where they have lived</h2>' + table(['When', 'From', 'To', 'Why'], [
-                [esc(m['year']), esc(where(m['from'])), esc(where(m['to'])), esc(m['reason'])] for m in geo['moves']]))
+        out.append(OH.residence_section(w, pid, p, geo))
+    elif tab == 'season':
+        out.append(OH.season_view(w, q, pid, p))
     elif tab == 'results':
         out.append(_results(w, q, pid))
     elif tab == 'team':
-        out.append(_team(w, pid))
+        out.append(OH.team_history(w, pid))
     elif tab in ('coaching', 'caddying'):
         out.append(_staff(w, pid, 'coach' if tab == 'coaching' else 'caddie'))
-        if geo and geo['moves'] and 'golfer' not in roles:
-            out.append('<h2>Where they have lived</h2>' + table(['When', 'From', 'To', 'Why'], [
-                [esc(m['year']), esc(where(m['from'])), esc(where(m['to'])), esc(m['reason'])] for m in geo['moves']]))
+        if 'golfer' not in roles:
+            out.append(OH.residence_section(w, pid, p, geo))
     if a and a.index and tab == 'playing':
         moments_ = a.index.moments(person=pid)
         if moments_:
@@ -982,11 +995,21 @@ def _season_history(w, q, pid, p, rows):
     live_prize = w.live.prize.get(pid) if w.live else None
     live_rec = (w.live_statistics() or [None, {}])[1] if w.live else {}
     out = []
+    career = dict.fromkeys(OD.ST.COLUMNS, 0)
+    career_prize, prize_unknown = 0.0, False
+    by_tour = {}                                     # tour -> [stats, prize so far, all known]
+
+    def cells(y, t, agg, prize_cell):
+        link = lambda label, outcome=None: results_link(pid, label, year=y, tour=t, outcome=outcome)
+        cut = f'{agg["cuts_made"]}/{agg["cut_events"]}' if agg['cut_events'] else '—'
+        missed = link(str(agg['cut_events'] - agg['cuts_made']), 'missed-cut') if agg['cut_events'] else '—'
+        return [link(str(agg['starts'])), link(str(agg['wins']), 'win'), link(str(agg['runner_ups']), 'runner-up'),
+                link(str(agg['top2']), 'top2'), link(str(agg['top5']), 'top5'), link(str(agg['top10']), 'top10'),
+                cut, missed, prize_cell]
     for y in sorted(set(roll) | set(seasons)):
         r = roll.get(y, {'all': dict.fromkeys(OD.ST.COLUMNS, 0), 'tours': {}})
         info = seasons.get(y, {})
         live = y == cur_year
-        prize_known = True
         if live:
             prize = live_prize
         elif y in stored:
@@ -994,46 +1017,61 @@ def _season_history(w, q, pid, p, rows):
         else:
             prize = info.get('prize')
         a = r['all']
+        for c in OD.ST.COLUMNS:
+            career[c] += a[c]
+        if prize is None:
+            prize_unknown = prize_unknown or bool(a['starts'])
+        else:
+            career_prize += prize
         tours = sorted(r['tours'])
-
-        def cells(t, agg, prize_cell):
-            link = lambda label, outcome=None: results_link(pid, label, year=y, tour=t, outcome=outcome)
-            cut = (f'{agg["cuts_made"]}/{agg["cut_events"]}' if agg['cut_events'] else '—')
-            return [link(str(agg['starts'])), link(str(agg['wins']), 'win'), link(str(agg['runner_ups']), 'runner-up'),
-                    link(str(agg['top2']), 'top2'), link(str(agg['top5']), 'top5'), link(str(agg['top10']), 'top10'),
-                    cut, prize_cell]
-        label = f'{y}' + (' <span class="tag">so far</span>' if live else '')
+        label = (f'<a href="/golfer/{pid}?tab=season&year={y}" title="This season as it was">{y}</a>'
+                 + (' <span class="tag">so far</span>' if live else ''))
         tour_cell = ', '.join(tour_link(w, t) for t in tours if t) or (tour_link(w, info.get('tour')) if info.get('tour') else '—')
         out.append([label, age_text(w, born, y), tour_cell, esc(info.get('status') or (p.get('golfer') or {}).get('status')
                                                                 if live else info.get('status') or '')]
-                   + cells(None, a, money(prize) if prize is not None else '<span class="muted">—</span>')
+                   + cells(y, None, a, money(prize) if prize is not None else '<span class="muted">—</span>')
                    + [esc(info.get('wr_end') or (w.live.wr.get(pid) if live and w.live else '') or '—')])
-        if expand and len(tours) > 1:
-            for t in tours:
-                tp = None
-                known = False
-                if live:
-                    known = bool(live_rec.get(pid))
-                    tp = (w.live_statistics()[0].get((pid, t)) or {}).get('prize') if known else None
-                elif y in stored and t in stored[y]['tours']:
-                    tp = stored[y]['tours'][t]['prize']
-                    known = tp is not None
-                out.append(['', '', '&nbsp;&nbsp;↳ ' + tour_link(w, t), ''] + cells(t, r['tours'][t],
+        for t in tours:
+            tp, known = None, False
+            if live:
+                known = bool(live_rec.get(pid))
+                tp = (w.live_statistics()[0].get((pid, t)) or {}).get('prize') if known else None
+            elif y in stored and t in stored[y]['tours']:
+                tp = stored[y]['tours'][t]['prize']
+                known = tp is not None
+            bt = by_tour.setdefault(t, [dict.fromkeys(OD.ST.COLUMNS, 0), 0.0, True])
+            for c in OD.ST.COLUMNS:
+                bt[0][c] += r['tours'][t][c]
+            if known:
+                bt[1] += tp or 0.0
+            else:
+                bt[2] = False
+            if expand and len(tours) > 1:
+                out.append(['', '', '&nbsp;&nbsp;↳ ' + tour_link(w, t), ''] + cells(y, t, r['tours'][t],
                                                                                   money(tp, known) if db or live else '…')
                            + [''])
     if not out:
         return '<h2>Season by season</h2><p class="muted">No seasons played yet.</p>'
+    out.append(['<strong>Career</strong>', '', f'{len(by_tour)} tour{"s" if len(by_tour) != 1 else ""}', '']
+               + cells(None, None, career, money(career_prize, not prize_unknown)) + [''])
+    if expand:
+        for t, (agg, tp, known) in sorted(by_tour.items(), key=lambda x: (w.tours().get(x[0], {}).get('tier', 9), x[0])):
+            out.append(['', '', '&nbsp;&nbsp;career ↳ ' + tour_link(w, t), ''] + cells(None, t, agg, money(tp, known and bool(db or w.live)))
+                       + [''])
     toggle = (f'<a href="/golfer/{pid}?tab=playing">hide tours</a>' if expand else
               f'<a href="/golfer/{pid}?tab=playing&tours=1">show each tour</a>')
-    note = ('Starts exclude qualifying stages. Top 2/5/10 include wins (do not add them up); runner-up is a recorded '
-            'second place (ties included). Cuts: made / stroke-play events with a cut. Prize money is gross tournament '
-            'prize money; per tour it is recomputed from each event’s payouts and shown only where it matches the '
-            'money paid.')
+    note = ('Click a season to see it as it was (that season\'s tour, rights, ratings, team and decisions). Starts '
+            'exclude qualifying stages. Top 2/5/10 include wins (do not add them up); runner-up is a recorded second '
+            'place (ties included). Cuts: made / stroke-play events with a cut; missed cuts are the rest of those '
+            'events. Prize money is gross tournament prize money; per tour it is each event\'s recorded payout (or, for '
+            'seasons played before payouts were recorded, the payouts recomputed and shown only where they match the '
+            'money paid). The career row adds every season once; career by tour adds each tour\'s seasons.')
     if building and expand:
         note += f' Prize money by tour is being worked out ({building["done"]} of {building["total"]} seasons).'
     return (f'<h2>Season by season</h2><p>{toggle}</p>' + table(
         ['Season', 'Age*', 'Tour(s)', 'Status', 'Starts', 'Wins', 'Runner-up', 'Top 2', 'Top 5', 'Top 10', 'Cuts',
-         'Prize money', 'World (end)'], out, numeric=(1, 4, 5, 6, 7, 8, 9, 11, 12)) + f'<p class="muted">{note}</p>')
+         'Missed cuts', 'Prize money', 'World (end)'], out, numeric=(1, 4, 5, 6, 7, 8, 9, 11, 12, 13))
+        + f'<p class="muted">{note}</p>')
 
 
 def ST_person_seasons(db, pid):
@@ -1044,7 +1082,8 @@ def ST_person_seasons(db, pid):
 def _playing(w, q, pid, p):
     rows = OD.results(w, pid)
     active = (p.get('golfer') or {}).get('lifestyle') not in (None, 'retired')
-    out = [_ratings(w, pid, p), _honors(w, pid, rows, active), _season_history(w, q, pid, p, rows)]
+    out = [OH.status_section(w, pid, p), _ratings(w, pid, p), _honors(w, pid, rows, active),
+           OH.grand_slam_line(w, pid), _season_history(w, q, pid, p, rows)]
     wins = [r for r in rows if r['pos'] == 1 and not OD.is_qualifying(r)]
     if wins:
         out.append(f'<h2>Wins ({len(wins)})</h2>' + table(['Season', 'Event', 'Tour then'], [
@@ -1055,9 +1094,12 @@ def _playing(w, q, pid, p):
 def _results(w, q, pid):
     rows = OD.results(w, pid)
     year, tour, outcome, honor = one(q, 'year'), one(q, 'tour'), one(q, 'outcome'), one(q, 'honor')
+    sid = one(q, 'series')
     sel = rows
     if year:
         sel = [r for r in sel if str(r['year']) == year]
+    if sid:
+        sel = [r for r in sel if r['series'] == sid]
     if tour:
         sel = [r for r in sel if (r['tour'] or '') == tour]
     if outcome in OD.OUTCOMES:
@@ -1090,6 +1132,8 @@ def _results(w, q, pid):
     f = f.replace('<button>Apply</button>', '<input type="hidden" name="tab" value="results"><button>Apply</button>')
     if honor:
         f += f'<p>Honor: {esc(dict((k, l) for k, l, _ in OD.HONORS).get(honor, honor))} · <a href="/golfer/{pid}?tab=results">clear</a></p>'
+    if sid:
+        f += f'<p>Tournament: <a href="/series/{quote(sid)}">{esc(w.series_name(sid))}</a> · <a href="/golfer/{pid}?tab=results">clear</a></p>'
     return (f + f'<p>{len(sel):,} of {len(rows):,} starts (archived seasons and the current season; qualifying '
                 f'stages included here and marked).</p>' + table(
         ['Season', 'Week', 'Event', 'Tour then', 'Pos', 'Prize', 'Coach', 'Caddie', 'How they got in'],
@@ -1097,30 +1141,12 @@ def _results(w, q, pid):
                                                                           if OD.is_qualifying(r) else ''),
           tour_link(w, r['tour']), esc(r['pos'] or 'MC'),
           money(prizes[(r['event'], r['site'])]) if (r['event'], r['site']) in prizes else '<span class="muted">—</span>',
-          w.person_link(r['coach']), w.person_link(r['caddie']), f'<span class="muted">{esc(r["route"])}</span>']
+          w.person_link(r['coach']), w.person_link(r['caddie']), OH.route_html(r['route'])]
          for r in chunk], numeric=(0, 1, 4, 5)) + pager
-        + '<p class="muted">Prize: the start’s share of the purse, recomputed from the event’s finish and checked against '
-          'the money paid that season; “—” where that cannot be confirmed (or the statistics are still being built).</p>')
-
-
-def _team(w, pid):
-    out = []
-    if w.live and pid in w.live.people:
-        coach, caddie = w.live.coach_of.get(pid), w.live.caddie_of.get(pid)
-        out.append(f'<p>Now: coach {w.person_link(coach) if coach else "none"} · caddie '
-                   f'{w.person_link(caddie) if caddie else "none"}.</p>')
-    stints = w.a.golfer_staff(pid) if w.a else []
-    if stints:
-        through = w.a.years[-1]
-        out.append(f'<h2>Team history</h2><p class="muted">Stints as recorded at the end of {through}; changes since then '
-                   'show under "Now" and in each result\'s team.</p>' + table(
-                       ['Role', 'Who', 'From', 'To', 'Why it ended'],
-                       [[esc(s.kind), w.person_link(s.staff) if s.staff else esc(s.arrangement),
-                         when(s.start), when(s.end) if s.end else 'still together',
-                         esc(s.reason_end or '')] for s in stints]))
-    elif not w.a:
-        out.append('<p class="muted">Dated stints are archived at the end of the first season.</p>')
-    return ''.join(out) or '<p class="muted">No coaches or caddies recorded.</p>'
+        + '<p class="muted">Prize: the money paid for the start, as recorded (since rules 2026-10-30); for older seasons '
+          'the start’s share of the purse recomputed from the event’s finish and checked against the money paid that '
+          'season, “—” where that cannot be confirmed (or the statistics are still being built). How they got in: the '
+          'rule in words, linked to the rules page, with the code recorded at the time.</p>')
 
 
 def _staff(w, pid, role):
@@ -1220,13 +1246,31 @@ def event(w, q, eid):
     out.append('<p>' + ' · '.join(f'{course_link(w, c, lay)}, {esc(city)}' for c, lay, city in e['sites']) + '</p>')
     rows = e['rows']
     multi = len(e['sites']) > 1
-    out.append(table((['Site'] if multi else []) + ['Pos', 'Golfer', 'Total', 'Coach', 'Caddie', 'How they got in'], [
+    winners = [r for r in rows if r['pos'] == 1]
+    out.append(f'<p>Winner: {", ".join(w.person_link(r["person"]) for r in winners) or "—"} · field {len(rows):,} · '
+               f'{OH.rules_note(w, e["year"])}</p>')
+    view = one(q, 'view', 'final')
+    base = f'/event/{quote(eid)}'
+    out.append('<div class="tabs">' + ''.join(f'<a href="{base}?view={k}" class="{"on" if k == view else ""}">{esc(t)}</a>'
+                                              for k, t in (('final', 'Final result'), ('rounds', 'Rounds & replay')))
+               + '</div>')
+    if view == 'rounds':
+        out.append(OH.rounds_view(w, q, e))
+        return f'{eid.split(":")[0]} {e.get("name") or w.series_name(sid)}', ''.join(out)
+    prizes = {}
+    if any(r.get('prize') is not None for r in rows):
+        prizes = {(r['person'], r['site']): r['prize'] for r in rows if r.get('prize') is not None}
+    elif e.get('prizes'):
+        prizes = {(int(g), k): x for k, site in enumerate(e['prizes']) for g, x in site.items()}
+    out.append(table((['Site'] if multi else []) + ['Pos', 'Golfer', 'Total', 'Prize', 'Coach', 'Caddie', 'How they got in'], [
         ([esc(r['site'] + 1)] if multi else []) +
-        [esc(r['pos'] or 'MC'), w.person_link(r['person']), esc(r['total'] or ''), w.person_link(r['coach']),
-         w.person_link(r['caddie']), f'<span class="muted">{esc(r["route"])}</span>'] for r in rows],
-        numeric=(1, 3) if multi else (0, 2)))
+        [esc(r['pos'] or 'MC'), w.person_link(r['person']), esc(r['total'] or ''),
+         money(prizes.get((r['person'], r['site']), 0.0)) if prizes else '<span class="muted">not recorded</span>',
+         w.person_link(r['coach']), w.person_link(r['caddie']), OH.route_html(r['route'])] for r in rows],
+        numeric=(1, 3, 4) if multi else (0, 2, 3)))
     out.append('<p class="muted">Coach and caddie are the team that week. MC: missed the cut (or out before the '
-               'final stage).</p>')
+               'final stage). Prize: the money paid, as recorded (since rules 2026-10-30; amateurs are never paid); '
+               'earlier editions did not record it. How they got in: the rule in words with the recorded code.</p>')
     return f'{eid.split(":")[0]} {e.get("name") or w.series_name(sid)}', ''.join(out)
 
 
@@ -1238,9 +1282,21 @@ def series(w, q, sid):
             f'{esc(info.get("category"))}{shortlist_button(w, "series", sid)}</p>') if info else ''
     if not eds:
         return w.series_name(sid), head + '<p class="muted">No editions played yet.</p>'
-    return w.series_name(sid), head + table(['Edition', 'Week', 'Winner', 'Field', 'Tour then'], [
-        [event_link(w, e['event']), esc(e['week']), w.person_link(e['winner']), esc(e['field']), tour_link(w, e['tour'])]
-        for e in eds], numeric=(1, 3))
+    venues = {}
+    if w.a and w.a.index:
+        for eid, c, lay in w.a.index.db.execute('SELECT e.event_id, si.course, si.layout FROM sites si JOIN editions e '
+                                               'USING(eid) WHERE e.series = ?' + w.a.index.upto('e.year')
+                                               + ' ORDER BY si.site', (sid,)):
+            venues.setdefault(eid, []).append((c, lay))
+    if w.live:
+        for e in w.live.editions.values():
+            if e['series'] == sid:
+                venues[e['id']] = [(c, lay) for c, lay, _ in e['sites']]
+    return w.series_name(sid), head + OH.series_summary(w, sid) + '<h2>Every edition</h2>' + table(
+        ['Edition', 'Week', 'Winner', 'Field', 'Course', 'Tour then'], [
+            [event_link(w, e['event']), esc(e['week']), w.person_link(e['winner']), esc(e['field']),
+             ' · '.join(course_link(w, c, lay) for c, lay in venues.get(e['event'], [])) or '—', tour_link(w, e['tour'])]
+            for e in eds], numeric=(1, 3))
 
 
 def tournaments(w, q):
@@ -1333,6 +1389,7 @@ def course(w, q, cid):
                            f'{h} holes {m["score"]} ({m["to_par"]:+d}) by {w.person_link(m.get("golfer_id"))}, '
                            f'{event_link(w, m["event_id"])}' for h, m in sorted(totals.items(), key=lambda x: int(x[0])))
                        + '</p>')
+    out.append(OH.course_use(w, cid))
     eds = sorted(w.course_editions(cid), key=lambda e: (e['year'], e['event']), reverse=True)
     chunk, pager = paged(eds, q, f'/course/{quote(cid)}')
     out.append('<h2>Editions hosted</h2>' + (table(['Edition', 'Layout', 'Winner'], [
@@ -1450,13 +1507,9 @@ def season(w, q, y):
     y = int(y)
     if not w.a or y not in w.a.years:
         return str(y), '<p class="muted">This season is not archived (yet).</p>'
-    facts = w.a.recap(y)
-    top = w.a.ranking(y, 52)[:10]
-    return f'{y} season', ('<ul>' + ''.join(
-        f'<li>{esc(f["text"])}' + (f' — {w.person_link(f["golfer"])}' if f.get('golfer') else '') +
-        (f' — {event_link(w, f["event"])}' if f.get('event') else '') + '</li>' for f in facts) + '</ul>'
-        + '<h2>World ranking at the end of the season</h2>' + table(['#', 'Golfer'], [
-            [str(i), w.person_link(g)] for i, g in enumerate(top, 1)], numeric=(0,)))
+    nav = ' · '.join(x for x in (f'<a href="/season/{y - 1}">← {y - 1}</a>' if y - 1 in w.a.years else '',
+                                 f'<a href="/season/{y + 1}">{y + 1} →</a>' if y + 1 in w.a.years else '') if x)
+    return f'{y} season', (f'<p>{nav}</p>' if nav else '') + OH.recap(w, y)
 
 
 STAT_COLUMNS = (('starts', 'Starts', None), ('wins', 'Wins', 'win'), ('runner_ups', 'Runner-up', 'runner-up'),
@@ -1553,7 +1606,7 @@ SCOPED = {'most-wins', 'most-starts', 'not-won-yet', 'retired-without-a-win', 's
 
 
 def records(w, q):
-    first = ''.join(f'<li><a href="/records/{k}">{esc(BOARDS[k][0])}</a>'
+    first = '<li><a href="/grand-slam">Career Grand Slam</a> — winners of all four majors</li>' + ''.join(f'<li><a href="/records/{k}">{esc(BOARDS[k][0])}</a>'
                     + (' — <span class="muted">by tour: choose a tour on the list</span>' if k in SCOPED else '') + '</li>'
                     for k in FEATURED)
     rest = ''.join(f'<li><a href="/records/{k}">{esc(t)}</a></li>' for k, (t, _, _) in BOARDS.items() if k not in FEATURED)
@@ -1582,13 +1635,24 @@ def record(w, q, name):
                                                                 [(k, f'tour: {t}') for k, t in tours])])
         if scope:
             title += f' — {w.tours().get(scope, {}).get("name", scope)}'
-    flag = lambda r: ('<span class=tag>active</span> ' if r['active'] else '') + (
-        '<span class=tag>partial</span>' if r['partial'] else '')
-    return title, (f + f'<p class="muted">{span(w.a.years)}. Active = still competing (may change). '
-                   'Partial = began before the archive; earlier results are not included.</p>' + table(
-                       ['#', 'Golfer', 'Value', '', 'When', 'Evidence'],
-                       [[str(i), w.person_link(r['person']), esc(r['value']), flag(r), esc(r.get('year', '')),
-                         ', '.join(event_link(w, e) for e in r['evidence'][:3])] for i, r in enumerate(rows, 1)],
+    flag = lambda r: '<span class=tag>partial</span>' if r['partial'] else ''
+    context = OH.record_context(w, name, rows)
+    value = (lambda r: money(r['value'])) if name == 'most-prize' else (lambda r: esc(r['value']))
+    def evidence(r):
+        ev = r['evidence']
+        more = f' <span class="muted">+{len(ev) - 3} more</span>' if len(ev) > 3 else ''
+        return ', '.join(event_link(w, e) for e in ev[:3]) + more
+    unit = OH.UNITS.get(name)
+    return title, (f + f'<p class="muted">{span(w.a.years)}' + (f'. Counted in {esc(unit)}' if unit else '')
+                   + '. When: the date, or the first and latest dates, of the results behind the row. Now: whether the '
+                   'person is still pursuing it, as of the date in the header — currently extending (a streak still '
+                   'alive, world No. 1 now, a partnership still going), competing (can add to a count), fixed (a single '
+                   'result), or closed (retired). Partial = began before the archive; earlier results are not '
+                   'included.</p>' + table(
+                       ['#', 'Golfer', 'Value', '', 'When', 'Now', 'Evidence'],
+                       [[str(i), w.person_link(r['person']) + (f' · with {w.person_link(r["staff"])}' if r.get('staff') else ''),
+                         value(r), flag(r), when_, now, evidence(r)]
+                        for i, (r, (when_, now)) in enumerate(zip(rows, context), 1)],
                        numeric=(0, 2)) + ('' if rows else '<p class="muted">Nobody qualifies yet.</p>'))
 
 
@@ -1611,7 +1675,8 @@ ROUTES = [('/golfer/', golfer), ('/event/', event), ('/series/', series), ('/cou
 PAGES = {'/': overview, '/rankings': rankings, '/search': search, '/golfers': golfers, '/coaches': coaches,
          '/caddies': caddies, '/records': records, '/moments': moments, '/tournaments': tournaments,
          '/calendar': calendar, '/courses': courses_page, '/nations': nations, '/tours': tours_page, '/seasons': seasons,
-         '/stats': stats_page, '/money': money_page, '/shortlist': shortlist_page}
+         '/stats': stats_page, '/money': money_page, '/shortlist': shortlist_page, '/rules': OH.rules_page,
+         '/grand-slam': OH.grand_slam_page}
 
 
 def render(w, path, q):

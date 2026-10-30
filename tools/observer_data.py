@@ -33,17 +33,19 @@ OUTCOMES = {'win': lambda p: p == 1, 'runner-up': lambda p: p == 2, 'top2': lamb
 
 def results(w, pid):
     """Every start, oldest first, with the edition's classification when played:
-    [{year, week, event, series, name, tour, tier, category, pos, site, coach, caddie, route, live}]."""
+    [{year, week, event, series, name, tour, tier, category, pos, site, coach, caddie, route, prize, live}];
+    prize is the money recorded as paid for that start (None where it was not recorded)."""
     out = []
     a = w.a
     if a is not None and pid in a.people:
         idx = a.index
         if idx is not None:
+            prize = 's.prize' if getattr(idx, 'has_prize', False) else 'NULL'
             q = ('SELECT s.year, s.week, e.event_id, e.series, e.name, e.tour, e.tier, e.category, s.pos, s.site, s.coach, '
-                 's.caddie, r.text FROM starts s JOIN editions e USING(eid) LEFT JOIN routes r USING(rid) WHERE s.person = ?'
-                 + idx.upto('s.year') + ' ORDER BY s.year, s.week, e.event_id, s.site')
+                 f's.caddie, r.text, {prize} FROM starts s JOIN editions e USING(eid) LEFT JOIN routes r USING(rid) '
+                 'WHERE s.person = ?' + idx.upto('s.year') + ' ORDER BY s.year, s.week, e.event_id, s.site')
             keys = ('year', 'week', 'event', 'series', 'name', 'tour', 'tier', 'category', 'pos', 'site', 'coach',
-                    'caddie', 'route')
+                    'caddie', 'route', 'prize')
             out = [dict(zip(keys, r), live=False) for r in idx.db.execute(q, (pid,))]
         else:
             for y, e in a.events():
@@ -54,15 +56,26 @@ def results(w, pid):
                             out.append({'year': y, 'week': e['week'], 'event': e['id'], 'series': e['series'],
                                         'name': e.get('name'), 'tour': e.get('tour'), 'tier': e.get('tier'),
                                         'category': e.get('category'), 'pos': pos, 'site': k, 'coach': coach,
-                                        'caddie': caddie, 'route': e['routes'].get(str(pid)), 'live': False})
+                                        'caddie': caddie, 'route': e['routes'].get(str(pid)),
+                                        'prize': _recorded_prize(e, k, pid), 'live': False})
     if w.live is not None:
         for eid, k, pos in w.live.by_person.get(pid, ()):
             e = w.live.editions[eid]
             coach, caddie = e['team'].get(str(pid), (0, 0))
             out.append({'year': int(eid.split(':')[0]), 'week': e['week'], 'event': eid, 'series': e['series'],
                         'name': e['name'], 'tour': e['tour'], 'tier': e['tier'], 'category': e['category'], 'pos': pos,
-                        'site': k, 'coach': coach, 'caddie': caddie, 'route': e['routes'].get(str(pid)), 'live': True})
+                        'site': k, 'coach': coach, 'caddie': caddie, 'route': e['routes'].get(str(pid)),
+                        'prize': _recorded_prize(e, k, pid), 'live': True})
     return out
+
+
+def _recorded_prize(e, site, pid):
+    """The prize money an edition recorded as paid to one golfer at one site (0 for an unpaid start), or None
+    for an edition played before payouts were recorded."""
+    prizes = e.get('prizes')
+    if not prizes or site >= len(prizes):
+        return None
+    return prizes[site].get(str(pid), prizes[site].get(pid, 0.0))
 
 
 def is_qualifying(r):
@@ -70,7 +83,8 @@ def is_qualifying(r):
 
 
 def start_prizes(w, pid, rows, db=None):
-    """{(event, site): prize} for the given starts of one person where it is known: the event's payouts
+    """{(event, site): prize} for the given starts of one person where it is known: as recorded when paid
+    (since rules 2026-10-30); for older seasons, the event's payouts
     recomputed (observer_stats.payouts) from its recorded finish, the golfers' in-season statuses and its
     purse (as recorded when played, or the calendar's), only for person-seasons whose payouts reconcile with
     the money actually paid. Unknown starts are left out (shown as unknown, never as zero)."""
@@ -78,6 +92,9 @@ def start_prizes(w, pid, rows, db=None):
     live_rec = None
     for r in rows:
         key = (r['event'], r['site'])
+        if r.get('prize') is not None:                   # recorded when it was paid
+            out[key] = r['prize']
+            continue
         if r['live']:
             if live_rec is None:
                 live_rec = ST.live_tables(w.live)[1]
@@ -176,6 +193,21 @@ def cut_flags(w, rows, db=None):
     return rows
 
 
+def career_rows(w, pid):
+    """[(year, season row)] for a golfer's archived seasons, without decoding season files: the index's full
+    rows (schema 2 and later), else its short season rows (tour, status, lifestyle, starts, wins, prize, year-end
+    rankings) for an older index opened read-only -- whatever a row lacks shows as not recorded."""
+    a = w.a
+    if a is None or pid not in a.people:
+        return []
+    idx = a.index
+    if idx is None:
+        return a.playing_career(pid)
+    if idx.derived_complete(a.years):
+        return idx.career(pid)
+    return [(r['year'], r) for r in idx.seasons(pid)]
+
+
 def rating_snapshots(w, pid):
     """{year: [overall, attrs...]}: ratings at the start of each season (recorded when the season before it
     was archived), in the archive's rating_keys order."""
@@ -183,7 +215,7 @@ def rating_snapshots(w, pid):
     a = w.a
     if a is None or pid not in a.people or 'rating_keys' not in a.world:
         return out
-    for y, row in a.playing_career(pid):
+    for y, row in career_rows(w, pid):
         if row.get('ratings'):
             out[y + 1] = row['ratings']
     return out
