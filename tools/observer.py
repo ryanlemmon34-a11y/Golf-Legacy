@@ -46,6 +46,7 @@ from golfsim import scopes as SC                                      # noqa: E4
 import observer_spoilers as SP                                        # noqa: E402
 import observer_views as V                                            # noqa: E402
 import observer_cohort as OC                                          # noqa: E402
+import observer_compare as OCMP                                       # noqa: E402
 
 PAGE_SIZE = 100
 
@@ -952,6 +953,7 @@ def golfer(w, q, pid):
     out.append(f'<p class="lead">Age {age_text(w, p.get("born"))} · born {esc(p.get("born"))} · '
                f'{nation_link(p.get("country"))} · {esc(", ".join(roles))}'
                + (' · <span class="tag">career began before the archive</span>' if initial else '')
+               + (f' · <a href="/compare?ids={pid}">compare</a>' if 'golfer' in roles else '')
                + '</p>' + shortlist_button(w, 'person', pid))
     geo = w.geography(pid)
     if geo:
@@ -2009,7 +2011,8 @@ PAGES = {'/': overview, '/rankings': rankings, '/search': search, '/golfers': go
          '/calendar': calendar, '/courses': courses_page, '/nations': nations, '/tours': tours_page, '/seasons': seasons,
          '/stats': stats_page, '/money': money_page, '/shortlist': shortlist_page, '/my-world': shortlist_page,
          '/rules': OH.rules_page,
-         '/grand-slam': OH.grand_slam_page, '/views': V.views_page, '/cohort': OC.cohort_page}
+         '/grand-slam': OH.grand_slam_page, '/views': V.views_page, '/cohort': OC.cohort_page,
+         '/compare': OCMP.compare_page}
 
 
 def render(w, path, q):
