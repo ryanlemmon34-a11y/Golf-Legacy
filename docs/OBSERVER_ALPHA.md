@@ -21,19 +21,14 @@ history archive), `--worlds DIR` for another library folder, `--port`, `--worker
 
 The observer listens on 127.0.0.1 only (this computer). Worlds are folders in `worlds/` (not tracked by git).
 
-## Trying the v14 build (beside your playtest)
+## The v14 update (in main from 30 October 2026)
 
-The v14 build is on the GitHub branch **build/v14** (not main). Your playtest installation, its worlds and the
-paused world are not touched by it:
-
-1. On GitHub (Golf-Legacy), switch the branch selector to **build/v14**, then **Code → Download ZIP**.
-2. Unzip it into a **new folder** (for example `Golf Legacy v14`), not over your playtest folder.
-3. Double-click `RUN_OBSERVER_WINDOWS.bat` in that new folder. If the playtest observer is also running, this
-   one opens on the next free port (8766...).
-4. **Create** a world: the *Calendar* choice defaults to **Reference (majors weeks 15, 20, 25, 30)**; *Classic*
-   is the calendar your earlier worlds use, for comparison. A world keeps its calendar for good.
-5. Worlds from the playtest build open as "another engine" here: browse them read-only, or Copy with "continue
-   with this engine" (the copy keeps the classic calendar; the original is never changed).
+It changes the simulation (the reference calendar for new worlds, the performance work, the rights ledger and
+peak ratings), so every world made before it opens as "another engine": browse it read-only, or **Copy** it
+with "continue with this engine" (the copy keeps the classic calendar; the original is never changed). New
+worlds choose a *Calendar* when created: **Reference (majors weeks 15, 20, 25, 30)** by default, or *Classic*
+(the calendar earlier worlds use). A world keeps its calendar for good. If a long run is still going in your
+current folder, install the update in a separate folder until it finishes. What is new: `docs/V14_BUILD_REPORT.md`.
 
 ## Updating to a new version
 

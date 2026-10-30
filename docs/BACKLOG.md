@@ -33,7 +33,7 @@ requirements are unchanged; no new long run, spending or calibration change is a
 
 ## Roadmap v14 build (branch build/v14; report `docs/V14_BUILD_REPORT.md`)
 
-Delivered for review (not merged into the playtest build): playoff display and per-site playoff evidence; the
+Delivered and merged into `main` (30 October 2026, owner's decision): playoff display and per-site playoff evidence; the
 multi-cause "no starts" ledger and the full-time amateur investigation (`docs/ZERO_START_REVIEW.md`); the Majors +
 Premier scope; Overall sorting on Stats and Recorded Peak Overall; the spoiler-safe workflow (Hide results, Watch
 from round 1, Reveal final); the reference calendar v2 for new worlds with its qualification rework

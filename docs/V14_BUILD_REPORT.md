@@ -3,7 +3,7 @@
 **Build**: branch `build/v14` (GitHub: Golf-Legacy), engine and observer code as of commit `1023dc5` (the commits
 after it change only documentation and one test). It starts from the playtest build `7d8e6ed` (branch `main`, unchanged) and
 includes the performance branch `perf/season-speed` (outcome-identical changes, reviewed separately in
-`docs/PERFORMANCE_REVIEW.md`). Nothing was merged into `main`; the paused world, the playtest installation and
+`docs/PERFORMANCE_REVIEW.md`). Merged into `main` at the owner's request on 30 October 2026 (before that, `main` was `7d8e6ed`); the paused world, the playtest installation and
 every save were left alone; no long simulation was run; nothing was bought or sent anywhere.
 
 ## Status
@@ -46,12 +46,11 @@ every save were left alone; no long simulation was run; nothing was bought or se
 - The **performance options** in `docs/PERFORMANCE_REVIEW.md`: per-golfer random streams (a new engine for new
   worlds), incremental checkpoints, or declaring outcome-equivalent engines.
 - Whether the **Kenya Open effect** under v2 is acceptable (see Known risks).
-- Whether to **merge** this build (or only the performance branch) into `main` after your review.
 
 ## How to try it (Windows)
 
-1. GitHub → Golf-Legacy → branch **build/v14** → **Code → Download ZIP**; unzip into a **new folder** (not your
-   playtest folder).
+1. GitHub → Golf-Legacy → branch **main** → **Code → Download ZIP**; unzip into a **new folder** if a long run
+   is still going in your current one (otherwise update as usual: `docs/OBSERVER_ALPHA.md`).
 2. Double-click `RUN_OBSERVER_WINDOWS.bat` there (if the playtest observer is running too, this one opens on the
    next free port).
 3. **Create** a world; *Calendar* defaults to **Reference**. Your earlier worlds open as "another engine":
