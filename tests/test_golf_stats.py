@@ -119,6 +119,35 @@ class CountingTests(unittest.TestCase):
         self.assertIsNone(GS.metric('gir', a))                              # no holes: N/A, not 0%
         self.assertEqual(GS.fmt('gir', None), 'N/A')
 
+    def test_qualified_driving_averages_are_filtered_before_they_are_limited(self):
+        """150 longer averages from too few drives must not push a qualified performance off the record list."""
+        def counters(tenths, drives):
+            c = GS.empty() + [0, 0, 0]
+            c[GS.IDX['drive_tenths']], c[GS.IDX['drives']] = tenths, drives
+            return c
+        base = {'tier': 4, 'tour': 'MN_TEST', 'series': 'S', 'category': 'regular', 'kind': 'pro', 'rounds': 2,
+                'match_play': False, 'playoff': 0}
+        events = [dict(base, id=f'2030:E{i}', week=i % 50 + 1, finish=[[(100 + i, 1, 140)]],
+                       golf=[{str(100 + i): counters(9 * (3300 + i), 9)}]) for i in range(150)]
+        events.append(dict(base, id='2030:Q', week=7, finish=[[(1, 1, 140)]], golf=[{'1': counters(25 * 3100, 25)}]))
+        _, avgs, _, _ = ST.season_records(events, 2030)
+        tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, tmp, True)
+        store = ST.StatsStore(tmp / 's.sqlite')
+        store.put(2030, 'x', {}, {}, {}, {}, (), ((), avgs, (), ()))
+        q = ('SELECT person, drives FROM event_drives WHERE tier = ? ORDER BY CAST(tenths AS REAL) / drives DESC, '
+             'person LIMIT 100')
+        self.assertEqual(store.db.execute(q, (20,)).fetchall(), [(1, 25)])   # the qualified leader is kept
+        self.assertEqual(len(store.db.execute(q, (8,)).fetchall()), 100)      # (8 drives: the 100 short samples)
+        self.assertNotIn((1, 25), store.db.execute(q, (8,)).fetchall())
+        store.db.execute("UPDATE meta SET value = '2' WHERE key = 'schema'")    # an older store is rebuilt
+        store.db.commit()
+        store.close()
+        again = ST.StatsStore(tmp / 's.sqlite')
+        self.assertEqual(again.db.execute('SELECT COUNT(*) FROM event_drives').fetchone()[0], 0)
+        self.assertEqual(again.sources(), {})
+        again.close()
+
     def test_winning_margins_and_match_results(self):
         base = {'tier': 1, 'tour': 'PT_AMERICAS', 'series': 'S', 'week': 5, 'category': 'regular', 'kind': 'pro',
                 'rounds': 4, 'match_play': False}

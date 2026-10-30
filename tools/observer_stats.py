@@ -43,12 +43,14 @@ sys.path.insert(0, str(ROOT))
 
 from golfsim import golfstats as GS                                      # noqa: E402
 
-SCHEMA = 2
+SCHEMA = 3
 COLUMNS = ('starts', 'wins', 'runner_ups', 'top2', 'top5', 'top10', 'cut_events', 'cuts_made', 'qualifiers')
 GOLF = ('golf_starts',) + GS.FIELDS            # summed golf statistics counters (and the starts carrying them)
 ALL = COLUMNS + GOLF
 RECORD_KEEP = 100                              # longest drives / event driving averages kept per season and tour
-EVENT_MIN_DRIVES = 8                           # an event driving average is kept from this many measured drives
+EVENT_DRIVE_TIERS = (8, 20, 30, 40)            # event driving averages: the top RECORD_KEEP among the editions with
+EVENT_MIN_DRIVES = EVENT_DRIVE_TIERS[0]        # at least this many measured drives, kept for each tier (qualified
+                                               # before limited: a record list never loses a qualified leader)
 TABLES = ('agg', 'season_prize', 'money', 'staff_year', 'long_drives', 'event_drives', 'margins', 'matches')
 DDL = """
 CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT);
@@ -58,7 +60,8 @@ CREATE TABLE IF NOT EXISTS agg(person INT, year INT, tour TEXT, starts INT, wins
     f'{c} INT' for c in GOLF) + """, PRIMARY KEY(person, year, tour));
 CREATE TABLE IF NOT EXISTS long_drives(year INT, tour TEXT, person INT, event_id TEXT, week INT, tenths INT, round INT,
     hole INT);
-CREATE TABLE IF NOT EXISTS event_drives(year INT, tour TEXT, person INT, event_id TEXT, week INT, tenths INT, drives INT);
+CREATE TABLE IF NOT EXISTS event_drives(year INT, tour TEXT, person INT, event_id TEXT, week INT, tenths INT, drives INT,
+    tier INT);
 CREATE TABLE IF NOT EXISTS margins(year INT, tour TEXT, event_id TEXT, series TEXT, week INT, major INT, rounds INT,
     winner INT, win_total INT, runner_total INT, margin INT, runners_up TEXT, playoff INT, field INT);
 CREATE TABLE IF NOT EXISTS matches(year INT, tour TEXT, event_id TEXT, series TEXT, week INT, stage TEXT, winner INT,
@@ -222,7 +225,11 @@ def season_records(events, year):
                         win[0], win[1], runner, runner - win[1], json.dumps([g for g, t in rest if t == runner]),
                         e.get('playoff') or 0, len(site)))
     keep_long = [r for rows in longs.values() for r in sorted(rows, key=lambda r: (-r[5], r[2]))[:RECORD_KEEP]]
-    keep_avg = [r for rows in avgs.values() for r in sorted(rows, key=lambda r: (-r[5] / r[6], r[2]))[:RECORD_KEEP]]
+    keep_avg = []
+    for rows in avgs.values():
+        ranked = sorted(rows, key=lambda r: (-r[5] / r[6], r[2]))
+        for tier in EVENT_DRIVE_TIERS:                   # filter by the tier first, then keep its leaders
+            keep_avg += [r + (tier,) for r in [r for r in ranked if r[6] >= tier][:RECORD_KEEP]]
     return keep_long, keep_avg, margins, matches
 
 

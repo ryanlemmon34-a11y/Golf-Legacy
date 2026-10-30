@@ -386,16 +386,20 @@ def golf_record(w, q, name):
         head, numeric = ['#', 'Golfer', 'Yards', 'When', 'Event', 'Course', 'Round, hole', 'Now'], (0, 2)
         note = 'Each golfer\'s longest measured drive of an event: the first driver tee shot on a par 4 or 5, where it finished.'
     elif name == 'event-driving-average':
-        mn = _min(q, QUALIFY['event_drives'], _st().EVENT_MIN_DRIVES)
-        fields.append(('min', 'Measured drives at least', [(str(x), str(x)) for x in (QUALIFY['event_drives'], 30, 40, 8)]))
-        q_ = (f'SELECT person, year, event_id, week, tenths, drives FROM event_drives WHERE {where} AND drives >= ? '
+        tiers = _st().EVENT_DRIVE_TIERS
+        asked = _min(q, QUALIFY['event_drives'], tiers[0])
+        mn = max(t for t in tiers if t <= asked)               # the lists are kept for these thresholds
+        fields.append(('min', 'Measured drives at least', [(str(x), str(x)) for x in
+                                                           sorted(tiers, key=lambda t: (t != QUALIFY['event_drives'], t))]))
+        q_ = (f'SELECT person, year, event_id, week, tenths, drives FROM event_drives WHERE {where} AND tier = ? '
               'ORDER BY CAST(tenths AS REAL) / drives DESC, person LIMIT 100')
         for i, (pid, y, eid, wk, t, n) in enumerate(db.execute(q_, args + [mn]), 1):
             rows.append([str(i), w.person_link(pid), f'{t / 10 / n:.1f}', str(n), f'{y} wk {wk}', O.event_link(w, eid),
                          _venue(w, eid), 'fixed (one event)'])
         head, numeric = ['#', 'Golfer', 'Yards per drive', 'Drives', 'When', 'Event', 'Course', 'Now'], (0, 2, 3)
         note = (f'Qualified: at least {mn} measured drives in the edition (proposed: {QUALIFY["event_drives"]}, about two '
-                'rounds; the store keeps averages from 8 drives). Not the edition\'s longest single drive.')
+                f'rounds; lists are kept for {", ".join(map(str, tiers))} drives, each qualified before its leaders are '
+                'kept). Not the edition\'s longest single drive.')
     elif name in ('season-driving-average', 'career-driving-average'):
         season = name.startswith('season')
         key = 'season_drives' if season else 'career_drives'
