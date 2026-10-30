@@ -258,7 +258,7 @@ class StatsStore:
             self.db.executescript(DDL)
             have = None
         if have is None:
-            self.db.execute("INSERT INTO meta VALUES ('schema', ?)", (str(SCHEMA),))
+            self.db.execute("INSERT OR IGNORE INTO meta VALUES ('schema', ?)", (str(SCHEMA),))   # (two readers may open a new store at once)
         self.db.commit()
 
     def close(self):

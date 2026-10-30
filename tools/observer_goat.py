@@ -20,7 +20,7 @@ from urllib.parse import urlencode
 # name: (label, definition, source, scope note, default weight)
 COMPONENTS = {
     'majors': ('Majors', 'Major championships won', 'the editions (as the Career Grand Slam page)',
-               'majors only, whatever the scope; current season included; hidden results left out', 8.0),
+               'majors only, whatever the scope; current season included', 8.0),
     'wins': ('Wins', 'Events won', 'the Stats directory (statistics store)', 'the chosen scope; current season included',
              3.0),
     'top10': ('Top 10s', 'Top-10 finishes (wins included)', 'the Stats directory', 'the chosen scope', 0.5),
@@ -34,7 +34,7 @@ COMPONENTS = {
     'peak': ('Peak Overall', 'Recorded Peak Overall (the highest base Overall the engine noted)',
              'the current snapshot, else the last archived season', 'missing where not recorded', 0.0),
     'slam': ('Career Grand Slam', '1 if all four majors won, else 0', 'the Career Grand Slam page',
-             'hidden results left out', 10.0),
+             'every major recorded', 10.0),
 }
 FUNCS = {'min': min, 'max': max, 'sqrt': math.sqrt, 'log': math.log}
 OPS = {ast.Add: operator.add, ast.Sub: operator.sub, ast.Mult: operator.mul, ast.Div: operator.truediv,
@@ -181,7 +181,6 @@ def _peaks(w):
 
 def goat_page(w, q):
     O = _o()
-    import observer_spoilers as SP
     from golfsim import scopes as SC
     if not w.a and w.live is None:
         return 'GOAT Lab', O.no_history()
@@ -245,7 +244,7 @@ def goat_page(w, q):
     how = (f'Score: <code>{O.esc(text)}</code>' if tree is not None else
            'Score: the weighted sum of the components (weight × value; the small figure under each value is its '
            'contribution)')
-    return 'GOAT Lab', (SP.aggregate_note(w, 'these career figures') + err + form
+    return 'GOAT Lab', (err + form
                         + f'<p>{how} · {SC.LABEL if scope else "all tours"} · {len(rows):,} careers · ties broken by '
                           'majors, then wins, then id.</p>' + note
                         + f'<div class="scroll"><table>{head}{"".join(body)}</table></div>' + pager

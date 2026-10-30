@@ -24,8 +24,14 @@ from golfsim.session import Session                                   # noqa: E4
 import observer as O                                                  # noqa: E402
 import observer_goat as G                                             # noqa: E402
 import observer_history as OH                                         # noqa: E402
-import observer_spoilers as SP                                        # noqa: E402
 import observer_stats as ST                                           # noqa: E402
+
+
+def plant_old_hiding(world_dir, since=(0, 0)):
+    """The removed Hide results setting as an earlier build wrote it (everything hidden, nothing revealed)."""
+    import json
+    (Path(world_dir) / 'observer_spoilers.json').write_text(json.dumps(
+        {'format': 'golf-legacy-spoilers/1', 'hide': True, 'from': list(since), 'revealed': {}}))
 
 
 class Formulas(unittest.TestCase):
@@ -68,9 +74,6 @@ class Lab(unittest.TestCase):
     def tearDownClass(cls):
         cls.w.close()
         shutil.rmtree(cls.tmp, ignore_errors=True)
-
-    def setUp(self):
-        SP.set_hide(self.w, False)
 
     def page(self, path):
         u = urlparse(path)
@@ -133,13 +136,17 @@ class Lab(unittest.TestCase):
             row = re.search(rf'<a href="/golfer/{p}">.*?</tr>', html, re.S).group(0)
             self.assertIn('missing:', row)
 
-    def test_hide_results(self):
+    def test_majors_and_slams_count_the_same_history_whatever_old_settings_say(self):
         vals, _ = G.careers(self.w, SC.MAJORS_PREMIER)
-        self.assertTrue(any(v['majors'] for v in vals.values()))
-        SP.set_hide(self.w, True, 'all')
-        hidden, _ = G.careers(self.w, SC.MAJORS_PREMIER)
-        self.assertFalse(any(v['majors'] or v['slam'] for v in hidden.values()))
-        self.assertIn('these career figures', self.page('/goat'))
+        plant_old_hiding(self.tmp / 'w')
+        self.addCleanup((self.tmp / 'w' / 'observer_spoilers.json').unlink)
+        again, _ = G.careers(self.w, SC.MAJORS_PREMIER)
+        self.assertEqual(again, vals)
+        idx = self.w.a.index                                            # every major in the history and this season
+        n = idx.db.execute("SELECT COUNT(*) FROM editions WHERE category = 'major' AND winner IS NOT NULL").fetchone()[0]
+        n += sum(1 for e in self.w.live.editions.values() if e.get('category') == 'major')
+        self.assertEqual(sum(v['majors'] for v in vals.values()), n)
+        self.assertGreater(n, 0)
 
 
 if __name__ == '__main__':

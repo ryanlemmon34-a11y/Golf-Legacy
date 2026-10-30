@@ -112,7 +112,6 @@ def _o():
 def qualification_page(w, q):
     O = _o()
     import observer_history as OH
-    import observer_spoilers as SP
     from golfsim import qualification as Q
     from golfsim import rules as R
     import golfsim.schedule as SCH
@@ -146,21 +145,12 @@ def qualification_page(w, q):
         out.append(OH.rights_section(w, year, major))
         return f'Qualification: {year} {name}', ''.join(out)
     wk = st['week']
-    hide = SP.state(w)['hide']
-    this_season = {r.code for r in rules[major] if any((x[0] == 'wins') or (x[0] not in ('standing', 'ranking', 'points', 'award')
-                                                                            and len(x) == 2 and x[1] == 0) for x in r.source)}
-    held = 0
     rows = []
     for gid, e in sorted(st['earned'].items(), key=lambda kv: (kv[1]['amateur'], [list(labels).index(c) for c in kv[1]['codes']], kv[0])):
-        if hide and all(c in this_season for c in e['codes']):
-            held += 1                                       # (would name a result of this season)
-            continue
         cats = '; '.join(f'{O.esc(labels.get(c, c))} <span class="tag">{O.esc(c)}</span>' for c in e['codes'])
         rows.append([w.person_link(gid), 'conditional (while an amateur)' if e['amateur'] else 'earned', cats])
     out.append(f'<h2>Earned and conditional places, as of week {wk}</h2>'
                + (O.table(['Golfer', 'Place', 'Categories'], rows) if rows else '<p class="muted">None yet.</p>')
-               + (f'<p class="muted">Hide results: {held} place{"s" if held != 1 else ""} earned by this season\'s '
-                  'results held back.</p>' if held else '')
                + '<p class="muted">Every category whose facts are known before this week, applied by the major\'s own '
                  'rules (one place per golfer however many categories support it). Conditional: an amateur\'s place, '
                  'which lapses on turning professional. A place earned in a qualifying event already played is '
@@ -183,8 +173,6 @@ def qualification_page(w, q):
     for code, lst in st['projected'].items():
         p = next(x for x in st['pending'] if x['code'] == code)
         for gid, rank in lst:
-            if hide:
-                continue
             proj.append([w.person_link(gid), str(rank), f'{O.esc(labels.get(code, code))} <span class="tag">{O.esc(code)}</span>',
                          O.esc(f'week {p["week"]}')])
     out.append('<h2>Projected (for information only)</h2><p class="muted"><strong>A projection is not a place.</strong> '
@@ -192,10 +180,9 @@ def qualification_page(w, q):
                f'(the latest list, after week {wk - 1}). The engine never uses a projection: the place is decided by the '
                'list published at the cut-off, and nobody loses a qualifying attempt because of one.</p>'
                + (O.table(['Golfer', 'Now', 'Cut-off', 'Published'], proj, numeric=(1,)) if proj else
-                  '<p class="muted">' + ('Hidden while results are hidden.' if hide and st['projected'] else
-                                         'No pending ranking or points cut-off this edition can be projected.') + '</p>'))
+                  '<p class="muted">No pending ranking or points cut-off this edition can be projected.</p>'))
     out.append(OH.rights_section(w, year, major))
-    return f'Qualification: {year} {name}', SP.aggregate_note(w, 'the rankings and places') + ''.join(out)
+    return f'Qualification: {year} {name}', ''.join(out)
 
 
 _STANDINGS = None

@@ -249,19 +249,17 @@ def status_section(w, pid, p):
             rows.append(('Level', O.esc(LEVELS.get(tier, '—'))))
         elif gs.get('status') == 'club_pro':
             rows.append(('Membership', 'club professional: the section events of their region'))
-    import observer_spoilers as SP
-    hw = SP.hidden_wins(w, pid)                         # (Hide results: lines naming a hidden win are blanked)
     if lv is not None:
         r = getattr(lv, 'rights', {}).get(pid)
         if r:
             rows.append(('Premier playing rights', f'{O.esc(r[0])} — {O.esc(r[1])} <a href="/rules#premier-rights">rule</a>'))
         e = getattr(lv, 'earned', {}).get(pid)
         if e:
-            rows.append(('Winner’s exemption', SP.redact(w, pid, f'{O.esc(e)}: exempt into Premier fields whatever the '
-                                                                 'membership <a href="/rules#winner-exemption">rule</a>', hw)))
+            rows.append(('Winner’s exemption', f'{O.esc(e)}: exempt into Premier fields whatever the membership '
+                                                '<a href="/rules#winner-exemption">rule</a>'))
         why = getattr(lv, 'card_reasons', {}).get(pid)
         if why:
-            rows.append(('Holds this card because', SP.redact(w, pid, O.esc(card_reason_text(why, tour)), hw)
+            rows.append(('Holds this card because', O.esc(card_reason_text(why, tour))
                          + f' <a href="/rules#{"premier-cards" if (tour or "").startswith("PT_") else "lower-cards"}">rules</a>'))
         col = getattr(lv, 'college', {}).get(pid) or []
         if tour and tour.startswith('CO_') and p.get('born'):
@@ -280,11 +278,9 @@ def status_changes(w, pid, cap=2):
     season (since rules 2026-10-30), and for a change of status or lifestyle the recorded decision."""
     O = _o()
     import observer_data as OD
-    import observer_spoilers as SP
     career = OD.career_rows(w, pid)
     if not career:
         return ''
-    hw = SP.hidden_wins(w, pid)                         # (Hide results: reasons naming a hidden win are blanked)
     states = [(y, _state(row), row) for y, row in career]
     now = None
     if w.live is not None and pid in w.live.people:
@@ -317,7 +313,7 @@ def status_changes(w, pid, cap=2):
             else:
                 why.append(f'<a href="/golfer/{pid}?tab=season&year={y}">see the {y} season</a>')
         rows.append([f'<a href="/golfer/{pid}?tab=season&year={y}">after {y}</a>', _describe_state(w, st),
-                     _describe_state(w, nxt), '<br>'.join(SP.redact(w, pid, x, hw) for x in why)])
+                     _describe_state(w, nxt), '<br>'.join(why)])
     if not rows:
         return '<p class="muted">No change of tour, status or lifestyle in the recorded seasons.</p>'
     return ('<h3>How their status changed</h3>' + O.table(['When', 'From', 'To', 'Why (as recorded)'], rows)
@@ -402,25 +398,11 @@ def season_view(w, q, pid, p):
         elif row.get('zero_start_reason'):
             facts.append(('No starts', O.esc(row['zero_start_reason'])))
     facts.append(('Rules', rules_note(w, y)))
-    import observer_spoilers as SP
-    if any(SP.hidden(w, r['event'], r['week']) for r in OD.results(w, pid) if r['year'] == y):
-        # Hide results: a line naming a hidden win is blanked; totals and rankings say what they include
-        hw = SP.hidden_wins(w, pid)
-        facts = [(k, SP.redact(w, pid, v, hw)) for k, v in facts]
-        facts = [(k, v + ' <span class="muted">(includes hidden results)</span>')
-                 if k.startswith(('Prize money', 'Season net', 'World ranking', 'Amateur ranking')) else (k, v)
-                 for k, v in facts]
     out.append('<dl class="kv">' + ''.join(f'<dt>{k}</dt><dd>{v}</dd>' for k, v in facts) + '</dl>')
     if row and row.get('access'):
         out.append(week_ledger(w, row, pid, y))
     # results that season
-    import observer_spoilers as SP
     rows = [r for r in OD.results(w, pid) if r['year'] == y]
-    held = [r for r in rows if SP.hidden(w, r['event'], r['week'])]
-    if held:                                           # Hide results: left out of the season's results here
-        rows = [r for r in rows if not SP.hidden(w, r['event'], r['week'])]
-        out.append(f'<p class="muted">Results are hidden: {len(held)} of this season\'s starts are left out below '
-                   '(their places would give the results away).</p>')
     db, _ = w.statistics()
     OD.cut_flags(w, rows, db)
     agg = OD.season_rollup(rows).get(y, {'all': dict.fromkeys(OD.ST.COLUMNS, 0)})['all']
@@ -604,17 +586,12 @@ def series_summary(w, sid):
     """A tournament's history in brief: editions, most-used courses, most wins, most starts, youngest and
     oldest winners -- every figure counted from its editions, with links to them."""
     O = _o()
-    import observer_spoilers as SP
     idx = w.a.index if w.a else None
     wins, starts, courses, winners = Counter(), Counter(), Counter(), []
     formats = set()
-    held = 0                                           # editions whose results are hidden (not counted below)
     if idx is not None:
         for eid, y, wk, winner in idx.db.execute('SELECT event_id, year, week, winner FROM editions WHERE series = ?'
                                                  + idx.upto(), (sid,)):
-            if SP.hidden(w, eid, wk):
-                held += 1
-                continue
             if winner:
                 wins[winner] += 1
                 winners.append((y, eid, winner))
@@ -629,9 +606,6 @@ def series_summary(w, sid):
             if e['series'] != sid:
                 continue
             formats.add((e.get('rounds'), bool(e.get('match_play'))))
-            if SP.hidden(w, e['id'], e['week']):
-                held += 1
-                continue
             win = next((g for g, pp, _ in (e['finish'][0] if e['finish'] else []) if pp == 1), None)
             if win:
                 wins[win] += 1
@@ -666,9 +640,7 @@ def series_summary(w, sid):
             f'{len(starts):,} golfers have played it · {sum(starts.values()):,} starts in all</p><div class="rgrid">' + ''.join(cards) + '</div>'
             + '<p class="muted">Counted over every edition played (series-wide), each edition once; a course hosting '
               'several sites of one edition counts once per site. Wins and starts link to the golfer\'s results in this '
-              f'tournament. * {O.AGE_NOTE}'
-            + (f' Results are hidden: {held} edition{"s" if held != 1 else ""} with hidden results '
-               f'{"are" if held != 1 else "is"} not counted in wins and winners.' if held else '') + '</p>')
+              f'tournament. * {O.AGE_NOTE}</p>')
 
 
 def course_use(w, cid):
@@ -793,29 +765,23 @@ def playoff_status(full, site, gid):
     return 'Lost playoff' + (f' (out at extra hole {max(out)})' if out else '')
 
 
-def rounds_view(w, q, e, hide=False):
-    """Round by round: the leaderboard after each round (a replay of the recorded rounds), each round's
-    conditions, and for majors each golfer's hole-by-hole scorecard. hide: results are hidden and this edition
-    is not revealed -- the final round shows the leaderboard after regulation, not who won a playoff, until the
-    final result is revealed; the round reached is remembered (observer_spoilers)."""
+def rounds_view(w, q, e):
+    """The replay of an edition's recorded rounds: the leaderboard after each round (nothing after the round shown:
+    no later rounds, final places or winner until the final round, which shows any playoff), each round's
+    conditions, and for majors each golfer's hole-by-hole scorecard."""
     O = _o()
-    import observer_spoilers as SP
     eid = e['id']
     full = full_edition(w, e)
     base = f'/event/{quote(eid)}'
     if not full or not full.get('scores'):
         return ('<p class="muted">Round scores were not recorded for this edition (played before rules 2026-10-30): '
-                'only final positions and totals are kept, and rounds are never reconstructed from a total.</p>'
-                + (f'<p>{SP.reveal_button(eid)}</p>' if hide else ''))
+                'only final positions and totals are kept, and rounds are never reconstructed from a total.</p>')
     site = int(O.one(q, 'site', '0') or 0)
     scores = full['scores'][site] if site < len(full['scores']) else {}
     n = max((len(v) for v in scores.values()), default=0)
     if not n:
-        return ('<p class="muted">No stroke-play rounds at this site (match play keeps final places only).</p>'
-                + (f'<p>{SP.reveal_button(eid)}</p>' if hide else ''))
-    k = max(1, min(n, int(O.one(q, 'round', '1') or 1)))    # a replay starts at round one: nothing ahead revealed
-    if hide:
-        SP.note_round(w, eid, k)                            # (the round reached, the same on every page)
+        return '<p class="muted">No stroke-play rounds at this site (match play keeps final places only).</p>'
+    k = max(1, min(n, int(O.one(q, 'round', '1') or 1)))    # a replay starts at round one: nothing ahead shown
     player = O.one(q, 'player')
     if player and full.get('holes'):
         return scorecard(w, full, int(player), base, k, n)
@@ -834,7 +800,7 @@ def rounds_view(w, q, e, hide=False):
     count = Counter(totals)
     cond = (full.get('conditions') or [None] * (site + 1))[site] if full.get('conditions') else None
     final = {r[0]: r for r in (full['finish'][site] if site < len(full['finish']) else [])}
-    step = lambda i: ('final round' if hide and i == n and k < n else f'after round {i}')
+    step = lambda i: f'after round {i}'
     steps = ' · '.join((f'<strong>{step(i)}</strong>' if i == k else f'<a href="{base}?{urlencode({"view": "rounds", "round": i, "site": site})}">{step(i)}</a>')
                        for i in range(1, n + 1))
     out = [f'<p><span class="tag">Replay</span> The recorded rounds, revealed one at a time: the event is already '
@@ -861,16 +827,13 @@ def rounds_view(w, q, e, hide=False):
         if k < n and len(rs) == k and len(rs) < n:
             status = '<span class="muted">missed the cut after this round</span>'
         fin = final.get(g)
-        if k == n and not hide:
+        if k == n:
             status = playoff_status(full, site, g) or (f'final {fin[1]}' if fin and fin[1] is not None
                                                          and fin[1] != pos else status)
         rows.append([label, name] + [str(x) for x in rs[:k]] + [str(t), f'{t - k * par:+d}' if par else '—', status])
     out.append(O.table(['Pos', 'Golfer'] + [f'R{i}' for i in range(1, k + 1)] + ['Total', 'To par', ''], rows,
                        numeric=tuple(range(2, 2 + k + 2))))
-    if k == n and hide:
-        out.append(f'<p>After regulation. Any playoff, the winner and the final places are hidden: '
-                   f'{SP.reveal_button(eid)}</p>')
-    elif k == n:
+    if k == n:
         out.append(playoff_lines(w, full, site, par))
     out.append('<p class="muted">Positions after a round are by total so far (ties share a place, “T”); nothing after the '
                'round shown is revealed (no final places, winner or later rounds) until the final round, where any '
@@ -1047,10 +1010,8 @@ def _together_now(w, name, r):
 
 
 # ---- Career Grand Slam ------------------------------------------------------------------------------------------
-def major_wins(w, include_hidden=False):
-    """[(year, week, event id, series, winner)] of every major, oldest first (archive and current season); a major
-    whose result is hidden (Hide results) is left out unless include_hidden."""
-    import observer_spoilers as SP
+def major_wins(w):
+    """[(year, week, event id, series, winner)] of every major, oldest first (archive and current season)."""
     out = []
     idx = w.a.index if w.a else None
     if idx is not None:
@@ -1069,8 +1030,6 @@ def major_wins(w, include_hidden=False):
                 win = next((g for g, p, _ in (e['finish'][0] if e['finish'] else []) if p == 1), None)
                 if win:
                     out.append((int(e['id'].split(':')[0]), e['week'], e['id'], e['series'], win))
-    if not include_hidden and SP.state(w)['hide']:
-        out = [r for r in out if not SP.hidden(w, r[2], r[1])]
     return sorted(out)
 
 
@@ -1132,14 +1091,8 @@ def recap(w, y):
     O = _o()
     a = w.a
     idx = a.index
-    import observer_spoilers as SP
     out = [f'<p>{rules_note(w, y)} <a href="/seasons">All seasons</a></p>']
     facts = a.recap(y)
-    held = [f for f in facts if f.get('event') and SP.hidden(w, f['event'])]   # results hidden: left out
-    facts = [f for f in facts if f not in held]
-    if held:
-        out.append(f'<p class="muted">Results are hidden: {len(held)} of this season\'s headline results (majors '
-                   'and other wins) are left out until revealed.</p>')
     majors = [f for f in facts if f.get('fact') == 'major']
     if majors:
         out.append('<h2>Majors</h2>' + O.table(['Major', 'Champion', 'Coach', 'Caddie'], [
@@ -1151,12 +1104,9 @@ def recap(w, y):
             f'<li>{O.esc(f["text"])}' + (f' (<a href="/golfer/{f["golfer"]}">profile</a>)' if f.get('golfer') else '')
             + '</li>' for f in others) + '</ul>')
     if idx is not None:
-        wins = Counter()                                 # (hidden editions' winners not counted)
-        for g, eid, wk in idx.db.execute('SELECT s.person, e.event_id, e.week FROM starts s JOIN editions e USING(eid) '
-                                         'WHERE e.year = ? AND s.pos = 1 AND e.tier BETWEEN 0 AND 4', (y,)):
-            if not SP.hidden(w, eid, wk):
-                wins[g] += 1
-        top = sorted(wins.items(), key=lambda x: (-x[1], x[0]))[:8]
+        top = list(idx.db.execute('SELECT s.person, COUNT(*) FROM starts s JOIN editions e USING(eid) WHERE e.year = ? '
+                                  'AND s.pos = 1 AND e.tier BETWEEN 0 AND 4 GROUP BY s.person ORDER BY 2 DESC, s.person '
+                                  'LIMIT 8', (y,)))
         if top:
             out.append('<h2>Most professional wins</h2>' + O.table(['Golfer', 'Wins'], [
                 [w.person_link(g), O.results_link(g, str(n), year=y, outcome='win')] for g, n in top], numeric=(1,)))
@@ -1201,7 +1151,7 @@ def recap(w, y):
         out.append('<h2>Career Grand Slams completed</h2><ul>' + ''.join(
             f'<li>{w.person_link(pid)} at the {O.event_link(w, eid)}</li>' for pid, (_, eid) in slams) + '</ul>')
     if idx is not None:
-        ms = [m for m in a.moments(year=y) if not (m.get('event') and SP.hidden(w, m['event'], m.get('week')))]
+        ms = a.moments(year=y)
         kinds = Counter(m['kind'] for m in ms)
         crs = [m for m in ms if m['kind'] == 'course record']
         if ms:

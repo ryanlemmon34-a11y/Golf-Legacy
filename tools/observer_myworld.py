@@ -11,9 +11,11 @@ worded, since you last marked it read (or over a window you choose):
 * a followed tournament's or tour's editions played (with their winners); a course's editions and course records
   set there; a nation's golfers' wins in majors and Premier events; a followed edition once played.
 
-Hide results: an item that would name the result of a hidden edition is held back (counted, with a link to
-watch it); nothing else changes. There are no pop-ups or banners: the menu shows a quiet count of new items.
-Nothing here is simulation state: the groups and the "read up to" week live in the shortlist file.
+Every recorded result is included. Earlier builds had a "Hide results" setting that held back items naming a
+hidden result; if this world used it, items dated after the hiding began and before the digest was last marked
+read may never have been shown: a one-line notice offers that period to review (the read marker is not moved,
+and nothing is shown twice in the unread count). There are no pop-ups or banners: the menu shows a quiet count
+of new items. Nothing here is simulation state: the groups and the "read up to" week live in the shortlist file.
 """
 from __future__ import annotations
 
@@ -39,11 +41,22 @@ def now(w):
     return (w.a.years[-1], 52) if w.a else (0, 0)
 
 
+def _yw(text):
+    """'2030.17' -> (2030, 17), or None."""
+    try:
+        y, wk = (int(x) for x in str(text).split('.'))
+        return (y, wk)
+    except (TypeError, ValueError):
+        return None
+
+
 def window_start(w, q, seen):
     """(year, week) after which items count, and the window's label."""
     O = _o()
     win = O.one(q, 'since', 'new') or 'new'
     y, wk = now(w)
+    if _yw(win):
+        return _yw(win), 'the period chosen', win
     if win == 'season':
         return (y, 0), WINDOWS[win], win
     if win.isdigit():
@@ -67,19 +80,15 @@ def _ed_info(w, eid, cache):
     return cache[eid]
 
 
-def digest(w, items, start):
-    """([(year, week, kind, html)], held): recorded facts for the followed items after `start`, newest first,
-    and how many were held back by Hide results."""
-    import observer_spoilers as SP
+def digest(w, items, start, until=None):
+    """[(year, week, kind, html)]: recorded facts for the followed items after `start` (and up to `until`, when
+    given), newest first."""
     O = _o()
-    out, held, cache = [], [0], {}
-    hidden = lambda eid, wk: SP.hidden(w, eid, wk)
+    out, cache = [], {}
 
     def add(y, wk, kind, html, eid=None):
-        if eid and hidden(eid, wk):
-            held[0] += 1
-            return
-        out.append((y, wk or 0, kind, html))
+        if until is None or (y, wk or 0) <= tuple(until):
+            out.append((y, wk or 0, kind, html))
     by = defaultdict(list)
     for kind, ident, *_ in items:
         by[kind].append(ident)
@@ -139,7 +148,7 @@ def digest(w, items, start):
         if x[3] not in seen:
             seen.add(x[3])
             uniq.append(x)
-    return uniq, held[0]
+    return uniq
 
 
 def _status_changes(w, pid, start, add):
@@ -228,6 +237,43 @@ def _nation_wins(w, code, start):
     return out
 
 
+OLD_SPOILERS = 'observer_spoilers.json'          # (the removed Hide results setting, from earlier builds)
+
+
+def hidden_period(w, seen):
+    """((year, week), (year, week)) when the digest may have been marked read while the removed Hide results setting
+    held items back: from when hiding began (the old setting's boundary) to the read marker. None when the world
+    never used it, the digest was never marked read inside that period, or the notice was dismissed. The old setting
+    is only read, never applied."""
+    import json
+    O = _o()
+    if w is None or w.read_only or not seen:
+        return None
+    try:
+        old = json.loads((w.path / OLD_SPOILERS).read_text())
+    except (OSError, ValueError):
+        return None
+    since = old.get('from') if isinstance(old, dict) else None
+    if not since or O.shortlist_flags(w).get('hidden_period_dismissed'):
+        return None
+    start = tuple(since) if tuple(since) != (0, 0) else ((min(w.a.years) if w.a else now(w)[0]), 0)
+    if tuple(seen) <= start:
+        return None
+    return start, tuple(seen)
+
+
+def _hidden_period_notice(w, seen):
+    O = _o()
+    got = hidden_period(w, seen)
+    if got is None:
+        return ''
+    (a, b), (c, d) = got
+    return (f'<p class="notice">An earlier version could hide results, and this world used it: items from {a} week {b} '
+            f'to {c} week {d} (when you last marked this digest read) may not have been shown. '
+            f'<a href="/my-world?since={a}.{b}&amp;until={c}.{d}">Review that period</a> '
+            '<form method="post" action="/my-world/dismiss" class="inline"><button>Dismiss</button></form></p>')
+
+
 def new_count(w):
     """How many digest items are new since last read (for the menu; 0 when nothing is followed)."""
     O = _o()
@@ -236,7 +282,7 @@ def new_count(w):
         return 0
     seen = O.shortlist_seen(w)
     try:
-        got, _ = digest(w, items, tuple(seen) if seen else (now(w)[0], 0))
+        got = digest(w, items, tuple(seen) if seen else (now(w)[0], 0))
     except Exception:                                    # (a count only: never stop a page over it)
         return 0
     return len(got)
@@ -256,17 +302,17 @@ def page(w, q):
     if not items:
         return 'My World', ('<p class="muted">Nothing followed yet: use ☆ Shortlist on a person, course, nation, tour, '
                             'tournament or edition. Everything shortlisted is followed here.</p>')
-    got, held = digest(w, items, start)
+    until = _yw(O.one(q, 'until'))
+    got = digest(w, items, start, until)
     y, wk = now(w)
+    if until:
+        y, wk = until
     tabs = '<div class="tabs">' + ''.join(
         f'<a href="/my-world?since={k}" class="{"on" if k == win else ""}">{O.esc(v)}</a>' for k, v in WINDOWS.items()) + '</div>'
     mark = ('<form method="post" action="/my-world/read" class="inline"><button>Mark all as read</button></form>'
             if got and win == 'new' else '')
-    out.append('<h2>Digest</h2>' + tabs + f'<p>{len(got):,} recorded item{"s" if len(got) != 1 else ""} {O.esc(label)} '
+    out.append('<h2>Digest</h2>' + _hidden_period_notice(w, seen) + tabs + f'<p>{len(got):,} recorded item{"s" if len(got) != 1 else ""} {O.esc(label)} '
                f'(after {start[0]} week {start[1]}; up to {y} week {wk}){mark}</p>')
-    if held:
-        out.append(f'<p class="muted">Hide results: {held} item{"s" if held != 1 else ""} naming a hidden result held back '
-                   '(open the event to watch it; revealed results appear here).</p>')
     if got:
         out.append(O.table(['Season', 'Week', 'What'], [[str(a), str(b) if b else '—', h] for a, b, _, h in got[:LIMIT]],
                            numeric=(0, 1))

@@ -22,7 +22,13 @@ import observer as O                                                  # noqa: E4
 import observer_compare as C                                          # noqa: E402
 import observer_data as OD                                            # noqa: E402
 import observer_history as OH                                         # noqa: E402
-import observer_spoilers as SP                                        # noqa: E402
+
+
+def plant_old_hiding(world_dir, since=(0, 0)):
+    """The removed Hide results setting as an earlier build wrote it (everything hidden, nothing revealed)."""
+    import json
+    (Path(world_dir) / 'observer_spoilers.json').write_text(json.dumps(
+        {'format': 'golf-legacy-spoilers/1', 'hide': True, 'from': list(since), 'revealed': {}}))
 
 
 class Compare(unittest.TestCase):
@@ -37,15 +43,12 @@ class Compare(unittest.TestCase):
         lv = cls.w.live
         ranked = sorted(lv.wr, key=lv.wr.get)
         cls.a, cls.b = ranked[0], ranked[1]
-        cls.champ = next((m[4] for m in OH.major_wins(cls.w, include_hidden=True)), cls.a)
+        cls.champ = next((m[4] for m in OH.major_wins(cls.w)), cls.a)
 
     @classmethod
     def tearDownClass(cls):
         cls.w.close()
         shutil.rmtree(cls.tmp, ignore_errors=True)
-
-    def setUp(self):
-        SP.set_hide(self.w, False)
 
     def page(self, path):
         u = urlparse(path)
@@ -97,14 +100,13 @@ class Compare(unittest.TestCase):
         self.assertTrue('before the world’s records' in same or 'no season recorded' in same
                         or len({self.w.person(p)['born'] for p in (self.a, self.b)}) == 1)
 
-    def test_hidden_majors_are_not_counted(self):
+    def test_every_major_counts_whatever_old_settings_say(self):
+        plant_old_hiding(self.tmp / 'w')
+        self.addCleanup((self.tmp / 'w' / 'observer_spoilers.json').unlink)
         html = self.page(f'/compare?ids={self.champ}')
-        n = int(self.cells(html, 'Majors')[0])
-        self.assertGreater(n, 0)
-        SP.set_hide(self.w, True, 'all')
-        hidden = self.page(f'/compare?ids={self.champ}')
-        self.assertEqual(int(self.cells(hidden, 'Majors')[0]), 0)
-        self.assertIn('these career figures', hidden)
+        self.assertEqual(int(self.cells(html, 'Majors')[0]), sum(1 for m in OH.major_wins(self.w) if m[4] == self.champ))
+        self.assertGreater(int(self.cells(html, 'Majors')[0]), 0)
+        self.assertNotIn('hidden', html.lower().replace('type="hidden"', ''))
 
     def test_choosing_golfers(self):
         name = self.w.live.people[self.b]['name'].split()[-1]

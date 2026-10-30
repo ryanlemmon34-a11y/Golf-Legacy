@@ -665,13 +665,15 @@ def make_handler(app):
                         notice = ('warn', 'Open a world (not only its history) to keep a shortlist.')
                     ref = self.headers.get('Referer') or ''
                     to = (urlparse(ref).path + ('?' + urlparse(ref).query if urlparse(ref).query else '')) if ref else '/shortlist'
-                elif u.path in ('/shortlist/group', '/my-world/read'):          # My World (browsing state only)
+                elif u.path in ('/shortlist/group', '/my-world/read', '/my-world/dismiss'):   # My World (browsing only)
                     w = app.world
                     to = '/my-world'
                     if w is None or w.read_only:
                         notice = ('warn', 'Open a world (not only its history) to follow people and events.')
                     elif u.path == '/my-world/read':
                         app.renderer.call(O.mark_read, w)
+                    elif u.path == '/my-world/dismiss':
+                        app.renderer.call(O.dismiss_hidden_period, w)
                     else:
                         app.renderer.call(O.set_shortlist, w, O.one(form, 'kind'), O.one(form, 'id'), True,
                                           O.one(form, 'group') or '')
@@ -690,18 +692,6 @@ def make_handler(app):
                         notice = ('ok', 'View saved.') if ok else ('warn', 'Only a list page’s view can be saved.')
                     else:
                         app.renderer.call(O.V.remove, w, O.one(form, 'id'))
-                elif u.path == '/spoilers':                # Hide results / Show results / Reveal final result
-                    w = app.world
-                    ref = self.headers.get('Referer') or ''
-                    to = (urlparse(ref).path + ('?' + urlparse(ref).query if urlparse(ref).query else '')) if ref else '/'
-                    if w is None:
-                        notice = ('warn', 'Open a world first.')
-                    elif O.one(form, 'reveal'):
-                        eid = O.one(form, 'reveal')
-                        app.renderer.call(O.SP.reveal, w, eid)
-                        to = f'/event/{quote(eid)}?view=final'
-                    else:
-                        app.renderer.call(O.SP.set_hide, w, O.one(form, 'hide') == '1', O.one(form, 'from') or 'season')
                 elif u.path == '/worlds/unlock':
                     notice, to = app.unlock(form), '/worlds'
                 elif u.path == '/worlds/close':

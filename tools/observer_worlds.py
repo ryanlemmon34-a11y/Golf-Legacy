@@ -316,8 +316,7 @@ def export_diagnostic(src, out_dir, note='', steps='', expected='', include_inde
                 for d in sorted(src.glob('gen_[0-9]*')):
                     if d.is_dir() and d != g and not d.name.endswith('.tmp'):
                         entries += [(p.relative_to(src).as_posix(), p, False) for p in sorted(d.rglob('*')) if p.is_file()]
-            for name in (J.LOG_FILE, J.JOB_FILE, ENGINE_ACCEPTED, WORLD_INFO, 'observer_shortlist.json', 'observer_spoilers.json',
-                         'observer_views.json'):
+            for name in (J.LOG_FILE, J.JOB_FILE, ENGINE_ACCEPTED, WORLD_INFO, 'observer_shortlist.json', 'observer_views.json'):
                 if (src / name).exists():
                     entries.append((name, src / name, True))
         prefix = 'archive/' if info['kind'] == 'session' else ''

@@ -1,6 +1,7 @@
 """My World: the shortlist in groups and a digest of recorded facts for what is followed -- complete and only what
-the history recorded, held back where Hide results says so, a quiet count in the menu, "mark as read", older
-shortlist files still read, and no simulation state.
+the history recorded, a quiet count in the menu, "mark as read", older shortlist files still read, no simulation
+state, and for a world that used the removed Hide results setting: nothing held back, and the period that may
+have been marked read unseen offered for review (the read marker untouched, nothing counted twice).
 
 Run from the project folder:  python -m unittest tests.test_myworld -v
 """
@@ -22,7 +23,12 @@ from golfsim.population import generate_world                         # noqa: E4
 from golfsim.session import Session                                   # noqa: E402
 import observer as O                                                  # noqa: E402
 import observer_myworld as MW                                         # noqa: E402
-import observer_spoilers as SP                                        # noqa: E402
+
+
+def plant_old_hiding(world_dir, since=(0, 0)):
+    """The removed Hide results setting as an earlier build wrote it (everything hidden, nothing revealed)."""
+    (Path(world_dir) / 'observer_spoilers.json').write_text(json.dumps(
+        {'format': 'golf-legacy-spoilers/1', 'hide': True, 'from': list(since), 'revealed': {}}))
 
 
 class MyWorld(unittest.TestCase):
@@ -48,7 +54,7 @@ class MyWorld(unittest.TestCase):
 
     def setUp(self):
         (self.path / O.SHORTLIST).unlink(missing_ok=True)
-        SP.set_hide(self.w, False)
+        (self.path / MW.OLD_SPOILERS).unlink(missing_ok=True)
 
     def page(self, path):
         u = urlparse(path)
@@ -61,7 +67,7 @@ class MyWorld(unittest.TestCase):
     def test_digest_is_complete_and_only_recorded_facts(self):
         self.follow(('person', self.winner))
         start = (self.w.live.cursor['year'], 0)
-        got, held = MW.digest(self.w, O.shortlist(self.w), start)
+        got = MW.digest(self.w, O.shortlist(self.w), start)
         wins = [x for x in got if x[2] == 'win']
         want = [r for r in self.w.results(self.winner) if r['pos'] == 1 and (r['year'], r['week']) > start
                 and (self.w.edition(r['event']) or {}).get('category') not in ('qualifier', 'q_school')]
@@ -69,7 +75,6 @@ class MyWorld(unittest.TestCase):
         self.assertEqual(len(wins), len(want))                         # every win, nothing invented
         for r in want:
             self.assertTrue(any(f'/event/{r["event"].replace(":", "%3A")}"' in h for _, _, _, h in wins), r)
-        self.assertEqual(held, 0)
         html = self.page('/my-world?since=season')
         self.assertIn(f'{len(got):,} recorded item', html)
 
@@ -78,7 +83,7 @@ class MyWorld(unittest.TestCase):
         course = lv.editions[self.eid]['sites'][0][0]
         self.follow(('tour', 'PT_AMERICAS'), ('series', self.eid.split(':', 1)[1]), ('edition', self.eid),
                     ('course', course), ('nation', (self.w.person(self.winner) or {}).get('country')))
-        got, _ = MW.digest(self.w, O.shortlist(self.w), (lv.cursor['year'], 0))
+        got = MW.digest(self.w, O.shortlist(self.w), (lv.cursor['year'], 0))
         played = [e for e in lv.editions.values() if e.get('tour') == 'PT_AMERICAS']
         for e in played:                                               # every edition of the followed tour
             self.assertTrue(any(f'/event/{e["id"].replace(":", "%3A")}"' in h for _, _, _, h in got), e['id'])
@@ -107,20 +112,47 @@ class MyWorld(unittest.TestCase):
         self.assertIn('0 recorded items since last read', self.page('/my-world'))
         self.assertNotIn('banner', self.page('/my-world'))             # no pop-ups or banners
 
-    def test_hide_results_holds_items_back(self):
+    def test_old_hiding_settings_hold_nothing_back(self):
         self.follow(('person', self.winner), ('tour', 'PT_AMERICAS'))
         start = (self.w.live.cursor['year'], 0)
-        shown, _ = MW.digest(self.w, O.shortlist(self.w), start)
-        SP.set_hide(self.w, True, 'season')
-        got, held = MW.digest(self.w, O.shortlist(self.w), start)
-        self.assertGreater(held, 0)
-        self.assertEqual(len(got) + held, len(shown))                  # held back, not dropped
-        for _, _, kind, h in got:                                      # nothing naming a hidden result
-            for e in self.w.live.editions.values():
-                if SP.hidden(self.w, e['id'], e['week']):
-                    self.assertNotIn(f'/event/{e["id"].replace(":", "%3A")}"', h)
-        html = self.page('/my-world?since=season')
-        self.assertIn('naming a hidden result held back', html)
+        before = MW.digest(self.w, O.shortlist(self.w), start)
+        plant_old_hiding(self.path)
+        self.assertEqual(MW.digest(self.w, O.shortlist(self.w), start), before)
+        wins = [r for r in self.w.results(self.winner) if r['pos'] == 1 and (r['year'], r['week']) > start]
+        for r in wins:                                                  # every win named, none held back
+            self.assertTrue(any(f'/event/{r["event"].replace(":", "%3A")}"' in h for _, _, _, h in before))
+        self.assertNotIn('held back', self.page('/my-world?since=season'))
+
+    def test_a_period_marked_read_while_hidden_is_offered_for_review(self):
+        self.follow(('tour', 'PT_AMERICAS'))
+        y = self.w.live.cursor['year']
+        plant_old_hiding(self.path, since=(y, 1))                       # hiding began in week 1 of this season
+        O.mark_read(self.w)                                             # ... and the digest was marked read since
+        seen = tuple(O.shortlist_seen(self.w))
+        self.assertEqual(MW.hidden_period(self.w, seen), ((y, 1), seen))
+        html = self.page('/my-world')
+        self.assertIn('may not have been shown', html)
+        link = f'/my-world?since={y}.1&amp;until={seen[0]}.{seen[1]}'
+        self.assertIn(link, html)
+        review = self.page(link.replace('&amp;', '&'))
+        got = MW.digest(self.w, O.shortlist(self.w), (y, 1), seen)
+        self.assertTrue(got)
+        self.assertIn(f'{len(got):,} recorded item', review)            # the period, everything in it
+        self.assertTrue(all((a, b) > (y, 1) and (a, b) <= seen for a, b, _, _ in got))
+        self.assertEqual(MW.new_count(self.w), 0)                       # not counted again as new
+        self.assertEqual(tuple(O.shortlist_seen(self.w)), seen)         # the read marker untouched
+        O.dismiss_hidden_period(self.w)
+        self.assertNotIn('may not have been shown', self.page('/my-world'))
+        self.assertEqual(tuple(O.shortlist_seen(self.w)), seen)
+        self.assertEqual(O.shortlist(self.w)[0][:2], ('tour', 'PT_AMERICAS'))   # (the shortlist kept)
+
+    def test_no_notice_without_old_hiding_or_before_it(self):
+        self.follow(('tour', 'PT_AMERICAS'))
+        O.mark_read(self.w)
+        self.assertNotIn('may not have been shown', self.page('/my-world'))
+        y, wk = self.w.live.cursor['year'], self.w.live.cursor['week']
+        plant_old_hiding(self.path, since=(y, wk + 5))                  # hiding began after the last read
+        self.assertIsNone(MW.hidden_period(self.w, O.shortlist_seen(self.w)))
 
     def test_not_simulation_state(self):
         before = {p.relative_to(self.path).as_posix(): p.stat().st_mtime_ns for p in self.path.rglob('*') if p.is_file()}
@@ -155,7 +187,7 @@ class MyWorldNewWeeks(unittest.TestCase):
         w = O.World(tmp / 'w', workers=1)
         self.addCleanup(w.close)
         w.reload()
-        got, _ = MW.digest(w, O.shortlist(w), seen)
+        got = MW.digest(w, O.shortlist(w), seen)
         self.assertTrue(got)
         self.assertTrue(all((y, wk) > seen for y, wk, _, _ in got))
         self.assertEqual(MW.new_count(w), len(got))

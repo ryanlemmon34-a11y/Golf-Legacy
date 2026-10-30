@@ -34,11 +34,10 @@ def seasons(w, pid):
     archived seasons from the records, and the current season so far from the snapshot."""
     import observer_data as OD
     import observer_history as OH
-    import observer_spoilers as SP
     p = w.person(pid) or {}
     born = p.get('born')
     snaps = OD.rating_snapshots(w, pid)
-    majors = {}                                        # (from the editions, as the Grand Slam page: hidden left out)
+    majors = {}                                        # (from the editions, as the Grand Slam page)
     for y, _, _, _, win in OH.major_wins(w):
         if win == pid:
             majors[y] = majors.get(y, 0) + 1
@@ -53,14 +52,13 @@ def seasons(w, pid):
         lp = w.live.people.get(pid)
         res = w.live.results(pid)
         if lp is not None and (res or lp.get('lifestyle') != 'retired'):
-            shown = [r for r in res if not SP.hidden(w, r['event'], r['week'])]
             cat = lambda r: (w.edition(r['event']) or {}).get('category')
             out[y] = {'age': (y - born) if born else None, 'tour': lp.get('tour'), 'status': lp.get('status'),
-                      'starts': len(res), 'wins': sum(1 for r in shown if r['pos'] == 1 and cat(r) not in ('qualifier', 'q_school')),
-                      'top10': sum(1 for r in shown if r['pos'] is not None and r['pos'] <= 10),
+                      'starts': len(res), 'wins': sum(1 for r in res if r['pos'] == 1 and cat(r) not in ('qualifier', 'q_school')),
+                      'top10': sum(1 for r in res if r['pos'] is not None and r['pos'] <= 10),
                       'majors': majors.get(y, 0),
                       'prize': w.live.prize.get(pid), 'wr_end': None, 'overall': (snaps.get(y) or [None])[0],
-                      'source': 'so far', 'held': len(res) - len(shown)}
+                      'source': 'so far'}
     return out
 
 
@@ -100,7 +98,6 @@ def totals(w, pid, ss):
 def compare_page(w, q):
     O = _o()
     import observer_data as OD
-    import observer_spoilers as SP
     pids = [p for p in ids(q) if w.person(p) is not None]
     find = (O.one(q, 'find', '') or '').strip()
     add = _finder(w, pids, find)
@@ -179,7 +176,7 @@ def compare_page(w, q):
         row('Weeks at world No. 1', lambda p: (str(no1.get(p, 0)) if no1 is not None else
                                                '<a href="/records/weeks-at-number-one">see Records</a>')),
     ]
-    out = [SP.aggregate_note(w, 'these career figures'), add,
+    out = [add,
            f'<div class="scroll"><table><thead><tr><th></th>{head}</tr></thead><tbody>{"".join(rows)}</tbody></table></div>']
     years = sorted({y for p in pids for y in data[p]})
     if years:

@@ -11,8 +11,7 @@ column a table was sorted by in the browser (``tsort``). The observer remembers,
 
 All of it is browsing state only: a file beside the world (``observer_views.json``, like the shortlist; a
 temporary file for a history browsed read-only). The simulation never reads it, and nothing here changes a
-result, the world or what Hide results conceals (a saved view is only an address: the page it opens applies
-the same rules as any other).
+result or the world (a saved view is only an address).
 """
 from __future__ import annotations
 

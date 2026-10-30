@@ -43,7 +43,6 @@ import observer_data as OD                                            # noqa: E4
 import observer_history as OH                                         # noqa: E402
 import observer_golf as OG                                            # noqa: E402
 from golfsim import scopes as SC                                      # noqa: E402
-import observer_spoilers as SP                                        # noqa: E402
 import observer_views as V                                            # noqa: E402
 import observer_cohort as OC                                          # noqa: E402
 import observer_compare as OCMP                                       # noqa: E402
@@ -60,6 +59,7 @@ form.inline { display:inline; margin-left:8px; } form.inline button { font-size:
 .views { margin:4px 0 10px; font-size:13px; } .views > a { margin-right:6px; padding:1px 8px; border:1px solid var(--line); border-radius:10px; }
 .views > a.on { background:var(--panel); font-weight:600; } .views input { font-size:13px; width:11em; }
 p.back { margin:0 0 4px; font-size:13px; }
+p.notice { padding:6px 10px; border:1px solid var(--line); border-radius:4px; background:var(--panel); }
 .up { color:var(--accent); } .down { color:#b3412f; } p.lead { font-size:16px; }
 table.sortable th { cursor:pointer; } table.sortable th[aria-sort=ascending]::after { content:" ▲"; }
 table.sortable th[aria-sort=descending]::after { content:" ▼"; }
@@ -581,7 +581,7 @@ def page(w, title, body, job=None, notices=()):
     return (f'<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" '
             f'content="width=device-width, initial-scale=1"><title>{esc(title)} — Golf Legacy</title>'
             f'<style>{CSS}</style></head><body><header><strong>Golf Legacy</strong>{world}'
-            f'<span class="date">{esc(date)}</span>{search}{SP.header(w)}{advance_controls(w, job)}</header>'
+            f'<span class="date">{esc(date)}</span>{search}{advance_controls(w, job)}</header>'
             f'<div class="layout">{nav}<main>{banners}<h1>{esc(title)}</h1>{body}'
             f'{history_note(w) if w is not None else ""}</main></div>{POLL_JS if running else ""}{V.SORT_JS}</body></html>')
 
@@ -592,7 +592,7 @@ def my_world_link(w):
     if w is not None and not w.read_only:
         import observer_myworld as MW
         key = (getattr(w.live, 'generation', None), w.a.stamp if w.a else None, json.dumps(shortlist(w)),
-               json.dumps(shortlist_seen(w)), json.dumps(SP.state(w), sort_keys=True))
+               json.dumps(shortlist_seen(w)))
         got = w.__dict__.get('_mw_count')
         if got is None or got[0] != key:
             got = (key, MW.new_count(w))
@@ -665,9 +665,9 @@ def _shortlist_file(w):
     try:
         raw = json.loads((w.path / SHORTLIST).read_text())
     except (OSError, ValueError):
-        return {'items': [], 'seen': None}
+        return {'items': [], 'seen': None, 'flags': {}}
     items = [tuple(x) + ('',) * (4 - len(x)) for x in raw.get('items') or []]   # (format 1: no group)
-    return {'items': [x[:4] for x in items], 'seen': raw.get('seen')}
+    return {'items': [x[:4] for x in items], 'seen': raw.get('seen'), 'flags': dict(raw.get('flags') or {})}
 
 
 def shortlist(w):
@@ -686,11 +686,19 @@ def shortlist_seen(w):
     return _shortlist_file(w)['seen']
 
 
-def _write_shortlist(w, items, seen):
+def shortlist_flags(w):
+    """{name: value}: My World's own notes (e.g. a dismissed notice)."""
+    if w is None or w.read_only:
+        return {}
+    return _shortlist_file(w)['flags']
+
+
+def _write_shortlist(w, items, seen, flags=None):
     import os
+    flags = _shortlist_file(w)['flags'] if flags is None else flags
     tmp = w.path / (SHORTLIST + '.tmp')
-    tmp.write_text(json.dumps({'format': 'golf-legacy-shortlist/2', 'items': [list(x) for x in items], 'seen': seen},
-                              indent=1))
+    tmp.write_text(json.dumps({'format': 'golf-legacy-shortlist/2', 'items': [list(x) for x in items], 'seen': seen,
+                               'flags': flags}, indent=1))
     os.replace(tmp, w.path / SHORTLIST)
     w.__dict__.pop('_mw_count', None)
 
@@ -706,6 +714,15 @@ def set_shortlist(w, kind, ident, on, group=None):
         items.append((kind, str(ident), old[2] if old else _t.strftime('%Y-%m-%d %H:%M'),
                       (group if group is not None else (old[3] if old else '')).strip()[:40]))
     _write_shortlist(w, items, f['seen'])
+    return True
+
+
+def dismiss_hidden_period(w):
+    """My World: stop offering the period an earlier version's results setting may have kept from the digest."""
+    if w is None or w.read_only:
+        return False
+    f = _shortlist_file(w)
+    _write_shortlist(w, f['items'], f['seen'], {**f['flags'], 'hidden_period_dismissed': True})
     return True
 
 
@@ -788,18 +805,15 @@ def overview(w, q):
         if recent:
             out.append(table(['Week', 'Event', 'Tour', 'Winner'], [
                 [str(e['week']), event_link(w, e['id']), tour_link(w, e['tour']),
-                 SP.mask(w, e['id'], e['week'], w.person_link(_winner(e)))] for e in recent]))
+                 w.person_link(_winner(e))] for e in recent]))
         else:
             out.append(f'<p class="muted">No events completed yet in {year}.</p>')
     if w.a:
         y = w.a.years[-1]
         facts = w.a.recap(y)
-        facts = [f for f in facts if not (f.get('event') and SP.hidden(w, f['event']))]   # (hidden results left out)
         out.append(f'<h2>{y} season recap</h2><ul>' + ''.join(
             f'<li>{esc(f["text"])}' + (f' — {w.person_link(f["golfer"])}' if f.get('golfer') else '') +
-            (f' — {event_link(w, f["event"])}' if f.get('event') else '') + '</li>' for f in facts) + '</ul>'
-            + (f'<p class="muted">Results are hidden: facts about hidden editions are left out.</p>'
-               if SP.state(w)['hide'] else ''))
+            (f' — {event_link(w, f["event"])}' if f.get('event') else '') + '</li>' for f in facts) + '</ul>')
         out.append('<p>Archived seasons: ' + ', '.join(f'<a href="/season/{x}">{x}</a>' for x in w.a.years) + '</p>')
     else:
         out.append('<p class="muted">No season has finished yet: the season recap, records and history pages fill in at '
@@ -813,7 +827,7 @@ def rankings(w, q):
                                            for k, t in (('world', 'World'), ('points', 'World: points by week'),
                                                         ('amateur', 'Amateur'))) + '</div>')
     if kind == 'points':
-        return 'World ranking points', SP.aggregate_note(w, 'the rankings') + tabs + OG.rankings_points_page(w, q)
+        return 'World ranking points', tabs + OG.rankings_points_page(w, q)
     if w.live:
         table_ = w.live.wr if kind == 'world' else w.live.am
         rows = sorted(((p, g) for g, p in table_.items()), key=lambda x: x[0])
@@ -824,7 +838,7 @@ def rankings(w, q):
         rows = []
     chunk, pager = paged(rows, q, '/rankings')
     title = 'World ranking' if kind == 'world' else 'Amateur ranking'
-    return title, SP.aggregate_note(w, 'the rankings') + tabs + table(['#', 'Golfer', 'Tour'], [
+    return title, tabs + table(['#', 'Golfer', 'Tour'], [
         [str(p), w.person_link(g), tour_link(w, (w.person(g) or {}).get('golfer', {}).get('tour'))] for p, g in chunk],
         numeric=(0,)) + pager
 
@@ -986,8 +1000,7 @@ def golfer(w, q, pid):
         if 'golfer' not in roles:
             out.append(OH.residence_section(w, pid, p, geo))
     if a and a.index and tab == 'playing':
-        moments_ = [m for m in a.index.moments(person=pid)       # (a hidden edition's moments left out)
-                    if not (m.get('event') and SP.hidden(w, m['event'], m.get('week')))]
+        moments_ = a.index.moments(person=pid)
         if moments_:
             out.append('<h2>Moments</h2>' + table(['Season', 'What', 'Event', 'Venue'], [
                 [esc(m['year']), esc(m['kind']), event_link(w, m['event']), venue_link(w, m.get('layout'))]
@@ -1226,13 +1239,7 @@ def ST_person_seasons(db, pid):
 def _playing(w, q, pid, p):
     rows = OD.results(w, pid)
     active = (p.get('golfer') or {}).get('lifestyle') not in (None, 'retired')
-    held = [r for r in rows if SP.hidden(w, r['event'], r['week'])]
-    if held:                                           # honors and wins below leave hidden results out
-        rows = [r for r in rows if not SP.hidden(w, r['event'], r['week'])]
-    out = [(f'<div class="banner warn" role="status">Results are hidden: {len(held)} of this golfer’s results are '
-            'unrevealed. Honors, wins and the season-by-season results leave them out; prize money, golf statistics '
-            'and rankings count every result and can give them away.</div>' if held else ''),
-           OH.status_section(w, pid, p), _ratings(w, pid, p), _honors(w, pid, rows, active),
+    out = [OH.status_section(w, pid, p), _ratings(w, pid, p), _honors(w, pid, rows, active),
            OH.grand_slam_line(w, pid), _season_history(w, q, pid, p, rows),
            OG.golf_section(w, pid, one(q, 'scope'))]
     wins = [r for r in rows if r['pos'] == 1 and not OD.is_qualifying(r)]
@@ -1262,9 +1269,6 @@ def _results(w, q, pid):
         if outcome in ('made-cut', 'missed-cut'):
             db, _ = w.statistics()
             sel = [r for r in OD.cut_flags(w, sel, db) if r['cut']]
-    held = [r for r in sel if SP.hidden(w, r['event'], r['week'])]
-    if held and (outcome or honor):                     # a finish filter would give hidden results away
-        sel = [r for r in sel if not SP.hidden(w, r['event'], r['week'])]
     if honor:
         tests = {k: t for k, _, t in OD.HONORS}
         keys = [k for k, _, _ in OD.HONORS]
@@ -1302,16 +1306,13 @@ def _results(w, q, pid):
                                                           f'{n_quals:,} qualifying stages</a>' if n_quals else ''))
     shown = (f'{len(sel):,} rows of {len(rows) - n_quals:,} starts and {n_quals:,} qualifying stages' if quals else
              f'{len(sel):,} of {len(rows) - n_quals:,} starts')
-    if held:
-        shown += (f' · results hidden: {len(held)} unrevealed (their places are hidden'
-                  + ('; a finish filter leaves them out' if outcome or honor else '') + ')')
     return (f + f'<p>{shown} (archived seasons and the current season; {scope}).</p>' + table(
         ['Season', 'Week', 'Event', 'Tour then', 'Pos', 'Prize', 'Coach', 'Caddie', 'How they got in'],
         [[esc(r['year']), esc(r['week']), event_link(w, r['event']) + (' <span class="tag">qualifying</span>'
                                                                           if OD.is_qualifying(r) else ''),
-          tour_link(w, r['tour']), SP.mask(w, r['event'], r['week'], esc(r['pos'] or 'MC')),
-          SP.mask(w, r['event'], r['week'], money(prizes[(r['event'], r['site'])]) if (r['event'], r['site']) in prizes
-                  else '<span class="muted">—</span>'),
+          tour_link(w, r['tour']), esc(r['pos'] or 'MC'),
+          money(prizes[(r['event'], r['site'])]) if (r['event'], r['site']) in prizes
+                  else '<span class="muted">—</span>',
           w.person_link(r['coach']), w.person_link(r['caddie']), OH.route_html(r['route'], w.calendar_version)]
          for r in chunk], numeric=(0, 1, 4, 5)) + pager
         + '<p class="muted">Prize: the money paid for the start, as recorded (since rules 2026-10-30); for older seasons '
@@ -1407,12 +1408,10 @@ def event(w, q, eid):
     out = [f'<p><a href="/series/{quote(sid)}">All editions of the {esc(e.get("name") or w.series_name(sid))}</a> · '
            f'{"current season" if e["source"] == "current season" else "archived season"} · '
            f'<a href="/cohort?event={quote(eid)}">where is this field now?</a>{shortlist_button(w, "edition", eid)}</p>']
-    hid = SP.hidden(w, eid, e['week'])                 # results hidden and not revealed: open on the replay
-    view = one(q, 'view', 'rounds' if hid else 'final')
-    if hid and not one(q, 'round'):
-        k = SP.watched(w, eid)
-        q = {**q, 'round': [str(k if isinstance(k, int) and k > 0 else 1)]}   # round one, or where they left off
-    replay = view == 'rounds' or hid                   # a replay reveals nothing beyond the round shown
+    view = one(q, 'view', 'final')
+    replay = view == 'rounds'                          # a replay shows nothing beyond the round shown
+    restart = (f' · <a href="/event/{quote(eid)}?view=rounds&amp;round=1">Watch from round 1</a>'
+               if not e.get('match_play') else '')     # (the replay always starts again at round one)
     fmt = []
     if e.get('rounds'):
         fmt.append(f'{e["rounds"] * 18} holes')
@@ -1426,30 +1425,19 @@ def event(w, q, eid):
     rows = e['rows']
     multi = len(e['sites']) > 1
     winners = [r for r in rows if r['pos'] == 1]
-    if hid:
-        out.append(f'<p>Field {len(rows):,} · {OH.rules_note(w, e["year"])}</p><p><span class="tag">Results hidden</span> '
-                   f'<span class="muted">Watch it round by round; the winner and final places stay hidden until you '
-                   f'reveal them.</span> {(SP.watch_link(w, eid) + " · " + SP.restart_link(w, eid)) if SP.watched(w, eid) else ""} '
-                   f'{SP.reveal_button(eid)}</p>')
-    elif replay:
+    if replay:
         out.append(f'<p>Field {len(rows):,} · {OH.rules_note(w, e["year"])} · <span class="muted">the winner and final '
-                   'places are not shown in the replay until its final round</span></p>')
+                   f'places are not shown in the replay until its final round</span>{restart}</p>')
     else:
         out.append(f'<p>Winner: {", ".join(w.person_link(r["person"]) for r in winners) or "—"} · field {len(rows):,} · '
-                   f'{OH.rules_note(w, e["year"])}</p>')
+                   f'{OH.rules_note(w, e["year"])}{restart}</p>')
     base = f'/event/{quote(eid)}'
     out.append('<div class="tabs">' + ''.join(f'<a href="{base}?view={k}" class="{"on" if k == view else ""}">{esc(t)}</a>'
                                               for k, t in (('final', 'Final result'), ('rounds', 'Rounds & replay'),
                                                            ('stats', 'Statistics')))
                + '</div>')
-    if hid and view != 'rounds':                       # the final result and statistics give the winner away
-        out.append(f'<p>The final result and statistics of this edition are hidden. {SP.watch_link(w, eid)}'
-                   + (f' · {SP.restart_link(w, eid)}' if SP.watched(w, eid) else '') + ' '
-                   f'{SP.reveal_button(eid)}</p><p class="muted">Revealing it is kept (every page then shows it); '
-                   'Show results in the header shows every result.</p>')
-        return f'{eid.split(":")[0]} {e.get("name") or w.series_name(sid)}', ''.join(out)
     if view in ('rounds', 'stats'):
-        out.append(OH.rounds_view(w, q, e, hide=hid) if view == 'rounds' else OG.edition_stats(w, e))
+        out.append(OH.rounds_view(w, q, e) if view == 'rounds' else OG.edition_stats(w, e))
         return f'{eid.split(":")[0]} {e.get("name") or w.series_name(sid)}', ''.join(out)
     prizes = {}
     if any(r.get('prize') is not None for r in rows):
@@ -1501,7 +1489,7 @@ def series(w, q, sid):
                 venues[e['id']] = [(c, lay) for c, lay, _ in e['sites']]
     return w.series_name(sid), head + OH.series_summary(w, sid) + '<h2>Every edition</h2>' + table(
         ['Edition', 'Week', 'Winner', 'Field', 'Course', 'Tour then'], [
-            [event_link(w, e['event']), esc(e['week']), SP.mask(w, e['event'], e['week'], w.person_link(e['winner'])),
+            [event_link(w, e['event']), esc(e['week']), w.person_link(e['winner']),
              esc(e['field']), ' · '.join(course_link(w, c, lay) for c, lay in venues.get(e['event'], [])) or '—',
              tour_link(w, e['tour'])]
             for e in eds], numeric=(1, 3))
@@ -1547,7 +1535,7 @@ def calendar(w, q):
         [esc(e['week']), (event_link(w, e['id']) if e['status'] == 'played' else
                           f'<a href="/series/{quote(e["series"])}">{esc(e["name"])}</a>'),
          tour_link(w, e['tour']), esc(e['tier']), f'{esc(e["city"])}, {esc(e["country"])}', esc(e['status']),
-         SP.mask(w, e['id'], e['week'], w.person_link(_winner(w.live.editions[e['id']]))) if e['status'] == 'played' else '']
+         w.person_link(_winner(w.live.editions[e['id']])) if e['status'] == 'played' else '']
         for e in chunk], numeric=(0, 3))
     return f'{w.live.cursor["year"]} calendar', f + body + pager
 
@@ -1586,10 +1574,7 @@ def course(w, q, cid):
     recs = {lid: r for lid, r in w.records_table().items() if lid.split(':')[0] == cid}
     for lid, r in recs.items():
         cr = r.get('course_record')
-        if cr and SP.hidden(w, cr['event_id']):
-            out.append(f'<p class="muted">{esc(lid.split(":")[1])} layout record: set in an edition whose results are '
-                       f'hidden · {SP.watch_link(w, cr["event_id"])}</p>')
-        elif cr:
+        if cr:
             out.append(f'<p>{esc(lid.split(":")[1])} layout record: {cr["score"]} by {w.person_link(cr.get("golfer_id"))} '
                        f'({event_link(w, cr["event_id"])})</p>')
         totals = r.get('lowest_totals') or {}
@@ -1597,15 +1582,14 @@ def course(w, q, cid):
             since = r.get('totals_since')
             out.append(f'<p class="muted">{esc(lid.split(":")[1])} lowest tournament totals'
                        + (f' (recorded since {since})' if since else '') + ': ' + '; '.join(
-                           (f'{h} holes: hidden · {SP.watch_link(w, m["event_id"])}' if SP.hidden(w, m['event_id']) else
-                            f'{h} holes {m["score"]} ({m["to_par"]:+d}) by {w.person_link(m.get("golfer_id"))}, '
-                            f'{event_link(w, m["event_id"])}') for h, m in sorted(totals.items(), key=lambda x: int(x[0])))
+                           f'{h} holes {m["score"]} ({m["to_par"]:+d}) by {w.person_link(m.get("golfer_id"))}, '
+                           f'{event_link(w, m["event_id"])}' for h, m in sorted(totals.items(), key=lambda x: int(x[0])))
                        + '</p>')
     out.append(OH.course_use(w, cid))
     eds = sorted(w.course_editions(cid), key=lambda e: (e['year'], e['event']), reverse=True)
     chunk, pager = paged(eds, q, f'/course/{quote(cid)}')
     out.append('<h2>Editions hosted</h2>' + (table(['Edition', 'Layout', 'Winner'], [
-        [event_link(w, e['event']), esc(e['layout']), SP.mask(w, e['event'], None, w.person_link(e['winner']))]
+        [event_link(w, e['event']), esc(e['layout']), w.person_link(e['winner'])]
         for e in chunk]) + pager
         if eds else '<p class="muted">None yet.</p>'))
     return c.get('name', cid), ''.join(out)
@@ -1649,7 +1633,7 @@ def nation(w, q, code):
         wins = []
         for pid, ss in w.stats.starts.items():
             if (w.person(pid) or {}).get('country') == code:
-                wins += [(s[0], s[2], pid) for s in ss if s[5] == 'major' and s[6] == 1 and not SP.hidden(w, s[2])]
+                wins += [(s[0], s[2], pid) for s in ss if s[5] == 'major' and s[6] == 1]
         out.append('<h2>Major wins (archived seasons)</h2>' + (table(['Season', 'Major', 'Champion'], [
             [str(y), event_link(w, e), w.person_link(pid)] for y, e, pid in sorted(wins, reverse=True)], numeric=(0,))
             if wins else '<p class="muted">None.</p>'))
@@ -1691,7 +1675,7 @@ def tour(w, q, key):
         eds = [e for e in w.live.schedule if e['tour'] == key]
         out.append(f'<h2>{w.live.cursor["year"]} events</h2>' + table(['Week', 'Event', 'Winner'], [
             [esc(e['week']), event_link(w, e['id']) if e['status'] == 'played' else esc(e['name']),
-             SP.mask(w, e['id'], e['week'], w.person_link(_winner(w.live.editions[e['id']]))) if e['status'] == 'played'
+             w.person_link(_winner(w.live.editions[e['id']])) if e['status'] == 'played'
              else esc(e['status'])] for e in eds],
             numeric=(0,)))
     return t.get('name', key), ''.join(out)
@@ -1715,7 +1699,7 @@ def seasons(w, q):
         for y, e in w.a.events():
             if e['series'] in kinds:
                 majors[y].append((e['id'], _winner(e)))
-    rows = [[f'<a href="/season/{y}">{y}</a>', ', '.join(f'{event_link(w, eid)}: {SP.mask(w, eid, None, w.person_link(g))}'
+    rows = [[f'<a href="/season/{y}">{y}</a>', ', '.join(f'{event_link(w, eid)}: {w.person_link(g)}'
                                                          for eid, g in majors[y])]
             for y in reversed(w.a.years)]
     chunk, pager = paged(rows, q, '/seasons', size=25)
@@ -1729,7 +1713,7 @@ def season(w, q, y):
     nav = ' · '.join(x for x in (f'<a href="/season/{y - 1}">← {y - 1}</a>' if y - 1 in w.a.years else '',
                                  f'<a href="/season/{y + 1}">{y + 1} →</a>' if y + 1 in w.a.years else '') if x)
     nav += (' · ' if nav else '') + f'<a href="/cohort?turned_pro={y}">where are the {y} rookies now?</a>'
-    return f'{y} season', SP.aggregate_note(w, 'the season review') + f'<p>{nav}</p>' + OH.recap(w, y)
+    return f'{y} season', f'<p>{nav}</p>' + OH.recap(w, y)
 
 
 STAT_COLUMNS = (('starts', 'Starts', None), ('wins', 'Wins', 'win'), ('runner_ups', 'Runner-up', 'runner-up'),
@@ -1811,7 +1795,7 @@ def stats_page(w, q, view='stats'):
     if show == 'golf':
         scope_ = ('all-time' if ysel == 'all' else f'{ysel}' + (' so far' if ysel == str(cur) else ''))
         scope_ += ' · ' + tour_scope_name(w, tour)
-        return title, SP.aggregate_note(w, 'these statistics') + f + OG.golf_table(w, q, data, path, {k: v[0] for k, v in q.items() if v and v[0]}, esc(scope_),
+        return title, f + OG.golf_table(w, q, data, path, {k: v[0] for k, v in q.items() if v and v[0]}, esc(scope_),
                                         ysel != 'all')
     rows = [(pid, r) for pid, r in data.items() if r['starts'] or r['prize']]
     if view == 'money':
@@ -1871,7 +1855,7 @@ def stats_page(w, q, view='stats'):
     scope = ('all-time' if ysel == 'all' else f'{ysel}' + (' so far' if ysel == str(cur) else ''))
     scope += ' · ' + tour_scope_name(w, tour)
     other = ('<a href="/money">Prize money leaderboard</a>' if view == 'stats' else '<a href="/stats">All statistics</a>')
-    return title, (SP.aggregate_note(w, 'these totals') + f + f'<p>{esc(scope)} · {len(rows):,} golfers · {other}</p>'
+    return title, (f + f'<p>{esc(scope)} · {len(rows):,} golfers · {other}</p>'
                    + f'<div class="scroll"><table>{head}{"".join(body)}</table></div>' + pager
                    + f'<p class="muted">{STATS_NOTE}' + (f' {esc(ov_note)}' if ov_note else '') + '</p>')
 
@@ -1958,22 +1942,14 @@ def record(w, q, name):
         if scope:
             title += f' — {SC.LABEL if hs_scope == "premier" else w.tours().get(scope, {}).get("name", scope)}'
     flag = lambda r: '<span class=tag>partial</span>' if r['partial'] else ''
-    # Hide results: a record set by a single hidden result (a youngest winner, a drought ended...) would name that
-    # result's winner, so its row is left out; a count keeps its row but not the hidden editions behind it
-    held = 0
-    if SP.state(w)['hide'] and name in OH.FIXED:
-        keep = [r for r in rows if not any(SP.hidden(w, e) for e in r['evidence'])]
-        held, rows = len(rows) - len(keep), keep
     context = OH.record_context(w, name, rows)
     value = (lambda r: money(r['value'])) if name == 'most-prize' else (lambda r: esc(r['value']))
     def evidence(r):
-        ev = [e for e in r['evidence'] if not SP.hidden(w, e)]
-        gone = len(r['evidence']) - len(ev)
+        ev = r['evidence']
         more = f' <span class="muted">+{len(ev) - 3} more</span>' if len(ev) > 3 else ''
-        return (', '.join(event_link(w, e) for e in ev[:3]) + more
-                + (f' <span class="muted">({gone} hidden)</span>' if gone else ''))
+        return ', '.join(event_link(w, e) for e in ev[:3]) + more
     unit = OH.UNITS.get(name)
-    return title, (SP.aggregate_note(w, 'the records') + f + f'<p class="muted">{span(w.a.years)}'
+    return title, (f + f'<p class="muted">{span(w.a.years)}'
                    + (f'. Counted in {esc(unit)}' if unit else '')
                    + '. When: the date, or the first and latest dates, of the results behind the row. Now: whether the '
                    'person is still pursuing it, as of the date in the header — currently extending (a streak still '
@@ -1984,9 +1960,7 @@ def record(w, q, name):
                        [[str(i), w.person_link(r['person']) + (f' · with {w.person_link(r["staff"])}' if r.get('staff') else ''),
                          value(r), flag(r), when_, now, evidence(r)]
                         for i, (r, (when_, now)) in enumerate(zip(rows, context), 1)],
-                       numeric=(0, 2)) + ('' if rows else '<p class="muted">Nobody qualifies yet.</p>')
-                   + (f'<p class="muted">Results are hidden: {held} row{"s" if held != 1 else ""} set by a hidden '
-                      'result left out.</p>' if held else ''))
+                       numeric=(0, 2)) + ('' if rows else '<p class="muted">Nobody qualifies yet.</p>'))
 
 
 def moments(w, q):
@@ -1994,18 +1968,13 @@ def moments(w, q):
         return 'Moments', no_history()
     kind = one(q, 'kind', '') or ''
     ms = list(reversed(w.a.index.moments(kind=kind or None)))
-    held = sum(1 for m in ms if m.get('event') and SP.hidden(w, m['event'], m.get('week')))
-    if held:                                           # moments of hidden editions are left out
-        ms = [m for m in ms if not (m.get('event') and SP.hidden(w, m['event'], m.get('week')))]
     kinds = [k for (k,) in w.a.index.db.execute('SELECT DISTINCT kind FROM moments ORDER BY kind')]
     f = filters('/moments', q, [('kind', 'Kind', [('', 'any')] + [(k, k) for k in kinds])])
     chunk, pager = paged(ms, q, '/moments')
     return 'Moments', f + table(['Season', 'What', 'Golfer', 'Event', 'Venue'], [
         [esc(m['year']), esc(m['kind']), w.person_link(m['person']), event_link(w, m['event']),
          venue_link(w, m.get('layout'))] for m in chunk], numeric=(0,)) + pager + (
-        '<p class="muted">Venue: the course and layout where it happened, as recorded with the moment.'
-        + (f' Results are hidden: {held} moment{"s" if held != 1 else ""} of hidden editions left out.' if held else '')
-        + '</p>')
+        '<p class="muted">Venue: the course and layout where it happened, as recorded with the moment.</p>')
 
 
 ROUTES = [('/golfer/', golfer), ('/event/', event), ('/series/', series), ('/course/', course), ('/records/', record),

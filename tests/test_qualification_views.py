@@ -24,8 +24,14 @@ from golfsim.season import Season                                         # noqa
 from golfsim.session import Session                                       # noqa: E402
 import observer as O                                                      # noqa: E402
 import observer_qual as OQ                                                # noqa: E402
-import observer_spoilers as SP                                            # noqa: E402
 import standings_calendar as SCAL                                         # noqa: E402
+
+
+def plant_old_hiding(world_dir, since=(0, 0)):
+    """The removed Hide results setting as an earlier build wrote it (everything hidden, nothing revealed)."""
+    import json
+    (Path(world_dir) / 'observer_spoilers.json').write_text(json.dumps(
+        {'format': 'golf-legacy-spoilers/1', 'hide': True, 'from': list(since), 'revealed': {}}))
 
 
 class Document(unittest.TestCase):
@@ -97,9 +103,6 @@ class Pages(unittest.TestCase):
         cls.w.close()
         shutil.rmtree(cls.tmp, ignore_errors=True)
 
-    def setUp(self):
-        SP.set_hide(self.w, False)
-
     def page(self, major):
         return O.render(self.w, '/qualification', parse_qs(f'major={major}'))[1]
 
@@ -118,11 +121,14 @@ class Pages(unittest.TestCase):
         self.assertIn('played', html)
         self.assertIn('Qualification ledger', html)
 
-    def test_hide_results(self):
-        SP.set_hide(self.w, True, 'season')
+    def test_old_hiding_settings_change_nothing(self):
+        before = self.page('USA_OPEN')
+        plant_old_hiding(self.tmp / 'w')
+        self.addCleanup((self.tmp / 'w' / 'observer_spoilers.json').unlink)
         html = self.page('USA_OPEN')
-        self.assertIn('Hidden while results are hidden', html)
-        self.assertIn('the rankings and places', html)                 # (the aggregate note)
+        self.assertEqual(html, before)
+        proj = html.split('Projected (for information only)')[1]
+        self.assertIn('href="/golfer/', proj)                           # the projections are listed
 
     def test_the_standings_page(self):
         html = O.render(self.w, '/standings', {})[1]

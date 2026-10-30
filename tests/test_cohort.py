@@ -1,6 +1,6 @@
 """Where are they now: a field or cohort followed through the rest of their careers -- every member by id (missed
 cuts, the unsuccessful, amateurs, club professionals and the retired included), figures read from the history,
-results hidden where Hide results says so, and an older history without newer facts shown as not recorded.
+complete results whatever an earlier build's Hide results setting said, and an older history without newer facts shown as not recorded.
 
 Run from the project folder:  python -m unittest tests.test_cohort -v
 """
@@ -23,7 +23,13 @@ from golfsim.population import generate_world                         # noqa: E4
 from golfsim.session import Session                                   # noqa: E402
 import observer as O                                                  # noqa: E402
 import observer_cohort as OC                                          # noqa: E402
-import observer_spoilers as SP                                        # noqa: E402
+
+
+def plant_old_hiding(world_dir, since=(0, 0)):
+    """The removed Hide results setting as an earlier build wrote it (everything hidden, nothing revealed)."""
+    import json
+    (Path(world_dir) / 'observer_spoilers.json').write_text(json.dumps(
+        {'format': 'golf-legacy-spoilers/1', 'hide': True, 'from': list(since), 'revealed': {}}))
 
 
 class Cohorts(unittest.TestCase):
@@ -40,9 +46,6 @@ class Cohorts(unittest.TestCase):
     def tearDownClass(cls):
         cls.w.close()
         shutil.rmtree(cls.tmp, ignore_errors=True)
-
-    def setUp(self):
-        SP.set_hide(self.w, False)
 
     def page(self, path):
         u = urlparse(path)
@@ -127,16 +130,16 @@ class Cohorts(unittest.TestCase):
         self.assertEqual(fol[first]['prize'], top)
         self.assertEqual(fol[int(self.rows(least)[0])]['prize'], min(f['prize'] for f in fol.values()))
 
-    def test_hidden_field_hides_positions(self):
+    def test_old_hiding_settings_change_nothing(self):
         e = self.field()
-        SP.set_hide(self.w, True, 'all')
+        before = self.page(f'/cohort?event={quote(e["id"])}')
+        plant_old_hiding(self.tmp / 'w')
+        self.addCleanup((self.tmp / 'w' / 'observer_spoilers.json').unlink)
         html = self.page(f'/cohort?event={quote(e["id"])}')
+        self.assertEqual(html, before)
         table = html.split('<table>')[1].split('</table>')[0]
-        self.assertIn('finishing positions are hidden', html)
-        self.assertNotIn('<td>MC', table)
-        for pos in range(1, 6):
-            self.assertNotIn(f'<td>{pos} ·', table)
-        self.assertIn('hidden', table)
+        self.assertIn('<td>1 ·', table)                                 # the winner's finish, shown
+        self.assertNotIn('hidden', table)
 
     def test_an_older_index_shows_peaks_as_not_recorded(self):
         e = self.field()

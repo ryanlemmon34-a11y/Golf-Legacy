@@ -39,26 +39,23 @@ def _o():
 # ---- who is in the cohort -------------------------------------------------------------------------------------------
 def members(w, q):
     """(title, description, year, {pid: then}) for the cohort a query names, or None if it names none. `then`
-    holds what is known of each member at the cohort's moment: {'text', 'sort', 'hidden'}."""
+    holds what is known of each member at the cohort's moment: {'text', 'sort'}."""
     O = _o()
     eid = O.one(q, 'event')
     if eid:
         e = w.edition(eid)
         if e is None:
             return None
-        import observer_spoilers as SP
-        hide = SP.hidden(w, eid, e.get('week'))
         out = {}
         for r in e['rows']:
             pos = r.get('pos')
             route = r.get('route') or ''
-            text = ('hidden' if hide else ('MC' if pos is None else str(pos))) + (f' · {route.lower()}' if route else '')
-            out[r['person']] = {'text': text, 'sort': (0 if hide else 1 if pos is None else 0, 0 if hide else pos or 0),
-                                'hidden': hide}
+            text = ('MC' if pos is None else str(pos)) + (f' · {route.lower()}' if route else '')
+            out[r['person']] = {'text': text, 'sort': (1 if pos is None else 0, pos or 0)}
         name = f'{e["year"]} {w.series_name(e["series"])}'
         return (f'Where are they now: the {name} field',
                 f'Every entrant of the <a href="/event/{quote(eid)}">{O.esc(name)}</a> (week {e.get("week")}), missed '
-                'cuts included' + (' (Hide results: the finishing positions are hidden)' if hide else '') + '.',
+                'cuts included.',
                 e['year'], out)
     tour, year = O.one(q, 'tour'), O.one(q, 'year')
     if tour and year and year.isdigit():
@@ -66,7 +63,7 @@ def members(w, q):
         rows = _season_rows_of(w, y, tour=tour)
         tname = w.tours().get(tour, {}).get('name', tour)
         out = {pid: {'text': f'{r.get("status") or ""} · {r.get("events") or 0} starts', 'sort': (0, -(r.get('events') or 0)),
-                     'hidden': False} for pid, r in rows.items() if r.get('status') is not None}
+                     } for pid, r in rows.items() if r.get('status') is not None}
         return (f'Where are they now: {tname}, {y}', f'Every golfer on the {O.esc(tname)} in {y} (their season’s tour).',
                 y, out)
     tp = O.one(q, 'turned_pro')
@@ -107,10 +104,10 @@ def _golfers(w):
 def _then(w, row):
     """A member's season at the cohort's moment: status and tour (or not recorded that season)."""
     if not row:
-        return {'text': 'not recorded that season', 'sort': (9, ''), 'hidden': False}
+        return {'text': 'not recorded that season', 'sort': (9, '')}
     t = w.tours().get(row.get('tour'), {})
     return {'text': f'{row.get("status") or ""} · {t.get("name", row.get("tour") or "no tour")}',
-            'sort': (t.get('tier', 9), t.get('name', '')), 'hidden': False}
+            'sort': (t.get('tier', 9), t.get('name', ''))}
 
 
 def _season_rows_of(w, y, tour=None):
@@ -140,7 +137,6 @@ def _season_rows_of(w, y, tour=None):
 def follow(w, pids, since):
     """{pid: {...}}: each member's recorded seasons from `since` (that season included) to now."""
     import observer_history as OH
-    import observer_spoilers as SP
     pids = list(pids)
     seasons = defaultdict(list)
     if w.a:
@@ -163,7 +159,7 @@ def follow(w, pids, since):
                             seasons[pid].append({**r, 'year': y})
     peaks = _peaks(w, pids)
     majors = defaultdict(int)
-    for y, wk, eid, sid, win in OH.major_wins(w):                     # (hidden majors left out)
+    for y, wk, eid, sid, win in OH.major_wins(w):
         if y >= since:
             majors[win] += 1
     tours = w.tours()
@@ -175,7 +171,7 @@ def follow(w, pids, since):
         live_starts = w.live.results(pid) if (w.live and cur is not None and cur >= since) else []
         played = [r for r in rows if r.get('events')]
         wins = sum(r.get('wins') or 0 for r in rows)
-        wins += sum(1 for r in live_starts if r['pos'] == 1 and not SP.hidden(w, r['event'], r['week'])
+        wins += sum(1 for r in live_starts if r['pos'] == 1
                     and (w.edition(r['event']) or {}).get('category') not in ('qualifier', 'q_school'))
         prize = sum(r.get('prize') or 0 for r in rows)
         best = min((r['wr_end'] for r in rows if r.get('wr_end')), default=None)
@@ -253,7 +249,6 @@ def _now(w, pid, live, last_played):
 # ---- the page ------------------------------------------------------------------------------------------------------
 def cohort_page(w, q):
     O = _o()
-    import observer_spoilers as SP
     got = members(w, q)
     if got is None:
         return 'Where are they now', index(w, q)
@@ -269,7 +264,7 @@ def cohort_page(w, q):
     def key(pid):
         f = fol[pid]
         if sort == 'then':
-            v = then[pid]['sort'] if not then[pid]['hidden'] else None
+            v = then[pid]['sort']
         elif sort == 'name':
             v = w.name(pid)
         elif sort == 'age':
@@ -324,8 +319,7 @@ def cohort_page(w, q):
     reached = sum(1 for p in then if fol[p]['level'] and tiers.get(fol[p]['level'][1]) == 1)
     winners = sum(1 for p in then if fol[p]['wins'])
     champs = sum(1 for p in then if fol[p]['majors'])
-    return title, (SP.aggregate_note(w, 'the wins, rankings and prize money since')
-                   + f'<p>{desc} {len(then):,} people. From {year} on (that season included).</p>'
+    return title, (f'<p>{desc} {len(then):,} people. From {year} on (that season included).</p>'
                    + f'<p><strong>Now</strong>: {summary}.<br>Played a Premier tour as a professional: {reached} · won '
                      f'anything since: {winners} · major champions since: {champs}.</p>'
                    + f'<div class="scroll"><table>{head}{"".join(body)}</table></div>' + pager

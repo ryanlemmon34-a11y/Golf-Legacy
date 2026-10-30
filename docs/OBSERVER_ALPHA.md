@@ -45,7 +45,7 @@ The v15 build is for review; `main` is unchanged. Try it without touching your w
    view*); *Where are they now* (a college championship field, from the menu or any event page); *My World*
    (shortlist a few golfers into groups; the digest); *Compare careers* (a profile's "compare" link); *GOAT Lab*
    (change weights, try a formula); *Qualification* (this season's majors: earned, pending and projected);
-   *Standings locks* (`/standings`). Hide results applies to every new page.
+   *Standings locks* (`/standings`).
 
 What changed and what is measured: `docs/V15_BUILD_REPORT.md`.
 
@@ -101,12 +101,11 @@ it too makes earlier worlds "another engine"; start the next long run on it so i
 - **World ranking points** (Rankings → *World: points by week*): any recorded week's top 200 with average,
   weighted points, counted starts and divisor; a golfer's page lists every start behind their points, the
   weight each carries now and the total (exactly the engine's arithmetic).
-- **Hide results** (header): hide this season's results, results from now on, or every result, until you reveal
-  them. Hidden editions show "hidden · Watch" instead of a winner in the calendar, overview, tour, tournament,
-  course and seasons lists; an event opens on the replay at round one (or where you left off); the final round
-  shows the leaderboard after regulation without any playoff or winner; **Reveal final result** shows it (and
-  every page then does). Pages that add results up (stats, rankings, records, profiles) say they count hidden
-  results. **Show results** turns it off and keeps what you watched. Kept with the world.
+- **Replay**: every event opens on its final result; *Watch from round 1* (or the *Rounds & replay* tab) shows the
+  recorded rounds one at a time -- nothing after the round shown (no winner, final places or later rounds) until
+  the final round, which shows any playoff hole by hole. Restarting always opens round one. (The earlier global
+  *Hide results* setting has been removed: every page shows the complete history. A world that still has its
+  old `observer_spoilers.json` opens normally; the file is ignored.)
 - **Majors + Premier** (Stats, golf statistics, profiles, records): one click for every major and every Premier
   circuit's events, by each edition's classification when played; **All tours** resets it.
 - **Overall** on Stats: sortable both ways over the whole list (current Overall; † last recorded for retired
