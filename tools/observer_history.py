@@ -337,10 +337,18 @@ def season_view(w, q, pid, p):
                                                  f'eligible through {c.get("final") or "?"}'))
         if row.get('injury_weeks'):
             facts.append(('Weeks injured', O.esc(row['injury_weeks'])))
-        if row.get('zero_start_reason'):
+        if row.get('events') == 0 and row.get('access'):
+            from golfsim import access as ACC
+            kind, text = ACC.zero_start_summary(row['access'], row.get('injury_weeks') or 0, row.get('lifestyle'))
+            old = row.get('zero_start_reason')
+            facts.append(('No starts', O.esc(text) + (f' <span class="muted">(the label recorded then, by an older '
+                                                     f'engine: “{O.esc(old)}”)</span>' if old and old != text else '')))
+        elif row.get('zero_start_reason'):
             facts.append(('No starts', O.esc(row['zero_start_reason'])))
     facts.append(('Rules', rules_note(w, y)))
     out.append('<dl class="kv">' + ''.join(f'<dt>{k}</dt><dd>{v}</dd>' for k, v in facts) + '</dl>')
+    if row and row.get('access'):
+        out.append(week_ledger(w, row, pid, y))
     # results that season
     rows = [r for r in OD.results(w, pid) if r['year'] == y]
     db, _ = w.statistics()
@@ -420,6 +428,42 @@ def _place(x):
 
 
 # ---- coaches and caddies -----------------------------------------------------------------------------------------
+def week_ledger(w, row, pid, y):
+    """The season's weeks by what happened (golfsim.access): played, injured, barriers (with the stage that
+    kept them out) and choices, each with its weeks out of the weeks recorded, and the weeks they were shut
+    out or played an alternative with the event they wanted."""
+    from golfsim import access as ACC
+    O = _o()
+    lg = ACC.ledger(row['access'])
+    n = lg['weeks'] or 1
+    pct = lambda k: f'{100 * k / n:.0f}%'
+    rows = [['played', '', str(lg['played']), pct(lg['played'])]] if lg['played'] else []
+    if lg['injured']:
+        rows.append(['injured', '', str(lg['injured']), pct(lg['injured'])])
+    for name in list(ACC.BARRIERS) + list(ACC.CHOICES):
+        k = lg['groups'].get(name)
+        if k:
+            kind = 'barrier' if name in ACC.BARRIERS else 'choice'
+            detail = ', '.join(f'{d.replace("chose to ", "")} {lg["detail"][d]}' for d in
+                               (ACC.BARRIERS.get(name) or ACC.CHOICES.get(name)) if lg['detail'].get(d))
+            rows.append([f'{kind}: {name}', O.esc(ACC.STAGE[name]) + (f' ({O.esc(detail)})' if ',' in detail else ''),
+                         str(k), pct(k)])
+    out = ['<h2>The season week by week</h2>' + O.table(['What happened', 'Where it was decided', 'Weeks', 'Share'],
+                                                        rows, numeric=(2, 3))]
+    out.append(f'<p class="muted">{lg["weeks"]} weeks recorded. Each week is classified once, when it is played, '
+               'in this order: played; injured; not admitted (every acceptable field full, or not picked for the '
+               'college lineup); no suitable event scheduled; not eligible; could not afford any event; declined; '
+               'trained, rested or worked. Choices are counted only when an affordable event they could enter '
+               'existed that week, so a season with barrier weeks is never called voluntary.</p>')
+    denied = row.get('denied') or []
+    if denied:
+        out.append('<h3>Weeks shut out or playing an alternative</h3>' + O.table(['Week', 'What happened', 'Wanted',
+                                                                                   'Played instead'], [
+            [O.esc(d[0]), O.esc(d[1]), O.event_link(w, d[2]) if d[2] else '—', O.event_link(w, d[3]) if d[3] else '—']
+            for d in denied], numeric=(0,)))
+    return ''.join(out)
+
+
 def team_history(w, pid):
     """Coaches and caddies in separate sections: dated stints with the starts and wins they shared (from the
     team recorded with each result, never from today's assignments)."""

@@ -30,6 +30,7 @@ from collections import Counter, defaultdict
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass, field, replace
 
+from . import access as ACC
 from . import development as D
 from . import golfstats as GS
 from . import finance as FIN
@@ -2136,20 +2137,13 @@ class Season:
         return snap
 
     def zero_start_reason(self, gid, year, row):
-        """Why a golfer played no event all season, from what was recorded in their monthly plans."""
-        f = self.block_flags[year].get(gid, Counter())
-        months = sum(f.values()) or 1
-        if row['injury_weeks'] >= 40:
-            return 'injured'
-        if f['stuck'] >= months / 2:
-            return 'could not afford any trip'
-        if self.entry_misses[year][gid] >= 4:
-            return 'wanted to play but every field they tried was full'
-        if f['no event'] >= months / 2:
-            return 'no event they were eligible for'
-        if self.g[gid].lifestyle == 'part_time':
-            return 'part-timer: chose not to play'
-        return 'chose not to play (training, rest or work)'
+        """Why a golfer played no event all season: every contributing cause from the season's weekly evidence
+        (golfsim.access), with its weeks -- a season with unaffordable or full-field weeks is never called
+        voluntary. Sets row['zero_start_kind'] too."""
+        kind, text = ACC.zero_start_summary(self.week_access[year].get(gid, {}), row['injury_weeks'],
+                                            self.g[gid].lifestyle)
+        row['zero_start_kind'] = kind
+        return text
 
     # ---- development and the monthly plan ------------------------------------------------------
     def plan_block(self, year, week0):

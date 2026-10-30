@@ -180,7 +180,7 @@ class ArchiveWriter:
             careers[gid] = {k: row.get(k) for k in ('tour', 'tier', 'status', 'lifestyle', 'events', 'wins', 'top10',
                                                     'cuts', 'majors', 'prize', 'net', 'wr_start', 'wr_end', 'am_start',
                                                     'am_end', 'injury_weeks', 'promoted', 'demoted', 'next_tour',
-                                                    'zero_start_reason')}
+                                                    'zero_start_reason', 'zero_start_kind')}
             careers[gid]['rights'] = season.rights.get(year, {}).get(gid)          # Premier status at entry, why
             careers[gid]['exemption'] = season.earned.get(year, {}).get(gid)      # winner's exemption held (why)
             careers[gid]['card_reason'] = season.card_reasons.get(year + 1, {}).get(gid)   # why next season's card
