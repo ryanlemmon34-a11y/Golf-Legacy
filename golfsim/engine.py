@@ -689,6 +689,20 @@ def play_hole(pl, hole, hidx, rng, st, pressure=0.0, state=None, pin=None):
         sg_add('app', before, baseline(_LIE_BASELINE[lie], dist))
 
     # ----------------------------------------------------------- bookkeeping
+    tally_hole(st, par, strokes, putts, gir, sand_at)
+    rel = strokes - par
+    if rel >= 1:
+        state.tilt = min(2.5, state.tilt + 0.6 * rel)
+    return strokes
+
+
+def tally_hole(st, par, strokes, putts, gir, sand_at):
+    """Count one finished hole into RoundStats `st` (golfsim.golfstats definitions). `gir`: the ball was on the
+    putting surface within par - 2 strokes (penalties included). A ball holed from off the green within par - 2
+    strokes (an ace, a holed approach) never touched the green but is a green in regulation with no putts, not
+    a missed green saved by a scramble."""
+    if not gir and putts == 0 and strokes <= par - 2:
+        gir = True
     rel = strokes - par
     st.holes.append(strokes)
     st.score += strokes
@@ -718,9 +732,6 @@ def play_hole(pl, hole, hidx, rng, st, pressure=0.0, state=None, pin=None):
         st.worse += 1
     st.par_scores[par][0] += strokes
     st.par_scores[par][1] += 1
-    if rel >= 1:
-        state.tilt = min(2.5, state.tilt + 0.6 * rel)
-    return strokes
 
 
 def play_round(golfer, course, rng, cond=None, caddie=None, round_no=1, week_form=None,

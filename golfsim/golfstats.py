@@ -17,7 +17,8 @@ Definitions (version 1):
   tee shots. A fairway bunker is not the fairway; a drive finishing on or beside a drivable green counts
   as an attempt without a fairway hit. Par 3 tee shots are not counted.
 - **Greens in regulation**: holes where the ball was on the putting surface after at most par - 2 strokes
-  (penalty strokes included; the fringe is not the putting surface) / holes played.
+  (penalty strokes included; the fringe is not the putting surface), or holed from off the green within
+  par - 2 strokes (an ace, a holed approach: a GIR with no putts) / holes played.
 - **Scrambling**: holes without a green in regulation finished in par or better / holes without a GIR.
   Separate from **sand saves**: up and down (holed in at most two strokes) from a greenside bunker /
   holes with a greenside bunker shot.

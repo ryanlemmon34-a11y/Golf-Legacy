@@ -61,8 +61,7 @@ class CountingTests(unittest.TestCase):
                 self.assertLessEqual(d['drives'], d['fairway_att'])     # drivers only, never a re-tee
                 self.assertLessEqual(d['fairways'], d['fairway_att'])
                 self.assertEqual(d['gir'] + d['scr_att'], 18)           # each hole: a GIR or a scrambling chance
-                self.assertLessEqual(d['gir_putts'], d['putts'])
-                self.assertGreaterEqual(d['gir_putts'], d['gir'])       # at least one putt on a GIR hole
+                self.assertLessEqual(d['gir_putts'], d['putts'])      # (a holed approach is a GIR with no putt)
                 self.assertEqual(d['strokes'], sum(st.holes))
                 self.assertEqual(d['p3_strokes'] + d['p4_strokes'] + d['p5_strokes'], d['strokes'])
                 self.assertEqual(sum(d[k] for k in ('eagles', 'birdies', 'pars', 'bogeys', 'doubles', 'worse')), 18)
@@ -73,6 +72,44 @@ class CountingTests(unittest.TestCase):
                 GS.add(tot, c)
         self.assertGreater(penalties, 0)                                # trouble happened, and was counted once
         self.assertEqual(tot[GS.IDX['rounds']], 120)
+
+    def test_a_ball_holed_from_off_the_green_in_regulation_is_a_gir(self):
+        """Aces and holed approaches within par - 2 strokes (penalties included) are greens in regulation with no
+        putts; a chip-in after a missed green is a scramble."""
+        from golfsim.engine import RoundStats, tally_hole
+        def one(par, strokes, putts, gir=False):
+            st = RoundStats()
+            tally_hole(st, par, strokes, putts, gir, None)
+            return st.gir, st.gir_putts, st.scramble_att, st.scramble_made
+        self.assertEqual(one(3, 1, 0), (1, 0, 0, 0))                     # ace
+        self.assertEqual(one(4, 2, 0), (1, 0, 0, 0))                     # holed approach for eagle
+        self.assertEqual(one(5, 2, 0), (1, 0, 0, 0))                     # albatross
+        self.assertEqual(one(5, 3, 0), (1, 0, 0, 0))                     # a penalty stroke and two shots, holed
+        self.assertEqual(one(4, 3, 0), (0, 0, 1, 1))                     # chip-in birdie after missing the green
+        self.assertEqual(one(4, 4, 0), (0, 0, 1, 1))                     # a penalty, then holed from off for par
+        self.assertEqual(one(4, 5, 0), (0, 0, 1, 0))
+        self.assertEqual(one(4, 4, 2, gir=True), (1, 2, 0, 0))           # on in two, two putts
+        self.assertEqual(one(3, 2, 1, gir=True), (1, 1, 0, 0))
+        # and as simulated, shot by shot: every hole finished without a putt follows the same rule
+        from golfsim.engine import Conditions, Player, play_hole
+        lib = default_library()
+        course = lib.course(next(v for vs in lib.venues(2027).values() for v in vs))
+        g = max(generate_world(seed=4, scale=0.01).golfers, key=lambda g: g.overall)
+        seen = {'gir without a putt': 0, 'holed after missing': 0}
+        for par in (3, 4):
+            h = next(h for h in course.holes if h.par == par)
+            for seed in range(1, 1500):
+                rng = random.Random(seed)
+                st = RoundStats()
+                n = play_hole(Player(g, course, Conditions(), None, rng), h, course.holes.index(h), rng, st, pin=(0.0, 0.0))
+                if st.putts == 0:
+                    if n <= par - 2:
+                        self.assertEqual((st.gir, st.scramble_att), (1, 0), (par, seed))
+                        seen['gir without a putt'] += 1
+                    else:
+                        self.assertEqual((st.gir, st.scramble_att), (0, 1), (par, seed))
+                        seen['holed after missing'] += 1
+        self.assertTrue(all(seen.values()), seen)                        # both happened (an ace at seed 332)
 
     def test_aggregates_are_sums_of_counts_not_means_of_rates(self):
         a = dict.fromkeys(GS.FIELDS, 0) | {'fairways': 1, 'fairway_att': 2}
