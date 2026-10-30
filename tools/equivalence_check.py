@@ -78,7 +78,11 @@ def parts(s, session_dir):
     if m.exists():
         from golfsim.archive import _read, read_manifest
         man = read_manifest(a)
-        out['published'] = (man['years'], {y: digest(canon(_read(a / f))) for y, f in man['files']['years'].items()},
+        seasons = {y: _read(a / f) for y, f in man['files']['years'].items()}
+        # development evidence is observation only (nothing reads it back): digested on its own, so a change that
+        # adds or extends it can still be shown to leave every outcome as it was
+        out['diagnostics'] = {y: digest(canon(d.pop('diagnostics', None))) for y, d in seasons.items()}
+        out['published'] = (man['years'], {y: digest(canon(d)) for y, d in seasons.items()},
                             {k: digest(canon(_read(a / f) if f.endswith('.gz') else json.loads((a / f).read_text())))
                              for k, f in man['files'].items() if k != 'years'})
     return {k: digest(v) for k, v in out.items()}

@@ -259,6 +259,19 @@ class ArchiveWriter:
         chunk['next_major_rights'] = js(rights.get(year + 1, {}))
         chunk['travel_grants'] = [dict(t) for t in getattr(season, 'travel_grants', {}).get(year, [])]   # major
         # trips the organizer paid (in kind: in no golfer's ledger)
+        # development evidence -- diagnostics only (hidden facts included; never shown to the player): how each
+        # golfer arriving this season started, and what each source moved this season (development.SOURCES)
+        from . import development as D
+        dev, born = getattr(season, 'dev_acc', {}).get(year, {}), getattr(season, 'creations', {}).get(year, {})
+        if dev or born:
+            chunk['diagnostics'] = {
+                'format': 'golf-legacy-development/1', 'sources': list(D.SOURCES), 'categories': list(D.CATS),
+                'layout': {'by_source_and_category': [0, 25], 'overall_by_source': [D.OVERALL, D.OVERALL + 5],
+                           'train_weeks_by_category': [D.TRAIN_WEEKS, D.TRAIN_WEEKS + 5], 'coached_weeks': D.COACHED,
+                           'coaching_quality_sum': D.COACH_Q, 'overall_before_aging': D.OV_PRE,
+                           'overall_after_aging': D.OV_POST, 'ceilings_overall_after_aging': D.CEIL_POST},
+                'created': {str(g): r for g, r in born.items()},
+                'development': {str(g): [round(x, 4) for x in v] for g, v in dev.items()}}
         if year == season.first_year and getattr(season, 'wr_seed', None):
             chunk['ranking_seed'] = {str(g): rows for g, rows in season.wr_seed.items()}   # points before the world began
         return chunk

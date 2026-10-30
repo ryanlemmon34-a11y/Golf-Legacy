@@ -392,6 +392,8 @@ class Season:
         self._caddie_paid = set()                            # ... and already paid this week
         self._week_grants = set()                            # (series, gid): a major trip the organizer pays this week
         self.travel_grants = defaultdict(list)               # year -> [major trips paid by the organizer, in kind]
+        self.dev_acc = defaultdict(dict)                     # year -> gid -> development evidence (D.ACC_LEN numbers)
+        self.creations = defaultdict(dict)                   # year -> gid -> how a golfer started (hidden facts too)
         for g in world.golfers:                              # the world starts mid-history: assume the season
             if g.lifestyle != 'retired':                     # before it was a typical one for their lifestyle
                 self.prior_rounds[g.id] = (self.first_year, D.EXPERIENCE_ROUNDS * (1.0 if g.lifestyle == 'full_time' else 0.5))
@@ -807,6 +809,10 @@ class Season:
         """1 January: people refreshed, sponsor contracts, the staff market, playing rights."""
         self._active = None
         self.year = year
+        if year == self.first_year:                          # the world's own golfers, as the records begin
+            for g in self.world.golfers:
+                if g.lifestyle != 'retired' and not any(g.id in c for c in self.creations.values()):
+                    self.note_creation(g, year, 'initial')
         self.refresh_people(year)
         self.start_finances(year)
 
@@ -1833,6 +1839,8 @@ class Season:
         state.setdefault('_reserved', Counter())
         state.setdefault('_week_grants', set())
         state.setdefault('travel_grants', defaultdict(list))   # major trips before the guarantee: none paid
+        state.setdefault('dev_acc', defaultdict(dict))       # development evidence before it was kept: not recorded
+        state.setdefault('creations', defaultdict(dict))
         state.setdefault('earned', {})                      # rebuilt from results when first needed
         state.setdefault('college', {})                     # college seasons before the ledger: not recorded
         state.setdefault('wr_seed', {})
@@ -2088,7 +2096,7 @@ class Season:
                     text = f'Injured ({kind}), out for {weeks} week{"s" if weeks > 1 else ""}'
                     if self.development:
                         self.note_peaks(year, week, (g,))     # (a lasting injury can lower the ratings)
-                        lost = D.serious_injury(g, weeks, rng)
+                        lost = D.serious_injury(g, weeks, rng, acc=self.dev_record(year, g.id))
                         if lost:
                             text += ' — lasting damage: ' + ', '.join(f'{k.replace("_", " ")} −{v}' for k, v in lost.items())
                     self.log(g.id, year, week, text)
@@ -2193,7 +2201,7 @@ class Season:
                   self.block_flags, self.cash_start, self.support_start, self.overall_start, self.rank_start, self.am_start,
                   self.staff_receipts, self.injuries, self.card_log, self.career_counts, self.transitions,
                   self.assignments, self.staff_year, self.unheld, self.rights, self.earned, self.card_reasons, self.snapshots,
-                  self.major_rights, self.travel_grants,
+                  self.major_rights, self.travel_grants, self.dev_acc, self.creations,
                   self.rank_top,
                   self.juniors_added, self.new_pros_added, self.stats, self.moments):
             for y in [y for y in d if isinstance(y, int) and old(y)]:
@@ -2249,11 +2257,18 @@ class Season:
         if self.development:
             from . import careers
             self.note_peaks(year, 52)                        # the season's ratings, before retirements and aging
+            for gid, acc in self.dev_acc[year].items():       # (evidence: the season's end, before aging; a
+                if gid in self.g:                            # golfer retiring now skips the winter's aging)
+                    acc[D.OV_PRE] = self.g[gid].overall
             self.career_counts[year] = careers.decide(self, year, snap)
             rng = random.Random(_seed(self.seed, year, 'aging'))
+            from .golfer import overall_rating
             for g in self.world.golfers:
                 if g.lifestyle != 'retired':
-                    D.age_year(g, g.age(year + 1), rng, self.year_experience(g.id, year))
+                    acc = self.dev_record(year, g.id)
+                    D.age_year(g, g.age(year + 1), rng, self.year_experience(g.id, year), acc=acc)
+                    acc[D.OV_POST] = g.overall               # as next season starts
+                    acc[D.CEIL_POST] = overall_rating(g.ceilings) if g.ceilings else 0.0
             self.juniors_added[year + 1] = careers.add_juniors(self, year + 1)
             self.new_pros_added[year + 1] = careers.add_new_professionals(self, year + 1)
             for g in self.world.golfers:
@@ -2922,6 +2937,24 @@ class Season:
         rounds = self.season_rounds[year][gid] + last * max(0, 52 - week) / 52
         return D.experience_factor(rounds)
 
+    def note_creation(self, g, year, path):
+        """Development evidence: a golfer as they start in the world's records -- 'initial' (the world's own, as
+        the records begin: their career began earlier), 'junior' (a new 18-year-old) or 'late_entrant' (a new
+        professional from outside the tracked amateur game) -- with the hidden facts (potential, ceilings, peak
+        age, aging rate) for diagnostics only. Observation: nothing reads it back."""
+        from .ratings import ATTRIBUTE_KEYS
+        self.creations[year][g.id] = {
+            'year': year, 'week': 0, 'path': path, 'age': g.age(year), 'overall': round(g.overall, 2),
+            'attrs': [round(g.attrs[k], 2) for k in ATTRIBUTE_KEYS], 'potential': round(g.potential, 2),
+            'ceilings': [round(g.ceilings.get(k, 0.0), 2) for k in ATTRIBUTE_KEYS] if g.ceilings else None,
+            'peak_age': round(g.peak_age, 2), 'aging_rate': round(g.aging_rate, 3)}
+
+    def dev_record(self, year, gid):
+        r = self.dev_acc[year].get(gid)
+        if r is None:
+            r = self.dev_acc[year][gid] = [0.0] * D.ACC_LEN
+        return r
+
     def year_experience(self, gid, year):
         """Competitive experience from a season's rounds actually played (0-1): what the year-end
         maturing of the mental game follows."""
@@ -2950,10 +2983,16 @@ class Season:
             if self.development and g.ceilings:
                 scale = 0.3 if g.lifestyle == 'part_time' and act == 'train' else 1.0
                 age = g.age(year)
+                acc = self.dev_record(year, g.id)
                 if act == 'train' and cat:
-                    D.develop_week(g, act, age, cat, rounds, coach=self.staff.coaching(g, cat, age, year), scale=scale,
-                                   experience=self.experience(g.id, year, week), gain=False)
+                    q = self.staff.coaching(g, cat, age, year)
+                    D.develop_week(g, act, age, cat, rounds, coach=q, scale=scale,
+                                   experience=self.experience(g.id, year, week), gain=False, acc=acc)
+                    acc[D.TRAIN_WEEKS + D.CATS.index(cat)] += 1
+                    acc[D.COACHED] += g.id in self.staff.coach_of
+                    acc[D.COACH_Q] += q
                 else:                                        # (rest, work or play: no coaching, no experience)
-                    D.develop_week(g, 'rest' if act == 'work' else act, age, cat, rounds, scale=scale, gain=False)
+                    D.develop_week(g, 'rest' if act == 'work' else act, age, cat, rounds, scale=scale, gain=False,
+                                   acc=acc)
             if act in ('train', 'play') and g.id in self.staff.coach_of:
                 self.staff.rel.add_work('coach', g.id, 1.0, year)        # a week actually worked together

@@ -492,6 +492,8 @@ def add_new_professionals(season, year):
         g.backer_patience = rng.random()
         season.world.golfers.append(g)
         season.g[g.id] = g
+        if hasattr(season, 'note_creation'):
+            season.note_creation(g, year, 'late_entrant')
         season.prior_rounds[g.id] = (year, EXPERIENCE_ROUNDS)    # seasons of competition behind them (fading)
         season.log(g.id, year, 1, f'Turned professional at {age}, starting on the {TOUR_BY_KEY[g.tour].name}'
                    + (f', with backers putting up ${g.backer:,.0f} a season' if g.backer else ', paying their own way'))
@@ -513,6 +515,8 @@ def add_juniors(season, year):
         g.backing = initial_backing(18, rng.random(), rng.random())
         season.world.golfers.append(g)
         season.g[g.id] = g
+        if hasattr(season, 'note_creation'):
+            season.note_creation(g, year, 'junior')
         season.prior_rounds[g.id] = (year, EXPERIENCE_ROUNDS)    # a junior season of competition behind them (fading)
         where = TOUR_BY_KEY[g.tour].name if g.tour in TOUR_BY_KEY else 'amateur golf'
         season.log(g.id, year, 1, f'Arrived on the scene at 18 ({where})')

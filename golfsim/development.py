@@ -44,6 +44,16 @@ CATEGORIES = {
 CATEGORY_OF = {k: c for c, ks in CATEGORIES.items() for k in ks}
 assert set(CATEGORY_OF) == set(ATTRIBUTE_KEYS)
 
+# Development evidence (observation only: what each source of change did, summed over a season; nothing reads it
+# back). An accumulator is a list of ACC_LEN numbers: for each source and category the attribute points it moved
+# (SOURCES x CATS), the Overall each source moved, the weeks trained in each category, coached training weeks and
+# the coaching quality summed over training weeks, and Overall before and after the winter's aging, with the
+# ceilings' Overall after it (hidden: diagnostics only).
+SOURCES = ('maturing', 'training', 'tournaments', 'injury', 'aging')
+CATS = tuple(CATEGORIES)
+OVERALL, TRAIN_WEEKS, COACHED, COACH_Q, OV_PRE, OV_POST, CEIL_POST = 25, 30, 35, 36, 37, 38, 39
+ACC_LEN = 40
+
 BASE_TRAIN = 0.016          # share of the gap closed per week of training (before learning rate)
 BASE_PLAY = 0.008           # per tournament (four rounds), on every non-physical attribute
 MENTAL_PLAY = 1.6           # competition teaches the mental game most
@@ -120,12 +130,20 @@ def coach_multiplier(quality):
     return 1.0 + 0.5 * max(0.0, quality - 0.3)
 
 
-def develop_week(g, activity, age, category=None, rounds=0.0, coach=0.3, scale=1.0, experience=1.0, gain=True):
+def note(acc, src, k, d):
+    """Development evidence: attribute `k` moved by `d` through source `src` (an index into SOURCES)."""
+    c, wt = _NOTE[k]
+    acc[src * 5 + c] += d
+    acc[OVERALL + src] += wt * d
+
+
+def develop_week(g, activity, age, category=None, rounds=0.0, coach=0.3, scale=1.0, experience=1.0, gain=True,
+                 acc=None):
     """Apply one week of development. activity: 'train', 'play' or 'rest' (a paid work week counts as
     rest). `scale` shrinks training for golfers with a full-time job; `experience` (0-1, from recent
     competitive rounds) limits what training can do for the competitive attributes. Returns overall
     gained (from the attributes that changed: a week touches only a few), or None with gain=False (the
-    season does not use it)."""
+    season does not use it). `acc`: a development evidence accumulator (see SOURCES), or None."""
     a, c = g.attrs, g.ceilings
     old = {}
     if age < 23:                                  # still growing into their body, whatever the week
@@ -134,6 +152,8 @@ def develop_week(g, activity, age, category=None, rounds=0.0, coach=0.3, scale=1
             if gap > 0:
                 old[k] = a[k]
                 a[k] = min(99.0, a[k] + MATURING * gap)
+                if acc is not None:
+                    note(acc, 0, k, a[k] - old[k])
     if activity == 'rest':
         return _gain(a, old) if gain else None
     lr = learning_rate(age) * (0.5 + g.personality['work_ethic'] / 100) * scale
@@ -145,7 +165,10 @@ def develop_week(g, activity, age, category=None, rounds=0.0, coach=0.3, scale=1
             gap = c[k] - a[k]
             if gap > 0:
                 old.setdefault(k, a[k])
+                was = a[k]
                 a[k] = min(99.0, a[k] + k_train * gap * _train_mult(k, experience))
+                if acc is not None:
+                    note(acc, 1, k, a[k] - was)
     elif activity == 'play' and rounds:
         k_play = BASE_PLAY * lr * min(1.0, rounds / 4)
         for k, cat in CATEGORY_OF.items():
@@ -154,11 +177,15 @@ def develop_week(g, activity, age, category=None, rounds=0.0, coach=0.3, scale=1
             gap = c[k] - a[k]
             if gap > 0:
                 old.setdefault(k, a[k])
+                was = a[k]
                 a[k] = min(99.0, a[k] + k_play * gap * (MENTAL_PLAY if cat == 'mental' else 1.0))
+                if acc is not None:
+                    note(acc, 2, k, a[k] - was)
     return _gain(a, old) if gain else None
 
 
 _TOTAL_W = sum(OVERALL_WEIGHTS.values())
+_NOTE = {k: (CATS.index(CATEGORY_OF[k]), OVERALL_WEIGHTS[k] / _TOTAL_W) for k in ATTRIBUTE_KEYS}
 
 
 def _gain(a, old):
@@ -262,7 +289,7 @@ def choose_category(g, rng, insight=0.0, gaps=None):
     return max(scores, key=lambda c: scores[c] / top + rng.gauss(0, noise))
 
 
-def age_year(g, age, rng, experience=1.0):
+def age_year(g, age, rng, experience=1.0, acc=None):
     """One year older: physical decline after the prime, then technique; the mental game matures with
     competitive experience (`experience`, 0-1, from the season's competitive rounds) — a year without
     competition matures nothing."""
@@ -283,13 +310,16 @@ def age_year(g, age, rng, experience=1.0):
             elif age > 55:
                 d = -0.2 * (age - 55) ** 0.7
         if d:
+            was = a[k]
             a[k] = max(1.0, min(99.0, a[k] + d))
+            if acc is not None:
+                note(acc, 4, k, a[k] - was)
             c[k] = max(1.0, min(99.0, c[k] + d))
             if a[k] > c[k]:
                 c[k] = a[k]
 
 
-def serious_injury(g, weeks, rng):
+def serious_injury(g, weeks, rng, acc=None):
     """A long injury (10+ weeks) can cost some strength, stamina and resilience to injury for good: the
     longer it is, the likelier (about 15% at 10 weeks, 60% at 20, 85% at 30)."""
     if weeks < 10 or rng.random() > 1 - math.exp(-(weeks - 8) / 12):
@@ -297,7 +327,10 @@ def serious_injury(g, weeks, rng):
     lost = {}
     for k in ('power', 'stamina', 'injury_resistance'):
         d = rng.uniform(0.3, 1.0) * min(4.0, weeks / 8)
+        was = g.attrs[k]
         g.attrs[k] = max(1.0, g.attrs[k] - d)
+        if acc is not None:
+            note(acc, 3, k, g.attrs[k] - was)
         g.ceilings[k] = max(g.attrs[k], g.ceilings[k] - d)
         lost[k] = round(d, 1)
     return lost
