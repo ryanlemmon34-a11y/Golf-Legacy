@@ -42,6 +42,7 @@ from observer_live import capture                                    # noqa: E40
 import observer_data as OD                                            # noqa: E402
 import observer_history as OH                                         # noqa: E402
 import observer_golf as OG                                            # noqa: E402
+from golfsim import scopes as SC                                      # noqa: E402
 
 PAGE_SIZE = 100
 
@@ -1015,6 +1016,10 @@ def _honors(w, pid, rows, active):
 
 def _season_history(w, q, pid, p, rows):
     db, building = w.statistics()
+    mp = one(q, 'scope') == SC.MAJORS_PREMIER          # the shared Majors + Premier scope: those editions only
+    if mp:
+        keep = SC.majors_premier_tours()
+        rows = [r for r in rows if (r['tour'] or '') in keep]
     OD.cut_flags(w, rows, db)
     roll = OD.season_rollup(rows)
     seasons = {r['year']: r for r in (w.a.index.seasons(pid) if w.a and w.a.index and pid in w.a.people else [])}
@@ -1030,17 +1035,30 @@ def _season_history(w, q, pid, p, rows):
     by_tour = {}                                     # tour -> [stats, prize so far, all known]
 
     def cells(y, t, agg, prize_cell):
-        link = lambda label, outcome=None: results_link(pid, label, year=y, tour=t, outcome=outcome)
+        scope_t = t or (SC.MAJORS_PREMIER if mp else None)
+        link = lambda label, outcome=None: results_link(pid, label, year=y, tour=scope_t, outcome=outcome)
         cut = f'{agg["cuts_made"]}/{agg["cut_events"]}' if agg['cut_events'] else '—'
         missed = link(str(agg['cut_events'] - agg['cuts_made']), 'missed-cut') if agg['cut_events'] else '—'
         return [link(str(agg['starts'])), link(str(agg['wins']), 'win'), link(str(agg['runner_ups']), 'runner-up'),
                 link(str(agg['top2']), 'top2'), link(str(agg['top5']), 'top5'), link(str(agg['top10']), 'top10'),
                 cut, missed, prize_cell]
-    for y in sorted(set(roll) | set(seasons)):
+    def tour_prize(y, t, live):
+        if live:
+            known = bool(live_rec.get(pid))
+            return ((w.live_statistics()[0].get((pid, t)) or {}).get('prize') if known else None), known
+        if y in stored and t in stored[y]['tours']:
+            tp = stored[y]['tours'][t]['prize']
+            return tp, tp is not None
+        return None, False
+
+    for y in sorted(set(roll) | (set() if mp else set(seasons))):
         r = roll.get(y, {'all': dict.fromkeys(OD.ST.COLUMNS, 0), 'tours': {}})
         info = seasons.get(y, {})
         live = y == cur_year
-        if live:
+        if mp:                                       # the scope's own events' payouts, where every one is known
+            parts = [tour_prize(y, t, live) for t in r['tours']]
+            prize = sum(tp or 0.0 for tp, _ in parts) if all(k for _, k in parts) else None
+        elif live:
             prize = live_prize
         elif y in stored:
             prize = stored[y]['prize']
@@ -1062,13 +1080,7 @@ def _season_history(w, q, pid, p, rows):
                    + cells(y, None, a, money(prize) if prize is not None else '<span class="muted">—</span>')
                    + [esc(info.get('wr_end') or (w.live.wr.get(pid) if live and w.live else '') or '—')])
         for t in tours:
-            tp, known = None, False
-            if live:
-                known = bool(live_rec.get(pid))
-                tp = (w.live_statistics()[0].get((pid, t)) or {}).get('prize') if known else None
-            elif y in stored and t in stored[y]['tours']:
-                tp = stored[y]['tours'][t]['prize']
-                known = tp is not None
+            tp, known = tour_prize(y, t, live)
             bt = by_tour.setdefault(t, [dict.fromkeys(OD.ST.COLUMNS, 0), 0.0, True])
             for c in OD.ST.COLUMNS:
                 bt[0][c] += r['tours'][t][c]
@@ -1088,14 +1100,20 @@ def _season_history(w, q, pid, p, rows):
         for t, (agg, tp, known) in sorted(by_tour.items(), key=lambda x: (w.tours().get(x[0], {}).get('tier', 9), x[0])):
             out.append(['', '', '&nbsp;&nbsp;career ↳ ' + tour_link(w, t), ''] + cells(None, t, agg, money(tp, known and bool(db or w.live)))
                        + [''])
-    toggle = (f'<a href="/golfer/{pid}?tab=playing">hide tours</a>' if expand else
-              f'<a href="/golfer/{pid}?tab=playing&tours=1">show each tour</a>')
+    sc = {'scope': SC.MAJORS_PREMIER} if mp else {}
+    toggle = (f'<a href="/golfer/{pid}?{urlencode({"tab": "playing", **sc})}">hide tours</a>' if expand else
+              f'<a href="/golfer/{pid}?{urlencode({"tab": "playing", "tours": 1, **sc})}">show each tour</a>')
+    toggle = scope_buttons(f'/golfer/{pid}', {**q, 'tab': ['playing']}, one(q, 'scope'), 'scope') + toggle
     note = ('Click a season to see it as it was (that season\'s tour, rights, ratings, team and decisions). Starts '
             'exclude qualifying stages. Top 2/5/10 include wins (do not add them up); runner-up is a recorded second '
             'place (ties included). Cuts: made / stroke-play events with a cut; missed cuts are the rest of those '
             'events. Prize money is gross tournament prize money; per tour it is each event\'s recorded payout (or, for '
             'seasons played before payouts were recorded, the payouts recomputed and shown only where they match the '
             'money paid). The career row adds every season once; career by tour adds each tour\'s seasons.')
+    if mp:
+        note += (f' {SC.LABEL}: only majors and Premier events, by each edition\'s classification when played (a '
+                 'Challenger member\'s major and Premier starts count; a Premier member\'s regional starts do not); '
+                 'prize money is those events\' payouts. World ranking and ratings stay global.')
     if building and expand:
         note += f' Prize money by tour is being worked out ({building["done"]} of {building["total"]} seasons).'
     return (f'<h2>Season by season</h2><p>{toggle}</p>' + table(
@@ -1113,7 +1131,8 @@ def _playing(w, q, pid, p):
     rows = OD.results(w, pid)
     active = (p.get('golfer') or {}).get('lifestyle') not in (None, 'retired')
     out = [OH.status_section(w, pid, p), _ratings(w, pid, p), _honors(w, pid, rows, active),
-           OH.grand_slam_line(w, pid), _season_history(w, q, pid, p, rows), OG.golf_section(w, pid)]
+           OH.grand_slam_line(w, pid), _season_history(w, q, pid, p, rows),
+           OG.golf_section(w, pid, one(q, 'scope'))]
     wins = [r for r in rows if r['pos'] == 1 and not OD.is_qualifying(r)]
     if wins:
         out.append(f'<h2>Wins ({len(wins)})</h2>' + table(['Season', 'Event', 'Tour then'], [
@@ -1133,7 +1152,8 @@ def _results(w, q, pid):
     if sid:
         sel = [r for r in sel if r['series'] == sid]
     if tour:
-        sel = [r for r in sel if (r['tour'] or '') == tour]
+        within = SC.tours_for(tour)
+        sel = [r for r in sel if (r['tour'] or '') in within]
     if outcome in OD.OUTCOMES:
         test = OD.OUTCOMES[outcome]
         sel = [r for r in sel if test(r['pos']) and not OD.is_qualifying(r)]
@@ -1158,7 +1178,8 @@ def _results(w, q, pid):
     tours = sorted({r['tour'] for r in rows if r['tour']})
     f = filters(f'/golfer/{pid}', {**q, 'tab': ['results']}, [
         ('year', 'Season', [('', 'all')] + [(str(y), str(y)) for y in years]),
-        ('tour', 'Tour then', [('', 'all')] + [(t, w.tours().get(t, {}).get('name', t)) for t in tours]),
+        ('tour', 'Tour then', [('', 'all'), (SC.MAJORS_PREMIER, SC.LABEL)]
+         + [(t, w.tours().get(t, {}).get('name', t)) for t in tours]),
         ('outcome', 'Finish', [('', 'any'), ('win', 'wins'), ('runner-up', 'runner-up'), ('top2', 'top 2'), ('top5', 'top 5'),
                                ('top10', 'top 10'), ('made-cut', 'made cut'), ('missed-cut', 'missed cut')])])
     f = f.replace('<button>Apply</button>', '<input type="hidden" name="tab" value="results">'
@@ -1582,6 +1603,26 @@ STATS_NOTE = ('Starts exclude qualifying stages; the simulation has no withdrawa
               'money paid (“unknown” otherwise). The current season counts as far as it has been played.')
 
 
+def tour_scope_name(w, tour):
+    if not tour:
+        return 'all tours'
+    if tour == SC.MAJORS_PREMIER:
+        return SC.LABEL + ' (every major and Premier event, by its classification when played)'
+    return w.tours().get(tour, {}).get('name', tour)
+
+
+def scope_buttons(path, q, current, param='tour'):
+    """The shared one-click scope control: Majors + Premier, or All tours (the reset). It replaces only the tour
+    choice; season, view, sort, minimum and every other filter are kept."""
+    keep = {k: v[0] for k, v in q.items() if k not in (param, 'page') and v and v[0]}
+    def b(value, label):
+        on = (current or '') == value
+        href = f'{path}?{urlencode({**keep, **({param: value} if value else {})})}'
+        return f'<a href="{href}" class="{"on" if on else ""}" aria-pressed="{"true" if on else "false"}">{esc(label)}</a>'
+    return ('<div class="tabs scope" title="Which events count">' + b(SC.MAJORS_PREMIER, SC.LABEL) + b('', 'All tours')
+            + '</div>')
+
+
 def stats_page(w, q, view='stats'):
     """Basketball GM-style statistics: a season or all-time, all tours or one, sorted by any column."""
     import observer_stats as ST
@@ -1613,8 +1654,9 @@ def stats_page(w, q, view='stats'):
     yopts = [('all', 'all-time')] + ([(str(cur), f'{cur} (so far)')] if cur is not None else []) + \
         [(str(y), str(y)) for y in reversed(archived)]
     f = filters(path, q, [('year', 'Season', yopts),
-                          ('tour', 'Tour', [('', 'all tours')] + [(t, w.tours().get(t, {}).get('name', t.replace('_', ' ').title()))
-                                                                  for t in tours])])
+                          ('tour', 'Tour', [('', 'all tours'), (SC.MAJORS_PREMIER, SC.LABEL)]
+                           + [(t, w.tours().get(t, {}).get('name', t.replace('_', ' ').title())) for t in tours])])
+    f = scope_buttons(path, q, tour) + f
     f = f.replace('<button>Apply</button>', f'<input type="hidden" name="sort" value="{esc(sort)}">'
                   + ('<input type="hidden" name="show" value="golf">' if show == 'golf' else '')
                   + (f'<input type="hidden" name="min" value="{esc(one(q, "min"))}">' if show == 'golf' and one(q, 'min')
@@ -1626,7 +1668,7 @@ def stats_page(w, q, view='stats'):
             for k, t in (('', 'Results & prize money'), ('golf', 'Golf statistics'))) + '</div>') + f
     if show == 'golf':
         scope_ = ('all-time' if ysel == 'all' else f'{ysel}' + (' so far' if ysel == str(cur) else ''))
-        scope_ += ' · ' + (w.tours().get(tour, {}).get('name', tour) if tour else 'all tours')
+        scope_ += ' · ' + tour_scope_name(w, tour)
         return title, f + OG.golf_table(w, q, data, path, {k: v[0] for k, v in q.items() if v and v[0]}, esc(scope_),
                                         ysel != 'all')
     rows = [(pid, r) for pid, r in data.items() if r['starts'] or r['prize']]
@@ -1660,7 +1702,7 @@ def stats_page(w, q, view='stats'):
                     f'<td>{nation_link((w.person(pid) or {}).get("country"))}</td>'
                     + ''.join(f'<td class="n">{c}</td>' for c in cells) + '</tr>')
     scope = ('all-time' if ysel == 'all' else f'{ysel}' + (' so far' if ysel == str(cur) else ''))
-    scope += ' · ' + (w.tours().get(tour, {}).get('name', tour) if tour else 'all tours')
+    scope += ' · ' + tour_scope_name(w, tour)
     other = ('<a href="/money">Prize money leaderboard</a>' if view == 'stats' else '<a href="/stats">All statistics</a>')
     return title, (f + f'<p>{esc(scope)} · {len(rows):,} golfers · {other}</p>'
                    + f'<div class="scroll"><table>{head}{"".join(body)}</table></div>' + pager
@@ -1699,15 +1741,20 @@ def record(w, q, name):
     if not w.stats:
         return BOARDS[name][0], no_history()
     scope = one(q, 'scope', '') or ''
-    over = {'scope': scope} if scope and name in SCOPED else {}
+    # the shared Majors + Premier scope is the records' tiers 0-1 ("premier") scope: every major and Premier event
+    hs_scope = 'premier' if scope == SC.MAJORS_PREMIER else scope
+    over = {'scope': hs_scope} if hs_scope and name in SCOPED else {}
     title, rows = board(w.stats, name, n=100, **over)
     f = ''
     if name in SCOPED:
         tours = sorted(((k, t.get('name', k)) for k, t in w.tours().items()), key=lambda x: x[1])
-        f = filters(f'/records/{name}', q, [('scope', 'Scope', [('', 'as defined')] + [(s, s) for s in SCOPES] +
-                                                                [(k, f'tour: {t}') for k, t in tours])])
+        names = {'all': 'all events', 'professional': 'professional events', 'premier': SC.LABEL, 'major': 'majors'}
+        f = scope_buttons(f'/records/{name}', q, SC.MAJORS_PREMIER if hs_scope == 'premier' else scope, 'scope') + \
+            filters(f'/records/{name}', q, [('scope', 'Scope', [('', 'as defined')]
+                                             + [(SC.MAJORS_PREMIER if s == 'premier' else s, names.get(s, s)) for s in SCOPES]
+                                             + [(k, f'tour: {t}') for k, t in tours])])
         if scope:
-            title += f' — {w.tours().get(scope, {}).get("name", scope)}'
+            title += f' — {SC.LABEL if hs_scope == "premier" else w.tours().get(scope, {}).get("name", scope)}'
     flag = lambda r: '<span class=tag>partial</span>' if r['partial'] else ''
     context = OH.record_context(w, name, rows)
     value = (lambda r: money(r['value'])) if name == 'most-prize' else (lambda r: esc(r['value']))

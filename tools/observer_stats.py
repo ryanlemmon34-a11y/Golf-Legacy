@@ -431,9 +431,11 @@ def query(db, years=None, tour=None, live=None, live_year=None, cols=ALL):
     if years is not None and not whole:
         where.append(f'year IN ({",".join("?" * len(years))})')
         args += list(years)
-    if tour:
-        where.append('tour = ?')
-        args.append(tour)
+    from golfsim.scopes import tours_for
+    tours = tours_for(tour)                              # one tour, or every tour of a shared scope (Majors + Premier)
+    if tours:
+        where.append(f'tour IN ({",".join("?" * len(tours))})')
+        args += list(tours)
     w = (' WHERE ' + ' AND '.join(where)) if where else ''
     sums = ', '.join(f'SUM({c})' for c in cols)
     if whole:
@@ -460,7 +462,7 @@ def query(db, years=None, tour=None, live=None, live_year=None, cols=ALL):
     if live is not None:
         agg, rec = live[0], live[1]
         for (gid, t), a in agg.items():
-            if tour and t != tour:
+            if tours and t not in tours:
                 continue
             r = out[gid]
             for c in cols:

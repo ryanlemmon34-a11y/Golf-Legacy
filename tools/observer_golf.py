@@ -65,15 +65,19 @@ def figure_cells(c):
 
 
 # ---- a golfer's golf statistics -------------------------------------------------------------------------------------
-def person_golf(w, pid):
+def person_golf(w, pid, scope=None):
     """{year: {'all': counters+starts, 'tours': {tour: counters+starts}, 'live': bool}} from the statistics store and
     the live season (None while the store is being built)."""
+    from golfsim.scopes import tours_for
+    within = set(tours_for(scope))                      # () = every tour
     db, building = w.statistics()
     out = {}
     if db is not None:
         for y, s in _st().person_seasons(db, pid).items():
-            d = out.setdefault(y, {'all': {}, 'tours': {}, 'live': False})
             for t, row in s['tours'].items():
+                if within and t not in within:
+                    continue
+                d = out.setdefault(y, {'all': {}, 'tours': {}, 'live': False})
                 d['tours'][t] = _add({}, row)
                 _add(d['all'], row)
     elif building:
@@ -83,17 +87,18 @@ def person_golf(w, pid):
         y = w.live.cursor['year']
         if not (w.a and y in w.a.years):
             for (gid, t), row in live[0].items():
-                if gid == pid:
+                if gid == pid and not (within and t not in within):
                     d = out.setdefault(y, {'all': {}, 'tours': {}, 'live': True})
                     d['tours'][t] = _add({}, row)
                     _add(d['all'], row)
     return out
 
 
-def golf_section(w, pid):
-    """The profile's golf statistics: each season (all tours), then the career and the career by tour."""
+def golf_section(w, pid, scope=None):
+    """The profile's golf statistics: each season (all tours, or the shared scope), then the career and the career
+    by tour."""
     O = _o()
-    data = person_golf(w, pid)
+    data = person_golf(w, pid, scope)
     if data is None:
         return '<h2>Golf statistics</h2><p class="muted">Working out the statistics from the history…</p>'
     if not data:
@@ -123,7 +128,9 @@ def golf_section(w, pid):
                 if c.get('golf_starts'):
                     rows.append(['&nbsp;&nbsp;career ↳ ' + O.tour_link(w, t), str(c['starts']), str(c['rounds'])]
                                 + figure_cells(c) + [_coverage(c)])
-    return ('<h2>Golf statistics</h2>' + O.table(head, rows, numeric=tuple(range(1, len(head) - 1)))
+    from golfsim.scopes import MAJORS_PREMIER, LABEL
+    title = '<h2>Golf statistics' + (f' — {LABEL}' if scope == MAJORS_PREMIER else '') + '</h2>'
+    return (title + O.table(head, rows, numeric=tuple(range(1, len(head) - 1)))
             + f'<p class="muted">{DEFINITIONS_NOTE} Coverage: starts with recorded statistics / starts. The career rows '
               'add only recorded seasons. <a href="/stats?show=golf">Compare in the Stats directory</a>.</p>')
 
@@ -396,10 +403,12 @@ def golf_record(w, q, name):
     if db is None:
         return title, (O.no_history() if not w.a else '<p>Working out the statistics from the history…</p>'
                        '<meta http-equiv="refresh" content="3">')
+    from golfsim.scopes import MAJORS_PREMIER, LABEL, tours_for
     tour = O.one(q, 'tour', '') or ''
     tours = sorted(((k, t.get('name', k)) for k, t in w.tours().items()), key=lambda x: x[1])
-    fields = [('tour', 'Tour', [('', 'all tours')] + tours)]
-    where, args = ('tour = ?', [tour]) if tour else ('1', [])
+    fields = [('tour', 'Tour', [('', 'all tours'), (MAJORS_PREMIER, LABEL)] + tours)]
+    within = tours_for(tour)
+    where, args = ((f'tour IN ({",".join("?" * len(within))})', list(within)) if within else ('1', []))
     years = list(w.a.years)
     recorded = [y for (y,) in db.execute('SELECT DISTINCT year FROM agg WHERE golf_starts > 0 ORDER BY year')]
     cov = (f'Recorded seasons: {O.span(recorded, False)}' if recorded else 'No season with recorded golf statistics yet')
@@ -497,7 +506,7 @@ def golf_record(w, q, name):
         note = ('Holes up with holes left to play (7&6: seven up with six to play); “2 up” went the distance; “19 holes”: '
                 'won at an extra hole. Never converted to strokes. A match win is not a championship: the final is the '
                 'championship match (choose “finals only”). Recorded from the golf-statistics update on.')
-    f = O.filters(f'/golf-records/{name}', q, fields)
+    f = O.scope_buttons(f'/golf-records/{name}', q, tour) + O.filters(f'/golf-records/{name}', q, fields)
     return title, (f + f'<p class="muted">{O.esc(cov)} Counted in {O.esc(unit)}.</p>'
                    + (O.table(head, rows, numeric=numeric) if rows else '<p class="muted">Nobody qualifies yet.</p>')
                    + f'<p class="muted">{note} Definitions: <a href="/rules#golf-statistics">golf statistics</a>.</p>')
