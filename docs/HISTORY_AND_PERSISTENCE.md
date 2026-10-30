@@ -203,6 +203,16 @@ column when its own session next opens it). Seasons archived before these facts 
 rounds are never reconstructed from totals, money splits stay the reconciled recomputation, ratings history
 starts where snapshots start.
 
+**Recorded since the golf-statistics update (`docs/PRETEST_REVIEW_RESPONSE.md`):** each edition carries every
+golfer's golf statistics counters per site (`golf`: `golfsim.golfstats.FIELDS` in order, then the longest drive
+in tenths of a yard, its round and hole), each counted start's world ranking points (`points`) and, for match
+play, every match (`matches`: stage, winner, loser, result, holes scheduled); each season file carries the
+definitions it used (`definitions`: golf statistics version, ranking rule) and each week's world ranking top 200
+with average and counted starts (`ranking_points`); the first season also keeps the points seeded when the world
+began (`ranking_seed`). The index (schema 4) adds each start's points (`starts.points`). The observer's
+statistics store (schema 2, derived and rebuilt from the season files) sums the counters per golfer, season and
+tour and keeps per-season record rows (longest drives, event driving averages, winning margins, match results).
+
 ### Queries (`archive.Archive`)
 
 | Question | Call |

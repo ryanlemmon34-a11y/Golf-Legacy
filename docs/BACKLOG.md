@@ -31,6 +31,17 @@ requirements are unchanged; no new long run, spending or calibration change is a
 5. **Complete the universe and release proof**: nation development, remaining autonomous pathway details,
    broad long-run validation. Nation-versus-nation events later; nationality and residence history kept.
 
+## The pretest review increment (owner roadmap, pinned review of 5bcc6ed, 29 October 2026)
+
+Delivered (`docs/PRETEST_REVIEW_RESPONSE.md`): golf statistics captured per edition with versioned definitions
+and kept in the archive; world ranking points per start, weekly top-200 averages and the seeded points, with a
+profile breakdown that reproduces the engine exactly; largest stroke-play margins and match-play wins; driving
+records (longest drive, event / season / career averages with proposed thresholds); a Golf statistics tab in
+Stats and on profiles; the five pretest fixes (replay spoilers, live record status, starts scope, restore order,
+no-index ids). Next, in order (observer-only, worlds stay resumable): saved table views and navigation; Where
+Are They Now; My World; career comparisons; the GOAT Lab; then the owner's choice of immersion views. Open for
+review: the qualification thresholds; whether strokes gained gets a validated baseline.
+
 ## The 2090 audit increment (owner roadmap "Fix genuine access defects and make history explain itself", 30 October 2026)
 
 The owner's 63-season world (seed 2027, 2027-2089) was reviewed read-only by the audit and is kept unchanged as

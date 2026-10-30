@@ -37,7 +37,9 @@ observer, tools or the save code keep it so.
 so worlds made before it -- your 63-season world included -- show as "another engine": browse them read-only,
 or **Copy** one with "continue with this engine" to keep playing it on the new rules (the copy's earlier
 seasons keep what was recorded then). Install this update in a separate folder from any long run still in
-progress.
+progress. The golf-statistics update (the same day: golf statistics, ranking points, match results; `docs/PRETEST_REVIEW_RESPONSE.md`)
+changes the engine's bookkeeping again (not a single shot or result: the same seed plays the same history), so
+it too makes earlier worlds "another engine"; start the next long run on it so its seasons record everything.
 
 ## What you can do
 
@@ -60,7 +62,17 @@ progress.
   keeps your filters.
 - **Stats** and **Prize money** (Basketball GM style): a season (the current one so far, or any archived one) or
   all-time, all tours or one, sorted by any column (starts, wins, runner-up, top 2/5/10, cuts made, prize
-  money); every number opens the results behind it. Definitions are under the table.
+  money); every number opens the results behind it. Definitions are under the table. The **Golf statistics**
+  tab: scoring average, driving distance, fairways, greens in regulation, scrambling, sand saves, putts per
+  round and per GIR, birdies and bogeys per round, strokes gained (the engine's table), with rounds and starts
+  beside them and a qualification (proposed: 20 rounds in a season, 100 all-time; "include everyone" lifts it).
+- **Golf records** (Records & frivolities → *Golf statistics and margins*): longest drives (round and hole),
+  the best driving average in an event, a season and a career (with sample thresholds), the largest stroke-play
+  winning margins (regulation; every tied runner-up listed; a playoff counts as zero; choose 72/54/36/18 holes,
+  majors only, a minimum field) and the largest match-play wins (holes up and to play; finals apart).
+- **World ranking points** (Rankings → *World: points by week*): any recorded week's top 200 with average,
+  weighted points, counted starts and divisor; a golfer's page lists every start behind their points, the
+  weight each carries now and the total (exactly the engine's arithmetic).
 - **Shortlist**: ☆ Shortlist on any person, course, nation, tour, tournament or edition; the Shortlist page
   lists them. Kept with the world (it travels with copies and problem reports).
 - **Rules** (`/rules`): how golfers get into fields, keep and earn cards, and which amateur and college golf
@@ -78,18 +90,23 @@ progress.
   and links; a Career Grand Slam line; a season-by-season table with age, missed cuts, a career total, every
   statistic linked to its results and *show each tour* for the per-tour rows and career totals by tour; where
   they have lived (birthplace, the residence they started with -- a college placement is not a move -- and each
-  dated move); coaches show their current clients as rows and a season-by-season staff table.
+  dated move); **golf statistics** season by season, the career and the career by tour (with coverage:
+  starts with recorded statistics / starts); **world ranking points** (each counted start, its weight now);
+  coaches show their current clients as rows and a season-by-season staff table.
   One identity with a tab per career — *Playing career* (seasons, wins, moments),
   *Results* (every start with its prize money, the coach and caddie that week and how they got in; filter by
-  season, tour, finish or tournament), *Coaches & caddies* (coaches and caddies in separate sections, with the
+  season, tour, finish or tournament; qualifying stages, which are not starts, only on request so the list
+  matches the numbers that link to it), *Coaches & caddies* (coaches and caddies in separate sections, with the
   starts and wins shared during each stint),
   *Coaching*, *Caddying* (each partnership with dates, starts together, wins and majors).
 - **An edition** (one year of a tournament) is separate from the **tournament** (all its editions), and a
   **course layout** from its course. The current season's editions are linked as soon as they are played and
   read the same after the season is archived. An edition shows its winner, field, course, each golfer's prize
   money and **Rounds & replay**: the leaderboard after each round (a replay of the recorded rounds -- nothing is
-  simulated), each round's conditions, missed cuts, and for majors every golfer's hole-by-hole scorecard.
-  Editions played before this update show "not recorded" there.
+  simulated, and nothing after the round shown is revealed: no winner, final places, playoff or later
+  scorecard rounds until the final round), each round's conditions, missed cuts, and for majors every
+  golfer's hole-by-hole scorecard; **Statistics**: each golfer's figures in that edition and longest drive.
+  Editions played before these updates show "not recorded" there.
 - **A tournament** shows a summary (most wins, most starts, most-used courses, youngest and oldest winners) and
   every edition with its course; **a course** shows its tournament mix and total starts.
 - **Records** show, on every row, when (the date or first and latest dates) and whether the person is still
@@ -174,6 +191,9 @@ the failure, reproduce with the engine commit it names, and never change your or
 12. After a season on this version: open a major from Seasons, then *Rounds & replay* (step through the rounds,
     open the winner's scorecard); open the winner, click the season in the season table (that season as it
     was), the *Coaches & caddies* tab, and a "How they got in" rule link; sort a table by clicking a heading.
+13. Stats → *Golf statistics* (sort by driving distance); Records → *Longest drives* and *Largest winning
+    margins*; the major's *Statistics* tab; the winner's *Golf statistics* and *World ranking points*; Rankings →
+    *World: points by week* for a week of that season. In round 1 of a replay, check the winner is not named.
 
 Write down anything surprising, with the world's name and date, and send the diagnostic zip.
 
@@ -201,7 +221,12 @@ it works on a temporary copy and never changes the world.
   the profile shows the current coach and caddie, and every result shows the team that week.
 - Seasons played before the 30 October 2026 update have no round scores, recorded payouts, rules version or
   card reasons: their pages say "not recorded" (per-tour prize money there is the reconciled recomputation).
+- Golf statistics, ranking points (and weekly ranking averages) and match-play results are recorded from the
+  golf-statistics update on: earlier seasons say "not recorded" (winning margins come from final totals, so
+  they cover every season).
 - Not yet: the university directory, nation development over time, a Hall of Fame (proposed), prestige peaks,
-  live round-by-round play of an event in progress, charts, portraits.
+  live round-by-round play of an event in progress, charts, portraits; the approved history explorers (Where
+  Are They Now, My World, saved table views, career comparisons, the GOAT Lab) come in later observer-only
+  updates, which keep worlds resumable.
 - Windows: the launcher, file locking and replacing files while they are read were designed for Windows
   but have not been run on Windows by us yet — please tell us if anything fails there.
