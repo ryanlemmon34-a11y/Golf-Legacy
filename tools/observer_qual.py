@@ -198,12 +198,18 @@ def qualification_page(w, q):
     return f'Qualification: {year} {name}', SP.aggregate_note(w, 'the rankings and places') + ''.join(out)
 
 
+_STANDINGS = None
+
+
 def standings_page(w, q):
     """docs/STANDINGS_AND_RIGHTS.md as a page (worked out from the calendar and card rules, as the document is)."""
     O = _o()
     import html
     import standings_calendar as SC
-    lines, out, table = SC.doc().splitlines(), [], []
+    global _STANDINGS
+    if _STANDINGS is None:                             # (the calendar and card rules cannot change while running)
+        _STANDINGS = SC.doc()
+    lines, out, table = _STANDINGS.splitlines(), [], []
 
     def inline(t):
         t = html.escape(t)
