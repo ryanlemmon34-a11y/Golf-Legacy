@@ -23,7 +23,7 @@ WORLD = generate_world(seed=11)
 
 def season(results=(), year=2027):
     """A season on 1 January of `year`, with earlier results recorded first: (series, year, gid, pos)."""
-    s = Season(pickle.loads(pickle.dumps(WORLD)), seed=11, workers=1)
+    s = Season(pickle.loads(pickle.dumps(WORLD)), seed=11, workers=1, calendar='v1')   # (classic weeks)
     s.refresh_people(year)
     for sid, y, gid, pos in results:
         s.ctx.add_result(sid, y, [(gid, pos)])

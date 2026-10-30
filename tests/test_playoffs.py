@@ -170,9 +170,9 @@ class SeasonPlayoffs(unittest.TestCase):
                     self.assertEqual(min(last.values()), last[str(po['winner'])])
                     losers = [g for g in po['players'] if g != po['winner']]
                     prizes = e['prizes'][k]
-                    if e.get('purse'):
-                        paid = {prizes.get(str(g)) for g in losers}
-                        self.assertEqual(len(paid), 1, e['id'])             # tied runners-up are paid alike
+                    if e.get('purse'):                               # tied professional runners-up are paid
+                        paid = {prizes.get(str(g)) for g in losers if prizes.get(str(g)) is not None}   # alike
+                        self.assertLessEqual(len(paid), 1, e['id'])         # (an amateur in it takes nothing)
                     pts = (e.get('points') or [{}] * (k + 1))[k]
                     if pts:
                         self.assertEqual(len({pts.get(str(g)) for g in losers}), 1)

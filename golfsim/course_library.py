@@ -38,7 +38,8 @@ import unicodedata
 from collections import Counter, defaultdict
 from dataclasses import dataclass, replace
 
-from .calendar import MAJOR_VENUES, MAJOR_WEEKS, WorldCalendar
+from .calendar import MAJOR_VENUES, WorldCalendar
+from . import schedule as SCH
 from .course import cedar_creek_municipal, georgia_national
 from .course_gen import generate_site, CLASS_DIFFICULTY
 from .geography import CITIES_BY_COUNTRY, CITY_BY_NAME, COUNTRIES, season_weeks
@@ -316,20 +317,27 @@ class CourseLibrary:
                 for cid, n in c.items():
                     if n > 1:
                         errors.append(f'{year} week {w}: {self.sites[cid]["name"]} hosts {n} events')
-                if w in MAJOR_WEEKS and sum(1 for cid in c if self.sites[cid]['cls'] == 'elite') != 1:
+                if w in self.calendar.major_weeks and sum(1 for cid in c if self.sites[cid]['cls'] == 'elite') != 1:
                     errors.append(f'{year} week {w}: a major week must use exactly one elite course (the major\'s)')
         return errors
 
 
-_DEFAULT = None
+_DEFAULT = {}
 
 
-def default_library():
-    """The standard world (seed 2027), built once per process."""
-    global _DEFAULT
-    if _DEFAULT is None:
-        _DEFAULT = CourseLibrary()
-    return _DEFAULT
+def default_library(version=SCH.LEGACY):
+    """The standard world (seed 2027) for a calendar version, built once per process. The courses follow the
+    calendar (each event's host cities), so each version has its own library; v1's is the one every world
+    used before calendar versions."""
+    lib = _DEFAULT.get(version)
+    if lib is None:
+        lib = _DEFAULT[version] = CourseLibrary(WorldCalendar(2027, version))
+    return lib
+
+
+def library_version(lib):
+    """The calendar version of a library (None for a library that is not a standard one)."""
+    return next((v for v, x in _DEFAULT.items() if x is lib), None)
 
 
 # ---------------------------------------------------------------------------------------------

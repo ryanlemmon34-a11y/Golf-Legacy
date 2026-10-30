@@ -20,7 +20,8 @@ from golfsim.season import (ACCESS, FULL_STATUS, PREMIER_TOURS, PREMIER_VISITOR_
 
 
 def fresh(seed=2027):
-    s = Season(generate_world(seed=seed), seed=seed, development=True, workers=2)
+    s = Season(generate_world(seed=seed), seed=seed, development=True, workers=2,
+               calendar='v1')                               # (the classic calendar's weeks: majors 18, 24, 25, 30)
     s.refresh_people(2027)
     s.start_finances(2027)
     return s

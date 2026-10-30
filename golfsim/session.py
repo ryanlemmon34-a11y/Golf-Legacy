@@ -97,14 +97,15 @@ class Session:
 
     # ---- creating and opening -------------------------------------------------------------------------
     @classmethod
-    def create(cls, directory, seed=2027, workers=None, world=None, development=True):
+    def create(cls, directory, seed=2027, workers=None, world=None, development=True, calendar=None):
         from .population import generate_world
         from .season import Season
         d = Path(directory)
         if (d / 'CURRENT').exists():
             raise FileExistsError(f'{d} already holds a session')
         d.mkdir(parents=True, exist_ok=True)
-        season = Season(world or generate_world(seed=seed), seed=seed, development=development, workers=workers)
+        season = Season(world or generate_world(seed=seed), seed=seed, development=development, workers=workers,
+                        calendar=calendar)               # (None: the default for new worlds, schedule.DEFAULT)
         writer = ArchiveWriter(d / 'archive', season, touch=False)   # published with the first commit
         pending = {'chunks': {}, 'world': writer.world, 'tables': writer.state_tables(season)}
         state = {'format': FORMAT, 'schema': SCHEMA, 'world_id': f'{seed}-{int(time.time())}', 'seed': seed,

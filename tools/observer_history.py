@@ -45,16 +45,47 @@ def _years_text(ys):
 
 
 # ---- entry routes and the rules ------------------------------------------------------------------------------
-def route_html(route):
-    """How a golfer got into a field: the rule in words, a link to it, and the recorded code."""
+def route_html(route, version=None):
+    """How a golfer got into a field: the rule in words (as worded in the world's calendar version), a link to
+    it, and the recorded code."""
     O = _o()
     if not route:
         return '<span class="muted">—</span>'
-    rule, text = R.explain(route)
+    rule, text = R.explain(route, version)
     code = f'<span class="tag" title="the code recorded with the start">{O.esc(route)}</span>'
     if text is None:
         return code
     return f'{O.esc(text)} <a href="/rules#{rule}" title="the rule this entry used">rule</a> {code}'
+
+
+def rights_section(w, year, major):
+    """A major edition's rights ledger: every place its rules gave -- with the categories behind it, the
+    evidence and when it was earned -- and how each ended (entered, withdrawn, declined, expired); one place
+    per golfer however many categories support it. Editions played before the ledger say so."""
+    O = _o()
+    book = w.major_rights(year, major)
+    if not book:
+        return ('<h2>Qualification ledger</h2><p class="muted">Not recorded for this edition (played before the '
+                'rights ledger was kept): “How they got in” above gives each entrant\'s route.</p>')
+    order = {'entered': 0}
+    rows = sorted(book.items(), key=lambda kv: (order.get((kv[1].get('result') or '').split(':')[0], 1),
+                                                kv[1].get('result') or '', kv[0]))
+    from collections import Counter as _C
+    tally = _C((r.get('result') or 'pending').split(':')[0] for _, r in rows)
+    v = w.calendar_version
+    body = []
+    for gid, r in rows:
+        cats = '; '.join(O.esc(R.explain(c, v)[1] or c) + f' <span class="tag">{O.esc(c)}</span>' for c in r['routes'])
+        when = r.get('awarded')
+        body.append([w.person_link(gid), O.esc(r.get('state') or ''), cats,
+                     O.esc('; '.join(r.get('sources') or []) or '—'),
+                     O.esc(f'{when[0]} week {when[1]}' if when else '—'), O.esc(r.get('result') or 'pending')])
+    return ('<h2>Qualification ledger</h2><p>' + ' · '.join(f'{n} {O.esc(k)}' for k, n in tally.most_common())
+            + '</p>' + O.table(['Golfer', 'Place', 'Categories', 'Evidence', 'Earned', 'Outcome'], body)
+            + '<p class="muted">Every place this edition\'s rules gave: earned, or conditional (an amateur\'s place, '
+              'which lapses on turning professional). Outcome: entered; withdrawn (injured or retired); declined (could '
+              'not pay the trip); expired. Alternates and invitations that took places given up are listed as entered. '
+              'Evidence is the edition and result, ranking or award the category read, as recorded.</p>')
 
 
 def rules_versions(w):
@@ -99,6 +130,18 @@ def rules_page(w, q):
     if by.get(None):
         rows.append(['earlier', O.esc(R.EARLIER), O.esc(_years_text(by[None]))])
     out.append('<h2>Versions</h2>' + O.table(['Version', 'What changed', 'Seasons of this world'], rows))
+    import golfsim.schedule as SCH
+    from golfsim.qualification import rules_for
+    v = getattr(w, 'calendar_version', 'v1')
+    sp = SCH.spec(v)
+    out.append(f'<h2>This world\'s calendar</h2><p><strong>{O.esc(sp.label)}</strong> (version {O.esc(v)}). '
+               f'{O.esc(sp.rules_note)} <a href="#calendar">The calendar rule</a>.</p>')
+    for major, routes in rules_for(v).items():
+        out.append(f'<details><summary>{O.esc(w.series_name(major))}: {len(routes)} categories (week '
+                   f'{sp.majors[major]})</summary>' + O.table(['Code', 'Category', 'Real-life analogue', 'Kind'], [
+                       [O.esc(r.code), O.esc(r.label), O.esc(r.analogue), O.esc(r.kind + (', amateurs only' if r.amateur_only
+                                                                                      else ''))] for r in routes])
+                   + '</details>')
     out.append('<h2>The rules</h2>')
     for rid, (title, text, since) in R.RULES.items():
         out.append(f'<div class="card" id="{rid}"><h3>{O.esc(title)}</h3><p>{O.esc(text)}</p><p class="muted">'
@@ -123,6 +166,10 @@ def decision_text(t):
         parts.append(f'desire to continue {t["desire"]:+.1f}')
     if t.get('secured'):
         parts.append('places already secured: ' + '; '.join(t['secured']))
+    if t.get('forecast'):                              # the figures a "paying their own way" decision used
+        f = t['forecast']
+        parts.append(f'savings {O.money(f["cash"])} against next season\'s forecast costs {O.money(f["costs"])} and '
+                     f'income {O.money(f["income"])}')
     if t.get('net') is not None:
         parts.append(f'season net {O.money(t["net"])}')
     if t.get('events') is not None:

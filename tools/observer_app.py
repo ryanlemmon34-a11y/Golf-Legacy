@@ -218,6 +218,10 @@ class App:
             start = int(O.one(form, 'start_year') or 2027)
             if not 1900 <= start <= 2200:
                 raise ValueError('The starting year must be from 1900 to 2200.')
+            from golfsim import schedule as SCH
+            calendar = O.one(form, 'calendar') or SCH.DEFAULT
+            if calendar not in SCH.SPECS:
+                raise ValueError('Unknown calendar version.')
         except (ValueError, FileExistsError) as e:
             return ('err', esc(e))
 
@@ -225,9 +229,10 @@ class App:
             from golfsim.population import generate_world
             from golfsim.session import Session
             job.update(phase='generating the world and its population')
-            s = Session.create(d, seed=seed, workers=self.workers, world=generate_world(year=start, seed=seed))
-            WL.record_creation(d, seed, start)
-            J.log(d, f'created with seed {seed}, starting in {start}')
+            s = Session.create(d, seed=seed, workers=self.workers, world=generate_world(year=start, seed=seed),
+                               calendar=calendar)
+            WL.record_creation(d, seed, start, calendar)
+            J.log(d, f'created with seed {seed}, starting in {start}, calendar {calendar}')
             job.update(phase='opening')
             self.renderer.call(self._install, d, s)
             job.finish('done', f'World “{d.name}” created (seed {seed}, starting {start}) at {O.date_text(s.cursor)}.')
@@ -478,12 +483,16 @@ class App:
                    '<label>Name<input name="name" required placeholder="my world"></label>'
                    '<label>Starting year<input name="start_year" type="number" min="1900" max="2200" value="2027"></label>'
                    f'<label>Seed<input name="seed" type="number" min="0" max="2147483647" value="{random.randrange(1, 1000000)}">'
+                   '</label><label>Calendar<select name="calendar"><option value="v2" selected>Reference (majors weeks '
+                   '15, 20, 25, 30)</option><option value="v1">Classic (majors weeks 18, 24, 25, 30)</option></select>'
                    '</label><button class="primary">Create</button></form>'
                    '<p class="muted">The starting year is the first season’s calendar year (golfers’ ages are set '
                    'from it); the seed is separate. The seed is the world’s starting point: the same seed always makes the same world -- the '
                    'same golfers and, shot for shot, the same history (that is what makes a problem report replayable). '
                    'A new seed is suggested each time; type an earlier world’s seed (shown in the library) to make that '
-                   'world again. The whole world is generated: every nation, golfer, coach and caddie.</p>')
+                   'world again. The whole world is generated: every nation, golfer, coach and caddie. Calendar: new '
+                   'worlds play the reference calendar (roadmap v14); the classic calendar is the one earlier worlds '
+                   'were played on (for comparison). A world keeps its calendar for good.</p>')
         trash = WL.trashed(self.lib)
         if trash:
             out.append('<h2>Removed worlds (trash)</h2>' + O.table(['World', 'Removed', 'Size', ''], [

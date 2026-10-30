@@ -38,8 +38,9 @@ from . import staff as ST
 from . import prestige as PR
 from . import qualification as Q
 from . import residence as RES
-from .calendar import MAJOR_WEEKS, TOUR_BY_KEY, _in_window
-from .course_library import default_library
+from .calendar import TOUR_BY_KEY, _in_window
+from . import schedule as SCH
+from .course_library import default_library, library_version
 from .engine import Conditions
 from .golfer import Caddie
 from .geography import CITY_BY_NAME, COUNTRIES
@@ -308,10 +309,12 @@ class EventResult:
 class Season:
     """The living world: population, calendar, courses and everything that has happened."""
 
-    def __init__(self, world, library=None, seed=2027, first_year=None, development=False, workers=None):
+    def __init__(self, world, library=None, seed=2027, first_year=None, development=False, workers=None,
+                 calendar=None):
         self.world = world
-        self.lib = library or default_library()
+        self.lib = library or default_library(calendar or SCH.DEFAULT)   # new worlds: the reference calendar
         self.cal = self.lib.calendar
+        self.calendar_version = self.cal.version
         self.seed = seed
         self.development = development
         self.first_year = first_year or world.year
@@ -356,7 +359,8 @@ class Season:
         self.cash_start = {}                                 # year -> gid -> cash on 1 January
         self.support_start = {}                              # year -> gid -> (family money, backers' money) then
         self.prize_share = {}                                # gid -> share of a purse they tend to win (all levels)
-        self.prize_record = {}                               # gid -> {tier: [share of purse they tend to win
+        self.prize_record = {}                               # (changed only by learn_prize: forecasts are remembered)
+                                                             # gid -> {tier: [share of purse they tend to win
                                                              #   at that level of competition, events]}
         self.snapshots = {}                                  # year -> gid -> completed-season evidence
         self.rank_start, self.am_start = {}, {}              # year -> world / amateur ranking on 1 January
@@ -421,6 +425,7 @@ class Season:
         self.wr_seed = {}                                    # gid -> [[abs week, points]]: pre-history (archived once)
         self._seed_world()
         RES.settle(self, self.first_year, 0)                 # everyone's birthplace and where they live
+        self.major_rights = defaultdict(dict)                # year -> major -> gid -> right (note_right)
         self.peak_overall = {}                               # gid -> (highest Overall, year, week): note_peaks
         self.peak_since = self.first_year
         self.note_peaks(self.first_year, 0, [g for g in self.world.golfers if g.lifestyle != 'retired'])
@@ -756,8 +761,8 @@ class Season:
         pace = self.target_events(g) * week / 52 - len(weeks)
         return {'streak': 5 * (streak - 1) ** 1.4 if streak >= 2 else None,
                 'pace': max(-25.0, min(6.0, 3.5 * pace)),
-                'before_major': week + 1 in MAJOR_WEEKS and self.wr_pos.get(g.id, 9999) <= 100,
-                'after_major': week - 1 in MAJOR_WEEKS and week - 1 in weeks,
+                'before_major': week + 1 in self.cal.major_weeks and self.wr_pos.get(g.id, 9999) <= 100,
+                'after_major': week - 1 in self.cal.major_weeks and week - 1 in weeks,
                 # tired golfers rest; good course managers plan their rest better
                 'tired': (8 + 10 * g.attrs["management"] / 100) * 2 * max(0.0, self.fatigue[g.id] - 0.1),
                 'kept': self.prize_kept(g), 'unit': FIN.money_unit(self.funds(g, year))}
@@ -825,6 +830,7 @@ class Season:
         rng = random.Random(_seed(self.seed, year, week, 'entries'))
         venues = self.lib.venues(year)
         busy = defaultdict(set)                              # gid -> days committed this week
+        self._week_where = where = defaultdict(list)         # gid -> [(days, country)] committed this week
         fields = {}                                          # event_id -> [per-site golfer lists]
         self._reserved.clear()                               # one budget for the week: every accepted entry
         self._caddie_week.clear()                            # books its cost at once (the caddie's weekly
@@ -835,8 +841,10 @@ class Season:
             sites = venues[ed.event_id]
             for k, ids in enumerate(ids_by_site):
                 city = sites[min(k, len(sites) - 1)].city
+                country = CITY_BY_NAME[city].country
                 for gid in ids:
                     busy[gid] |= ed.series.day_set
+                    where[gid].append((ed.series.day_set, country))
                     self._week_entered.setdefault(gid, (ed.event_id, how))
                     self.reserve(self.g[gid], ed.series, city)
 
@@ -847,10 +855,15 @@ class Season:
         for ed in sorted(special, key=lambda e: (e.series.tier, e.series.series_id)):
             sites = self.special_field(ed, year, week, rng, busy)
             if sites is not None:
-                # never two events on the same days, whatever a selection rule produced
+                # never two events on the same days, whatever a selection rule produced (v2: nor a trip that
+                # cannot be made between them)
                 seen = set()
-                sites = [[gid for gid in site if not (busy[gid] & ed.series.day_set) and not (gid in seen or seen.add(gid))]
-                         for site in sites]
+                vs = venues[ed.event_id]
+                travel = self.cal.spec.travel
+                sites = [[gid for gid in site if not (busy[gid] & ed.series.day_set) and not (gid in seen or seen.add(gid))
+                          and (not travel or self.can_travel(gid, ed.series.day_set,
+                                                             (CITY_BY_NAME[vs[min(k, len(vs) - 1)].city].country,)))]
+                         for k, site in enumerate(sites)]
                 sites = self.pay_at_sites(ed, year, sites, venues)
                 self._default_routes(ed.series, year, sites)
                 commit(ed, sites)
@@ -867,6 +880,8 @@ class Season:
         self.record_access(year, week)
         self.weekly_finances(year, week)
         self.update_rankings(year, week)
+        if self.cal.spec.amateur_award and week == self.cal.spec.amateur_award[0]:
+            self.award_amateur(year, week)
         self.update_fame(year, week)
         self.snapshot_standings(year, week)
         self.update_fatigue(year, week)
@@ -913,6 +928,8 @@ class Season:
                 if days & ed.series.day_set:
                     continue
                 eid = ed.event_id
+                if days and self.cal.spec.travel and not self.can_travel(g.id, ed.series.day_set, (country[eid],)):
+                    continue                                 # (v2) cannot get there from this week's other event
                 fk = (g.tour.startswith('CO_'), g.status == 'club_pro', home, eid)
                 fee = fees.get(fk)
                 if fee is None:
@@ -1082,8 +1099,31 @@ class Season:
         return gid
 
     # ---- special fields --------------------------------------------------------------------------
-    def available(self, gid, s, busy):
-        return not (busy[gid] & s.day_set) and gid not in self.injured and self.g[gid].lifestyle != 'retired'
+    def available(self, gid, s, busy, countries=None):
+        if busy[gid] & s.day_set or gid in self.injured or self.g[gid].lifestyle == 'retired':
+            return False
+        return countries is None or not self.cal.spec.travel or self.can_travel(gid, s.day_set, countries)
+
+    TRAVEL_DAYS = {'country': 0, 'region': 1, 'world': 2}   # free days needed between events this week
+
+    def can_travel(self, gid, days, countries):
+        """Whether a golfer committed elsewhere this week can also play days `days` in one of `countries`
+        (v2, day-level): the days must not overlap, and between the earlier event's last day and the later one's
+        first there must be time to travel and recover -- none within a country, a day within a region, two
+        between regions (a Monday qualifier in England and a Thursday start in the USA can both be played; a
+        Tuesday final there and a Thursday start here cannot)."""
+        for cdays, ccountry in self.__dict__.get('_week_where', {}).get(gid, ()):
+            if cdays & days:
+                return False
+            gap = (min(days) - max(cdays) - 1) if min(days) > max(cdays) else (min(cdays) - max(days) - 1)
+            def need(c):
+                if c == ccountry:
+                    return self.TRAVEL_DAYS['country']
+                same = COUNTRIES[c].region == COUNTRIES[ccountry].region
+                return self.TRAVEL_DAYS['region' if same else 'world']
+            if not any(gap >= need(c) for c in countries):
+                return False
+        return True
 
     def observed_form(self, gid):
         """Strokes per round against the field over this and last season (lower is better): what
@@ -1111,7 +1151,8 @@ class Season:
         # a golfer who can pay for at least one of the event's sites; the site they are given is checked
         # again before the field is fixed (pay_at_sites)
         pays = lambda g: any(self.can_afford(g, s, c, self.spendable(g, year)) for c in cities)
-        free = lambda g: self.available(g.id, s, busy)
+        countries = tuple(sorted({CITY_BY_NAME[c].country for c in cities}))
+        free = lambda g: self.available(g.id, s, busy, countries)
         if s.kind == 'qualifying' or sid == 'CLUB_PRO_SECTIONALS':   # entrants decide, and pay, for themselves
             can_go = free
             free = lambda g: can_go(g) and pays(g)
@@ -1322,7 +1363,92 @@ class Season:
                 if ok(gid) and gid not in routes:
                     routes[gid] = 'INIT'
         self.entry_routes[(year, sid)] = routes
+        self.lock_rights(sid, year, week, f, routes)
         return list(routes)
+
+    # ---- the rights ledger: every major place, earned, used or lost ----------------------------------------
+    RIGHT_ORDER = {'earned': 0, 'conditional': 1}
+
+    def note_right(self, year, major, gid, routes, state, awarded, sources, result=None):
+        """A place in the `year` edition of `major` (target edition), earned by `routes` (route codes, one place
+        however many routes support it) with its evidence: state 'earned' or 'conditional' (an amateur's place:
+        lapses on turning professional), awarded (year, week), sources (source edition and result, ranking or
+        list, award), and its resolution once the field is locked (entered, withdrawn, declined, expired).
+        Observation only: nothing reads it to decide a field."""
+        book = self.major_rights[year].setdefault(major, {})
+        r = book.get(gid)
+        if r is None:
+            book[gid] = {'routes': list(routes), 'state': state, 'awarded': list(awarded) if awarded else None,
+                         'sources': list(sources), 'result': result, 'target': f'{year}:{major}',
+                         'rule': f'calendar {self.calendar_version}'}
+            return
+        r['routes'] += [c for c in routes if c not in r['routes']]
+        r['sources'] += [x for x in sources if x not in r['sources']]
+        if self.RIGHT_ORDER.get(state, 9) < self.RIGHT_ORDER.get(r['state'], 9):
+            r['state'] = state
+        if awarded and (r['awarded'] is None or list(awarded) < r['awarded']):
+            r['awarded'] = list(awarded)
+        if result is not None:
+            r['result'] = result
+
+    def _route_evidence(self, major, codes, gid, year, view, wins):
+        by = {r.code: r for r in Q.rules_for(self.calendar_version)[major]}
+        out, when = [], []
+        for c in codes:
+            if c in by:
+                for src, at in Q.evidence(by[c], gid, year, view, wins):
+                    out.append(src)
+                    when.append(at)
+        return out, (min(when) if when else None)
+
+    def lock_rights(self, major, year, week, f, routes):
+        """At the field lock: every place the rules gave, with how it was resolved -- entered, withdrawn (injured
+        or retired), declined (could not pay the trip), or expired (an amateur's place after turning
+        professional) -- plus the alternates and invitations that took the places given up."""
+        view = self.ctx.as_of(year, week)
+        wins = Q.wins_index(view)
+        amateur_only = {r.code for r in Q.rules_for(self.calendar_version)[major] if r.amateur_only}
+        for e in f.entries:
+            gid = e.golfer_id
+            srcs, at = self._route_evidence(major, e.sources, gid, year, view, wins)
+            state = 'conditional' if all(c in amateur_only for c in e.sources) else 'earned'
+            if gid in routes:
+                result = 'entered'
+            elif gid in self.injured:
+                result = 'withdrawn: injured'
+            elif gid not in self.g or self.g[gid].lifestyle == 'retired':
+                result = 'withdrawn: retired'
+            else:
+                result = 'declined: could not pay the trip'
+            self.note_right(year, major, gid, e.sources, state, at or (year, week), srcs, result)
+        for gid, code in routes.items():
+            if code in ('ALT', 'INIT'):
+                self.note_right(year, major, gid, [code], 'earned', (year, week),
+                                ['next alternate when a place was given up' if code == 'ALT' else
+                                 'inaugural invitation (seeded world ranking)'], 'entered')
+        for gid, r in self.major_rights[year].get(major, {}).items():   # earned earlier, not in the field
+            if r['result'] is None:
+                g = self.g.get(gid)
+                r['result'] = ('withdrawn: retired' if g is None or g.lifestyle == 'retired' else
+                               'expired: turned professional' if r['state'] == 'conditional' and g.status != 'amateur'
+                               else 'expired: not eligible when the field was set')
+
+    def award_amateur(self, year, week):
+        """The season's annual amateur award (v2 calendar): the leading amateur in the amateur ranking published
+        after the USA Amateur (week 33), named the week after; it brings places in next season's USA Open and
+        Britannia Open while still an amateur (conditional). Nobody is named for a season the world never played."""
+        ids = self.ctx.amateur_rankings.get((year, week), [])
+        gid = next((g for g in ids if g in self.g and self.g[g].status == 'amateur'
+                    and self.g[g].lifestyle != 'retired'), None)
+        self.ctx.__dict__.setdefault('awards', {})[('amateur_award', year)] = gid
+        if gid is None:
+            return
+        self.log(gid, year, week + 1, f'Annual amateur award {year}: places in the {year + 1} USA Open and Britannia '
+                                      'Open while still an amateur')
+        codes = {'USA_OPEN': 'UA', 'BRITANNIA_OPEN': 'B13'}
+        for major in self.cal.spec.amateur_award[1]:
+            self.note_right(year + 1, major, gid, [codes[major]], 'conditional', (year, week + 1),
+                            [f'annual amateur award {year} (amateur ranking after week {week})'])
 
     # ---- club professionals: sectional qualifying, then their championship --------------------------
     def club_pro_sectionals(self, ed, year, rng, free):
@@ -1440,6 +1566,9 @@ class Season:
         elif sid == 'JP_QSCHOOL_FINAL':
             keep = set(self._money_rank('CH_JAPAN', year)[:60])
             ids = [g.id for g in self._qs_pool(('Asia',), keep, year, free) if g.country in ('Japan', 'South Korea')]
+        elif week >= 50:  # ASIA_QSCHOOL_FINAL in week 51 (v2): this season's standings, cards for next season
+            keep = set(self._money_rank('CH_ASIA', year)[:60])
+            ids = [g.id for g in self._qs_pool(('Asia', 'Oceania'), keep, year, free)]
         else:  # ASIA_QSCHOOL_FINAL (week 2: last season's standings)
             keep = set(self.ctx.standing('CH_ASIA', year - 1)[:60])
             ids = [g.id for g in self._qs_pool(('Asia', 'Oceania'), keep, year, free)]
@@ -1455,6 +1584,8 @@ class Season:
 
     # ---- USA Open and Britannia Open qualifying ----------------------------------------------------
     def qualifier_field(self, ed, year, week, rng, free):
+        if self.cal.spec.snapshots:                          # v2: waves, one attempt, earned exemptions only
+            return self.qualifier_waves(ed, year, week, rng, free)
         s = ed.series
         sid = s.series_id
         major = 'USA_OPEN' if sid.startswith('USA_OPEN') else 'BRITANNIA_OPEN'
@@ -1514,6 +1645,109 @@ class Season:
             return [eu[:s.field], asia[:s.field]]
         return [ids[i::s.sites] for i in range(s.sites)]
 
+    STAGE_RESERVES = 2              # first alternates kept per local site, in finishing order
+
+    def qualifier_waves(self, ed, year, week, rng, free):
+        """USA Open and Britannia Open qualifying under the reference calendar (roadmap v14).
+
+        Applying is separate from qualifying: golfers apply once, when the first wave is entered, and each
+        applicant chooses one wave (USA local waves weeks 17, 19 and 21; Britannia regional waves 26 and 27) --
+        one attempt, never three. Only exemptions already earned count: a ranking cut-off not yet published is
+        pending, so a projected place never removes anyone's attempt. Before every stage the earned exemptions
+        are checked again; an applicant who has since become exempt, or cannot play that week, withdraws and the
+        next applicant for that wave takes the place (never a past score). Local advancers go to the domestic
+        final (USA week 24; Britannia final week 28) with first alternates in finishing order for places given
+        up there; the USA international final (week 22) is a direct-entry route only. Every step is recorded
+        in stage_log (applied, wave, withdrawn with why, advanced, alternates)."""
+        s = ed.series
+        sid = s.series_id
+        major = 'USA_OPEN' if sid.startswith('USA_OPEN') else 'BRITANNIA_OPEN'
+        sp = self.cal.spec
+        waves = [x[0] for x in (sp.usa_local if major == 'USA_OPEN' else sp.britannia_regional)]
+        final = 'USA_OPEN_FINAL' if major == 'USA_OPEN' else 'BRITANNIA_FINAL'
+        exempt, pending = Q.earned_exemptions(major, year, self.ctx.as_of(year, week))
+        key = (year, major)
+        if key not in self.stage_log:
+            limit = 250 if major == 'USA_OPEN' else 300
+            tiers_ok = PREMIER_TOURS if major == 'USA_OPEN' else PREMIER_TOURS + tuple(
+                k for k, t in TOUR_BY_KEY.items() if t.tier == 2)
+            direct = {g.id for g in self.active_golfers() if g.id not in exempt and g.status != 'club_pro' and
+                      g.lifestyle != 'retired' and (self.wr_pos.get(g.id, 9999) <= limit or g.tour in tiers_ok)}
+            home = QS_AMERICAS if major == 'USA_OPEN' else QS_EUROPE
+            pool = []
+            for g in self.active_golfers():
+                if g.id in exempt or g.id in direct or g.status == 'club_pro' and major == 'BRITANNIA_OPEN' \
+                        or g.lifestyle == 'retired':
+                    continue
+                good = g.status in ('pro', 'club_pro') or self.am_pos.get(g.id, 9999) <= 400
+                keen = 0.75 if self.home_region(g) in home else 0.08
+                if good and rng.random() < keen:
+                    pool.append(g.id)
+            pool.sort(key=lambda gid: (self.wr_pos.get(gid, 9999) if self.g[gid].status != 'amateur'
+                                       else self.am_pos.get(gid, 9999) * 3))
+            choice = {gid: waves[rng.randrange(len(waves))] for gid in pool}   # the wave each applicant picks
+            self.stage_log[key] = {'exempt': set(exempt), 'pending': list(pending), 'direct': direct, 'pool': pool,
+                                   'choice': choice, 'advanced': [], 'reserves': [], 'entered': set(),
+                                   'withdrawn': {}, 'version': sp.version}
+        st = self.stage_log[key]
+        st['exempt'] |= set(exempt)                          # earned since applying (rechecked every stage)
+        st['pending'] = list(pending)
+        n = s.field * s.sites
+        if sid in waves:
+            ids = []
+            for gid in st['pool']:
+                if st['choice'].get(gid) != sid or gid in st['entered'] or gid in st['withdrawn']:
+                    continue
+                if len(ids) >= n:
+                    break                                    # the rest of this wave's applicants stay unplaced
+                if gid in exempt:
+                    st['withdrawn'][gid] = (sid, 'exempt before the stage')
+                elif not free(self.g[gid]):
+                    st['withdrawn'][gid] = (sid, 'could not play that week')
+                else:
+                    ids.append(gid)
+            st['entered'] |= set(ids)
+            rng.shuffle(ids)
+        else:
+            per = Q.stages(sp.version)[final]['per_site']
+            if sid == final and not st['advanced']:
+                for feeder in waves:
+                    for site, rows in sorted(self.ctx.results.get((feeder, year), {}).items()):
+                        done = [gid for gid, pos in rows if pos is not None]
+                        st['advanced'] += done[:per]
+                        st['reserves'] += done[per:per + self.STAGE_RESERVES]
+            direct = [gid for gid in st['direct'] if free(self.g[gid]) and gid not in st['entered'] and gid not in exempt]
+            direct.sort(key=lambda gid: self.wr_pos.get(gid, 9999))
+            if sid == 'USA_OPEN_FINAL_INTL':                 # direct entries from outside the Americas only
+                ids = [gid for gid in direct if self.home_region(self.g[gid]) not in QS_AMERICAS and rng.random() < 0.6][:n]
+            else:
+                ids, given_up = [], 0
+                for gid in st['advanced']:
+                    if gid in exempt or not free(self.g[gid]):
+                        st['withdrawn'][gid] = (sid, 'exempt before the final' if gid in exempt else 'could not play that week')
+                        given_up += 1
+                    else:
+                        ids.append(gid)
+                for gid in st['reserves']:                   # only the places given up, in finishing order
+                    if given_up <= 0:
+                        break
+                    if gid not in exempt and free(self.g[gid]) and gid not in ids:
+                        ids.append(gid)
+                        given_up -= 1
+                share = 0.7 if major == 'USA_OPEN' else 0.5
+                ids += [gid for gid in direct if (major != 'USA_OPEN' or self.home_region(self.g[gid]) in QS_AMERICAS)
+                        and rng.random() < share]
+                ids = ids[:n]
+            st['entered'] |= set(ids)
+            rng.shuffle(ids)
+        if s.sites == 1:
+            return [ids]
+        if sid == 'USA_OPEN_FINAL_INTL':
+            eu = [gid for gid in ids if self.home_region(self.g[gid]) in QS_EUROPE]
+            asia = [gid for gid in ids if gid not in set(eu)]
+            return [eu[:s.field], asia[:s.field]]
+        return [ids[i::s.sites] for i in range(s.sites)]
+
     # ---- playing and recording ----------------------------------------------------------------------
     def play_week(self, year, week, eds, fields, venues):
         tasks = []
@@ -1555,8 +1789,10 @@ class Season:
         state.pop('_active', None)                           # rebuilt from world.golfers
         state.pop('_pf_memo', None)                          # derived caches (prize_forecast, update_fame):
         state.pop('_fame_seen', None)                        # rebuilt as they are used
-        if state.get('lib') is default_library():
-            state['lib'] = 'default'
+        state.pop('_week_where', None)                       # (this week's commitments: empty between weeks)
+        v = library_version(state.get('lib'))
+        if v is not None:                                    # a standard library: saved by its version
+            state['lib'] = 'default' if v == SCH.LEGACY else f'default:{v}'
             state.pop('cal', None)
         state['_self_view'] = D.self_views([g.id for g in self.world.golfers if g.lifestyle != 'retired'])
         return state
@@ -1576,6 +1812,7 @@ class Season:
         state.setdefault('college', {})                     # college seasons before the ledger: not recorded
         state.setdefault('wr_seed', {})
         state.setdefault('rank_top', defaultdict(dict))     # ranking snapshots before they were kept: not recorded
+        state.setdefault('major_rights', defaultdict(dict))  # major rights before the ledger: not recorded
         if 'peak_overall' not in state:                      # saves from before peaks were kept: kept from now on
             state['peak_overall'] = {}
             state['peak_since'] = state.get('year')
@@ -1585,9 +1822,11 @@ class Season:
             state['prize_record'] = {gid: {tier(gid): [v, 5]} for gid, v in state.get('prize_share', {}).items()}
         if 'prior_rounds' not in state:
             state['prior_rounds'] = _migrate_prior_rounds(state)
-        if state.get('lib') == 'default':
-            state['lib'] = default_library()
+        if isinstance(state.get('lib'), str) and state['lib'].startswith('default'):
+            v = state['lib'].partition(':')[2] or SCH.LEGACY  # ('default': saved before calendar versions)
+            state['lib'] = default_library(v)
             state['cal'] = state['lib'].calendar
+        state.setdefault('calendar_version', state['cal'].version)   # a season is read with its own calendar
         if 'places' not in state:                           # saves from before residence: everyone there now
             places = RES.Places()                            # has unknown geography (never invented)
             places.legacy = {g.id for g in state['world'].golfers} | set(state['staff'].coaches) \
@@ -1628,7 +1867,7 @@ class Season:
             res.finish.append(finish)
             res.playoff = max(res.playoff, o['playoff'])
             res.playoffs.append(playoff_evidence(finish, o) if o['playoff'] else None)
-            self.ctx.add_result(sid, year, [(gid, pos) for gid, pos, _ in finish], site=site)
+            self.ctx.add_result(sid, year, [(gid, pos) for gid, pos, _ in finish], site=site, week=week)
             w = self.ctx.winner(sid, year) if (s.kind == 'major' or s.tier == 1) and year in self.earned else None
             if w is not None and (s.kind == 'major' or w not in self.earned[year]):
                 self.earned[year][w] = f'won the {year} {s.name}'   # exempt from this week on (cards.winner_exemptions)
@@ -1910,6 +2149,9 @@ class Season:
                 del table[k]
         for k in [k for k in self.ctx.standings if len(k) == 3 and k[1] < year - 1]:
             del self.ctx.standings[k]
+        for d in (self.ctx.__dict__.get('edition_weeks', {}), self.ctx.__dict__.get('awards', {})):
+            for k in [k for k in d if k[1] < year - 1]:
+                del d[k]
         # Per-season working tables: the rules read this season and last at most; older seasons are in the
         # archive. Results older than last season keep only their winners (champions, exemptions and the
         # Masters' lifetime winners are the only rules that look further back).
@@ -1922,6 +2164,7 @@ class Season:
                   self.block_flags, self.cash_start, self.support_start, self.overall_start, self.rank_start, self.am_start,
                   self.staff_receipts, self.injuries, self.card_log, self.career_counts, self.transitions,
                   self.assignments, self.staff_year, self.unheld, self.rights, self.earned, self.card_reasons, self.snapshots,
+                  self.major_rights,
                   self.rank_top,
                   self.juniors_added, self.new_pros_added, self.stats, self.moments):
             for y in [y for y in d if isinstance(y, int) and old(y)]:
@@ -2128,7 +2371,13 @@ class Season:
         # places already earned in next season's majors, by the majors' own rules (qualification.RULES)
         # applied to what is known now: unconditional ones count for decisions; an amateur title's place
         # is kept with its condition (it lapses on turning professional)
+        view = self.ctx.as_of(year + 1, 1)
+        wins = Q.wins_index(view)
         for gid, places in Q.secured_places(self.ctx, year).items():
+            for major, routes, cond in places:                # (in the rights ledger, with their evidence)
+                codes = [code for code, _, _ in routes]
+                srcs, at = self._route_evidence(major, codes, gid, year + 1, view, wins)
+                self.note_right(year + 1, major, gid, codes, 'conditional' if cond else 'earned', at or (year, 52), srcs)
             row = snap.get(gid)
             if row is None:
                 continue
@@ -2266,7 +2515,7 @@ class Season:
             inj_c = 1 + 0.05 * max(0, age - 30)
             inj_d = 1 + 0.5 * (1 - g.attrs['stamina'] / 100)
             pace0 = [target * w / 52 for w in weeks]
-            major = [6 if w + 1 in MAJOR_WEEKS and top100 else 0 for w in weeks]
+            major = [6 if w + 1 in self.cal.major_weeks and top100 else 0 for w in weeks]
             net = [(costs[i] - prizes[i]) / unit for i in range(len(weeks))]
             f0 = self.fatigue[g.id]
             best_val, best_acts = plan_search(weeks, now, inj_until, slot, playable, costs, base, pace0, major, bar, dp,

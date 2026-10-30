@@ -52,11 +52,13 @@ def engine_now():
     return _ENGINE['id'], _ENGINE['commit']
 
 
-def record_creation(d, seed, start_year):
-    """The world's chosen seed and starting year, kept beside it (the save and its history hold them too)."""
+def record_creation(d, seed, start_year, calendar=None):
+    """The world's chosen seed, starting year and calendar version, kept beside it (the save and its history
+    hold them too)."""
     engine, commit = engine_now()
-    (Path(d) / WORLD_INFO).write_text(json.dumps({'seed': seed, 'start_year': start_year, 'engine': engine,
-                                                  'commit': commit, 'created': time.strftime('%Y-%m-%d %H:%M:%S')}, indent=1))
+    (Path(d) / WORLD_INFO).write_text(json.dumps({'seed': seed, 'start_year': start_year, 'calendar': calendar,
+                                                  'engine': engine, 'commit': commit,
+                                                  'created': time.strftime('%Y-%m-%d %H:%M:%S')}, indent=1))
 
 
 def remove_world(lib, name):

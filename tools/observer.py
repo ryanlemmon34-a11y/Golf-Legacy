@@ -337,6 +337,24 @@ class World:
             return self.a.world['series'].get(sid, {})
         return {}
 
+    @property
+    def calendar_version(self):
+        """The calendar this world plays (schedule.py): the running world's, else its history's (a history
+        written before calendar versions is the classic calendar)."""
+        v = getattr(self.live, 'calendar_version', None) if self.live is not None else None
+        return v or ((self.a.world.get('calendar') if self.a else None) or 'v1')
+
+    def major_rights(self, year, major):
+        """{gid: right} of the rights ledger for one major edition (the running season's, else its season
+        file's); {} where the season did not record one."""
+        if self.live is not None and year == self.live.cursor['year']:
+            book = getattr(self.live, 'major_rights', {}) or {}
+            return OD.int_keys(book.get(major, {}))
+        if self.a and year in self.a.years:
+            book = self.a.year(year).get('major_rights') or {}
+            return OD.int_keys(book.get(major, {}))
+        return {}
+
     def series_name(self, sid):
         return self.series_info(sid).get('name', sid)
 
@@ -1259,7 +1277,7 @@ def _results(w, q, pid):
           tour_link(w, r['tour']), SP.mask(w, r['event'], r['week'], esc(r['pos'] or 'MC')),
           SP.mask(w, r['event'], r['week'], money(prizes[(r['event'], r['site'])]) if (r['event'], r['site']) in prizes
                   else '<span class="muted">—</span>'),
-          w.person_link(r['coach']), w.person_link(r['caddie']), OH.route_html(r['route'])]
+          w.person_link(r['coach']), w.person_link(r['caddie']), OH.route_html(r['route'], w.calendar_version)]
          for r in chunk], numeric=(0, 1, 4, 5)) + pager
         + '<p class="muted">Prize: the money paid for the start, as recorded (since rules 2026-10-30); for older seasons '
           'the start’s share of the purse recomputed from the event’s finish and checked against the money paid that '
@@ -1414,8 +1432,10 @@ def event(w, q, eid):
         ([esc(r['site'] + 1)] if multi else []) +
         [esc(r['pos'] or 'MC') + tag(r), w.person_link(r['person']), esc(r['total'] or ''),
          money(prizes.get((r['person'], r['site']), 0.0)) if prizes else '<span class="muted">not recorded</span>',
-         w.person_link(r['coach']), w.person_link(r['caddie']), OH.route_html(r['route'])] for r in rows],
+         w.person_link(r['coach']), w.person_link(r['caddie']), OH.route_html(r['route'], w.calendar_version)] for r in rows],
         numeric=(1, 3, 4) if multi else (0, 2, 3)))
+    if e.get('tier') == 0 or sid in ('TOUR_MASTERS', 'PREMIER_TOUR_CHAMPIONSHIP', 'USA_OPEN', 'BRITANNIA_OPEN'):
+        out.append(OH.rights_section(w, e['year'], sid))
     out.append('<p class="muted">Coach and caddie are the team that week. MC: missed the cut (or out before the '
                'final stage). Prize: the money paid, as recorded (since rules 2026-10-30; amateurs are never paid); '
                'earlier editions did not record it. How they got in: the rule in words with the recorded code.</p>')

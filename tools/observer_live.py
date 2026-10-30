@@ -134,6 +134,8 @@ def capture(session):
         history_years=sorted(archived), weeks_played=session.state.get('weeks_played'), engine=meta.get('engine'), commit=meta.get('commit'),
         written=meta.get('written'), year=year, people=people, wr=dict(s.wr_pos), am=dict(s.am_pos),
         wr_avg=dict(getattr(s, 'wr_avg', {})), first_year=s.first_year, peak_since=getattr(s, 'peak_since', None),
+        calendar_version=getattr(s, 'calendar_version', 'v1'),
+        major_rights={m: dict(book) for m, book in getattr(s, 'major_rights', {}).get(year, {}).items()},
         rank_top={w_: list(rows) for w_, rows in getattr(s, 'rank_top', {}).get(year, {}).items()},
         wr_seed=dict(getattr(s, 'wr_seed', {})),          # (seeded points: the world's first two seasons only)
         editions=editions, by_person=dict(by_person), schedule=schedule, series=series,

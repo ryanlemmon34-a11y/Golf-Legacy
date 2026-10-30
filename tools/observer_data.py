@@ -69,6 +69,11 @@ def results(w, pid):
     return out
 
 
+def int_keys(d):
+    """A dict keyed by golfer id, with integer keys (a season file's JSON keys are strings)."""
+    return {int(k): v for k, v in d.items()}
+
+
 def by_person(d, pid, default=None):
     """A per-golfer entry of an edition (team, routes...) whether its keys are integers (an archived season as
     the Archive decodes it) or strings (an edition record not yet archived, or read without decoding)."""

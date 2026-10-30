@@ -22,8 +22,10 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass, field
 
+from . import schedule as SCH
+
 MAJOR_SERIES = ('TOUR_MASTERS', 'PREMIER_TOUR_CHAMPIONSHIP', 'USA_OPEN', 'BRITANNIA_OPEN')
-MAJOR_WEEK = {'TOUR_MASTERS': 18, 'PREMIER_TOUR_CHAMPIONSHIP': 24, 'USA_OPEN': 25, 'BRITANNIA_OPEN': 30}
+MAJOR_WEEK = dict(SCH.V1.majors)          # the classic calendar's weeks (a context's own: ctx.major_week)
 FIELD_SIZE = {'TOUR_MASTERS': None, 'PREMIER_TOUR_CHAMPIONSHIP': 156, 'USA_OPEN': 156, 'BRITANNIA_OPEN': 156}
 OTHER_MAJORS = {m: tuple(x for x in MAJOR_SERIES if x != m) for m in MAJOR_SERIES}
 
@@ -41,6 +43,11 @@ class Person:
     active: bool = True
 
 
+class FutureSnapshot(LookupError):
+    """A rule asked for a ranking or points list not yet published at the moment it is applied (a cut-off
+    snapshot is read only once its week is over: never a later list standing in for it, never an earlier one)."""
+
+
 @dataclass
 class QualificationContext:
     people: dict = field(default_factory=dict)                 # id -> Person
@@ -51,15 +58,50 @@ class QualificationContext:
     standings: dict = field(default_factory=dict)              # (tour, year) final, or (tour, year, week) in-season
     tour_of: dict = field(default_factory=dict)                # series_id -> tour key
     category_of: dict = field(default_factory=dict)            # series_id -> calendar category
+    version: str = SCH.LEGACY                                  # the calendar (schedule.Spec) the rules follow
+    horizon: tuple = None                                      # (year, week): facts from then on are unknown
+    awards: dict = field(default_factory=dict)                 # ('amateur_award', year) -> gid (or None)
+    edition_weeks: dict = field(default_factory=dict)          # (series_id, year) -> week it was played
 
     # -- recording ---------------------------------------------------------------------------
-    def add_result(self, series_id, year, finishers, site=0):
-        """finishers: [(id, position)] in finishing order; position None = missed cut."""
+    def add_result(self, series_id, year, finishers, site=0, week=None):
+        """finishers: [(id, position)] in finishing order; position None = missed cut. week: when the edition
+        was played (its actual date, kept so a rule never reads a later calendar's week into the past)."""
         self.results.setdefault((series_id, year), {})[site] = list(finishers)
+        if week is not None:
+            self.__dict__.setdefault('edition_weeks', {})[(series_id, year)] = week
+
+    def edition_week(self, series_id, year):
+        """The week an edition was played (recorded), else its series' week in this calendar."""
+        w = self.__dict__.get('edition_weeks', {}).get((series_id, year))
+        return w if w is not None else self.event_weeks.get(series_id)
+
+    def major_week(self, major):
+        return SCH.spec(self.version).majors[major]
+
+    def snapshot(self, year, week, amateur=False):
+        """The ranking published at the end of `week` of `year` exactly (an immutable cut-off snapshot): [] if
+        it was never recorded (before the world began), FutureSnapshot if it is not published yet in this view."""
+        h = self.__dict__.get('horizon')
+        if h is not None and (year, week) >= h:
+            raise FutureSnapshot(f'ranking after week {week} of {year} is not published before week {h[1]} of {h[0]}')
+        return (self.amateur_rankings if amateur else self.world_rankings).get((year, week), [])
+
+    def standing_snapshot(self, tour_key, year, week):
+        """A points list exactly as published after `week` (FutureSnapshot before then)."""
+        h = self.__dict__.get('horizon')
+        if h is not None and (year, week) >= h:
+            raise FutureSnapshot(f'{tour_key} points after week {week} of {year} are not published before week '
+                                 f'{h[1]} of {h[0]}')
+        return self.standings.get((tour_key, year, week))
+
+    def award(self, name, year):
+        return self.__dict__.get('awards', {}).get((name, year))
 
     @classmethod
     def from_calendar(cls, calendar, **kw):
         ctx = cls(**kw)
+        ctx.version = getattr(calendar, 'version', SCH.LEGACY)
         for s in calendar.series:
             ctx.event_weeks[s.series_id] = s.week
             ctx.tour_of[s.series_id] = s.tour
@@ -96,8 +138,13 @@ class QualificationContext:
         """A view containing only facts known before `week` of `year` (no hindsight)."""
         def known(y, wk):
             return y < year or (y == year and wk < week)
-        view = QualificationContext(self.people, {}, self.event_weeks, {}, {}, {}, self.tour_of, self.category_of)
-        view.results = {k: v for k, v in self.results.items() if known(k[1], self.event_weeks.get(k[0], 0))}
+        h = self.__dict__.get('horizon')
+        view = QualificationContext(self.people, {}, self.event_weeks, {}, {}, {}, self.tour_of, self.category_of,
+                                    version=self.version, horizon=min(h, (year, week)) if h else (year, week),
+                                    edition_weeks=self.__dict__.get('edition_weeks', {}))
+        cut = SCH.spec(self.version).cutoffs                # an award is known once the week it follows is over
+        view.awards = {k: v for k, v in self.__dict__.get('awards', {}).items() if known(k[1], cut.get(k[0], 52))}
+        view.results = {k: v for k, v in self.results.items() if known(k[1], self.edition_week(k[0], k[1]) or 0)}
         view.world_rankings = {k: v for k, v in self.world_rankings.items() if known(*k)}
         view.amateur_rankings = {k: v for k, v in self.amateur_rankings.items() if known(*k)}
         view.standings = {k: v for k, v in self.standings.items()
@@ -127,6 +174,8 @@ class Route:
     alternates: bool = False       # next finishers become first alternates for the field
     cutoff: bool = False           # decided by a ranking or points list published during the major's own
                                    # season: never a place secured in advance
+    source: tuple = ()             # where the right comes from, for the rights ledger: ((series id, year
+                                   # offset), ...) or (('ranking' | 'points' | 'award', week, year offset),)
 
 
 def winners_of(series_ids, years_back, include_current=True):
@@ -244,6 +293,57 @@ def ranking_fill(week, year_offset=0):
     return select
 
 
+def snapshot_top(n, week, year_offset=0, amateur=False):
+    """The top n of the ranking published after `week` exactly (v2: an immutable cut-off snapshot)."""
+    def select(ctx, year):
+        return ctx.snapshot(year + year_offset, week, amateur)[:n]
+    return select
+
+
+def snapshot_fill(week, year_offset=0):
+    def select(ctx, year):
+        return ctx.snapshot(year + year_offset, week)
+    return select
+
+
+def points_snapshot(tour_key, week, start=0, stop=None):
+    """This season's points list exactly as published after `week` (last season's final standings only if no
+    list was recorded, e.g. a season played before in-season lists were kept)."""
+    def select(ctx, year):
+        rows = ctx.standing_snapshot(tour_key, year, week)
+        if rows is None:
+            rows = ctx.standing(tour_key, year - 1)
+        return rows[start:stop]
+    return select
+
+
+def winners_since_major(predicate, major, through):
+    """Winners of events matching predicate from the week after last season's edition of `major` (as it was
+    actually played) through week `through` of this season."""
+    def select(ctx, year):
+        prior = ctx.edition_week(major, year - 1)
+        lo, hi = (year - 1, (prior if prior is not None else ctx.major_week(major)) + 1), (year, through)
+        out = []
+        for (sid, y) in sorted(ctx.results, key=lambda k: (k[1], ctx.edition_week(*k) or 0)):
+            wk = ctx.edition_week(sid, y)
+            if wk is None or not (lo <= (y, wk) <= hi) or not predicate(sid, ctx):
+                continue
+            w = ctx.winner(sid, y)
+            if w is not None and w not in out:
+                out.append(w)
+        return out
+    return select
+
+
+def amateur_award(year_offset=-1):
+    """The annual amateur award winner of an earlier season (named after the USA Amateur, published the next
+    week); nobody for a season with no recorded award (never an invented winner)."""
+    def select(ctx, year):
+        g = ctx.award('amateur_award', year + year_offset)
+        return [g] if g is not None else []
+    return select
+
+
 def _is_premier_full_points(sid, ctx):
     return ctx.tour_of.get(sid) == 'PT_AMERICAS' and ctx.category_of.get(sid) != 'opportunity' or \
         (ctx.tour_of.get(sid, '').startswith('PT_') and ctx.category_of.get(sid) == 'flagship')
@@ -258,128 +358,213 @@ def _is_premier(sid, ctx):
 # ---------------------------------------------------------------------------------------------
 MAJOR_WINNER_SETS = {m: OTHER_MAJORS[m] for m in MAJOR_SERIES}
 
-RULES = {
-    'TOUR_MASTERS': (
-        Route('M1', 'Past Tour Masters champions', 'Masters champions (lifetime)', lifetime_winners('TOUR_MASTERS')),
+def _rules(sp):
+    """Each major's routes under calendar specification `sp` (schedule.Spec). v1 is the classic rule set
+    exactly as it always was; v2 reads the reference calendar's cut-offs from immutable snapshots, sends each
+    amateur title to the edition its date allows, keeps champion and runner-up entitlements apart and adds
+    the season's annual amateur award (after the USA Amateur) for next season's USA and Britannia Opens."""
+    c = sp.cutoffs
+    v2 = sp.snapshots
+    top = snapshot_top if v2 else ranking_top
+    fill = snapshot_fill if v2 else ranking_fill
+    pts = points_snapshot if v2 else points_list
+    since = (lambda pred, major, through: winners_since_major(pred, major, through)) if v2 else \
+        (lambda pred, major, through: tour_winners_between(pred, (-1, c[{'TOUR_MASTERS': 'masters_wins_from',
+                                                                         'PREMIER_TOUR_CHAMPIONSHIP': 'pga_wins_from'}[major]]),
+                                                           (0, through)))
+    if v2:
+        usa_am = (Route('M4', 'USA Amateur champion', 'U.S. Amateur champion', places('USA_AMATEUR', (1,)),
+                        amateur_only=True, source=(('USA_AMATEUR', -1),)),
+                  Route('M4R', 'USA Amateur runner-up', 'U.S. Amateur runner-up', places('USA_AMATEUR', (2,)),
+                        amateur_only=True, source=(('USA_AMATEUR', -1),)))
+    else:
+        usa_am = (Route('M4', 'USA Amateur champion and runner-up', 'U.S. Amateur champion and runner-up',
+                        places('USA_AMATEUR', (1, 2)), amateur_only=True),)
+    masters = (
+        Route('M1', 'Past Tour Masters champions', 'Masters champions (lifetime)', lifetime_winners('TOUR_MASTERS'),
+              source=(('wins', ('TOUR_MASTERS',), 0),)),
         Route('M2', 'Major champions, last 5 years', 'US Open, Open and PGA champions (5 years)',
-              winners_of(OTHER_MAJORS['TOUR_MASTERS'], 5)),
+              winners_of(OTHER_MAJORS['TOUR_MASTERS'], 5), source=(('wins', OTHER_MAJORS['TOUR_MASTERS'], 5),)),
         Route('M3', 'Premier Players Championship winners, last 3 years', 'Players Championship winners (3 years)',
-              winners_of(('PT_PREMIER_PLAYERS_CHAMPIONSHIP',), 3)),
-        Route('M4', 'USA Amateur champion and runner-up', 'U.S. Amateur champion and runner-up',
-              places('USA_AMATEUR', (1, 2)), amateur_only=True),
+              winners_of(('PT_PREMIER_PLAYERS_CHAMPIONSHIP',), 3), source=(('wins', ('PT_PREMIER_PLAYERS_CHAMPIONSHIP',), 3),)),
+        *usa_am,
         Route('M5', 'Britannia Amateur champion', 'The Amateur Championship winner',
-              places('BRITANNIA_AMATEUR', (1,)), amateur_only=True),
+              places('BRITANNIA_AMATEUR', (1,)), amateur_only=True, source=(('BRITANNIA_AMATEUR', -1),)),
         Route('M6', 'Asia-Pacific Amateur champion', 'Asia-Pacific Amateur champion',
-              places('ASIA_PACIFIC_AMATEUR', (1,)), amateur_only=True),
+              places('ASIA_PACIFIC_AMATEUR', (1,)), amateur_only=True, source=(('ASIA_PACIFIC_AMATEUR', -1),)),
         Route('M7', 'Latin America Amateur champion', 'Latin America Amateur champion',
-              places('LATIN_AMERICA_AMATEUR', (1,), year_offset=0), amateur_only=True),
+              places('LATIN_AMERICA_AMATEUR', (1,), year_offset=0), amateur_only=True,
+              source=(('LATIN_AMERICA_AMATEUR', 0),)),
         Route('M8', 'USA Mid-Amateur champion', 'U.S. Mid-Amateur champion',
-              places('USA_MID_AMATEUR', (1,)), amateur_only=True),
+              places('USA_MID_AMATEUR', (1,)), amateur_only=True, source=(('USA_MID_AMATEUR', -1),)),
+        *((Route('M16', 'College national champion (last season)', 'NCAA individual champion (previous season)',
+                 places('COLLEGE_NATIONAL_CHAMPIONSHIP', (1,)), amateur_only=True,
+                 source=(('COLLEGE_NATIONAL_CHAMPIONSHIP', -1),)),) if v2 else ()),
         Route('M9', 'Top 12 and ties, last Tour Masters', 'Top 12 and ties, previous Masters',
-              top_finishers('TOUR_MASTERS', 12)),
+              top_finishers('TOUR_MASTERS', 12), source=(('TOUR_MASTERS', -1),)),
         Route('M10', 'Top 4 and ties, last year\'s other majors', 'Top 4 and ties, previous US Open / Open / PGA',
-              top_finishers_of(OTHER_MAJORS['TOUR_MASTERS'], 4)),
+              top_finishers_of(OTHER_MAJORS['TOUR_MASTERS'], 4), source=tuple((m, -1) for m in OTHER_MAJORS['TOUR_MASTERS'])),
         Route('M11', 'Premier Tour winners since the last Tour Masters', 'PGA Tour winners (full-points events) since previous Masters',
-              tour_winners_between(_is_premier_full_points, (-1, 19), (0, 17))),
+              since(_is_premier_full_points, 'TOUR_MASTERS', c['masters_wins_through']), source=(('wins', None, 1),)),
         Route('M12', 'Last season\'s Premier Tour Finals qualifiers', 'Tour Championship qualifiers (previous season)',
-              standing_top('PT_AMERICAS', 30)),
+              standing_top('PT_AMERICAS', 30), source=(('standing', 'PT_AMERICAS', -1),)),
         Route('M13', 'World top 50 at the end of last year', 'OWGR top 50, final ranking of previous year',
-              ranking_top(50, 52, -1)),
-        Route('M14', 'World top 50 two weeks before', 'OWGR top 50, ranking published before the Masters',
-              ranking_top(50, 16), cutoff=True),
+              top(50, 52, -1), source=(('ranking', 52, -1),)),
+        Route('M14', 'World top 50 two weeks before' if not v2 else f'World top 50 after week {c["masters_ranking"]}',
+              'OWGR top 50, ranking published before the Masters', top(50, c['masters_ranking']), cutoff=True,
+              source=(('ranking', c['masters_ranking'], 0),)),
         Route('M15', 'International invitations', 'Special invitations to international players',
-              lambda ctx, year: [g for g in ctx.ranking(year, 16)[50:100]
-                                 if ctx.people[g].country not in ('USA',)], kind='qualifying', spots=4),
-    ),
-    'PREMIER_TOUR_CHAMPIONSHIP': (
+              (lambda ctx, year: [g for g in ctx.snapshot(year, c['masters_ranking'])[50:100]
+                                  if ctx.people[g].country not in ('USA',)]) if v2 else
+              (lambda ctx, year: [g for g in ctx.ranking(year, 16)[50:100] if ctx.people[g].country not in ('USA',)]),
+              kind='qualifying', spots=4),
+    )
+    pga = (
         Route('P1', 'Past Premier Tour Championship champions', 'PGA champions (lifetime)',
-              lifetime_winners('PREMIER_TOUR_CHAMPIONSHIP')),
+              lifetime_winners('PREMIER_TOUR_CHAMPIONSHIP'), source=(('wins', ('PREMIER_TOUR_CHAMPIONSHIP',), 0),)),
         Route('P2', 'Major champions, last 5 years', 'Masters, US Open and Open champions (5 years)',
-              winners_of(OTHER_MAJORS['PREMIER_TOUR_CHAMPIONSHIP'], 5)),
+              winners_of(OTHER_MAJORS['PREMIER_TOUR_CHAMPIONSHIP'], 5),
+              source=(('wins', OTHER_MAJORS['PREMIER_TOUR_CHAMPIONSHIP'], 5),)),
         Route('P3', 'Premier Players Championship winners, last 3 years', 'Players Championship winners (3 years)',
-              winners_of(('PT_PREMIER_PLAYERS_CHAMPIONSHIP',), 3)),
+              winners_of(('PT_PREMIER_PLAYERS_CHAMPIONSHIP',), 3), source=(('wins', ('PT_PREMIER_PLAYERS_CHAMPIONSHIP',), 3),)),
         Route('P4', 'Top 15 and ties, last Premier Tour Championship', 'Top 15 and ties, previous PGA',
-              top_finishers('PREMIER_TOUR_CHAMPIONSHIP', 15)),
+              top_finishers('PREMIER_TOUR_CHAMPIONSHIP', 15), source=(('PREMIER_TOUR_CHAMPIONSHIP', -1),)),
         Route('P5', 'Top 20, Club Professional Championship', 'Top 20, PGA Professional Championship (ties for the '
               'last places settled by playoff)', qualifier_finishers(('CLUB_PRO_CHAMPIONSHIP',)), kind='qualifying',
-              status='club_pro', spots=20),
+              status='club_pro', spots=20, source=(('CLUB_PRO_CHAMPIONSHIP', 0),)),
         Route('P6', 'Top 70, Premier Tour Americas points list', 'Top 70, PGA Tour points list',
-              points_list('PT_AMERICAS', 22, 0, 70), cutoff=True),
+              pts('PT_AMERICAS', c['pga_points'], 0, 70), cutoff=True, source=(('points', c['pga_points'], 0),)),
         Route('P7', 'Premier Tour winners since the last Premier Tour Championship', 'PGA Tour winners since previous PGA',
-              tour_winners_between(_is_premier, (-1, 25), (0, 23))),
+              since(_is_premier, 'PREMIER_TOUR_CHAMPIONSHIP', c['pga_wins_through']), source=(('wins', None, 1),)),
         Route('P8', 'Invitations: world top 100', 'PGA of America invitations (effectively the OWGR top 100)',
-              ranking_top(100, 22), cutoff=True),
+              top(100, c['pga_ranking']), cutoff=True, source=(('ranking', c['pga_ranking'], 0),)),
         Route('PF', 'Alternates from the points list', 'Field filled from the PGA Tour points list',
-              points_list('PT_AMERICAS', 22, 70), kind='fill'),
-    ),
-    'USA_OPEN': (
-        Route('U1', 'USA Open champions, last 10 years', 'US Open champions (10 years)', winners_of(('USA_OPEN',), 10, False)),
-        Route('U2', 'USA Amateur champion and runner-up', 'U.S. Amateur champion and runner-up',
-              places('USA_AMATEUR', (1, 2)), amateur_only=True),
-        Route('U3', 'USA Mid-Amateur champion', 'U.S. Mid-Amateur champion', places('USA_MID_AMATEUR', (1,)), amateur_only=True),
-        Route('U4', 'Britannia Amateur champion', 'The Amateur Championship winner',
-              places('BRITANNIA_AMATEUR', (1,), 0), amateur_only=True),
+              pts('PT_AMERICAS', c['pga_points'], 70), kind='fill'),
+    )
+    if v2:
+        usa_amateurs = (
+            Route('U2', 'USA Amateur champion', 'U.S. Amateur champion', places('USA_AMATEUR', (1,)), amateur_only=True,
+                  source=(('USA_AMATEUR', -1),)),
+            Route('U2R', 'USA Amateur runner-up', 'U.S. Amateur runner-up', places('USA_AMATEUR', (2,)),
+                  amateur_only=True, source=(('USA_AMATEUR', -1),)),
+            Route('U3', 'USA Mid-Amateur champion', 'U.S. Mid-Amateur champion', places('USA_MID_AMATEUR', (1,)),
+                  amateur_only=True, source=(('USA_MID_AMATEUR', -1),)),
+            # played in week 26, after this season's USA Open: its champion is in next season's
+            Route('U4', 'Britannia Amateur champion (last season)', 'The Amateur Championship winner',
+                  places('BRITANNIA_AMATEUR', (1,)), amateur_only=True, source=(('BRITANNIA_AMATEUR', -1),)),
+            Route('UA', 'Annual amateur award (last season)', 'Mark McCormack Medal (previous year)',
+                  amateur_award(), amateur_only=True, source=(('award', c['amateur_award'], -1),)),
+        )
+    else:
+        usa_amateurs = (
+            Route('U2', 'USA Amateur champion and runner-up', 'U.S. Amateur champion and runner-up',
+                  places('USA_AMATEUR', (1, 2)), amateur_only=True),
+            Route('U3', 'USA Mid-Amateur champion', 'U.S. Mid-Amateur champion', places('USA_MID_AMATEUR', (1,)),
+                  amateur_only=True),
+            Route('U4', 'Britannia Amateur champion', 'The Amateur Championship winner',
+                  places('BRITANNIA_AMATEUR', (1,), 0), amateur_only=True),
+        )
+    finals = tuple(sid for sid in ('USA_OPEN_FINAL_INTL', 'USA_OPEN_FINAL'))
+    usa = (
+        Route('U1', 'USA Open champions, last 10 years', 'US Open champions (10 years)', winners_of(('USA_OPEN',), 10, False),
+              source=(('wins', ('USA_OPEN',), 10),)),
+        *usa_amateurs,
         Route('U5', 'Major champions, last 5 years', 'Masters, Open and PGA champions (5 years)',
-              winners_of(OTHER_MAJORS['USA_OPEN'], 5)),
+              winners_of(OTHER_MAJORS['USA_OPEN'], 5), source=(('wins', OTHER_MAJORS['USA_OPEN'], 5),)),
         Route('U6', 'Premier Players Championship winners, last 3 years', 'Players Championship winners (3 years)',
-              winners_of(('PT_PREMIER_PLAYERS_CHAMPIONSHIP',), 3)),
-        Route('U7', 'Top 10 and ties, last USA Open', 'Top 10 and ties, previous US Open', top_finishers('USA_OPEN', 10)),
+              winners_of(('PT_PREMIER_PLAYERS_CHAMPIONSHIP',), 3), source=(('wins', ('PT_PREMIER_PLAYERS_CHAMPIONSHIP',), 3),)),
+        Route('U7', 'Top 10 and ties, last USA Open', 'Top 10 and ties, previous US Open', top_finishers('USA_OPEN', 10),
+              source=(('USA_OPEN', -1),)),
         Route('U8', 'Last season\'s Premier Tour Finals qualifiers', 'Tour Championship qualifiers (previous season)',
-              standing_top('PT_AMERICAS', 30)),
-        Route('U9', 'World top 60, first cut-off', 'OWGR top 60, mid-May ranking', ranking_top(60, 21), cutoff=True),
-        Route('U10', 'World top 60, final cut-off', 'OWGR top 60, ranking the week before', ranking_top(60, 23), cutoff=True),
+              standing_top('PT_AMERICAS', 30), source=(('standing', 'PT_AMERICAS', -1),)),
+        Route('U9', 'World top 60, first cut-off', 'OWGR top 60, mid-May ranking', top(60, c['usa_ranking_1']), cutoff=True,
+              source=(('ranking', c['usa_ranking_1'], 0),)),
+        Route('U10', 'World top 60, final cut-off', 'OWGR top 60, ranking the week before', top(60, c['usa_ranking_2']),
+              cutoff=True, source=(('ranking', c['usa_ranking_2'], 0),)),
         Route('UQ', 'Final Qualifying', 'US Open Final Qualifying (36 holes, one day)',
-              stage_sites(('USA_OPEN_FINAL_INTL', 'USA_OPEN_FINAL')), kind='qualifying', site_spots=(6, 4, 8, 7, 6, 6, 8, 6, 7, 5),
-              alternates=True),
-        Route('UF', 'Alternates', 'Alternates from final qualifying, then the world ranking', ranking_fill(23), kind='fill'),
-    ),
-    'BRITANNIA_OPEN': (
+              stage_sites(finals), kind='qualifying', site_spots=(6, 4, 8, 7, 6, 6, 8, 6, 7, 5),
+              alternates=True, source=tuple((sid, 0) for sid in finals)),
+        Route('UF', 'Alternates', 'Alternates from final qualifying, then the world ranking', fill(c['usa_fill']), kind='fill'),
+    )
+    if v2:
+        award = (Route('B13', 'Annual amateur award (last season)', 'Mark McCormack Medal (previous year)',
+                       amateur_award(), amateur_only=True, source=(('award', c['amateur_award'], -1),)),)
+    else:
+        award = (Route('B13', 'Leading amateur in the world amateur ranking', 'Mark McCormack Medal',
+                       ranking_top(1, 26, amateur=True), amateur_only=True, cutoff=True),)
+    britannia = (
         Route('B1', 'Past Britannia Open champions aged 60 or under', 'Open champions aged 60 or under',
-              lifetime_winners('BRITANNIA_OPEN'), max_age=60),
-        Route('B2', 'Top 10 and ties, last Britannia Open', 'Top 10 and ties, previous Open', top_finishers('BRITANNIA_OPEN', 10)),
+              lifetime_winners('BRITANNIA_OPEN'), max_age=60, source=(('wins', ('BRITANNIA_OPEN',), 0),)),
+        Route('B2', 'Top 10 and ties, last Britannia Open', 'Top 10 and ties, previous Open', top_finishers('BRITANNIA_OPEN', 10),
+              source=(('BRITANNIA_OPEN', -1),)),
         Route('B3', 'Major champions, last 5 years', 'Masters, US Open and PGA champions (5 years)',
-              winners_of(OTHER_MAJORS['BRITANNIA_OPEN'], 5)),
+              winners_of(OTHER_MAJORS['BRITANNIA_OPEN'], 5), source=(('wins', OTHER_MAJORS['BRITANNIA_OPEN'], 5),)),
         Route('B4', 'Premier Players Championship winners, last 3 years', 'Players Championship winners (3 years)',
-              winners_of(('PT_PREMIER_PLAYERS_CHAMPIONSHIP',), 3)),
-        Route('B5', 'World top 50', 'OWGR top 50 (late-May ranking)', ranking_top(50, 21), cutoff=True),
+              winners_of(('PT_PREMIER_PLAYERS_CHAMPIONSHIP',), 3), source=(('wins', ('PT_PREMIER_PLAYERS_CHAMPIONSHIP',), 3),)),
+        Route('B5', 'World top 50', 'OWGR top 50 (late-May ranking)', top(50, c['britannia_ranking']), cutoff=True,
+              source=(('ranking', c['britannia_ranking'], 0),)),
         Route('B6', 'Last season\'s Premier Tour Finals qualifiers', 'Tour Championship qualifiers (previous season)',
-              standing_top('PT_AMERICAS', 30)),
+              standing_top('PT_AMERICAS', 30), source=(('standing', 'PT_AMERICAS', -1),)),
         Route('B7', 'Top 30, last season\'s Premier Tour Europe standings', 'Top 30, Race to Dubai (previous season)',
-              standing_top('PT_EUROPE', 30)),
+              standing_top('PT_EUROPE', 30), source=(('standing', 'PT_EUROPE', -1),)),
         Route('B8', 'Order of Merit winners: Japan, Asia, Australasia, Southern Africa', 'Order of Merit winners (Japan, Asian, Australasian, Sunshine tours)',
-              standing_leaders(('CH_JAPAN', 'CH_ASIA', 'RG_AUSTRALASIA', 'RG_SOUTHERN_AFRICA'))),
+              standing_leaders(('CH_JAPAN', 'CH_ASIA', 'RG_AUSTRALASIA', 'RG_SOUTHERN_AFRICA')),
+              source=tuple(('standing', t, -1) for t in ('CH_JAPAN', 'CH_ASIA', 'RG_AUSTRALASIA', 'RG_SOUTHERN_AFRICA'))),
         Route('B9', 'Britannia Amateur champion', 'The Amateur Championship winner',
-              places('BRITANNIA_AMATEUR', (1,), 0), amateur_only=True),
-        Route('B10', 'USA Amateur champion', 'U.S. Amateur champion', places('USA_AMATEUR', (1,)), amateur_only=True),
+              places('BRITANNIA_AMATEUR', (1,), 0), amateur_only=True, source=(('BRITANNIA_AMATEUR', 0),)),
+        Route('B10', 'USA Amateur champion', 'U.S. Amateur champion', places('USA_AMATEUR', (1,)), amateur_only=True,
+              source=(('USA_AMATEUR', -1),)),
         Route('B11', 'European Amateur champion', 'European Amateur champion',
-              places('EUROPEAN_AMATEUR', (1,), 0), amateur_only=True),
+              places('EUROPEAN_AMATEUR', (1,), 0), amateur_only=True, source=(('EUROPEAN_AMATEUR', 0),)),
         Route('B12', 'Asia-Pacific, Latin America and Africa Amateur champions', 'Asia-Pacific, Latin America and Africa Amateur champions',
               lambda ctx, year: places('ASIA_PACIFIC_AMATEUR', (1,))(ctx, year) +
               places('LATIN_AMERICA_AMATEUR', (1,), 0)(ctx, year) + places('AFRICA_AMATEUR', (1,), 0)(ctx, year),
-              amateur_only=True),
-        Route('B13', 'Leading amateur in the world amateur ranking', 'Mark McCormack Medal',
-              ranking_top(1, 26, amateur=True), amateur_only=True, cutoff=True),
+              amateur_only=True, source=(('ASIA_PACIFIC_AMATEUR', -1), ('LATIN_AMERICA_AMATEUR', 0), ('AFRICA_AMATEUR', 0))),
+        *award,
         # Britannia Qualifying Series: leading finishers not already exempt.
         *[Route(f'BQ_{sid}', f'Britannia Qualifying Series: {label}', f'Open Qualifying Series: {real}',
-                qualifier_finishers((sid,), off), kind='qualifying', spots=n)
-          for sid, label, real, off, n in (
-              ('PT_AUSTRALIA_OPEN', 'Australia Open (December)', 'Australian Open', -1, 3),
-              ('PT_SOUTH_AFRICA_OPEN', 'South Africa Open (December)', 'South African Open', -1, 3),
-              ('NATIONAL_OPEN_JAPAN', 'Japan Open (October)', 'Japan Open / Mizuno Open', -1, 2),
-              ('NATIONAL_OPEN_NEW_ZEALAND', 'New Zealand Open', 'New Zealand Open', 0, 1),
-              ('PT_KENYA_OPEN', 'Kenya Open', 'African national-open route', 0, 1),
-              ('PT_HEARTLAND_INVITATIONAL', 'Heartland Invitational', 'Memorial Tournament', 0, 3),
-              ('PT_CANADA_OPEN', 'Canada Open', 'RBC Canadian Open', 0, 3),
-              ('NATIONAL_OPEN_SOUTH_KOREA', 'Korea Open', 'Kolon Korea Open', 0, 2),
-              ('PT_GREAT_LAKES_OPEN', 'Great Lakes Open', 'John Deere Classic', 0, 1),
-              ('PT_SCOTLAND_OPEN', 'Scotland Open', 'Genesis Scottish Open', 0, 3))],
+                qualifier_finishers((sid,), off), kind='qualifying', spots=n, source=((sid, off),))
+          for sid, label, real, off, n in BRITANNIA_SERIES],
         Route('BQ', 'Final Qualifying', 'Open Final Qualifying (36 holes, four venues)',
-              stage_sites(('BRITANNIA_FINAL',)), kind='qualifying', site_spots=(4, 4, 4, 4), alternates=True),
-        Route('BF', 'Reserves from the world ranking', 'Reserve list (OWGR)', ranking_fill(26), kind='fill'),
-    ),
-}
+              stage_sites(('BRITANNIA_FINAL',)), kind='qualifying', site_spots=(4, 4, 4, 4), alternates=True,
+              source=(('BRITANNIA_FINAL', 0),)),
+        Route('BF', 'Reserves from the world ranking', 'Reserve list (OWGR)', fill(c['britannia_fill']), kind='fill'),
+    )
+    return {'TOUR_MASTERS': masters, 'PREMIER_TOUR_CHAMPIONSHIP': pga, 'USA_OPEN': usa, 'BRITANNIA_OPEN': britannia}
+
+
+# The designated Britannia Qualifying Series: ten game allocations (source edition: last season's or this one's)
+BRITANNIA_SERIES = (
+    ('PT_AUSTRALIA_OPEN', 'Australia Open (December)', 'Australian Open', -1, 3),
+    ('PT_SOUTH_AFRICA_OPEN', 'South Africa Open (December)', 'South African Open', -1, 3),
+    ('NATIONAL_OPEN_JAPAN', 'Japan Open (October)', 'Japan Open / Mizuno Open', -1, 2),
+    ('NATIONAL_OPEN_NEW_ZEALAND', 'New Zealand Open', 'New Zealand Open', 0, 1),
+    ('PT_KENYA_OPEN', 'Kenya Open', 'African national-open route', 0, 1),
+    ('PT_HEARTLAND_INVITATIONAL', 'Heartland Invitational', 'Memorial Tournament', 0, 3),
+    ('PT_CANADA_OPEN', 'Canada Open', 'RBC Canadian Open', 0, 3),
+    ('NATIONAL_OPEN_SOUTH_KOREA', 'Korea Open', 'Kolon Korea Open', 0, 2),
+    ('PT_GREAT_LAKES_OPEN', 'Great Lakes Open', 'John Deere Classic', 0, 1),
+    ('PT_SCOTLAND_OPEN', 'Scotland Open', 'Genesis Scottish Open', 0, 3))
+
+RULES_BY_VERSION = {v: _rules(sp) for v, sp in SCH.SPECS.items()}
+RULES = RULES_BY_VERSION[SCH.LEGACY]                 # (the classic rules: worlds saved before calendar versions)
+
+
+def rules_for(version=None):
+    return RULES_BY_VERSION[version or SCH.LEGACY]
 
 # Every calendar series the rules refer to (checked against the calendar by the tests).
+def referenced_series(version=None):
+    sp = SCH.spec(version)
+    return tuple(dict.fromkeys(
+        ('TOUR_MASTERS', 'PREMIER_TOUR_CHAMPIONSHIP', 'USA_OPEN', 'BRITANNIA_OPEN', 'PT_PREMIER_PLAYERS_CHAMPIONSHIP',
+         'USA_AMATEUR', 'BRITANNIA_AMATEUR', 'ASIA_PACIFIC_AMATEUR', 'LATIN_AMERICA_AMATEUR', 'USA_MID_AMATEUR',
+         'EUROPEAN_AMATEUR', 'AFRICA_AMATEUR', 'CLUB_PRO_CHAMPIONSHIP', 'USA_OPEN_FINAL_INTL', 'USA_OPEN_FINAL',
+         *(x[0] for x in sp.usa_local), 'BRITANNIA_FINAL', *(x[0] for x in sp.britannia_regional),
+         *(x[0] for x in BRITANNIA_SERIES))
+        + (('COLLEGE_NATIONAL_CHAMPIONSHIP',) if sp.snapshots else ())))
+
+
 REFERENCED_SERIES = (
     'TOUR_MASTERS', 'PREMIER_TOUR_CHAMPIONSHIP', 'USA_OPEN', 'BRITANNIA_OPEN', 'PT_PREMIER_PLAYERS_CHAMPIONSHIP',
     'USA_AMATEUR', 'BRITANNIA_AMATEUR', 'ASIA_PACIFIC_AMATEUR', 'LATIN_AMERICA_AMATEUR', 'USA_MID_AMATEUR',
@@ -391,6 +576,15 @@ REFERENCED_SERIES = (
 )
 
 # Earlier stages that feed the final qualifying events.
+def stages(version=None):
+    """{final stage: feeders, places per site, who skips the earlier stage} for a calendar version."""
+    sp = SCH.spec(version)
+    if sp.version == SCH.LEGACY:
+        return STAGES
+    return {'USA_OPEN_FINAL': dict(STAGES['USA_OPEN_FINAL'], feeders=tuple(x[0] for x in sp.usa_local)),
+            'BRITANNIA_FINAL': dict(STAGES['BRITANNIA_FINAL'], feeders=tuple(x[0] for x in sp.britannia_regional))}
+
+
 STAGES = {
     'USA_OPEN_FINAL': dict(feeders=('USA_OPEN_LOCAL_W19', 'USA_OPEN_LOCAL_W20', 'USA_OPEN_LOCAL_W21'),
                            per_site=5, exempt_from_earlier='World top 250, Premier Tour members, recent USA Amateur finalists'),
@@ -428,7 +622,7 @@ def secured_places(ctx, year):
     ('if still an amateur': it lapses if they turn professional) only if every route is an amateur's."""
     view = ctx.as_of(year + 1, 1)                     # everything of `year`, nothing of the next
     found = {}
-    for major, rules in RULES.items():
+    for major, rules in rules_for(ctx.version).items():
         for route in rules:
             if route.kind != 'exempt' or route.cutoff:
                 continue
@@ -465,13 +659,14 @@ def _eligible(ctx, gid, route, year):
 
 def build_field(major, year, ctx):
     """Apply the major's routes in order and return the field with each entrant's sources."""
-    if major not in RULES:
+    rules = rules_for(ctx.version)
+    if major not in rules:
         raise KeyError(major)
-    ctx = ctx.as_of(year, MAJOR_WEEK[major])
+    ctx = ctx.as_of(year, ctx.major_week(major))
     entries, in_field = [], {}
     counts = defaultdict(int)
     alternates = []
-    rules = RULES[major]
+    rules = rules[major]
     # Every exempt category is applied before any qualifying places are handed out, whatever order the
     # routes are listed in: a player who is exempt anyway (e.g. a club professional inside the world
     # top 100) never uses up a qualifying place; it passes to the next finisher.
@@ -536,6 +731,68 @@ def build_field(major, year, ctx):
     return Field(major, year, entries, alternates, {k: v for k, v in counts.items() if v})
 
 
+def wins_index(ctx):
+    """{gid: [(series_id, year)]} of every recorded win (one pass over the results, for evidence())."""
+    out = defaultdict(list)
+    for (sid, y) in ctx.results:
+        w = ctx.winner(sid, y)
+        if w is not None:
+            out[w].append((sid, y))
+    return out
+
+
+def evidence(route, gid, year, ctx, wins=None):
+    """[(source, (year, week) awarded)] behind a golfer's place by `route` in the `year` edition: the edition(s)
+    and result, ranking or points list, or award the route read (empty where the route names none). wins: a
+    wins_index(ctx), when many golfers are looked up at once."""
+    out = []
+    for src in route.source:
+        if src[0] == 'wins':                                 # a win: the latest one the route counts
+            series, back = src[1], src[2]
+            found = None
+            mine = wins.get(gid, ()) if wins is not None else [k for k in ctx.results if ctx.winner(*k) == gid]
+            for (sid, y) in mine:
+                if (series is None and not ctx.tour_of.get(sid, '').startswith('PT_')) or \
+                        (series is not None and sid not in series) or (back and y < year - back):
+                    continue
+                if found is None or (y, ctx.edition_week(sid, y) or 0) > found[1]:
+                    found = (f'{y}:{sid} (won)', (y, ctx.edition_week(sid, y) or 0))
+            if found:
+                out.append(found)
+        elif src[0] == 'standing':
+            out.append((f'{src[1]} final standings {year + src[2]}', (year + src[2], 52)))
+        elif src[0] in ('ranking', 'points', 'award'):
+            what = {'ranking': 'world ranking', 'points': 'Premier Tour Americas points', 'award': 'annual amateur award'}
+            out.append((f'{what[src[0]]} after week {src[1]} of {year + src[2]}', (year + src[2], src[1])))
+        else:                                                # an edition: where the golfer finished
+            sid, off = src
+            y = year + off
+            pos = next((p for g, p in ctx.finishers(sid, y) if g == gid), None)
+            if pos is not None or any(g == gid for g, _ in ctx.finishers(sid, y)):
+                out.append((f'{y}:{sid} ({"position " + str(pos) if pos else "missed cut"})',
+                            (y, ctx.edition_week(sid, y) or 0)))
+    return out
+
+
+def earned_exemptions(major, year, ctx):
+    """({gid: [route codes]}, [pending route codes]): who is exempt into `major` on the facts `ctx` holds (a view
+    as of a qualifying stage). A route decided by a cut-off not yet published is pending -- nobody holds it
+    yet: a projected ranking never stands in for it, so it never takes away anyone's qualifying attempt."""
+    out, pending = {}, []
+    for route in rules_for(ctx.version)[major]:
+        if route.kind != 'exempt':
+            continue
+        try:
+            ids = route.select(ctx, year)
+        except FutureSnapshot:
+            pending.append(route.code)
+            continue
+        for gid in ids:
+            if _eligible(ctx, gid, route, year):
+                out.setdefault(gid, []).append(route.code)
+    return out, pending
+
+
 def stage_entrants(stage_series, year, ctx, pool_ids):
     """Who may enter a qualifying stage: the open pool minus anyone already exempt into the major."""
     major = 'USA_OPEN' if stage_series.startswith('USA_OPEN') else 'BRITANNIA_OPEN'
@@ -543,9 +800,9 @@ def stage_entrants(stage_series, year, ctx, pool_ids):
     return [g for g in pool_ids if g not in exempt and ctx.available(g)]
 
 
-def describe():
+def describe(version=None):
     """Plain-language list of every route, for reports."""
     out = {}
-    for major, routes in RULES.items():
+    for major, routes in rules_for(version).items():
         out[major] = [(r.code, r.label, r.analogue, r.kind) for r in routes]
     return out

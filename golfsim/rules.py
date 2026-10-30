@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import re
 
-RULES_VERSION = '2026-10-30'
+RULES_VERSION = '2026-10-31'
 RANKING_RULE = 'world-ranking-1'     # the world ranking's formula (unchanged since the world began; named now)
 VERSIONS = (
     ('2026-10-30', 'Winners\' exemptions count whatever a golfer\'s membership (a non-member champion earns a '
@@ -22,6 +22,12 @@ VERSIONS = (
                    'nationality; the college eligibility ledger; round scores, conditions and each golfer\'s prize '
                    'money recorded for every event; golf statistics (driving, greens, putting...), each start\'s world '
                    'ranking points, weekly ranking averages and match-play results recorded.'),
+    ('2026-10-31', 'Calendar versions: new worlds play the reference calendar (v2: majors in weeks 15, 20, 25 and 30, '
+                   'qualifying waves with one attempt, cut-offs read from immutable snapshots, amateur titles routed '
+                   'to the edition their date allows, the annual amateur award after the USA Amateur, Asian Q-School '
+                   'in week 51, day-level travel between events in one week); worlds started earlier keep the '
+                   'classic calendar (v1) unchanged. A ledger of every major place (earned, used or lost) and each '
+                   'golfer\'s highest Overall are recorded.'),
 )
 EARLIER = ('Seasons archived before rules versions were recorded were played under earlier rules. The '
            'differences that matter for reading old results: a winner without a Premier card held no '
@@ -130,8 +136,30 @@ RULES = {
     'major-qualification': (
         'Major championship qualification',
         'Each major\'s published exemption categories, then its qualifying and alternates (the route code is the '
-        'category: M = Tour Masters, P = Premier Tour Championship, U = USA Open, B = Britannia Open).',
-        None),
+        'category: M = Tour Masters, P = Premier Tour Championship, U = USA Open, B = Britannia Open). Under the '
+        'reference calendar (v2) a place is one place however many categories support it; every place is kept in '
+        'the rights ledger with its evidence (the edition and result, ranking or award it came from, when it was '
+        'earned) and how it ended: entered, withdrawn (injured or retired), declined (could not pay the trip) or '
+        'expired (an amateur\'s place after turning professional). Champion and runner-up places are separate '
+        'categories; an amateur title feeds the next edition its date allows (the Britannia Amateur, after the '
+        'USA Open, feeds next season\'s USA Open and Masters but this season\'s Britannia Open).',
+        '2026-10-31'),
+    'calendar': (
+        'The calendar',
+        'Each world plays one calendar version, recorded with every season. Classic (v1): majors in weeks 18, 24, '
+        '25 and 30. Reference (v2, new worlds): majors in weeks 15, 20, 25 and 30, five weeks apart; Premier '
+        'opportunity events in the week after each; 36 Premier events (8 flagship, 20 standard, 8 opportunity) '
+        'at their reference weeks; club professionals\' sectionals in week 12 and championship in week 18; USA '
+        'Open local waves in weeks 17, 19 and 21 (each applicant chooses one: one attempt), international final '
+        'qualifying in week 22 (direct entries only) and domestic final in week 24; Britannia regional waves in '
+        'weeks 26 and 27 (one attempt across them), final qualifying week 28, Scotland Open week 29; the season\'s '
+        'leading amateur after the USA Amateur (week 33) is named in week 34 and holds places in next season\'s '
+        'USA and Britannia Opens while still an amateur; Asian Challenger Q-School in week 51 for next season\'s '
+        'cards. Ranking cut-offs are the lists published after their week (Masters 13, Premier Tour Championship '
+        '18, USA Open 20 and 24, Britannia Open 21), never a later or earlier one. A golfer can play two events in '
+        'one week only if the days do not overlap and there is time to travel: none within a country, a free day '
+        'within a region, two between regions.',
+        '2026-10-31'),
     'premier-finals': (
         'Premier Tour Finals',
         'The leaders of the season\'s Premier points list (Premier money) as it stood the week before.',
@@ -239,33 +267,32 @@ _PATTERNS = (
     (re.compile(r'^QUALIFYING SITE (\d+)$'), 'usa-amateur', 'Qualified at site {0}'),
     (re.compile(r'^SECTIONAL (\d+)$'), 'club-pro', 'Qualified at sectional {0}'),
 )
-_MAJOR_CODE = re.compile(r'^([MPUB]\d+|UQ|UF|BQ|BF|PF|BQ_[A-Z_]+)$')
+_MAJOR_CODE = re.compile(r'^([MPUB]\d+R?|UQ|UF|UA|BQ|BF|PF|BQ_[A-Z_]+)$')
 
 
-def _major_labels():
-    from .qualification import RULES as MAJOR_RULES
-    return {r.code: r.label for routes in MAJOR_RULES.values() for r in routes}
+def _major_labels(version=None):
+    from .qualification import rules_for
+    return {r.code: r.label for routes in rules_for(version).values() for r in routes}
 
 
-_labels = None
+_labels = {}
 
 
-def explain(route):
+def explain(route, version=None):
     """(rule id, readable text) for a recorded entry route; (None, None) if it is not recognised (the code
-    is then shown as it is)."""
-    global _labels
+    is then shown as it is). version: the calendar the season was played under (a major route's wording
+    follows its own version; classic when not given)."""
     if not route:
         return None, None
     late = route.endswith(' — late entry')
     base = route[:-len(' — late entry')] if late else route
-    rule, text = _explain(base)
+    rule, text = _explain(base, version)
     if late and text:
         text += ' — a late entry'
     return rule, text
 
 
-def _explain(r):
-    global _labels
+def _explain(r, version=None):
     if r in _FIXED:
         return _FIXED[r]
     if r.startswith('PREMIER ') and r[8:] in _PREMIER_RIGHTS:
@@ -275,10 +302,11 @@ def _explain(r):
         if m:
             return rule, text.format(*m.groups())
     if _MAJOR_CODE.match(r):
-        if _labels is None:
-            _labels = _major_labels()
-        if r in _labels:
-            return 'major-qualification', _labels[r]
+        labels = _labels.get(version)
+        if labels is None:
+            labels = _labels[version] = _major_labels(version)
+        if r in labels:
+            return 'major-qualification', labels[r]
     if r.endswith(' MEMBER'):
         return 'other-member', f'A member of the {r[:-7].title()}'
     return None, None

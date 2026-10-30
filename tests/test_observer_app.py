@@ -39,10 +39,10 @@ import observer_worlds as WL                                          # noqa: E4
 SCALE = 0.02
 
 
-def small_create(cls, directory, seed=2027, workers=None, world=None, development=True):
+def small_create(cls, directory, seed=2027, workers=None, world=None, development=True, calendar=None):
     """Session.create with a small population (the observer creates whole worlds; tests need speed)."""
     return REAL_CREATE(cls, directory, seed=seed, workers=workers, development=development,
-                       world=world or generate_world(seed=seed, scale=SCALE))
+                       world=world or generate_world(seed=seed, scale=SCALE), calendar=calendar)
 
 
 REAL_CREATE = Session.create.__func__

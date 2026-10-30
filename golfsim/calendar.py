@@ -25,7 +25,10 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass, field as dc_field, replace
 
 from .geography import CITIES_BY_COUNTRY, CITY_BY_NAME, COUNTRIES, season_weeks
+from . import schedule as SCH
 
+# The v1 (classic) calendar's majors, kept for code that predates calendar versions; a calendar's own
+# majors are WorldCalendar.majors / .major_weeks (from its schedule.Spec)
 MAJORS = {
     18: ('TOUR_MASTERS', 'Tour Masters'),
     24: ('PREMIER_TOUR_CHAMPIONSHIP', 'Premier Tour Championship'),
@@ -34,6 +37,7 @@ MAJORS = {
 }
 MAJOR_WEEKS = frozenset(MAJORS)
 MAJOR_ID_BY_WEEK = {w: sid for w, (sid, _) in MAJORS.items()}
+MAJOR_NAMES = {sid: name for sid, name in MAJORS.values()}
 
 TIERS = {0: 'Major', 1: 'Premier', 2: 'Challenger', 3: 'Regional', 4: 'Mini', 5: 'College',
          6: 'Amateur', 7: 'Qualifying', 8: 'Club professional'}
@@ -382,99 +386,130 @@ CIRCUIT_FLAGSHIP_ELSEWHERE = {'CP_NORTH_AMERICA': 'CLUB_PRO_CHAMPIONSHIP'}
 FLAGSHIP_LAST_WEEK = 48                 # year-round circuits finish their season before the holidays
 
 
-def _anchor_specs():
+def _anchor_specs(spec=SCH.V1):
     """Fixed-week anchors outside the Premier Tour: (series_id, name, tour, tier, kind, category, holes,
-    field, week, eligibility, country, cities, policy, days, match_play, prestige, sites, cut_top)."""
+    field, week, eligibility, country, cities, policy, days, match_play, prestige, sites, cut_top). Their
+    weeks come from the calendar's specification (schedule.py)."""
+    A = spec.anchors
     UK_LINKS = ('St Andrews', 'Carnoustie', 'Troon', 'North Berwick', 'Southport', 'Hoylake', 'Sandwich',
                 'Portrush', 'Newcastle, County Down', 'Ballybunion', 'Tenby', 'Aberdeen')
     US_AM = ('Pinehurst, North Carolina', 'Southampton, New York', 'Bandon, Oregon', 'Chicago, Illinois',
              'Kohler, Wisconsin', 'Omaha, Nebraska', 'Bethesda, Maryland', 'San Francisco, California')
     yield ('LATIN_AMERICA_AMATEUR', 'Latin America Amateur Championship', 'AMATEUR', 6, 'amateur', 'elite_amateur',
-           72, 108, 3, 'amateur', 'Argentina', ('Buenos Aires', 'Santiago', 'Mexico City', 'Bogotá', 'Lima',
+           72, 108, A['LATIN_AMERICA_AMATEUR'], 'amateur', 'Argentina', ('Buenos Aires', 'Santiago', 'Mexico City', 'Bogotá', 'Lima',
                                                   'São Paulo', 'Cancún'), 'rotating', 'Thu-Sun', False, 72, 1, 50)
-    yield ('AFRICA_AMATEUR', 'Africa Amateur Championship', 'AMATEUR', 6, 'amateur', 'elite_amateur', 72, 96, 9,
+    yield ('AFRICA_AMATEUR', 'Africa Amateur Championship', 'AMATEUR', 6, 'amateur', 'elite_amateur', 72, 96,
+           A['AFRICA_AMATEUR'],
            'amateur', 'South Africa', ('Johannesburg', 'Cape Town', 'Nairobi', 'Rabat', 'Durban', 'Windhoek'),
            'rotating', 'Thu-Sun', False, 62, 1, 50)
     # Club professionals qualify for their championship through 36-hole sectionals (a competition)
     yield ('CLUB_PRO_SECTIONALS', 'Club Professional Championship Sectional Qualifying', 'QUALIFYING', 7, 'qualifying',
-           'qualifier', 36, 90, 12, 'club_pro', 'USA', None, 'rotating', 'Mon', False, 25, 4, 0)
+           'qualifier', 36, 90, A['CLUB_PRO_SECTIONALS'], 'club_pro', 'USA', None, 'rotating', 'Mon', False, 25, 4, 0)
     yield ('CLUB_PRO_CHAMPIONSHIP', 'Club Professional Championship', 'QUALIFYING', 7, 'qualifying', 'qualifier',
-           72, 156, 16, 'club_pro', 'USA', ('Austin, Texas', 'Palm Springs, California', 'Myrtle Beach, South Carolina',
+           72, 156, A['CLUB_PRO_CHAMPIONSHIP'], 'club_pro', 'USA', ('Austin, Texas', 'Palm Springs, California', 'Myrtle Beach, South Carolina',
                                            'Tucson, Arizona', 'Fort Worth, Texas'), 'rotating', 'Thu-Sun', False, 50, 1, 70)
-    yield ('BRITANNIA_AMATEUR', 'Britannia Amateur Championship', 'AMATEUR', 6, 'amateur', 'elite_amateur', 36, 144, 23,
+    yield ('BRITANNIA_AMATEUR', 'Britannia Amateur Championship', 'AMATEUR', 6, 'amateur', 'elite_amateur', 36, 144,
+           A['BRITANNIA_AMATEUR'],
            'amateur', 'Scotland', UK_LINKS, 'rotating', 'Mon-Sun', True, 78, 1, 0)
-    yield ('EUROPEAN_AMATEUR', 'European Amateur Championship', 'AMATEUR', 6, 'amateur', 'elite_amateur', 72, 144, 27,
+    yield ('EUROPEAN_AMATEUR', 'European Amateur Championship', 'AMATEUR', 6, 'amateur', 'elite_amateur', 72, 144,
+           A['EUROPEAN_AMATEUR'],
            'amateur', 'Spain', ('Madrid', 'Copenhagen', 'Prague', 'Vienna', 'Stockholm', 'Lisbon', 'Hamburg', 'Milan'),
            'rotating', 'Tue-Fri', False, 66, 1, 60)
     # The USA Amateur's open route: 36-hole qualifying at eight sites three weeks before (USA_AMATEUR_EXEMPT
     # are exempt; Season.usa_amateur_field fills the rest of the field from here)
-    yield ('USA_AMATEUR_QUALIFYING', 'USA Amateur Qualifying', 'QUALIFYING', 7, 'qualifying', 'qualifier', 36, 78, 30,
+    yield ('USA_AMATEUR_QUALIFYING', 'USA Amateur Qualifying', 'QUALIFYING', 7, 'qualifying', 'qualifier', 36, 78,
+           A['USA_AMATEUR_QUALIFYING'],
            'amateur', 'USA', None, 'rotating', 'Mon', False, 30, 8, 0)
-    yield ('USA_AMATEUR', 'USA Amateur Championship', 'AMATEUR', 6, 'amateur', 'elite_amateur', 36, 156, 33,
+    yield ('USA_AMATEUR', 'USA Amateur Championship', 'AMATEUR', 6, 'amateur', 'elite_amateur', 36, 156, A['USA_AMATEUR'],
            'amateur', 'USA', US_AM, 'rotating', 'Mon-Sun', True, 80, 1, 0)
-    yield ('USA_MID_AMATEUR', 'USA Mid-Amateur Championship', 'AMATEUR', 6, 'amateur', 'elite_amateur', 36, 132, 38,
+    yield ('USA_MID_AMATEUR', 'USA Mid-Amateur Championship', 'AMATEUR', 6, 'amateur', 'elite_amateur', 36, 132,
+           A['USA_MID_AMATEUR'],
            'mid_amateur', 'USA', ('Atlanta, Georgia', 'Denver, Colorado', 'Hartford, Connecticut', 'Nashville, Tennessee',
                                   'Scottsdale, Arizona'), 'rotating', 'Mon-Sun', True, 55, 1, 0)
     yield ('ASIA_PACIFIC_AMATEUR', 'Asia-Pacific Amateur Championship', 'AMATEUR', 6, 'amateur', 'elite_amateur', 72, 120,
-           43, 'amateur', 'Japan', ('Tokyo', 'Melbourne', 'Singapore', 'Seoul', 'Shanghai', 'Bangkok', 'Auckland', 'Dubai'),
+           A['ASIA_PACIFIC_AMATEUR'], 'amateur', 'Japan', ('Tokyo', 'Melbourne', 'Singapore', 'Seoul', 'Shanghai', 'Bangkok', 'Auckland', 'Dubai'),
            'rotating', 'Thu-Sun', False, 70, 1, 60)
     # College post-season (US)
     for i in range(8):
         yield (f'CONFERENCE_CHAMPIONSHIP_{i + 1}', f'Conference Championship {i + 1}', 'CO_US_D1', 5, 'college',
-               'college_postseason', 54, 60, 17, 'college', 'USA', None, 'rotating', 'Fri-Sun', False, 40, 1, 0)
+               'college_postseason', 54, 60, A['CONFERENCE_CHAMPIONSHIP'], 'college', 'USA', None, 'rotating', 'Fri-Sun',
+               False, 40, 1, 0)
     for i in range(4):
         yield (f'COLLEGE_REGIONAL_{i + 1}', f'College Regional {i + 1}', 'CO_US_D1', 5, 'college', 'college_postseason',
-               54, 75, 20, 'college', 'USA', None, 'rotating', 'Mon-Wed', False, 48, 1, 0)
+               54, 75, A['COLLEGE_REGIONAL'], 'college', 'USA', None, 'rotating', 'Mon-Wed', False, 48, 1, 0)
     yield ('COLLEGE_NATIONAL_CHAMPIONSHIP', 'College National Championship', 'CO_US_D1', 5, 'college',
-           'college_postseason', 72, 156, 21, 'college', 'USA', ('Scottsdale, Arizona', 'Fort Worth, Texas',
+           'college_postseason', 72, 156, A['COLLEGE_NATIONAL_CHAMPIONSHIP'], 'college', 'USA', ('Scottsdale, Arizona', 'Fort Worth, Texas',
                                                                  'Atlanta, Georgia', 'San Diego, California'),
            'rotating', 'Thu-Sun', False, 62, 1, 75)
     yield ('SMALL_COLLEGE_CHAMPIONSHIP', 'Small College National Championship', 'CO_US_SMALL', 5, 'college',
-           'college_postseason', 72, 120, 20, 'college', 'USA', None, 'rotating', 'Tue-Fri', False, 38, 1, 60)
+           'college_postseason', 72, 120, A['SMALL_COLLEGE_CHAMPIONSHIP'], 'college', 'USA', None, 'rotating', 'Tue-Fri',
+           False, 38, 1, 60)
     yield ('INTL_UNIVERSITY_CHAMPIONSHIP', 'World University Championship', 'CO_INTL', 5, 'college',
-           'college_postseason', 72, 96, 28, 'college', 'England', None, 'rotating', 'Thu-Sun', False, 42, 1, 0)
+           'college_postseason', 72, 96, A['INTL_UNIVERSITY_CHAMPIONSHIP'], 'college', 'England', None, 'rotating',
+           'Thu-Sun', False, 42, 1, 0)
     # USA Open qualifying: 18-hole local qualifying, then 36-hole final qualifying (one day)
-    for wk in (19, 20, 21):
-        yield (f'USA_OPEN_LOCAL_W{wk}', f'USA Open Local Qualifying (week {wk})', 'QUALIFYING', 7, 'qualifying',
+    for sid, wk, label in spec.usa_local:
+        yield (sid, f'USA Open Local Qualifying ({label})', 'QUALIFYING', 7, 'qualifying',
                'qualifier', 18, 90, wk, 'open', 'USA', None, 'rotating', 'Mon', False, 30, 4, 0)
     yield ('USA_OPEN_FINAL_INTL', 'USA Open Final Qualifying (England & Japan)', 'QUALIFYING', 7, 'qualifying',
-           'qualifier', 36, 90, 22, 'open', 'England', ('Virginia Water', 'Tokyo'), 'fixed', 'Mon', False, 45, 2, 0)
-    yield ('USA_OPEN_FINAL', 'USA Open Final Qualifying', 'QUALIFYING', 7, 'qualifying', 'qualifier', 36, 96, 23,
+           'qualifier', 36, 90, spec.usa_final_intl, 'open', 'England', ('Virginia Water', 'Tokyo'), 'fixed', 'Mon',
+           False, 45, 2, 0)
+    yield ('USA_OPEN_FINAL', 'USA Open Final Qualifying', 'QUALIFYING', 7, 'qualifying', 'qualifier', 36, 96,
+           spec.usa_final,
            'open', 'USA', ('Columbus, Ohio', 'Dallas, Texas', 'Atlanta, Georgia', 'Rochester, New York',
                            'Seattle, Washington', 'Charlotte, North Carolina', 'Boston, Massachusetts', 'Toronto, Ontario'),
            'fixed', 'Mon', False, 45, 8, 0)
     # Britannia Open qualifying: 18-hole regional qualifying, then 36-hole final qualifying (one day)
-    for wk in (26, 27):
-        yield (f'BRITANNIA_REGIONAL_W{wk}', f'Britannia Open Regional Qualifying (week {wk})', 'QUALIFYING', 7,
+    for sid, wk, label in spec.britannia_regional:
+        yield (sid, f'Britannia Open Regional Qualifying ({label})', 'QUALIFYING', 7,
                'qualifying', 'qualifier', 18, 84, wk, 'open', 'England', None, 'rotating', 'Mon', False, 30, 4, 0)
-    yield ('BRITANNIA_FINAL', 'Britannia Open Final Qualifying', 'QUALIFYING', 7, 'qualifying', 'qualifier', 36, 72, 28,
+    yield ('BRITANNIA_FINAL', 'Britannia Open Final Qualifying', 'QUALIFYING', 7, 'qualifying', 'qualifier', 36, 72,
+           spec.britannia_final,
            'open', 'England', ('Southport', 'Woodhall Spa', 'Troon', 'Sandwich'), 'fixed', 'Tue', False, 45, 4, 0)
     # Tour qualifying schools
-    for sid, name, wk, cc, sites, field_n in (
-            ('PT_QSCHOOL_PRE', 'Premier Tour Q-School Pre-Qualifying', 40, 'USA', 4, 78),
-            ('PT_QSCHOOL_FIRST', 'Premier Tour Q-School First Stage', 42, 'USA', 6, 78),
-            ('PT_QSCHOOL_SECOND', 'Premier Tour Q-School Second Stage', 46, 'USA', 4, 78),
-            ('PT_QSCHOOL_FINAL', 'Premier Tour Q-School Final Stage', 50, 'USA', 1, 156),
-            ('EU_QSCHOOL_FIRST', 'Premier Tour Europe Q-School First Stage', 37, 'Spain', 4, 84),
-            ('EU_QSCHOOL_SECOND', 'Premier Tour Europe Q-School Second Stage', 44, 'Spain', 4, 78),
-            ('EU_QSCHOOL_FINAL', 'Premier Tour Europe Q-School Final Stage', 48, 'Spain', 1, 156),
-            ('JP_QSCHOOL_FINAL', 'Japan Golf Tour Q-School', 48, 'Japan', 1, 120),
-            ('ASIA_QSCHOOL_FINAL', 'Asian Challenger Tour Q-School', 2, 'Thailand', 1, 156)):
-        yield (sid, name, 'QUALIFYING', 7, 'qualifying', 'q_school', 72, field_n, wk, 'pro', cc, None, 'rotating',
-               'Thu-Sun', False, 52, sites, 0)
+    for sid, name, cc, sites, field_n in (
+            ('PT_QSCHOOL_PRE', 'Premier Tour Q-School Pre-Qualifying', 'USA', 4, 78),
+            ('PT_QSCHOOL_FIRST', 'Premier Tour Q-School First Stage', 'USA', 6, 78),
+            ('PT_QSCHOOL_SECOND', 'Premier Tour Q-School Second Stage', 'USA', 4, 78),
+            ('PT_QSCHOOL_FINAL', 'Premier Tour Q-School Final Stage', 'USA', 1, 156),
+            ('EU_QSCHOOL_FIRST', 'Premier Tour Europe Q-School First Stage', 'Spain', 4, 84),
+            ('EU_QSCHOOL_SECOND', 'Premier Tour Europe Q-School Second Stage', 'Spain', 4, 78),
+            ('EU_QSCHOOL_FINAL', 'Premier Tour Europe Q-School Final Stage', 'Spain', 1, 156),
+            ('JP_QSCHOOL_FINAL', 'Japan Golf Tour Q-School', 'Japan', 1, 120),
+            ('ASIA_QSCHOOL_FINAL', 'Asian Challenger Tour Q-School', 'Thailand', 1, 156)):
+        yield (sid, name, 'QUALIFYING', 7, 'qualifying', 'q_school', 72, field_n, spec.qschool[sid], 'pro', cc, None,
+               'rotating', 'Thu-Sun', False, 52, sites, 0)
 
 
 class WorldCalendar:
-    """Builds the permanent series list once; `editions(year)` gives that year's events."""
+    """Builds the permanent series list once; `editions(year)` gives that year's events. `version` picks the
+    calendar specification (schedule.py): 'v1' the classic calendar (worlds saved before calendar versions),
+    'v2' the reference calendar new worlds use."""
 
-    def __init__(self, seed=2027):
+    version = SCH.LEGACY                        # (calendars saved before versions are the classic one)
+
+    def __init__(self, seed=2027, version=SCH.LEGACY):
         self.seed = seed
+        self.version = version
         self.series = []
         self._tour_weeks = defaultdict(Counter)        # tour -> week -> events
         self._build()
         self.by_id = {s.series_id: s for s in self.series}
         if len(self.by_id) != len(self.series):
             raise AssertionError('duplicate series id')
+
+    @property
+    def spec(self):
+        return SCH.spec(self.version)
+
+    @property
+    def majors(self):
+        """{week: (series id, name)} of this calendar's majors."""
+        return {w: (sid, MAJOR_NAMES[sid]) for sid, w in self.spec.majors.items()}
+
+    @property
+    def major_weeks(self):
+        return self.spec.major_weeks
 
     # -- helpers ---------------------------------------------------------------------------------
     def _cities_for(self, country, week=None, n=6, key=''):
@@ -491,7 +526,7 @@ class WorldCalendar:
             raise ValueError(f'{s.name}: no host city in season in week {s.week}')
         if in_season != s.cities:
             s = replace(s, cities=in_season)
-        if s.week in MAJOR_WEEKS and s.tier == 1:
+        if s.week in self.major_weeks and s.tier == 1:
             raise AssertionError(f'{s.name} scheduled in major week {s.week}')
         self.series.append(s)
         self._tour_weeks[s.tour][s.week] += 1
@@ -499,7 +534,7 @@ class WorldCalendar:
     def _free_weeks(self, tour, windows, per_week, countries):
         out = []
         for w in range(1, 53):
-            if (w in MAJOR_WEEKS and TOUR_BY_KEY[tour].tier == 1 or not _in_window(w, windows)
+            if (w in self.major_weeks and TOUR_BY_KEY[tour].tier == 1 or not _in_window(w, windows)
                     or self._tour_weeks[tour][w] >= per_week):
                 continue
             if any(w in season_weeks(c) for country, _ in countries for c in CITIES_BY_COUNTRY[country]):
@@ -567,20 +602,22 @@ class WorldCalendar:
     # -- the cascade -----------------------------------------------------------------------------
     def _build(self):
         # 1. Majors
-        for week, (sid, name) in MAJORS.items():
+        for week, (sid, name) in self.majors.items():
             country, cities, policy = MAJOR_VENUES[sid]
             field_n, cut = MAJOR_FIELDS[sid]
             self._add(Series(sid, name, 'MAJORS', 0, 'major', 'major', 72, field_n, week, 'invitation', country,
                              cities, policy, 36, cut, 'Thu-Sun', prestige=100, purse=22_000_000, anchored=True))
         # 2. Fixed-week anchors
         for (sid, name, tour, tier, kind, cat, holes, field_n, week, elig, country, cities, policy, days, match,
-             prestige, sites, cut_top) in _anchor_specs():
+             prestige, sites, cut_top) in _anchor_specs(self.spec):
             cities = cities or self._cities_for(country, week, key=sid)
             self._add(Series(sid, name, tour, tier, kind, cat, holes, field_n, week, elig, country, cities, policy,
                              36 if cut_top else 0, cut_top, days, match, prestige, 0, sites, anchored=True))
         # 3. Premier Tour
         for tour_key, week, cat, name, country, city, field_n in PREMIER_EVENTS:
             tour = TOUR_BY_KEY[tour_key]
+            week = self.spec.premier_weeks[name]           # (the calendar's week: None = placed here)
+            pool = self.spec.city_pools.get(name)          # a venue-bound event's own host cities
             if week is None:
                 free = [w for w in self._free_weeks(tour_key, tour.weeks, 1, ((country, 1),))]
                 week = self._spread(free, 1, f'{tour_key}:{name}')[0]
@@ -589,7 +626,7 @@ class WorldCalendar:
             prestige, purse = PREMIER_TERMS[PREMIER_CLASS[cat]]
             if cat == 'national_open':
                 prestige = min(97, prestige + 6)
-            cities = (city,) if city else self._cities_for(country, week, key=name)
+            cities = (city,) if city else pool if pool else self._cities_for(country, week, key=name)
             sid = 'PT_' + name.upper().replace(' ', '_').replace('-', '_')
             self._add(Series(sid, name, tour_key, 1, 'premier', cat, 72, field_n, week, 'members', country, cities,
                              'fixed' if city else 'rotating', 36 if field_n > 80 else 0,
@@ -695,7 +732,7 @@ class WorldCalendar:
         eds = self.editions(year)
         for w in range(1, 53):
             week_eds = [e for e in eds if e.week == w]
-            if w in MAJOR_WEEKS:
+            if w in self.major_weeks:
                 if sum(1 for e in week_eds if e.series.kind == 'major') != 1:
                     errors.append(f'Week {w}: major week must contain its major')
                 if any(e.series.tier == 1 for e in week_eds):
@@ -718,7 +755,54 @@ class WorldCalendar:
         prem = Counter(PREMIER_CLASS[s.category] for s in self.series if s.tier == 1)
         if prem != Counter(flagship=8, standard=20, opportunity=8):
             errors.append(f'Premier categories wrong: {dict(prem)}')
-        for w in (19, 26, 31):
+        for w in self.spec.opportunity_after_majors:
             if not any(s.week == w and s.category == 'opportunity' for s in self.series):
                 errors.append(f'No opportunity event the week after a major (week {w})')
+        return errors + self.validate_contract()
+
+    def validate_contract(self):
+        """The calendar's specification, checked on the series it built (each failure names the rule and the
+        series): majors at their anchors and evenly spaced where the version requires it, no Premier event in a
+        major week, every fixed week where the specification puts it, no two Premier flagships in one week,
+        venue-bound events only in their pools, and every qualifying stage before the field it feeds."""
+        sp, errors = self.spec, []
+        by_id = self.by_id
+        weeks = sorted(sp.majors.values())
+        for sid, w in sp.majors.items():
+            if by_id.get(sid) is None or by_id[sid].week != w:
+                errors.append(f'{sid}: major not in its anchor week {w}')
+        if sp.major_spacing and any(b - a != sp.major_spacing for a, b in zip(weeks, weeks[1:])):
+            errors.append(f'majors {weeks}: not {sp.major_spacing} weeks apart')
+        for s in self.series:
+            if s.tier == 1 and s.week in self.major_weeks:
+                errors.append(f'{s.series_id}: Premier event in major week {s.week}')
+            fixed = sp.week_of(s.series_id)
+            if fixed is None and s.series_id.startswith(('CONFERENCE_CHAMPIONSHIP_', 'COLLEGE_REGIONAL_')):
+                fixed = sp.anchors[s.series_id.rsplit('_', 1)[0]]
+            if fixed is not None and s.week != fixed:
+                errors.append(f'{s.series_id}: week {s.week}, the specification says {fixed}')
+            if s.tier == 1 and sp.premier_weeks.get(s.name) not in (None, s.week):
+                errors.append(f'{s.series_id}: week {s.week}, the specification says {sp.premier_weeks[s.name]}')
+            pool = sp.city_pools.get(s.name)
+            if s.tier == 1 and pool and not set(s.cities) <= set(pool):
+                errors.append(f'{s.series_id}: hosts {sorted(set(s.cities) - set(pool))} outside its pool')
+        flag = Counter(s.week for s in self.series if s.tier == 1 and s.category == 'flagship')
+        errors += [f'week {w}: {n} Premier flagships' for w, n in flag.items() if n > 1]
+        # every stage feeding a major is played before it (the engine builds a week's fields before playing it)
+        for major, stages in ((('USA_OPEN', [x[0] for x in sp.usa_local] + ['USA_OPEN_FINAL_INTL', 'USA_OPEN_FINAL']),
+                               ('BRITANNIA_OPEN', [x[0] for x in sp.britannia_regional] + ['BRITANNIA_FINAL']))):
+            for st in stages:
+                if by_id[st].week >= by_id[major].week:
+                    errors.append(f'{st} (week {by_id[st].week}) is not before {major} (week {by_id[major].week})')
+        for local, _, _ in sp.usa_local:
+            if by_id[local].week >= by_id['USA_OPEN_FINAL'].week:
+                errors.append(f'{local} is not before the domestic final')
+        for reg, _, _ in sp.britannia_regional:
+            if by_id[reg].week >= by_id['BRITANNIA_FINAL'].week:
+                errors.append(f'{reg} is not before the Britannia final')
+        if by_id['CLUB_PRO_SECTIONALS'].week >= by_id['CLUB_PRO_CHAMPIONSHIP'].week or \
+                by_id['CLUB_PRO_CHAMPIONSHIP'].week >= by_id['PREMIER_TOUR_CHAMPIONSHIP'].week:
+            errors.append('club professionals: sectionals, championship and the Premier Tour Championship out of order')
+        if by_id['USA_AMATEUR_QUALIFYING'].week >= by_id['USA_AMATEUR'].week:
+            errors.append('USA Amateur qualifying is not before the USA Amateur')
         return errors

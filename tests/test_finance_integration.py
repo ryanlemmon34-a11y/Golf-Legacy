@@ -57,7 +57,10 @@ class PromotionTests(unittest.TestCase):
             income, costs = s.season_forecast(g, g.tour, s.target_events(g), last, without_backers=True, cautious=True)
             self.assertGreaterEqual(g.cash, FIN.UPFRONT_SHARE * costs, (gid, why))
             if 'savings' in why:
-                self.assertGreaterEqual(g.cash, C.SELF_FUNDED_SEASONS * (costs - income) - 1e-6, (gid, why))
+                # judged on the figures the decision used (recorded with it): staff and home changes later
+                # that winter can move next season's forecast, but they do not rewrite the decision
+                seen = self.decisions[gid]['forecast']
+                self.assertGreaterEqual(seen['cash'], C.SELF_FUNDED_SEASONS * (seen['costs'] - seen['income']) - 1, (gid, why))
             elif 'sponsor contract' in why:                                    # a contract, not a forecast
                 self.assertGreaterEqual(s.sponsor_income(g), costs, (gid, why))
             else:                                                              # proven at the new level
@@ -135,7 +138,8 @@ class EntryBudgetTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.s = s = Season(generate_world(seed=11, scale=0.2), seed=11, development=True, workers=1)
+        cls.s = s = Season(generate_world(seed=11, scale=0.2), seed=11, development=True, workers=1,
+                           calendar='v1')                  # (the classic USA Open qualifying weeks 19-23)
         s.start_year(2027)
         for w in range(1, 19):
             s.advance_week(2027, w)

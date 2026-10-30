@@ -144,6 +144,7 @@ class ArchiveWriter:
         cal, lib = season.cal, season.lib
         from .ratings import ATTRIBUTE_KEYS
         world = {'format': FORMAT, 'seed': season.seed, 'first_year': season.first_year, 'years': [],
+                 'calendar': getattr(cal, 'version', 'v1'),           # the calendar version (schedule.py)
                  'rating_keys': ['overall'] + list(ATTRIBUTE_KEYS),   # the order of each season's ratings
                  'tours': {k: {'name': t.name, 'tier': t.tier} for k, t in TOUR_BY_KEY.items()},
                  'series': {s.series_id: {'name': s.name, 'tour': s.tour, 'tier': s.tier, 'kind': s.kind,
@@ -237,6 +238,25 @@ class ArchiveWriter:
         from .golfstats import VERSION as GOLF_STATS
         from .rules import RANKING_RULE
         chunk['definitions'] = {'golf_stats': GOLF_STATS, 'ranking': RANKING_RULE}   # what the counts mean
+        # the calendar the season was played under (schedule.py): a season is always read with its own
+        sp = season.cal.spec
+        chunk['calendar'] = {'version': sp.version, 'majors': dict(sp.majors)}
+        # the cut-off snapshots the major rules read (immutable: the list as published after that week)
+        cut = {}
+        for name, wk in sp.cutoffs.items():
+            if name.endswith(('_ranking', '_ranking_1', '_ranking_2', '_fill')) and (year, wk) in season.ctx.world_rankings:
+                cut[name] = {'week': wk, 'top': season.ctx.world_rankings[(year, wk)][:100]}
+        if (year, 52) in season.ctx.world_rankings:
+            cut['year_end'] = {'week': 52, 'top': season.ctx.world_rankings[(year, 52)][:100]}
+        award = season.ctx.__dict__.get('awards', {})
+        if ('amateur_award', year) in award:
+            cut['amateur_award'] = {'week': sp.cutoffs.get('amateur_award'), 'person': award[('amateur_award', year)]}
+        chunk['cutoffs'] = cut
+        # every major place this season (earned, used or lost) and those already earned for the next one
+        rights = getattr(season, 'major_rights', {})
+        js = lambda book: {m: {str(g): r for g, r in v.items()} for m, v in book.items()}
+        chunk['major_rights'] = js(rights.get(year, {}))
+        chunk['next_major_rights'] = js(rights.get(year + 1, {}))
         if year == season.first_year and getattr(season, 'wr_seed', None):
             chunk['ranking_seed'] = {str(g): rows for g, rows in season.wr_seed.items()}   # points before the world began
         return chunk

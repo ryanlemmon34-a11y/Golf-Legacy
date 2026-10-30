@@ -114,6 +114,8 @@ def own_way(season, g, year, row):
         if income >= costs:
             return 'their sponsor contract now covers a season'
     if g.cash >= SELF_FUNDED_SEASONS * (costs - income):
+        # (the figures the decision used, kept with the decision: later winter changes do not rewrite them)
+        season._own_way_last = {'cash': round(g.cash), 'income': round(income), 'costs': round(costs)}
         return f'their own savings now cover {g.cash / (costs - income):.0f} seasons'
     return None
 
@@ -398,8 +400,9 @@ def decide(season, year, snap):
         # ---- full-time professionals (every tier): backers decide first, then keep chasing or stop --
         change = review_backers(season, g, row, year, rng)
         if change:
+            seen = season.__dict__.pop('_own_way_last', None) if change == 'backers no longer needed' else None
             note(change, g, backer=round(g.backer), progress=round(progress_signal(row), 2),
-                 secured=list(row.get('secured', ())))
+                 secured=list(row.get('secured', ())), **({'forecast': seen} if seen else {}))
         p, why = p_stop_chasing(season, g, row, year)
         if rng.random() < p:
             why = dict(p=round(p, 4), runway=round(why['runway'], 2), progress=round(why['progress'], 2),
