@@ -74,6 +74,8 @@ class SnapshotTests(unittest.TestCase):
         w = observer.World(d / 'archive')
         self.addCleanup(w.close)
         pid = board(w.stats, 'most-starts', n=1)[1][0]['person']
+        if w.statistics()[0] is None:                                  # profiles say "working out the statistics"
+            w._builder.wait(300)                                       # until the store is built: start from built
         before = view(w, pid)
         s = Session.open(d, workers=1)                                 # a separate session publishes 2028
         s.advance(52)
