@@ -26,7 +26,8 @@ from golfsim.calendar import TOUR_BY_KEY                              # noqa: E4
 from golfsim.population import generate_world                         # noqa: E402
 from golfsim.season import PREMIER_TOURS, Season                      # noqa: E402
 
-SEASON = Season(generate_world(seed=11), seed=11, development=True, workers=1)
+SEASON = Season(generate_world(seed=11), seed=11, development=True, workers=1,
+                calendar='v1')                               # (the classic rules' wording and weeks)
 
 
 def set_record(s, g, share):
