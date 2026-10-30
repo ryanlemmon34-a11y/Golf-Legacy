@@ -21,6 +21,20 @@ history archive), `--worlds DIR` for another library folder, `--port`, `--worker
 
 The observer listens on 127.0.0.1 only (this computer). Worlds are folders in `worlds/` (not tracked by git).
 
+## Trying the v14 build (beside your playtest)
+
+The v14 build is on the GitHub branch **build/v14** (not main). Your playtest installation, its worlds and the
+paused world are not touched by it:
+
+1. On GitHub (Golf-Legacy), switch the branch selector to **build/v14**, then **Code → Download ZIP**.
+2. Unzip it into a **new folder** (for example `Golf Legacy v14`), not over your playtest folder.
+3. Double-click `RUN_OBSERVER_WINDOWS.bat` in that new folder. If the playtest observer is also running, this
+   one opens on the next free port (8766...).
+4. **Create** a world: the *Calendar* choice defaults to **Reference (majors weeks 15, 20, 25, 30)**; *Classic*
+   is the calendar your earlier worlds use, for comparison. A world keeps its calendar for good.
+5. Worlds from the playtest build open as "another engine" here: browse them read-only, or Copy with "continue
+   with this engine" (the copy keeps the classic calendar; the original is never changed).
+
 ## Updating to a new version
 
 1. Quit the observer.
@@ -73,6 +87,27 @@ it too makes earlier worlds "another engine"; start the next long run on it so i
 - **World ranking points** (Rankings → *World: points by week*): any recorded week's top 200 with average,
   weighted points, counted starts and divisor; a golfer's page lists every start behind their points, the
   weight each carries now and the total (exactly the engine's arithmetic).
+- **Hide results** (header): hide this season's results, results from now on, or every result, until you reveal
+  them. Hidden editions show "hidden · Watch" instead of a winner in the calendar, overview, tour, tournament,
+  course and seasons lists; an event opens on the replay at round one (or where you left off); the final round
+  shows the leaderboard after regulation without any playoff or winner; **Reveal final result** shows it (and
+  every page then does). Pages that add results up (stats, rankings, records, profiles) say they count hidden
+  results. **Show results** turns it off and keeps what you watched. Kept with the world.
+- **Majors + Premier** (Stats, golf statistics, profiles, records): one click for every major and every Premier
+  circuit's events, by each edition's classification when played; **All tours** resets it.
+- **Overall** on Stats: sortable both ways over the whole list (current Overall; † last recorded for retired
+  golfers; a past season shows its recorded start-of-season Overall, "—" where none was recorded).
+- **Peak Overall** on a profile's Ratings: the highest recorded base Overall, when it was first reached, the age,
+  and how much of the career the records cover ("Recorded Peak Overall" when they do not cover all of it).
+- **Playoffs**: every player in a playoff is listed with "Won playoff" / "Lost playoff (out at extra hole N)",
+  the number of players and extra holes, and each extra hole's scores (kept from this build on; older editions
+  say the holes were not recorded); each site of a multi-site qualifier keeps its own.
+- **No starts, explained**: a season page shows the week-by-week ledger (played, injured, barriers, choices)
+  and a season without a start lists every cause with its weeks, never "chose not to play" when a barrier
+  (unaffordable, full fields, no suitable event) kept them out.
+- **Qualification ledger** (a major's page, reference calendar and later seasons): every place the rules gave,
+  with the categories behind it, the evidence, when it was earned and how it ended (entered, withdrawn,
+  declined, expired). The **Rules** page shows the world's calendar and every major's categories.
 - **Shortlist**: ☆ Shortlist on any person, course, nation, tour, tournament or edition; the Shortlist page
   lists them. Kept with the world (it travels with copies and problem reports).
 - **Rules** (`/rules`): how golfers get into fields, keep and earn cards, and which amateur and college golf

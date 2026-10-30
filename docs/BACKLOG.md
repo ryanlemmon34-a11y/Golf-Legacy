@@ -31,6 +31,21 @@ requirements are unchanged; no new long run, spending or calibration change is a
 5. **Complete the universe and release proof**: nation development, remaining autonomous pathway details,
    broad long-run validation. Nation-versus-nation events later; nationality and residence history kept.
 
+## Roadmap v14 build (branch build/v14; report `docs/V14_BUILD_REPORT.md`)
+
+Delivered for review (not merged into the playtest build): playoff display and per-site playoff evidence; the
+multi-cause "no starts" ledger and the full-time amateur investigation (`docs/ZERO_START_REVIEW.md`); the Majors +
+Premier scope; Overall sorting on Stats and Recorded Peak Overall; the spoiler-safe workflow (Hide results, Watch
+from round 1, Reveal final); the reference calendar v2 for new worlds with its qualification rework
+(`docs/CALENDAR_V2.md`, `docs/CALENDAR_MANIFEST.md`); the measured performance work (`docs/PERFORMANCE_REVIEW.md`).
+
+Open after it: projections of who is inside a cut-off still to come; a per-tour standings-lock table; the
+per-region amateur affordability comparison before any access change; a day-ordered engine (only if same-week
+feeders are ever wanted). Decision pending (owner): the parent/child tour filter; migrating an existing world to
+v2 (a copy, at a season boundary); the performance options in the review (per-golfer random streams,
+incremental checkpoints, outcome-equivalent engines). Blocked: the Test1 archive on Google Drive (the host is
+not reachable from the build environment).
+
 ## The pretest review increment (owner roadmap, pinned review of 5bcc6ed, 29 October 2026)
 
 Delivered (`docs/PRETEST_REVIEW_RESPONSE.md`): golf statistics captured per edition with versioned definitions
