@@ -61,9 +61,8 @@ def round_counters(st):
 
 
 def add(into, c):
-    """Sum counters `c` into the list `into` (FIELDS order)."""
-    for i, v in enumerate(c):
-        into[i] += v
+    """Sum counters `c` into the list `into` (FIELDS order; `into` may carry more after them)."""
+    into[:len(c)] = [a + b for a, b in zip(into, c)]
     return into
 
 

@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import math
 import random
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, fields
 
 KINDS = ('coach', 'caddie', 'school')
 WORK_SCALE = {'coach': 30.0, 'caddie': 60.0}     # weeks of coaching / rounds on the bag to reach ~63%
@@ -57,6 +57,24 @@ class Pair:
     work: float = 0.0            # accumulated working time (worn down by time apart)
     last_year: int = 0           # the last year they worked together
     fit: float = 0.0
+
+
+_STINT_FIELDS = []
+
+
+def _stint_fields():
+    if not _STINT_FIELDS:
+        _STINT_FIELDS.extend(f.name for f in fields(Stint))
+    return _STINT_FIELDS
+
+
+def _copy(v):
+    """dataclasses.asdict's copy of a stint's value (plain values, tuples and lists of tuples)."""
+    if isinstance(v, list):
+        return [_copy(x) for x in v]
+    if isinstance(v, tuple):
+        return tuple(_copy(x) for x in v)
+    return v
 
 
 class Relations:
@@ -147,7 +165,8 @@ class Relations:
         return None
 
     def export(self):
-        return {'stints': [asdict(s) for s in self.stints],
+        names = _stint_fields()                     # what asdict gives, built directly (faster)
+        return {'stints': [{n: _copy(getattr(s, n)) for n in names} for s in self.stints],
                 'pairs': [[k, st, g, p.work, p.last_year, p.fit] for (k, st, g), p in self.pairs.items()]}
 
     @classmethod

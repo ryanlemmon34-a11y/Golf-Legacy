@@ -25,7 +25,7 @@ championship final is kept), but never as an 18-hole round: a match that ends 5&
 """
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, fields
 
 
 @dataclass(frozen=True)
@@ -80,9 +80,17 @@ class LayoutRecords:
             self.tier_records[mark.tier] = mark
         if self.highest_round is None or mark.score > self.highest_round.score:
             self.highest_round = mark
+        # each hole, exactly as add_hole does it (inlined: about 6 million holes a season)
+        best = self.hole_best
+        golfer, event_id, gid = mark.golfer, mark.event_id, mark.golfer_id
         for i, s in enumerate(hole_scores):
-            self.add_hole(i, s, hole_pars[i] if hole_pars else 0, mark.golfer, mark.event_id, mark.year,
-                          f'round {mark.round_no}' if mark.round_no else '', mark.golfer_id)
+            b = best[i]
+            if b is None or s < b[0]:
+                best[i] = (s, golfer, event_id, gid)
+            if s == 1 or (hole_pars and hole_pars[i] and s == hole_pars[i] - 3):
+                stage = f'round {mark.round_no}' if mark.round_no else ''
+                (self.aces if s == 1 else self.albatrosses).append((i + 1, golfer, event_id, mark.year, stage, gid))
+        self.holes_played += len(hole_scores)
 
     def add_hole(self, idx, score, par, golfer, event_id, year, stage='', golfer_id=0):
         """One competitive hole: a round's hole, a match-play hole or a playoff hole."""
@@ -148,10 +156,37 @@ class RecordBook:
                                           week, 0, tier, getattr(golfer, 'id', 0)))
 
     def to_dict(self):
+        """Every layout's records as plain data: what dataclasses.asdict gives (the same keys in the same
+        order, Marks as dicts, lists and tuples copied), built directly (asdict walks millions of values
+        a season on a mature world)."""
+        names = _layout_fields()
+        since = getattr(self, 'totals_since', None)
         out = {}
         for lid, r in self.layouts.items():
-            d = asdict(r)
-            d['history'] = [(k, asdict(m)) for k, m in r.history]
-            d['totals_since'] = getattr(self, 'totals_since', None)
+            d = {n: _plain(getattr(r, n)) for n in names}
+            d['totals_since'] = since
             out[lid] = d
         return out
+
+
+_FIELDS = {}
+
+
+def _layout_fields():
+    if 'layout' not in _FIELDS:
+        _FIELDS['layout'] = tuple(f.name for f in fields(LayoutRecords))
+        _FIELDS['mark'] = tuple(f.name for f in fields(Mark))
+    return _FIELDS['layout']
+
+
+def _plain(v):
+    """dataclasses.asdict's conversion for the record book's values (Marks hold only plain values)."""
+    if isinstance(v, Mark):
+        return {k: getattr(v, k) for k in _FIELDS['mark']}
+    if isinstance(v, list):
+        return [_plain(x) for x in v]
+    if isinstance(v, tuple):
+        return tuple(_plain(x) for x in v)
+    if isinstance(v, dict):
+        return {k: _plain(x) for k, x in v.items()}
+    return v
