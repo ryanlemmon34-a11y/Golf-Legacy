@@ -9,7 +9,7 @@ here touched the owner's 63-season world or launched a long run; development use
 earlier worlds open as "another engine" (browse read-only, or Copy with "continue with this engine"). It
 does not change a single shot, result or decision: one season of seed 21 (scale 0.03) played on the reviewed
 engine (5bcc6ed) and on this one gives identical results for all 345 editions and identical season rows for
-every golfer (`tools`: compared from the two archives).
+every golfer (compared from the two archives).
 
 ## Done before the long run
 
@@ -107,8 +107,28 @@ dated stints, as-of snapshots). In order, as observer-only updates that keep wor
 The immersion proposals (what is at stake before an event, record succession, breakthroughs, rivalries,
 droughts, how a tournament unfolded) are for the owner to choose from; the last needs the round data now kept.
 
-## Storage and speed
-(Measured on this 4-CPU development machine; see *Measured* below.)
+## Storage and speed (measured)
+On the development machine (Intel Xeon 2.1 GHz, 4 logical CPUs, 15.7 GB; Python 3.13), full population, seed
+2027, season 1 with 4 workers (`tools/benchmark_skip.py`), two runs of each engine, alternating order:
+
+| | previous engine (5bcc6ed) | this engine |
+|---|---|---|
+| season-1 skip | 110.0 s, 106.7 s | 123.1 s, 116.3 s |
+| of which simulate / save / publish | 103.2 / 3.1 / 2.2 s (first run) | 112.6 / 5.0 / 3.4 s (first run) |
+| main process peak memory | 564 MB | 730 MB |
+| season file (2027) | 4.4 MB | 10.4 MB |
+| history index after season 1 | 16.7 MB | 17.1 MB |
+| observer statistics store, one season | 4.1 MB, 1.5 s to build | 5.6 MB, 2.8 s to build |
+
+So the capture costs about 10% of a season-1 skip here (about 11 s of 108 s), about 166 MB of peak memory and
+about 6 MB of history per season (roughly 0.6 GB more over 100 seasons, before the index's own growth). On the
+owner's laptop season 1 took 47.9 s before this increment; we have not measured it there. Season 100 was not
+measured (no long run). Page times on that one-season world: every page under 0.5 s except the weekly ranking
+view (1.0 s: it reads the season file); ranking reproduction checked exact for 600 golfer-weeks (weeks 5, 26,
+52, top 200).
 
 ## Tests
-See the commit and the report: the whole suite, module by module, with ResourceWarnings shown.
+The whole suite, one module per process with ResourceWarnings shown: 30 modules pass (no warnings); one
+module (`test_history_consistency`) first failed because a profile now includes golf statistics, which read
+"working out the statistics" until the background store is built -- the test now starts from a built store and
+passes. New: `tests.test_golf_stats` (9) and `tests.test_pretest_fixes` (7).

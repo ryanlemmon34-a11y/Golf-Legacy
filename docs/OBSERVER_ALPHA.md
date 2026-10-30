@@ -120,7 +120,8 @@ it too makes earlier worlds "another engine"; start the next long run on it so i
   install updates into another folder (copy worlds across only when you want to open them with newer code).
 - Note the world's name, seed and start year (the library shows the seed; the start year is 2027).
 - Keep the laptop plugged in, and keep about 10 GB of disk free (a 50-season world with its history index
-  takes about 1.3 GB; 100 seasons is larger, not yet measured).
+  took about 1.3 GB; golf statistics add about 6 MB per season, so a 100-season world on this version needs
+  roughly 3-4 GB, not yet measured).
 - Type the number of seasons and press *Advance seasons*. You can browse meanwhile; *Stop simulation* stops
   after the current week. To continue later, Open the world and advance the remaining seasons.
 - Report a problem and Copy wait for the running advance: stop it first.
