@@ -22,7 +22,7 @@ from golfsim import development as D                                    # noqa: 
 from golfsim.population import generate_world                           # noqa: E402
 from golfsim.session import Session                                     # noqa: E402
 
-TOL = 0.002                       # archived numbers are rounded (4 places; creation Overall 2 places)
+TOL = 0.015                       # archived numbers are rounded (Overall 2 places, its parts 3 places)
 
 
 class Evidence(unittest.TestCase):

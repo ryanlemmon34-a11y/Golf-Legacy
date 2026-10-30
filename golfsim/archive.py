@@ -274,7 +274,9 @@ class ArchiveWriter:
                            'coaching_quality_sum': D.COACH_Q, 'overall_before_aging': D.OV_PRE,
                            'overall_after_aging': D.OV_POST, 'ceilings_overall_after_aging': D.CEIL_POST},
                 'created': {str(g): r for g, r in born.items()},
-                'development': {str(g): [round(x, 4) for x in v] for g, v in dev.items()}}
+                'development': {str(g): [(int(r) if r == int(r) else r) for r in (round(x, n) for x, n in
+                                                                                    zip(v, D.DECIMALS))]
+                                for g, v in dev.items()}}
         if year == season.first_year and getattr(season, 'wr_seed', None):
             chunk['ranking_seed'] = {str(g): rows for g, rows in season.wr_seed.items()}   # points before the world began
         return chunk

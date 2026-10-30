@@ -53,6 +53,8 @@ SOURCES = ('maturing', 'training', 'tournaments', 'injury', 'aging')
 CATS = tuple(CATEGORIES)
 OVERALL, TRAIN_WEEKS, COACHED, COACH_Q, OV_PRE, OV_POST, CEIL_POST = 25, 30, 35, 36, 37, 38, 39
 ACC_LEN = 40
+DECIMALS = [2] * 25 + [3] * 5 + [0] * 6 + [2] * 4    # as archived: enough for the evidence, small (about 42 bytes a
+#                                                     golfer-season compressed)
 
 BASE_TRAIN = 0.016          # share of the gap closed per week of training (before learning rate)
 BASE_PLAY = 0.008           # per tournament (four rounds), on every non-physical attribute
