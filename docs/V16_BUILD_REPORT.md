@@ -51,8 +51,9 @@ under.
 **Tested**: in Chromium (Playwright) at **3,440 x 1,440 and 2,560 x 1,440** on 18 pages (Stats with and without
 golf statistics, a profile and its season tab, an event and its round replay, Record Book, rankings, a season
 recap, GOAT Lab, a comparison, qualification, rules, standings, Grand Slam, a cohort, the calendar, the golfer
-directory): no page wider than the window; the longest line in any table cell 741 px; data tables up to
-1,880 px. Re-measured on the final build with the new profile sections: see *Validation*. Unit tests:
+directory): no page wider than the window; the longest line in any table cell 741 px; the widest table
+2,178 px (a major's qualification ledger). Re-measured on the final build with the new profile sections: see
+*Validation*. Unit tests:
 `test_myworld` (one retirement event; menu; Record Book), `test_compare` (top 10s without qualifying),
 `test_cohort` (current season's level). All five new tests fail on the previous code.
 
@@ -185,9 +186,32 @@ plan); "fit" between golfer and staff (needs a definition from you first).
 
 ## Validation
 
-*In progress*: the whole suite on the final code, the new tests on the code before each change, the wide-screen
-re-measure with the new profile sections, and a read-only check on a copy of Test 1. Results replace this
-paragraph when they are in.
+- **Whole suite on the final code** (`eba01e1`; the commits after it change documents only): **51 modules, 539
+  tests, all passed**, 1 skipped by design (`test_observer_profiles`, as before); six modules at a time, 19
+  minutes, 4 CPUs.
+- **The new tests fail on the code before each change** (a separate checkout with the new test files):
+  package 1, 5 of 5 (on `0cbfebf`); package 2, 2 of 4 (the other two pin windows that were already right);
+  package 3, 3 of 3 (on `2ab1176`); package 4, the 4 guarantee scenarios (on `289a0c9`: a broke golfer's place
+  ends "declined: could not pay the trip" and there is no grant ledger); package 6, 10 of 10 (on `d7dacfc`).
+  Package 5's tests read a section that did not exist before; they were not run on the old code.
+- **Outcomes unchanged where they should be** (`tools/equivalence_check.py`, the same saved test world advanced
+  on two checkouts): package 3 (`2ab1176` -> `289a0c9`, 10 weeks, 94 events) and package 5 (`45151e1` ->
+  `d7dacfc`, 16 weeks across a season end, 154 events, 13 playoffs): identical in every outcome part. The final
+  build against `d7dacfc` over the same 16 weeks: identical in all 14 outcome parts and in the published history
+  once the two new records (injury episodes, caddie skills) are left out; only the development section differs
+  (its precision changed in `92b3925`).
+- **Wide desktop, final build**: Chromium (Playwright) at **3,440 x 1,440 and 2,560 x 1,440**, a fresh 5 %
+  test world made by this build (2030, week 21), 24 pages: the 18 measured in package 1 plus a profile's ratings
+  chart (levels and changes), injuries, a coach, a caddie and a team page. No page is wider than the window;
+  paragraphs are at most 1,110 px wide; the longest line in any table cell is 738 px. At 3,440 the widest table
+  is a major's qualification ledger on its event page (7 columns with the new money column, 2,828 px; every cell
+  wraps at its reading width, checked on a screenshot); at 2,560 wide tables fit the content width (2,296 px)
+  and wrap. Ratings bars are 38 px at both widths. *Correction*: package 1's commit message said data tables
+  reach 1,880 px; its own measurement had the same ledger (6 columns then) at 2,178 px.
+- **A copy of Test 1 10.30** (read-only, archive only): *in progress*; the result is added when it finishes.
+- **Originals**: the Test 1 10.30 download is unchanged (SHA-256 `df90dd2f...e515`, as when it was fetched);
+  its extracted copy unchanged (names, sizes and modification times); checks used a further copy. The 50-season
+  world was not opened in this pass.
 
 ## Decisions needed from you
 
