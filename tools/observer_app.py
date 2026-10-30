@@ -651,6 +651,18 @@ def make_handler(app):
                         notice = ('warn', 'Open a world (not only its history) to keep a shortlist.')
                     ref = self.headers.get('Referer') or ''
                     to = (urlparse(ref).path + ('?' + urlparse(ref).query if urlparse(ref).query else '')) if ref else '/shortlist'
+                elif u.path == '/spoilers':                # Hide results / Show results / Reveal final result
+                    w = app.world
+                    ref = self.headers.get('Referer') or ''
+                    to = (urlparse(ref).path + ('?' + urlparse(ref).query if urlparse(ref).query else '')) if ref else '/'
+                    if w is None:
+                        notice = ('warn', 'Open a world first.')
+                    elif O.one(form, 'reveal'):
+                        eid = O.one(form, 'reveal')
+                        app.renderer.call(O.SP.reveal, w, eid)
+                        to = f'/event/{quote(eid)}?view=final'
+                    else:
+                        app.renderer.call(O.SP.set_hide, w, O.one(form, 'hide') == '1', O.one(form, 'from') or 'season')
                 elif u.path == '/worlds/unlock':
                     notice, to = app.unlock(form), '/worlds'
                 elif u.path == '/worlds/close':

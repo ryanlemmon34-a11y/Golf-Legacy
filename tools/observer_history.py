@@ -534,11 +534,17 @@ def series_summary(w, sid):
     """A tournament's history in brief: editions, most-used courses, most wins, most starts, youngest and
     oldest winners -- every figure counted from its editions, with links to them."""
     O = _o()
+    import observer_spoilers as SP
     idx = w.a.index if w.a else None
     wins, starts, courses, winners = Counter(), Counter(), Counter(), []
     formats = set()
+    held = 0                                           # editions whose results are hidden (not counted below)
     if idx is not None:
-        for eid, y, winner in idx.db.execute('SELECT event_id, year, winner FROM editions WHERE series = ?' + idx.upto(), (sid,)):
+        for eid, y, wk, winner in idx.db.execute('SELECT event_id, year, week, winner FROM editions WHERE series = ?'
+                                                 + idx.upto(), (sid,)):
+            if SP.hidden(w, eid, wk):
+                held += 1
+                continue
             if winner:
                 wins[winner] += 1
                 winners.append((y, eid, winner))
@@ -553,6 +559,9 @@ def series_summary(w, sid):
             if e['series'] != sid:
                 continue
             formats.add((e.get('rounds'), bool(e.get('match_play'))))
+            if SP.hidden(w, e['id'], e['week']):
+                held += 1
+                continue
             win = next((g for g, pp, _ in (e['finish'][0] if e['finish'] else []) if pp == 1), None)
             if win:
                 wins[win] += 1
@@ -587,7 +596,9 @@ def series_summary(w, sid):
             f'{len(starts):,} golfers have played it · {sum(starts.values()):,} starts in all</p><div class="rgrid">' + ''.join(cards) + '</div>'
             + '<p class="muted">Counted over every edition played (series-wide), each edition once; a course hosting '
               'several sites of one edition counts once per site. Wins and starts link to the golfer\'s results in this '
-              f'tournament. * {O.AGE_NOTE}</p>')
+              f'tournament. * {O.AGE_NOTE}'
+            + (f' Results are hidden: {held} edition{"s" if held != 1 else ""} with hidden results '
+               f'{"are" if held != 1 else "is"} not counted in wins and winners.' if held else '') + '</p>')
 
 
 def course_use(w, cid):
@@ -701,22 +712,29 @@ def playoff_status(full, site, gid):
     return 'Lost playoff' + (f' (out at extra hole {max(out)})' if out else '')
 
 
-def rounds_view(w, q, e):
+def rounds_view(w, q, e, hide=False):
     """Round by round: the leaderboard after each round (a replay of the recorded rounds), each round's
-    conditions, and for majors each golfer's hole-by-hole scorecard."""
+    conditions, and for majors each golfer's hole-by-hole scorecard. hide: results are hidden and this edition
+    is not revealed -- the final round shows the leaderboard after regulation, not who won a playoff, until the
+    final result is revealed; the round reached is remembered (observer_spoilers)."""
     O = _o()
+    import observer_spoilers as SP
     eid = e['id']
     full = full_edition(w, e)
     base = f'/event/{quote(eid)}'
     if not full or not full.get('scores'):
         return ('<p class="muted">Round scores were not recorded for this edition (played before rules 2026-10-30): '
-                'only final positions and totals are kept, and rounds are never reconstructed from a total.</p>')
+                'only final positions and totals are kept, and rounds are never reconstructed from a total.</p>'
+                + (f'<p>{SP.reveal_button(eid)}</p>' if hide else ''))
     site = int(O.one(q, 'site', '0') or 0)
     scores = full['scores'][site] if site < len(full['scores']) else {}
     n = max((len(v) for v in scores.values()), default=0)
     if not n:
-        return '<p class="muted">No stroke-play rounds at this site (match play keeps final places only).</p>'
+        return ('<p class="muted">No stroke-play rounds at this site (match play keeps final places only).</p>'
+                + (f'<p>{SP.reveal_button(eid)}</p>' if hide else ''))
     k = max(1, min(n, int(O.one(q, 'round', '1') or 1)))    # a replay starts at round one: nothing ahead revealed
+    if hide:
+        SP.note_round(w, eid, k)                            # (the round reached, the same on every page)
     player = O.one(q, 'player')
     if player and full.get('holes'):
         return scorecard(w, full, int(player), base, k, n)
@@ -735,7 +753,8 @@ def rounds_view(w, q, e):
     count = Counter(totals)
     cond = (full.get('conditions') or [None] * (site + 1))[site] if full.get('conditions') else None
     final = {r[0]: r for r in (full['finish'][site] if site < len(full['finish']) else [])}
-    steps = ' · '.join((f'<strong>after round {i}</strong>' if i == k else f'<a href="{base}?{urlencode({"view": "rounds", "round": i, "site": site})}">after round {i}</a>')
+    step = lambda i: ('final round' if hide and i == n and k < n else f'after round {i}')
+    steps = ' · '.join((f'<strong>{step(i)}</strong>' if i == k else f'<a href="{base}?{urlencode({"view": "rounds", "round": i, "site": site})}">{step(i)}</a>')
                        for i in range(1, n + 1))
     out = [f'<p><span class="tag">Replay</span> The recorded rounds, revealed one at a time: the event is already '
            f'complete and nothing is simulated here. {steps}</p>']
@@ -761,13 +780,16 @@ def rounds_view(w, q, e):
         if k < n and len(rs) == k and len(rs) < n:
             status = '<span class="muted">missed the cut after this round</span>'
         fin = final.get(g)
-        if k == n:
+        if k == n and not hide:
             status = playoff_status(full, site, g) or (f'final {fin[1]}' if fin and fin[1] is not None
                                                          and fin[1] != pos else status)
         rows.append([label, name] + [str(x) for x in rs[:k]] + [str(t), f'{t - k * par:+d}' if par else '—', status])
     out.append(O.table(['Pos', 'Golfer'] + [f'R{i}' for i in range(1, k + 1)] + ['Total', 'To par', ''], rows,
                        numeric=tuple(range(2, 2 + k + 2))))
-    if k == n:
+    if k == n and hide:
+        out.append(f'<p>After regulation. Any playoff, the winner and the final places are hidden: '
+                   f'{SP.reveal_button(eid)}</p>')
+    elif k == n:
         out.append(playoff_lines(w, full, site, par))
     out.append('<p class="muted">Positions after a round are by total so far (ties share a place, “T”); nothing after the '
                'round shown is revealed (no final places, winner or later rounds) until the final round, where any '
