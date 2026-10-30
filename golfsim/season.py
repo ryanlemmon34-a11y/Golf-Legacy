@@ -31,6 +31,7 @@ from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass, field, replace
 
 from . import development as D
+from . import golfstats as GS
 from . import finance as FIN
 from . import staff as ST
 from . import prestige as PR
@@ -52,6 +53,12 @@ INJURIES = ('back', 'wrist', 'shoulder', 'elbow', 'knee', 'hip', 'neck', 'rib', 
             'oblique')
 STAT_KEYS = ('drive_yards', 'drives', 'fairways', 'fairway_att', 'gir', 'putts', 'sg_ott', 'sg_app', 'sg_arg',
              'sg_putt')
+# the season's summed round statistics (pstats) from the golfstats counters: (key, counter index, scale)
+RANK_KEEP = 200                  # world ranking snapshot kept each week for the archive (and every counted start's points)
+PSTAT_FROM = tuple((k, GS.IDX[src], scale) for k, src, scale in (
+    ('drive_yards', 'drive_tenths', 0.1), ('drives', 'drives', 1), ('fairways', 'fairways', 1),
+    ('fairway_att', 'fairway_att', 1), ('gir', 'gir', 1), ('putts', 'putts', 1), ('sg_ott', 'sg_ott', 0.01),
+    ('sg_app', 'sg_app', 0.01), ('sg_arg', 'sg_arg', 0.01), ('sg_putt', 'sg_putt', 0.01)))
 AMATEUR_CAP = {1: 4, 2: 8, 3: 8, 4: 8}          # most amateurs (sponsor invitations) in a pro event
 COLLEGE_WINDOWS = {k: TOUR_BY_KEY[k].weeks for k in ('CO_US_D1', 'CO_US_SMALL', 'CO_INTL')}
 # golfers at college in the USA (wherever they are from) can play that country's amateur events
@@ -171,21 +178,21 @@ def play_site(task):
     rng = random.Random(task['seed'])
     course, golfers = task['course'], task['golfers']
     caddies = {id(g): k for g, k in zip(golfers, task.get('caddies') or ())}
-    rounds_data, holes_data = [], []
+    rounds_data, holes_data, matches = [], [], []
     def on_round(g, rd, st):
-        rounds_data.append((g.id, rd, st.score, tuple(st.holes),
-                            (sum(st.drives), len(st.drives), st.fairways, st.fairway_att, st.gir, st.putts,
-                             st.sg_ott, st.sg_app, st.sg_arg, st.sg_putt)))
+        rounds_data.append((g.id, rd, st.score, tuple(st.holes), GS.round_counters(st)))
     def on_hole(g, idx, strokes, stage=''):
         holes_data.append((g.id, idx, strokes, stage))
+    def on_match(stage, w, l, text, scheduled):
+        matches.append([stage, w.id, l.id, text, scheduled])
     out = {'event_id': task['event_id'], 'site': task['site'], 'rounds': rounds_data, 'holes': holes_data}
     if not golfers:
         out.update(finish=[], playoff=0)
         return out
     if task['match_play']:
         res = play_stroke_and_match(golfers, course, rng, stroke_holes=36, bracket=64, final_holes=36,
-                                    on_round=on_round, on_hole=on_hole, caddies=caddies)
-        out.update(finish=[(g.id, pos, None) for g, pos in res], playoff=0)
+                                    on_round=on_round, on_hole=on_hole, caddies=caddies, on_match=on_match)
+        out.update(finish=[(g.id, pos, None) for g, pos in res], playoff=0, matches=matches)
         return out
     wind = max(0.0, rng.gauss(course.typical_wind, 3.0))
     pins = 0.3 + 0.4 * task['prestige'] / 100
@@ -227,6 +234,9 @@ class EventResult:
     conditions: list = field(default_factory=list)   # per site: [[wind mph, rain 0/1, pin difficulty] per round]
     holes: list = field(default_factory=list)        # majors, per site: {gid: [[strokes per hole] per round]}
     pars: list = field(default_factory=list)         # majors, per site: each hole's par (for the scorecards)
+    golf: list = field(default_factory=list)         # per site: {gid: golfstats counters + longest drive}
+    matches: list = field(default_factory=list)      # match play, per site: [[stage, winner, loser, result, holes]]
+    points: list = field(default_factory=list)       # per site: {gid: world ranking points awarded}
 
     def winner(self, site=0):
         rows = self.finish[site] if self.finish else []
@@ -323,6 +333,7 @@ class Season:
         self.moments = defaultdict(list)                     # year -> special moments (aces, playoffs, records)
         self.rights = {}                                     # year -> gid -> (Premier playing rights, why)
         self.earned = {}                                     # year -> gid -> winner's exemption held (why)
+        self.rank_top = defaultdict(dict)                    # year -> week -> [[gid, average, events]] (top RANK_KEEP)
         self.college = {}                                    # gid -> [seasons enrolled in college] (ledger)
         self.week_access = defaultdict(_dd_counter)          # year -> gid -> weeks by access outcome (ACCESS)
         self.denied_run = Counter()                          # gid -> consecutive weeks shut out of full fields
@@ -345,6 +356,7 @@ class Season:
         for k, t in TOUR_BY_KEY.items():
             if t.tier in (2, 3):
                 tour_target(self, k)                         # remember each tour's starting size
+        self.wr_seed = {}                                    # gid -> [[abs week, points]]: pre-history (archived once)
         self._seed_world()
         RES.settle(self, self.first_year, 0)                 # everyone's birthplace and where they live
 
@@ -369,6 +381,7 @@ class Season:
                 aw = -rng.randint(1, 100)
                 if g.status == 'pro':
                     self.wr[g.id].append((aw, 0.08 * math.exp((g.overall - 60) / 6) * (0.5 + u)))
+                    self.wr_seed.setdefault(g.id, []).append([aw, self.wr[g.id][-1][1]])
                 elif g.status == 'amateur':
                     self.am[g.id].append((aw, 0.3 * math.exp((g.overall - 40) / 9) * (0.5 + u)))
         self.update_rankings(self.first_year - 1, 52)
@@ -397,26 +410,22 @@ class Season:
     # ---- rankings -------------------------------------------------------------------------------
     def update_rankings(self, year, week):
         now = self.abs_week(year, week)
-        def table(entries, lo, hi):
+        def table(entries, divisor, counts=None):
             out = {}
             for gid, rows in entries.items():
                 if not rows:
                     continue                                 # every point expired: no average
-                tot, n = 0.0, 0
-                keep = []
-                for aw, pts in rows:
-                    age = now - aw
-                    if age >= 104:
-                        continue
-                    keep.append((aw, pts))
-                    n += 1
-                    tot += pts * (1.0 if age < 13 else 1 - (age - 13) / 91)
+                keep = [r for r in rows if now - r[0] < PR.RANK_WEEKS]
                 rows[:] = keep
+                tot, n = PR.ranking_total(keep, now)
                 if tot > 0:
-                    out[gid] = tot / min(hi, max(lo, n))
+                    out[gid] = tot / PR.ranking_divisor(n, divisor)
+                    if counts is not None:
+                        counts[gid] = n
             return out
-        wr = table(self.wr, 40, 52)
-        am = table(self.am, 12, 40)
+        events = {}
+        wr = table(self.wr, PR.WORLD_DIVISOR, events)
+        am = table(self.am, PR.AMATEUR_DIVISOR)
         am = {g: v for g, v in am.items() if self.g[g].status == 'amateur'}
         wr_ids = sorted(wr, key=wr.get, reverse=True)
         am_ids = sorted(am, key=am.get, reverse=True)
@@ -424,6 +433,8 @@ class Season:
         self.wr_pos = {g: i + 1 for i, g in enumerate(wr_ids)}
         self.am_pos = {g: i + 1 for i, g in enumerate(am_ids)}
         self.ctx.world_rankings[(year, week)] = wr_ids[:2000]
+        if year >= self.first_year:                          # kept for the archive: who led, on what
+            self.rank_top[year][week] = [[g, wr[g], events[g]] for g in wr_ids[:RANK_KEEP]]
         self.ctx.amateur_rankings[(year, week)] = am_ids[:1000]
 
     def update_fame(self, year, week):
@@ -1449,6 +1460,8 @@ class Season:
         state.setdefault('_reserved', Counter())
         state.setdefault('earned', {})                      # rebuilt from results when first needed
         state.setdefault('college', {})                     # college seasons before the ledger: not recorded
+        state.setdefault('wr_seed', {})
+        state.setdefault('rank_top', defaultdict(dict))     # ranking snapshots before they were kept: not recorded
         if 'prize_record' not in state:                     # saves from before earnings kept their level:
             tier = lambda gid: next((TOUR_BY_KEY[g.tour].tier for g in (state['g'].get(gid),)   # their
                                      if g is not None and g.tour in TOUR_BY_KEY), 4)            # tour's
@@ -1509,13 +1522,20 @@ class Season:
             for gid, rd, score, holes, _ in o['rounds']:
                 by_round[rd].append(score)
             round_avg = {rd: sum(v) / len(v) for rd, v in by_round.items()}
-            for gid, rd, score, holes, st in o['rounds']:
+            golf = {}
+            for gid, rd, score, holes, (c, long) in o['rounds']:
                 ps = self.pstats[year][gid]
                 ps['rounds'] += 1
                 ps['strokes'] += score
                 ps['vs_field'] += score - round_avg[rd]
-                for k, val in zip(STAT_KEYS, st):
-                    ps[k] += val
+                for k, i, scale in PSTAT_FROM:
+                    ps[k] += c[i] * scale
+                e = golf.get(gid)
+                if e is None:
+                    e = golf[gid] = GS.empty() + [0, 0, 0]       # counters, then the longest drive (tenths, round, hole)
+                GS.add(e, c)
+                if long and long[0] > e[GS.N]:
+                    e[GS.N:] = [long[0], rd, long[1]]
                 aces, albs, cr = len(rec.aces), len(rec.albatrosses), rec.course_record
                 mark = Mark(score, score - course.par, self.g[gid].name, ed.event_id, year, week, rd, s.tier, gid)
                 rec.add_round(mark, holes, pars)
@@ -1602,6 +1622,8 @@ class Season:
                 if s.kind == 'major':
                     holes[gid].append(list(hs))
             res.scores.append(dict(scores))
+            res.golf.append(golf)
+            res.matches.append(o.get('matches') or [])
             res.prizes.append({gid: round(x, 2) for gid, x in won.items()})
             res.conditions.append(o.get('conditions'))
             if s.kind == 'major':
@@ -1616,6 +1638,8 @@ class Season:
                         lv = self.level_earnings[year].setdefault(gid, {}).setdefault(s.tier, [0.0, 0])
                         lv[0] += won.get(gid, 0.0)
                         lv[1] += 1
+            points = {}
+            res.points.append(points)
             for gid, pos, _ in finish:
                 all_ids.append(gid)
                 self.played[year][gid].append(week)
@@ -1625,7 +1649,8 @@ class Season:
                     if g.status == 'amateur':
                         self.am[gid].append((aw, PR.amateur_points(p, pos)))
                     if s.tier <= 4:
-                        self.wr[gid].append((aw, PR.world_points(p, pos)))
+                        points[gid] = PR.world_points(p, pos)        # every counted start, zero points included
+                        self.wr[gid].append((aw, points[gid]))
                     self.fame_log[gid].append((aw, PR.fame_points(p, pos)))
                     if pos == 1:
                         kind = 'major' if s.kind == 'major' else 'flagship' if s.category == 'flagship' else \
@@ -1778,11 +1803,14 @@ class Season:
                   self.block_flags, self.cash_start, self.support_start, self.overall_start, self.rank_start, self.am_start,
                   self.staff_receipts, self.injuries, self.card_log, self.career_counts, self.transitions,
                   self.assignments, self.staff_year, self.unheld, self.rights, self.earned, self.card_reasons, self.snapshots,
+                  self.rank_top,
                   self.juniors_added, self.new_pros_added, self.stats, self.moments):
             for y in [y for y in d if isinstance(y, int) and old(y)]:
                 del d[y]
         for k in [k for k in self.money if old(k[1])]:
             del self.money[k]
+        if old(self.first_year):
+            self.wr_seed = {}                                # archived with the first season
         for k in [k for k in self.entry_routes if old(k[0])]:
             del self.entry_routes[k]
         for k in [k for k in self.stage_log if old(k[0])]:

@@ -120,13 +120,14 @@ def play_match(a, b, course, rng, holes=18, pressure=0.5, caddies=None, on_hole=
 
 
 def play_stroke_and_match(field, course, rng, stroke_holes=36, bracket=64, final_holes=36, on_round=None,
-                          on_hole=None, caddies=None):
+                          on_hole=None, caddies=None, on_match=None):
     """Amateur-championship format: stroke-play qualifying, then a seeded knockout.
 
     Returns finishers [(golfer, position)]: 1 champion, 2 runner-up, 3 semi-finalists, 5 quarter-
     finalists, 9 / 17 / 33 earlier rounds, then non-qualifiers by stroke-play position.
     If fewer players qualify than the bracket holds, the top seeds get byes into the next round.
-    on_round receives the stroke-play rounds; on_hole every match-play hole.
+    on_round receives the stroke-play rounds; on_hole every match-play hole; on_match(stage, winner, loser,
+    result text, holes scheduled) every match played (byes are not matches).
     """
     caddies = caddies or {}
     totals = {id(g): 0 for g in field}
@@ -164,8 +165,10 @@ def play_stroke_and_match(field, course, rng, stroke_holes=36, bracket=64, final
             if a is None or b is None:            # a bye
                 winners.append(a if b is None else b)
                 continue
-            w, l, _ = play_match(a, b, course, rng, final_holes if final else 18, caddies=caddies, on_hole=on_hole,
-                                 stage=stage)
+            scheduled = final_holes if final else 18
+            w, l, text = play_match(a, b, course, rng, scheduled, caddies=caddies, on_hole=on_hole, stage=stage)
+            if on_match:
+                on_match(stage, w, l, text, scheduled)
             winners.append(w)
             losers.append(l)
         pos = len(alive) // 2 + 1

@@ -82,6 +82,35 @@ def initial_prestige(series, course_quality):
 
 
 # ---- what results are worth --------------------------------------------------------------------
+RANK_WEEKS = 104              # ranking points count for 104 weeks (rules: world-ranking)
+RANK_FULL = 13               # in full for 13 weeks, then falling in a straight line to nothing
+WORLD_DIVISOR = (40, 52)     # the average divides by the starts in the window, but by at least 40, at most 52
+AMATEUR_DIVISOR = (12, 40)
+
+
+def ranking_weight(age):
+    """How much of a start's points count `age` weeks later (age < RANK_WEEKS)."""
+    return 1.0 if age < RANK_FULL else 1 - (age - RANK_FULL) / (RANK_WEEKS - RANK_FULL)
+
+
+def ranking_total(rows, now):
+    """(weighted points, starts) of the rows [(absolute week, points)] still in the window at week `now`,
+    summed in the rows' order (the order they were earned) so the result is exactly the engine's."""
+    tot, n = 0.0, 0
+    for aw, pts in rows:
+        age = now - aw
+        if age >= RANK_WEEKS:
+            continue
+        n += 1
+        tot += pts * ranking_weight(age)
+    return tot, n
+
+
+def ranking_divisor(n, divisor=WORLD_DIVISOR):
+    lo, hi = divisor
+    return min(hi, max(lo, n))
+
+
 def finish_share(pos):
     """Share of the winner's points for a finishing position (world ranking style)."""
     if pos is None:

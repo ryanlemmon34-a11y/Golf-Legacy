@@ -112,13 +112,16 @@ class RoundStats:
     fairway_att: int = 0
     gir: int = 0
     putts: int = 0
+    gir_putts: int = 0               # putts on holes with a green in regulation
     three_putts: int = 0
     scramble_att: int = 0
     scramble_made: int = 0
     sand_att: int = 0
     sand_saves: int = 0
     penalties: int = 0
-    drives: list = field(default_factory=list)
+    drives: list = field(default_factory=list)       # measured drives (golfstats): yards
+    long_drive: float = 0.0
+    long_drive_hole: int = 0
     eagles: int = 0
     birdies: int = 0
     pars: int = 0
@@ -374,6 +377,7 @@ def play_hole(pl, hole, hidx, rng, st, pressure=0.0, state=None, pin=None):
     putts = 0
     sand_at = None
     missed_green_once = False
+    teed = False                    # the hole's first tee shot is the measured one (not a re-tee)
 
     def sg_add(cat, before, after, penalty=0):
         val = before - after - 1 - penalty
@@ -436,9 +440,14 @@ def play_hole(pl, hole, hidx, rng, st, pressure=0.0, state=None, pin=None):
                 else:
                     forced_rough = over > 8 and rng.random() < min(0.7, over / 25)
                     total = hole.landing_limit + over * 0.35
-            if club == 'driver':
-                st.drives.append(total)
-            st.fairway_att += 1
+            first = not teed
+            teed = True
+            if first:
+                if club == 'driver':
+                    st.drives.append(total)
+                    if total > st.long_drive:
+                        st.long_drive, st.long_drive_hole = total, hole.number
+                st.fairway_att += 1
             strokes += 1
             rem = hole.plays - total
             half = hole.fairway_width / 2
@@ -478,7 +487,7 @@ def play_hole(pl, hole, hidx, rng, st, pressure=0.0, state=None, pin=None):
                     sg_add('ott', before, baseline('tee', hole.plays), 1)
                     lie, dist = 'tee', float(hole.plays)
                     continue
-            if lie == 'fairway':
+            if lie == 'fairway' and first:
                 st.fairways += 1
             if penalty:
                 st.penalties += 1
@@ -688,6 +697,7 @@ def play_hole(pl, hole, hidx, rng, st, pressure=0.0, state=None, pin=None):
         st.three_putts += 1
     if gir:
         st.gir += 1
+        st.gir_putts += putts
     else:
         st.scramble_att += 1
         if rel <= 0:

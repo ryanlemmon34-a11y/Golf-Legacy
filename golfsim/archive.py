@@ -158,9 +158,18 @@ class ArchiveWriter:
                                      if (year, w) in table}
                               for kind, table in (('world', season.ctx.world_rankings),
                                                   ('amateur', season.ctx.amateur_rankings))},
+                 # the world ranking's averages (top RANK_KEEP each week: [person, average points, events in
+                 # the window]); with each start's points (editions' `points`) they reproduce the table
+                 'ranking_points': {str(w): [[g, a, n] for g, a, n in rows]
+                                    for w, rows in getattr(season, 'rank_top', {}).get(year, {}).items()},
                  'staff_year': {f'{k}:{i}': dict(v, earnings_total=_staff_earnings(season, k, i))
                                 for (k, i), v in season.staff_year.get(year, {}).items()},
                  'log': {g: v for g, v in log.items() if v}}
+        from .golfstats import VERSION as GOLF_STATS
+        from .rules import RANKING_RULE
+        chunk['definitions'] = {'golf_stats': GOLF_STATS, 'ranking': RANKING_RULE}   # what the counts mean
+        if year == season.first_year and getattr(season, 'wr_seed', None):
+            chunk['ranking_seed'] = {str(g): rows for g, rows in season.wr_seed.items()}   # points before the world began
         return chunk
 
     def write_state(self, season):
@@ -228,6 +237,12 @@ def _played(r):
     if getattr(r, 'holes', None):
         out['holes'] = [{str(g): v for g, v in site.items()} for site in r.holes]
         out['pars'] = list(r.pars)
+    if getattr(r, 'golf', None):                 # golfstats counters (FIELDS order) + longest drive
+        out['golf'] = [{str(g): v for g, v in site.items()} for site in r.golf]
+    if getattr(r, 'points', None):               # world ranking points per counted start
+        out['points'] = [{str(g): v for g, v in site.items()} for site in r.points]
+    if any(getattr(r, 'matches', None) or ()):   # match play: [stage, winner, loser, result, holes scheduled]
+        out['matches'] = list(r.matches)
     return out
 
 

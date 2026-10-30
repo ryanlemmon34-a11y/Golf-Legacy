@@ -9,7 +9,8 @@ anything, and dropping seasons beyond a committed point (session recovery) is on
 Tables: editions (one per event played, with its classification when played and its first site's
 winner), sites (course and layout of each site), starts (one per golfer per edition and site: position,
 total, the coach and caddie that week, the entry route -- every site's winner is here -- and, since schema 3,
-the prize money paid, NULL for seasons played before it was kept), seasons (one per
+the prize money paid, NULL for seasons played before it was kept; since schema 4, the world ranking points
+the start earned, NULL where none were counted or recorded), seasons (one per
 golfer per season), moments (holes-in-one, albatrosses, playoffs, course records); since schema 2,
 number_one (each week's No. 1, world and amateur) and careers (each golfer's season row, compressed).
 An index written before schema 2 is completed once by the session that owns it (backfill_derived). Indexed by person, event,
@@ -26,7 +27,7 @@ import sqlite3
 import zlib
 from pathlib import Path
 
-SCHEMA = 3
+SCHEMA = 4
 DDL = """
 CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT);
 CREATE TABLE IF NOT EXISTS editions(eid INTEGER PRIMARY KEY, event_id TEXT UNIQUE, year INT, week INT, series TEXT,
@@ -35,7 +36,7 @@ CREATE TABLE IF NOT EXISTS sites(eid INT, site INT, year INT, course TEXT, layou
     PRIMARY KEY(eid, site));
 CREATE TABLE IF NOT EXISTS routes(rid INTEGER PRIMARY KEY, text TEXT UNIQUE);
 CREATE TABLE IF NOT EXISTS starts(person INT, eid INT, year INT, week INT, site INT, pos INT, total INT,
-    coach INT, caddie INT, rid INT, prize REAL);
+    coach INT, caddie INT, rid INT, prize REAL, points REAL);
 CREATE TABLE IF NOT EXISTS seasons(person INT, year INT, tour TEXT, status TEXT, lifestyle TEXT, events INT,
     wins INT, prize INT, wr_end INT, am_end INT, PRIMARY KEY(person, year));
 CREATE TABLE IF NOT EXISTS moments(year INT, week INT, kind TEXT, person INT, event_id TEXT, layout TEXT,
@@ -76,6 +77,8 @@ class ArchiveIndex:
             self.db.executescript(DDL)
             if not self._has_prize():                   # schema 3: each start's prize money (NULL for seasons
                 self.db.execute('ALTER TABLE starts ADD COLUMN prize REAL')   # played before it was kept)
+            if not self._has_col('points'):             # schema 4: each start's world ranking points
+                self.db.execute('ALTER TABLE starts ADD COLUMN points REAL')
             self.db.execute("INSERT OR REPLACE INTO meta VALUES ('schema', ?)", (str(SCHEMA),))
             self.db.commit()
         except BaseException:
@@ -83,7 +86,17 @@ class ArchiveIndex:
             raise
 
     def _has_prize(self):
-        return any(r[1] == 'prize' for r in self.db.execute('PRAGMA table_info(starts)'))
+        return self._has_col('prize')
+
+    def _has_col(self, name):
+        return any(r[1] == name for r in self.db.execute('PRAGMA table_info(starts)'))
+
+    @property
+    def has_points(self):
+        """Whether starts carry ranking points (an index written before schema 4, opened read-only, does not)."""
+        if not hasattr(self, '_points_col'):
+            self._points_col = self._has_col('points')
+        return self._points_col
 
     @property
     def has_prize(self):
@@ -145,18 +158,21 @@ class ArchiveIndex:
                     site_rows.append((eid, k, year, v[0], v[1], v[2]))
                 team, routes = e.get('team', {}), e.get('routes', {})
                 prizes = e.get('prizes')                # each golfer's prize money, when it was kept
+                points = e.get('points')                # each counted start's world ranking points, when kept
                 for k, site in enumerate(e['finish']):
                     paid = prizes[k] if prizes and k < len(prizes) else None
+                    pts = points[k] if points and k < len(points) else {}
                     for g, p, total in site:
                         coach, caddie = team.get(str(g), team.get(g, (0, 0)))
                         route = routes.get(str(g), routes.get(g))
                         if route is not None and route not in rid:
                             rid[route] = self.db.execute('INSERT INTO routes VALUES (NULL, ?)', (route,)).lastrowid
                         prize = None if paid is None else paid.get(str(g), paid.get(g, 0.0))
-                        start_rows.append((g, eid, year, e['week'], k, p, total, coach, caddie, rid.get(route), prize))
+                        start_rows.append((g, eid, year, e['week'], k, p, total, coach, caddie, rid.get(route), prize,
+                                           pts.get(str(g), pts.get(g))))
             self.db.executemany('INSERT INTO sites VALUES (?,?,?,?,?,?)', site_rows)
-            self.db.executemany('INSERT INTO starts(person, eid, year, week, site, pos, total, coach, caddie, rid, prize) '
-                                'VALUES (?,?,?,?,?,?,?,?,?,?,?)', start_rows)
+            self.db.executemany('INSERT INTO starts(person, eid, year, week, site, pos, total, coach, caddie, rid, prize, '
+                                'points) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)', start_rows)
             self.db.executemany('INSERT INTO moments VALUES (?,?,?,?,?,?,?)', [
                 (year, m.get('week'), m['kind'], m['person'], m['event'], m.get('layout'),
                  json.dumps({k: v for k, v in m.items() if k not in ('kind', 'person', 'event', 'layout', 'week')}))

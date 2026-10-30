@@ -15,11 +15,13 @@ from __future__ import annotations
 import re
 
 RULES_VERSION = '2026-10-30'
+RANKING_RULE = 'world-ranking-1'     # the world ranking's formula (unchanged since the world began; named now)
 VERSIONS = (
     ('2026-10-30', 'Winners\' exemptions count whatever a golfer\'s membership (a non-member champion earns a '
                    'Premier card and exempt entry); open amateur golf follows where an amateur lives as well as '
                    'nationality; the college eligibility ledger; round scores, conditions and each golfer\'s prize '
-                   'money recorded for every event.'),
+                   'money recorded for every event; golf statistics (driving, greens, putting...), each start\'s world '
+                   'ranking points, weekly ranking averages and match-play results recorded.'),
 )
 EARLIER = ('Seasons archived before rules versions were recorded were played under earlier rules. The '
            'differences that matter for reading old results: a winner without a Premier card held no '
@@ -163,6 +165,32 @@ RULES = {
         '(age by birth year), so at most five seasons for an 18-year-old entrant. Each season enrolled is '
         'recorded once in the eligibility ledger. No redshirt, waiver or transfer exceptions. A fictional rule: '
         'close to the NCAA\'s age-based five-year window, not its older four-seasons-in-five rule.',
+        '2026-10-30'),
+    'world-ranking': (
+        'World ranking (world-ranking-1)',
+        'Every start in a professional event -- majors, Premier, Challenger, Regional and Mini tour events; not '
+        'qualifying stages, amateur, college or club-professional events -- earns points: 100 x ((the event\'s '
+        'prestige when played - 20) / 80) ^ 2.2 (nothing below prestige 20), times the finish\'s share: 1 for a '
+        'win, 0.6 x (position - 1) ^ -0.73 for second to 60th (tied golfers each take their shared position\'s share), '
+        'nothing beyond 60th or for a missed cut. Points count for 104 weeks: in full for 13 weeks, then falling '
+        'in a straight line to nothing. The ranking average is the weighted total divided by the number of '
+        'starts in those 104 weeks (zero-point starts included), but by at least 40 and at most 52. Recomputed '
+        'every week. Amateurs earn world points in these events too. The world\'s first two seasons also carry '
+        'points seeded from each golfer\'s standing when the world began. Not today\'s official ranking: no '
+        'separate field-strength formula beyond prestige.',
+        '2026-10-30'),
+    'golf-statistics': (
+        'Golf statistics (definitions version 1)',
+        'Counted from every simulated shot in completed 18-hole stroke-play rounds (match-play and playoff holes '
+        'are not rounds). Driving distance: the first tee shot on each par 4 and 5 hit with a driver, carry and '
+        'roll to where it finished, misses included. Fairways hit: first tee shots on par 4s and 5s finishing '
+        'on the fairway (a fairway bunker or a driven green is not the fairway). Greens in regulation: on the '
+        'putting surface in par - 2 strokes or fewer, penalties included (the fringe is not the green). '
+        'Scrambling: par or better after missing the green in regulation. Sand saves: up and down from a '
+        'greenside bunker. Putts: strokes on the putting surface (not from the fringe). Scoring average: raw '
+        'strokes per round, not adjusted. Strokes gained: against the engine\'s own expected-strokes table, '
+        'not a validated real-world baseline. Season, career and tour figures add up the counts and the '
+        'opportunities (never averages of averages); seasons before this version show "not recorded".',
         '2026-10-30'),
 }
 
