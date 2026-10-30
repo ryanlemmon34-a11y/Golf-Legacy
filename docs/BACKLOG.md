@@ -78,6 +78,26 @@ an upgraded index for older archives); the parent/child tour filter; migrating a
 Deferred (not in this increment): nation development and other large simulation expansions; a day-ordered
 same-week feeder engine; season-100 timing (no checkpoint exists).
 
+## Build v16 (branch build/v16; report `docs/V16_BUILD_REPORT.md`; the prompt worked out with HAL, 30 October 2026)
+
+Delivered for review, one commit per package: the wide desktop layout (no 1,150 px cap; tables sized to their
+columns, reading width for text), Compare careers and GOAT Lab in the menu, the Record Book, retired status
+everywhere, one retirement event in My World, comparison top 10s without qualifying, cohort level counting the
+current season; USA Open champions exempt through the tenth anniversary (simulation change); the money behind
+every major place recorded; an earned major place never lost for money alone (organizer-paid trips in kind,
+recorded once; simulation change); development evidence (creation records, each season's change by source,
+aging dated; measured cost under 1 % time, about +4.6 % archive); ratings over time on profiles; injury episodes
+recorded and shown; coach and caddie profiles and partnership stories. Rules version 2026-11-01.
+
+Waiting for the owner (listed in the report): the amateur sponsorship settings
+(`docs/AMATEUR_SPONSORSHIP_PROPOSAL.md`); v1 worlds browse-only (blocks advancing the paused v1 playthrough);
+the proposed simulation runs (seeds, lengths, times, questions); whether a coach's teaching and scouting stay
+hidden; "last N years" routes that include the current year (six editions once it is played); injuries keeping
+a golfer out of one more week of entries than announced. Next once approved: sponsorship, the runs and
+calibration from their evidence, retiring v1; then My World injury and return items, and staff "fit" (needs a
+definition). Deferred: small screens, the death system; geography, course usage, prestige and deeper staff
+careers later. Hide results stays removed.
+
 ## The pretest review increment (owner roadmap, pinned review of 5bcc6ed, 29 October 2026)
 
 Delivered (`docs/PRETEST_REVIEW_RESPONSE.md`): golf statistics captured per edition with versioned definitions

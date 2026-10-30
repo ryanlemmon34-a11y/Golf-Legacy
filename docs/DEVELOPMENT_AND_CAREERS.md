@@ -121,10 +121,14 @@ Money moves weekly when it is earned or spent, and every dollar passes through t
 any family or private backing, and a **limited** line of credit (it grows with their recent earned
 income, up to $60k — nobody borrows without limit). The next four weeks of living costs are set aside
 first. A trip they cannot pay for is not booked, however much they want to play — **one rule for
-every entry, qualifier and invitation** (majors, elite and national amateur championships, the Tour
-Finals): an invited golfer who cannot pay declines (recorded) and the next in line or the next alternate
-takes the place. College events are paid by the school, never blocked by a golfer's debt, and the school
-is recorded as the payer (a club professional's section golf likewise, by the club). A week has one
+every entry, qualifier and invitation** (elite and national amateur championships, the Tour Finals; majors
+before rules 2026-11-01): an invited golfer who cannot pay declines (recorded) and the next in line or the next
+alternate takes the place. **An earned major place is the exception** (rules 2026-11-01): a golfer who holds
+one, or an alternate called up, and cannot pay the trip has its travel and entry paid by the organizer, in kind
+(recorded once, never in the golfer's ledger; the caddie's week stays theirs). Injury, retirement and an
+expired amateur place still end a place; qualifying for a major is paid as before. College events are paid
+by the school, never blocked by a golfer's debt, and the school is recorded as the payer (a club professional's
+section golf likewise, by the club). A week has one
 budget: every entry accepted books its cost at once, so a Monday qualifier and that weekend's
 tournament are not both paid from the same money, and a qualifier is priced at the site the golfer is
 sent to (England or Japan for the USA Open's international final qualifying). A caddie's weekly fee is

@@ -104,9 +104,14 @@ playoff), then ordered alternates.
 **The rights ledger.** Every major place, both versions (observation only: it never decides a field):
 golfer, categories (codes), state (earned / conditional), evidence (the source edition and result, ranking list
 or award), when it was earned, target edition, the calendar version, and how it ended: *entered*, *withdrawn*
-(injured or retired), *declined* (could not pay the trip) or *expired* (an amateur's place after turning
-professional; not eligible when the field was set). Places already earned for next season are recorded at the
-season's end (and the amateur award in week 34), then resolved when that field is set. Season files keep
+(injured or retired), *declined* (could not pay the trip; only before rules 2026-11-01, see below) or
+*expired* (an amateur's place after turning professional; not eligible when the field was set). From rules
+2026-11-01 each place decided when the field is set also keeps the money it was decided on (what the golfer could
+draw, what was set aside, what remained, the trip's cost, who paid); an earned place is never lost for money
+alone: if the golfer cannot pay, the organizer pays the trip's travel and entry in kind, recorded once per trip
+in `travel_grants` (week, event, golfer, amount, what it covers, source) and never in the golfer's ledger.
+Places already earned for next season are recorded at the season's end (and the amateur award in week 34),
+then resolved when that field is set. Season files keep
 `major_rights` (this season's, resolved) and `next_major_rights`; the event page of a major shows the ledger.
 
 **Q-School.** The Asian Challenger Q-School moved from week 2 to week 51: it uses this season's standings and its
