@@ -218,9 +218,9 @@ class ProfilesAndStatsTests(unittest.TestCase):
         app2 = OA.App(lib, workers=1)                                   # reopened: still there
         self.addCleanup(app2.shutdown)
         app2.renderer.call(app2._install, lib / 'w', None)
-        self.assertEqual(sorted((k, i) for k, i, _ in O.shortlist(app2.world)), sorted(items))
+        self.assertEqual(sorted((k, i) for k, i, *_ in O.shortlist(app2.world)), sorted(items))
         app2.renderer.call(O.set_shortlist, app2.world, 'nation', 'USA', False)
-        self.assertNotIn(('nation', 'USA'), [(k, i) for k, i, _ in O.shortlist(app2.world)])
+        self.assertNotIn(('nation', 'USA'), [(k, i) for k, i, *_ in O.shortlist(app2.world)])
         self.assertIn('Shortlisted', app2.renderer.call(app2.draw, f'/golfer/{items[0][1]}', {}))
 
     def test_removed_worlds_can_be_restored_and_are_deleted_only_deliberately(self):

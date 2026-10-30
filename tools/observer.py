@@ -566,7 +566,7 @@ def page(w, title, body, job=None, notices=()):
            '<a href="/rankings">Rankings</a><a href="/stats">Stats</a><a href="/money">Prize money</a>'
            '<h4>Explore</h4><a href="/golfers">Golfers</a><a href="/coaches">Coaches</a><a href="/caddies">Caddies</a>'
            '<a href="/courses">Courses</a><a href="/nations">Nations</a><a href="/tours">Tours</a>'
-           '<a href="/tournaments">Tournaments</a><a href="/shortlist">Shortlist</a><a href="/views">Saved views</a>'
+           '<a href="/tournaments">Tournaments</a>' + my_world_link(w) + '<a href="/views">Saved views</a>'
            '<h4>History</h4><a href="/seasons">Seasons</a><a href="/records">Records &amp; frivolities</a>'
            '<a href="/grand-slam">Career Grand Slam</a><a href="/moments">Moments</a><a href="/cohort">Where are they now</a>'
            '<a href="/rules">Rules</a>'
@@ -580,6 +580,21 @@ def page(w, title, body, job=None, notices=()):
             f'<span class="date">{esc(date)}</span>{search}{SP.header(w)}{advance_controls(w, job)}</header>'
             f'<div class="layout">{nav}<main>{banners}<h1>{esc(title)}</h1>{body}'
             f'{history_note(w) if w is not None else ""}</main></div>{POLL_JS if running else ""}{V.SORT_JS}</body></html>')
+
+
+def my_world_link(w):
+    """The menu's My World entry, with a quiet count of digest items new since last read (no pop-ups)."""
+    n = 0
+    if w is not None and not w.read_only:
+        import observer_myworld as MW
+        key = (getattr(w.live, 'generation', None), w.a.stamp if w.a else None, json.dumps(shortlist(w)),
+               json.dumps(shortlist_seen(w)), json.dumps(SP.state(w), sort_keys=True))
+        got = w.__dict__.get('_mw_count')
+        if got is None or got[0] != key:
+            got = (key, MW.new_count(w))
+            w._mw_count = got
+        n = got[1]
+    return '<a href="/my-world">My World' + (f' <span class="muted">({n} new)</span>' if n else '') + '</a>'
 
 
 def history_note(w):
@@ -642,35 +657,68 @@ SHORT_TYPES = {'person': ('People', '/golfer/'), 'course': ('Courses', '/course/
                'tour': ('Tours', '/tour/'), 'series': ('Tournaments', '/series/'), 'edition': ('Editions', '/event/')}
 
 
+def _shortlist_file(w):
+    try:
+        raw = json.loads((w.path / SHORTLIST).read_text())
+    except (OSError, ValueError):
+        return {'items': [], 'seen': None}
+    items = [tuple(x) + ('',) * (4 - len(x)) for x in raw.get('items') or []]   # (format 1: no group)
+    return {'items': [x[:4] for x in items], 'seen': raw.get('seen')}
+
+
 def shortlist(w):
-    """[(type, id, added)] kept for this world (a file in its folder: it travels with copies and diagnostic
-    packages; names are looked up when shown, so they stay current and retired people stay listed)."""
+    """[(type, id, added, group)] kept for this world (a file in its folder: it travels with copies and diagnostic
+    packages; names are looked up when shown, so they stay current and retired people stay listed). Everything
+    shortlisted is followed in My World; group '' is ungrouped."""
     if w is None or w.read_only:
         return []
-    try:
-        return [tuple(x) for x in json.loads((w.path / SHORTLIST).read_text())['items']]
-    except (OSError, ValueError, KeyError):
-        return []
+    return _shortlist_file(w)['items']
 
 
-def set_shortlist(w, kind, ident, on):
+def shortlist_seen(w):
+    """[year, week]: My World's digest was last marked read after that week (None: never)."""
+    if w is None or w.read_only:
+        return None
+    return _shortlist_file(w)['seen']
+
+
+def _write_shortlist(w, items, seen):
+    import os
+    tmp = w.path / (SHORTLIST + '.tmp')
+    tmp.write_text(json.dumps({'format': 'golf-legacy-shortlist/2', 'items': [list(x) for x in items], 'seen': seen},
+                              indent=1))
+    os.replace(tmp, w.path / SHORTLIST)
+    w.__dict__.pop('_mw_count', None)
+
+
+def set_shortlist(w, kind, ident, on, group=None):
     if w is None or w.read_only or kind not in SHORT_TYPES:
         return False
-    import os
     import time as _t
-    items = [x for x in shortlist(w) if not (x[0] == kind and str(x[1]) == str(ident))]
+    f = _shortlist_file(w)
+    old = next((x for x in f['items'] if x[0] == kind and str(x[1]) == str(ident)), None)
+    items = [x for x in f['items'] if x is not old]
     if on:
-        items.append((kind, str(ident), _t.strftime('%Y-%m-%d %H:%M')))
-    tmp = w.path / (SHORTLIST + '.tmp')
-    tmp.write_text(json.dumps({'format': 'golf-legacy-shortlist/1', 'items': items}, indent=1))
-    os.replace(tmp, w.path / SHORTLIST)
+        items.append((kind, str(ident), old[2] if old else _t.strftime('%Y-%m-%d %H:%M'),
+                      (group if group is not None else (old[3] if old else '')).strip()[:40]))
+    _write_shortlist(w, items, f['seen'])
+    return True
+
+
+def mark_read(w):
+    """My World: the digest is read up to the latest week played."""
+    if w is None or w.read_only:
+        return False
+    import observer_myworld as MW
+    f = _shortlist_file(w)
+    _write_shortlist(w, f['items'], list(MW.now(w)))
     return True
 
 
 def shortlist_button(w, kind, ident):
     if w is None or w.read_only:
         return ''
-    on = any(k == kind and str(i) == str(ident) for k, i, _ in shortlist(w))
+    on = any(k == kind and str(i) == str(ident) for k, i, *_ in shortlist(w))
     return (f'<form method="post" action="/shortlist" class="inline"><input type="hidden" name="kind" value="{esc(kind)}">'
             f'<input type="hidden" name="id" value="{esc(ident)}"><input type="hidden" name="on" value="{"0" if on else "1"}">'
             f'<button title="{"Remove from" if on else "Add to"} this world’s shortlist">{"★ Shortlisted" if on else "☆ Shortlist"}'
@@ -678,33 +726,8 @@ def shortlist_button(w, kind, ident):
 
 
 def shortlist_page(w, q):
-    items = shortlist(w)
-    if w.read_only:
-        return 'Shortlist', '<p class="muted">Open the world (not only its history) to keep a shortlist.</p>'
-    if not items:
-        return 'Shortlist', ('<p class="muted">Nothing shortlisted yet: use ☆ Shortlist on a person, course, nation, tour, '
-                             'tournament or edition.</p>')
-    out = []
-    for kind, (label, prefix) in SHORT_TYPES.items():
-        rows = [(i, added) for k, i, added in items if k == kind]
-        if not rows:
-            continue
-        def name(i):
-            if kind == 'person':
-                return w.person_link(int(i)) + (' <span class="tag">' + esc(', '.join((w.person(int(i)) or {}).get('roles', [])))
-                                                + '</span>')
-            if kind == 'course':
-                return course_link(w, i)
-            if kind == 'nation':
-                return nation_link(i)
-            if kind == 'tour':
-                return tour_link(w, i)
-            if kind == 'series':
-                return f'<a href="/series/{quote(i)}">{esc(w.series_name(i))}</a>'
-            return event_link(w, i)
-        out.append(f'<h2>{esc(label)}</h2>' + table(['', 'Added', ''], [
-            [name(i), esc(added), shortlist_button(w, kind, i)] for i, added in rows]))
-    return 'Shortlist', ''.join(out) + '<p class="muted">Kept with this world (by id: names shown as they are now).</p>'
+    import observer_myworld as MW
+    return MW.page(w, q)
 
 
 def event_link(w, eid):
@@ -1984,7 +2007,8 @@ ROUTES = [('/golfer/', golfer), ('/event/', event), ('/series/', series), ('/cou
 PAGES = {'/': overview, '/rankings': rankings, '/search': search, '/golfers': golfers, '/coaches': coaches,
          '/caddies': caddies, '/records': records, '/moments': moments, '/tournaments': tournaments,
          '/calendar': calendar, '/courses': courses_page, '/nations': nations, '/tours': tours_page, '/seasons': seasons,
-         '/stats': stats_page, '/money': money_page, '/shortlist': shortlist_page, '/rules': OH.rules_page,
+         '/stats': stats_page, '/money': money_page, '/shortlist': shortlist_page, '/my-world': shortlist_page,
+         '/rules': OH.rules_page,
          '/grand-slam': OH.grand_slam_page, '/views': V.views_page, '/cohort': OC.cohort_page}
 
 

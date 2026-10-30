@@ -665,6 +665,16 @@ def make_handler(app):
                         notice = ('warn', 'Open a world (not only its history) to keep a shortlist.')
                     ref = self.headers.get('Referer') or ''
                     to = (urlparse(ref).path + ('?' + urlparse(ref).query if urlparse(ref).query else '')) if ref else '/shortlist'
+                elif u.path in ('/shortlist/group', '/my-world/read'):          # My World (browsing state only)
+                    w = app.world
+                    to = '/my-world'
+                    if w is None or w.read_only:
+                        notice = ('warn', 'Open a world (not only its history) to follow people and events.')
+                    elif u.path == '/my-world/read':
+                        app.renderer.call(O.mark_read, w)
+                    else:
+                        app.renderer.call(O.set_shortlist, w, O.one(form, 'kind'), O.one(form, 'id'), True,
+                                          O.one(form, 'group') or '')
                 elif u.path in ('/views/save', '/views/remove', '/views/last'):   # browsing state only
                     w = app.world
                     ref = self.headers.get('Referer') or ''
