@@ -309,6 +309,11 @@ def _played(r):
         out['points'] = [{str(g): v for g, v in site.items()} for site in r.points]
     if any(getattr(r, 'matches', None) or ()):   # match play: [stage, winner, loser, result, holes scheduled]
         out['matches'] = list(r.matches)
+    if any(getattr(r, 'playoffs', None) or ()):  # per site: players tied, winner, each extra hole's scores
+        out['playoffs'] = [None if p is None else {'players': p['players'], 'winner': p['winner'],
+                                                   'holes': [[n, h, {str(g): v for g, v in sc.items()}]
+                                                             for n, h, sc in p['holes']]}
+                           for p in r.playoffs]
     return out
 
 

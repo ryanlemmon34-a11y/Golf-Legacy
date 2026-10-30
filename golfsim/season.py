@@ -74,6 +74,22 @@ def _seed(*parts):
     return int.from_bytes(hashlib.blake2b(':'.join(map(str, parts)).encode(), digest_size=8).digest(), 'big')
 
 
+def playoff_evidence(finish, out):
+    """A site's playoff as recorded: {'players': everyone tied after regulation (in finishing order), 'winner',
+    'holes': [[playoff hole number, course hole (1-18), {gid: strokes}] ...]}. A golfer drops out of the holes
+    once beaten (sudden death); the holes come from the shots actually played (the hole callbacks), nothing
+    is recomputed."""
+    best = finish[0][2] if finish else None
+    players = [g for g, p, t in finish if t is not None and t == best and p in (1, 2)]
+    holes = {}
+    for gid, idx, strokes, stage in out.get('holes', ()):
+        if stage.startswith('playoff hole '):
+            n = int(stage.rsplit(' ', 1)[1])
+            holes.setdefault(n, [n, idx + 1, {}])[2][gid] = strokes
+    return {'players': players, 'winner': finish[0][0] if finish else None,
+            'holes': [holes[n] for n in sorted(holes)]}
+
+
 def plan_search(weeks, now, inj_until, slot, playable, costs, base, pace0, major, bar, dp, inj0, inj_b, inj_c, inj_d,
                 net, load4, rest_rec, work_v, dt, can_work, f0, played0, money0, WAGE=None):
     """The planner's choice for a block of weeks: (value, activities) of the best combination of playable weeks
@@ -281,6 +297,7 @@ class EventResult:
     golf: list = field(default_factory=list)         # per site: {gid: golfstats counters + longest drive}
     matches: list = field(default_factory=list)      # match play, per site: [[stage, winner, loser, result, holes]]
     points: list = field(default_factory=list)       # per site: {gid: world ranking points awarded}
+    playoffs: list = field(default_factory=list)     # per site: None, or the playoff (see playoff_evidence)
 
     def winner(self, site=0):
         rows = self.finish[site] if self.finish else []
@@ -1587,6 +1604,7 @@ class Season:
             finish = o['finish']
             res.finish.append(finish)
             res.playoff = max(res.playoff, o['playoff'])
+            res.playoffs.append(playoff_evidence(finish, o) if o['playoff'] else None)
             self.ctx.add_result(sid, year, [(gid, pos) for gid, pos, _ in finish], site=site)
             w = self.ctx.winner(sid, year) if (s.kind == 'major' or s.tier == 1) and year in self.earned else None
             if w is not None and (s.kind == 'major' or w not in self.earned[year]):

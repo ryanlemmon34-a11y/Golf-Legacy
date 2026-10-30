@@ -594,6 +594,69 @@ def _layout_par(w, site):
     return (c.get('layouts', {}).get(site[1]) or {}).get('par')
 
 
+def playoff_at(full, site):
+    """A site's playoff: {'players', 'winner', 'holes' (None when the extra holes were not recorded), 'length'
+    (extra holes, None when not recorded for this site)}, or None if the site had no playoff. Editions played
+    before playoffs were kept give the players from the recorded finish (everyone tied for first after
+    regulation: the winner, and the runners-up on the same total) and the length only for a single site."""
+    rec = (full.get('playoffs') or [None] * (site + 1))
+    if full.get('playoffs') is not None and site < len(rec):
+        p = rec[site]
+        if p is None:
+            return None
+        return {'players': list(p['players']), 'winner': p['winner'],
+                'holes': [(n, h, {int(g): v for g, v in sc.items()}) for n, h, sc in p['holes']],
+                'length': len(p['holes'])}
+    if not full.get('playoff') or site >= len(full.get('finish') or []):
+        return None
+    fin = full['finish'][site]
+    if not fin or fin[0][2] is None:
+        return None
+    best = fin[0][2]
+    players = [g for g, p, t in fin if t == best and p in (1, 2)]
+    if len(players) < 2:
+        return None
+    return {'players': players, 'winner': fin[0][0], 'holes': None,
+            'length': full['playoff'] if len(full['finish']) == 1 else None}
+
+
+def playoff_lines(w, full, site, par=None):
+    """HTML: who was in the playoff (every player, won or lost), its length and, where recorded, each extra hole."""
+    O = _o()
+    po = playoff_at(full, site)
+    if po is None:
+        return ''
+    win = po['winner']
+    losers = [g for g in po['players'] if g != win]
+    length = (f'{po["length"]} extra hole{"s" if po["length"] != 1 else ""}' if po['length'] is not None
+              else 'its length was not recorded for this site')
+    total = next((t for g, p, t in full['finish'][site] if g == win), None)
+    tie = f' at {total}' + (f' ({total - par:+d})' if par and total is not None and full.get('rounds') else '') if total else ''
+    out = [f'<p><strong>Playoff</strong>: {len(po["players"])} players tied{tie} after regulation; {length}. '
+           f'{w.person_link(win)} won the playoff; lost the playoff: '
+           + ', '.join(w.person_link(g) for g in losers) + '.</p>']
+    if po['holes']:
+        rows = [[str(n), str(h)] + [O.esc(sc.get(g, '—')) for g in po['players']] for n, h, sc in po['holes']]
+        out.append(O.table(['Extra hole', 'Course hole'] + [w.name(g) for g in po['players']], rows,
+                           numeric=tuple(range(0, 2 + len(po['players'])))))
+        out.append('<p class="muted">Strokes on each extra hole (sudden death: “—” once a player was beaten).</p>')
+    else:
+        out.append('<p class="muted">The extra holes\' scores were not recorded for this edition (played before '
+                   'playoff holes were kept); the players, the winner and the final places are as recorded.</p>')
+    return ''.join(out)
+
+
+def playoff_status(full, site, gid):
+    """'Won playoff' / 'Lost playoff' (with the extra hole they went out at, when recorded) or ''."""
+    po = playoff_at(full, site)
+    if po is None or gid not in po['players']:
+        return ''
+    if gid == po['winner']:
+        return 'Won playoff'
+    out = [n for n, h, sc in (po['holes'] or ()) if gid in sc]
+    return 'Lost playoff' + (f' (out at extra hole {max(out)})' if out else '')
+
+
 def rounds_view(w, q, e):
     """Round by round: the leaderboard after each round (a replay of the recorded rounds), each round's
     conditions, and for majors each golfer's hole-by-hole scorecard."""
@@ -654,14 +717,14 @@ def rounds_view(w, q, e):
         if k < n and len(rs) == k and len(rs) < n:
             status = '<span class="muted">missed the cut after this round</span>'
         fin = final.get(g)
-        if k == n and fin and fin[1] is not None and fin[1] != pos:
-            status = f'final {fin[1]} (playoff)' if fin[1] <= 2 and count[t] > 1 else f'final {fin[1]}'
+        if k == n:
+            status = playoff_status(full, site, g) or (f'final {fin[1]}' if fin and fin[1] is not None
+                                                         and fin[1] != pos else status)
         rows.append([label, name] + [str(x) for x in rs[:k]] + [str(t), f'{t - k * par:+d}' if par else '—', status])
     out.append(O.table(['Pos', 'Golfer'] + [f'R{i}' for i in range(1, k + 1)] + ['Total', 'To par', ''], rows,
                        numeric=tuple(range(2, 2 + k + 2))))
-    if k == n and full.get('playoff') and site == 0:
-        out.append(f'<p>Playoff: {full["playoff"]} extra hole{"s" if full["playoff"] > 1 else ""}; '
-                   f'won by {w.person_link(next((g for g, p, _ in final.values() if p == 1), None))}.</p>')
+    if k == n:
+        out.append(playoff_lines(w, full, site, par))
     out.append('<p class="muted">Positions after a round are by total so far (ties share a place, “T”); nothing after the '
                'round shown is revealed (no final places, winner or later rounds) until the final round, where any '
                'playoff decides the winner. Missed-cut players have only the rounds before the cut.'

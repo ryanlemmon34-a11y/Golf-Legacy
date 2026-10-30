@@ -1285,7 +1285,8 @@ def event(w, q, eid):
         fmt.append('match play' if e['match_play'] else 'stroke play')
     out.append(f'<p>{e["year"]} week {e["week"]} · {tour_link(w, e.get("tour"))} · tier {esc(e.get("tier"))} · '
                f'{esc(e.get("category"))} · prestige {esc(e.get("prestige"))}' + (f' · {", ".join(fmt)}' if fmt else '')
-               + (f' · playoff ({e["playoff"]} holes)' if e.get('playoff') and not replay else '') + '</p>')
+               + (f' · playoff{"" if len(e["sites"]) == 1 else " (at least one site)"}' if e.get('playoff') and not replay
+                  else '') + '</p>')
     out.append('<p>' + ' · '.join(f'{course_link(w, c, lay)}, {esc(city)}' for c, lay, city in e['sites']) + '</p>')
     rows = e['rows']
     multi = len(e['sites']) > 1
@@ -1309,9 +1310,18 @@ def event(w, q, eid):
         prizes = {(r['person'], r['site']): r['prize'] for r in rows if r.get('prize') is not None}
     elif e.get('prizes'):
         prizes = {(int(g), k): x for k, site in enumerate(e['prizes']) for g, x in site.items()}
+    full = OH.full_edition(w, e) or {'finish': [[(r['person'], r['pos'], r['total']) for r in rows if r['site'] == k]
+                                                for k in range(len(e['sites']))], 'playoff': e.get('playoff'),
+                                     'rounds': e.get('rounds')}
+    for k in range(len(e['sites'])):                   # every playoff, at every site, with everyone in it
+        lines = OH.playoff_lines(w, full, k)
+        if lines:
+            out.append((f'<h3>Site {k + 1}</h3>' if multi else '') + lines)
+    tag = lambda r: (f' <span class="tag">{esc(OH.playoff_status(full, r["site"], r["person"]))}</span>'
+                     if OH.playoff_status(full, r['site'], r['person']) else '')
     out.append(table((['Site'] if multi else []) + ['Pos', 'Golfer', 'Total', 'Prize', 'Coach', 'Caddie', 'How they got in'], [
         ([esc(r['site'] + 1)] if multi else []) +
-        [esc(r['pos'] or 'MC'), w.person_link(r['person']), esc(r['total'] or ''),
+        [esc(r['pos'] or 'MC') + tag(r), w.person_link(r['person']), esc(r['total'] or ''),
          money(prizes.get((r['person'], r['site']), 0.0)) if prizes else '<span class="muted">not recorded</span>',
          w.person_link(r['coach']), w.person_link(r['caddie']), OH.route_html(r['route'])] for r in rows],
         numeric=(1, 3, 4) if multi else (0, 2, 3)))
