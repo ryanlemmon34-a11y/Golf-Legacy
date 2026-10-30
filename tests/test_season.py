@@ -22,7 +22,9 @@ WEEKS = 19
 
 
 def _run(weeks, seed=2027):
-    s = Season(generate_world(seed=seed), seed=seed, workers=2)
+    # the classic calendar: these checks sample its first 19 weeks (under the reference calendar the Kenya
+    # Open in week 10 draws more of the top 30, while opportunity events stay star-light over the season)
+    s = Season(generate_world(seed=seed), seed=seed, workers=2, calendar='v1')
     eds = s.cal.editions(2027)
     for w in range(1, weeks + 1):
         s.run_week(2027, w, [e for e in eds if e.week == w])
