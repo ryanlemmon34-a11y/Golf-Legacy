@@ -257,6 +257,8 @@ class ArchiveWriter:
         js = lambda book: {m: {str(g): r for g, r in v.items()} for m, v in book.items()}
         chunk['major_rights'] = js(rights.get(year, {}))
         chunk['next_major_rights'] = js(rights.get(year + 1, {}))
+        chunk['travel_grants'] = [dict(t) for t in getattr(season, 'travel_grants', {}).get(year, [])]   # major
+        # trips the organizer paid (in kind: in no golfer's ledger)
         if year == season.first_year and getattr(season, 'wr_seed', None):
             chunk['ranking_seed'] = {str(g): rows for g, rows in season.wr_seed.items()}   # points before the world began
         return chunk

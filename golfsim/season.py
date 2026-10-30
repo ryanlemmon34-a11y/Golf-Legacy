@@ -390,6 +390,8 @@ class Season:
         self._reserved = Counter()                           # gid -> cost of entries accepted this week, not yet paid
         self._caddie_week = set()                            # gids whose caddie's weekly fee is booked this week
         self._caddie_paid = set()                            # ... and already paid this week
+        self._week_grants = set()                            # (series, gid): a major trip the organizer pays this week
+        self.travel_grants = defaultdict(list)               # year -> [major trips paid by the organizer, in kind]
         for g in world.golfers:                              # the world starts mid-history: assume the season
             if g.lifestyle != 'retired':                     # before it was a typical one for their lifestyle
                 self.prior_rounds[g.id] = (self.first_year, D.EXPERIENCE_ROUNDS * (1.0 if g.lifestyle == 'full_time' else 0.5))
@@ -835,6 +837,7 @@ class Season:
         self._reserved.clear()                               # one budget for the week: every accepted entry
         self._caddie_week.clear()                            # books its cost at once (the caddie's weekly
         self._caddie_paid.clear()                            # fee once), so the next entry sees what is left
+        self._week_grants.clear()
 
         def commit(ed, ids_by_site, how='selected'):
             fields[ed.event_id] = ids_by_site
@@ -1354,8 +1357,12 @@ class Season:
                 return False
             facts(self.g[gid])
             if not pays(self.g[gid]):
-                self.declined[year][gid].append(sid)
-                return False
+                # An earned major place is never lost for money alone: the organizer pays the trip's travel and
+                # entry, in kind (nothing passes through the golfer's books, so nothing can be paid twice); the
+                # caddie's week stays the golfer's. Injury, retirement and an expired amateur place still apply.
+                self._week_grants.add((sid, gid))
+                if gid in money:
+                    money[gid]['paid_by'] = 'organizer'
             return True
         routes = {}
         for e in f.entries:
@@ -1824,6 +1831,8 @@ class Season:
         for k in ('_caddie_week', '_caddie_paid'):           # this week's bookings (empty between weeks)
             state.setdefault(k, set())
         state.setdefault('_reserved', Counter())
+        state.setdefault('_week_grants', set())
+        state.setdefault('travel_grants', defaultdict(list))   # major trips before the guarantee: none paid
         state.setdefault('earned', {})                      # rebuilt from results when first needed
         state.setdefault('college', {})                     # college seasons before the ledger: not recorded
         state.setdefault('wr_seed', {})
@@ -1972,7 +1981,11 @@ class Season:
                     self.club_trips[year][gid] += 1
                 else:
                     cost = FIN.event_cost(g_, s, v.city, self.home_country(g_))   # the rule they were priced by
-                    if cost:
+                    if cost and (s.series_id, gid) in self._week_grants:      # in kind: the organizer pays
+                        self.travel_grants[year].append({'week': week, 'event': ed.event_id, 'gid': gid,
+                                                         'amount': round(cost, 2), 'covers': 'travel and entry',
+                                                         'source': 'organizer: an earned major place'})
+                    elif cost:
                         self.spend(g_, year, 'events', cost)
                 k = self.staff.caddie(gid)
                 if k is not None and gid not in self._caddie_paid:   # a weekly retainer: once a week,
@@ -2180,7 +2193,7 @@ class Season:
                   self.block_flags, self.cash_start, self.support_start, self.overall_start, self.rank_start, self.am_start,
                   self.staff_receipts, self.injuries, self.card_log, self.career_counts, self.transitions,
                   self.assignments, self.staff_year, self.unheld, self.rights, self.earned, self.card_reasons, self.snapshots,
-                  self.major_rights,
+                  self.major_rights, self.travel_grants,
                   self.rank_top,
                   self.juniors_added, self.new_pros_added, self.stats, self.moments):
             for y in [y for y in d if isinstance(y, int) and old(y)]:
@@ -2674,8 +2687,11 @@ class Season:
         return self.funds(g, year) - FIN.RESERVE_WEEKS * self.committed_weekly(g) - self._reserved.get(g.id, 0.0)
 
     def reserve(self, g, series, city):
-        """An accepted entry books its cost against the week's budget at once (paid when played)."""
+        """An accepted entry books its cost against the week's budget at once (paid when played); a major trip
+        the organizer pays books only the caddie's week."""
         cost = self.trip_cost(g, series, city)
+        if (series.series_id, g.id) in self._week_grants:
+            cost -= FIN.event_cost(g, series, city, self.home_country(g))
         if cost > 0:
             self._reserved[g.id] += cost
         if self.staff.caddie(g.id) is not None:

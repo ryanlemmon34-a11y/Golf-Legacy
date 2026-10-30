@@ -29,7 +29,10 @@ VERSIONS = (
                    'classic calendar (v1) unchanged. A ledger of every major place (earned, used or lost) and each '
                    'golfer\'s highest Overall are recorded.'),
     ('2026-11-01', 'USA Open champions keep their place for the ten editions after their win, through the tenth '
-                   'anniversary (it had ended a year early, after the ninth).'),
+                   'anniversary (it had ended a year early, after the ninth). An earned major place is never lost '
+                   'for money alone: when the golfer cannot pay the trip, the organizer pays its travel and entry, '
+                   'in kind (the caddie\'s week stays the golfer\'s). Each major place records the money it was '
+                   'decided on.'),
 )
 EARLIER = ('Seasons archived before rules versions were recorded were played under earlier rules. The '
            'differences that matter for reading old results: a winner without a Premier card held no '
@@ -141,8 +144,11 @@ RULES = {
         'category: M = Tour Masters, P = Premier Tour Championship, U = USA Open, B = Britannia Open). Under the '
         'reference calendar (v2) a place is one place however many categories support it; every place is kept in '
         'the rights ledger with its evidence (the edition and result, ranking or award it came from, when it was '
-        'earned) and how it ended: entered, withdrawn (injured or retired), declined (could not pay the trip) or '
-        'expired (an amateur\'s place after turning professional). Champion and runner-up places are separate '
+        'earned) and how it ended: entered, withdrawn (injured or retired), declined (could not pay the trip: only '
+        'before rules 2026-11-01) or expired (an amateur\'s place after turning professional). Since 2026-11-01 a '
+        'golfer with an earned place who cannot pay the trip has its travel and entry paid by the organizer, in '
+        'kind; injury, retirement and an expired amateur place still end a place, and qualifying stages and other '
+        'events are paid as usual. Champion and runner-up places are separate '
         'categories; an amateur title feeds the next edition its date allows (the Britannia Amateur, after the '
         'USA Open, feeds next season\'s USA Open and Masters but this season\'s Britannia Open). USA Open champions '
         'hold their place for the ten editions after their win (U1).',
