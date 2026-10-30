@@ -2609,7 +2609,10 @@ class Season:
         return D.experience_factor(self.season_rounds[year][gid])
 
     def develop_week(self, year, week):
-        """What each golfer did this week, and how it changed their game."""
+        """What each golfer did this week, and how it changed their game. Coaching and experience matter only
+        to a training week, so they are worked out only for one (both read state without changing it; the
+        season's round counts are touched first, as reading experience did)."""
+        self.season_rounds[year]
         for g in self.active_golfers():
             if g.lifestyle == 'retired':
                 continue
@@ -2627,8 +2630,11 @@ class Season:
             self.activity_counts[year][g.id][act] += 1
             if self.development and g.ceilings:
                 scale = 0.3 if g.lifestyle == 'part_time' and act == 'train' else 1.0
-                D.develop_week(g, 'rest' if act == 'work' else act, g.age(year), cat, rounds,
-                               coach=self.staff.coaching(g, cat, g.age(year), year), scale=scale,
-                               experience=self.experience(g.id, year, week))
+                age = g.age(year)
+                if act == 'train' and cat:
+                    D.develop_week(g, act, age, cat, rounds, coach=self.staff.coaching(g, cat, age, year), scale=scale,
+                                   experience=self.experience(g.id, year, week), gain=False)
+                else:                                        # (rest, work or play: no coaching, no experience)
+                    D.develop_week(g, 'rest' if act == 'work' else act, age, cat, rounds, scale=scale, gain=False)
             if act in ('train', 'play') and g.id in self.staff.coach_of:
                 self.staff.rel.add_work('coach', g.id, 1.0, year)        # a week actually worked together

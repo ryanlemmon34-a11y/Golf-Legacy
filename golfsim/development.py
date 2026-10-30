@@ -71,8 +71,19 @@ def _train_mult(k, experience):
     return p + (1 - p) * experience
 
 
+_LEARNING = {}
+
+
 def learning_rate(age):
-    """How quickly a golfer learns at this age (1.2 in the teens, 0.6 at 30, 0.25 at 40)."""
+    """How quickly a golfer learns at this age (1.2 in the teens, 0.6 at 30, 0.25 at 40). Remembered per age
+    (a pure function of it)."""
+    r = _LEARNING.get(age)
+    if r is None:
+        r = _LEARNING[age] = _learning_rate(age)
+    return r
+
+
+def _learning_rate(age):
     pts = ((18, 1.2), (21, 1.15), (25, 0.9), (30, 0.6), (35, 0.4), (40, 0.25), (50, 0.1), (70, 0.05))
     if age <= pts[0][0]:
         return pts[0][1]
@@ -109,11 +120,12 @@ def coach_multiplier(quality):
     return 1.0 + 0.5 * max(0.0, quality - 0.3)
 
 
-def develop_week(g, activity, age, category=None, rounds=0.0, coach=0.3, scale=1.0, experience=1.0):
+def develop_week(g, activity, age, category=None, rounds=0.0, coach=0.3, scale=1.0, experience=1.0, gain=True):
     """Apply one week of development. activity: 'train', 'play' or 'rest' (a paid work week counts as
     rest). `scale` shrinks training for golfers with a full-time job; `experience` (0-1, from recent
     competitive rounds) limits what training can do for the competitive attributes. Returns overall
-    gained (from the attributes that changed: a week touches only a few)."""
+    gained (from the attributes that changed: a week touches only a few), or None with gain=False (the
+    season does not use it)."""
     a, c = g.attrs, g.ceilings
     old = {}
     if age < 23:                                  # still growing into their body, whatever the week
@@ -123,7 +135,7 @@ def develop_week(g, activity, age, category=None, rounds=0.0, coach=0.3, scale=1
                 old[k] = a[k]
                 a[k] = min(99.0, a[k] + MATURING * gap)
     if activity == 'rest':
-        return _gain(a, old)
+        return _gain(a, old) if gain else None
     lr = learning_rate(age) * (0.5 + g.personality['work_ethic'] / 100) * scale
     if activity == 'train' and category:
         k_train = BASE_TRAIN * lr * (0.6 + 0.8 * g.personality['coachability'] / 100) * coach_multiplier(coach)
@@ -143,7 +155,7 @@ def develop_week(g, activity, age, category=None, rounds=0.0, coach=0.3, scale=1
             if gap > 0:
                 old.setdefault(k, a[k])
                 a[k] = min(99.0, a[k] + k_play * gap * (MENTAL_PLAY if cat == 'mental' else 1.0))
-    return _gain(a, old)
+    return _gain(a, old) if gain else None
 
 
 _TOTAL_W = sum(OVERALL_WEIGHTS.values())
