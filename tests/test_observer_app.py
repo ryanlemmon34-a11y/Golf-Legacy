@@ -448,7 +448,7 @@ os._exit(9)                                   # the window closed: no cleanup at
         self.assertEqual([tuple(map(list, x['sites'])) for x in (after['edition'],)],
                          [tuple(map(list, x['sites'])) for x in (before['edition'],)])
         self.assertEqual(after['results'][:len(before['results'])], before['results'])   # no double counting
-        cut = lambda p: p.split('<table>')[1].split('</table>')[0]
+        cut = lambda p: re.search(r'<table[ >].*?</table>', p, re.S).group(0)    # the first table
         self.assertEqual(cut(after['page']), cut(before['page']))      # the leaderboard reads the same
 
     # -- over HTTP ----------------------------------------------------------------------------------------------

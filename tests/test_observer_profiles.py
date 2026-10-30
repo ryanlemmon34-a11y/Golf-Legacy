@@ -154,7 +154,7 @@ class ProfilesAndStatsTests(unittest.TestCase):
         self.assertIn('unavailable', html)                              # no start-of-2027 snapshot: last season
         cur, base = lv.people[pid]['ratings'][0], snaps[2028][0]
         self.assertIn(f'{round(cur - base, 1):+.1f}', html)            # this season, signed, against the record
-        self.assertIn(f'<td>2027</td><td class=n>{2027 - g.born}*</td>', html.replace('"', ''))
+        self.assertIn(f'>2027</a></td><td class=n>{2027 - g.born}*</td>', html.replace('"', ''))   # linked season
         self.assertIn('so far', html)
         rows = OD.results(w, pid)
         wins = [r for r in rows if r['pos'] == 1 and not OD.is_qualifying(r)]
