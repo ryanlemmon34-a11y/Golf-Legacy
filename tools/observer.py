@@ -45,6 +45,7 @@ import observer_golf as OG                                            # noqa: E4
 from golfsim import scopes as SC                                      # noqa: E402
 import observer_spoilers as SP                                        # noqa: E402
 import observer_views as V                                            # noqa: E402
+import observer_cohort as OC                                          # noqa: E402
 
 PAGE_SIZE = 100
 
@@ -567,7 +568,8 @@ def page(w, title, body, job=None, notices=()):
            '<a href="/courses">Courses</a><a href="/nations">Nations</a><a href="/tours">Tours</a>'
            '<a href="/tournaments">Tournaments</a><a href="/shortlist">Shortlist</a><a href="/views">Saved views</a>'
            '<h4>History</h4><a href="/seasons">Seasons</a><a href="/records">Records &amp; frivolities</a>'
-           '<a href="/grand-slam">Career Grand Slam</a><a href="/moments">Moments</a><a href="/rules">Rules</a>'
+           '<a href="/grand-slam">Career Grand Slam</a><a href="/moments">Moments</a><a href="/cohort">Where are they now</a>'
+           '<a href="/rules">Rules</a>'
            '<h4>Worlds</h4><a href="/worlds">World library</a><a href="/export">Report a problem</a>'
            '<a href="/job">Last operation</a></nav>')
     banners = ''.join(f'<div class="banner {esc(kind)}" role="status">{text}</div>' for kind, text in notices)
@@ -1375,7 +1377,8 @@ def event(w, q, eid):
                 f'{esc(sched["country"])} · {tour_link(w, sched["tour"])} · {esc(sched["status"])}.</p>')
         return eid, '<p class="muted">No such edition in this world’s published history or current season.</p>'
     out = [f'<p><a href="/series/{quote(sid)}">All editions of the {esc(e.get("name") or w.series_name(sid))}</a> · '
-           f'{"current season" if e["source"] == "current season" else "archived season"}{shortlist_button(w, "edition", eid)}</p>']
+           f'{"current season" if e["source"] == "current season" else "archived season"} · '
+           f'<a href="/cohort?event={quote(eid)}">where is this field now?</a>{shortlist_button(w, "edition", eid)}</p>']
     hid = SP.hidden(w, eid, e['week'])                 # results hidden and not revealed: open on the replay
     view = one(q, 'view', 'rounds' if hid else 'final')
     if hid and not one(q, 'round'):
@@ -1645,6 +1648,10 @@ def tour(w, q, key):
     out = [f'<p>Tier {esc(t.get("tier"))} · <a href="/tournaments?tour={quote(key)}">its tournaments</a> · '
            f'<a href="/golfers?tour={quote(key)}">all members</a> · <a href="/stats?tour={quote(key)}">stats</a>'
            f'{shortlist_button(w, "tour", key)}</p>']
+    ys = list(reversed(w.a.years))[:12] if w.a else []
+    if ys:
+        out.append('<p>Where are they now: ' + ' '.join(f'<a href="/cohort?tour={quote(key)}&amp;year={y}">{y}</a>'
+                                                       for y in ys) + ' (its golfers that season)</p>')
     if w.live:
         mem = sorted((w.live.wr.get(pid, 10 ** 9), pid) for pid, p in w.live.people.items()
                      if p.get('tour') == key and p.get('lifestyle') != 'retired')
@@ -1691,7 +1698,8 @@ def season(w, q, y):
         return str(y), '<p class="muted">This season is not archived (yet).</p>'
     nav = ' · '.join(x for x in (f'<a href="/season/{y - 1}">← {y - 1}</a>' if y - 1 in w.a.years else '',
                                  f'<a href="/season/{y + 1}">{y + 1} →</a>' if y + 1 in w.a.years else '') if x)
-    return f'{y} season', SP.aggregate_note(w, 'the season review') + (f'<p>{nav}</p>' if nav else '') + OH.recap(w, y)
+    nav += (' · ' if nav else '') + f'<a href="/cohort?turned_pro={y}">where are the {y} rookies now?</a>'
+    return f'{y} season', SP.aggregate_note(w, 'the season review') + f'<p>{nav}</p>' + OH.recap(w, y)
 
 
 STAT_COLUMNS = (('starts', 'Starts', None), ('wins', 'Wins', 'win'), ('runner_ups', 'Runner-up', 'runner-up'),
@@ -1977,7 +1985,7 @@ PAGES = {'/': overview, '/rankings': rankings, '/search': search, '/golfers': go
          '/caddies': caddies, '/records': records, '/moments': moments, '/tournaments': tournaments,
          '/calendar': calendar, '/courses': courses_page, '/nations': nations, '/tours': tours_page, '/seasons': seasons,
          '/stats': stats_page, '/money': money_page, '/shortlist': shortlist_page, '/rules': OH.rules_page,
-         '/grand-slam': OH.grand_slam_page, '/views': V.views_page}
+         '/grand-slam': OH.grand_slam_page, '/views': V.views_page, '/cohort': OC.cohort_page}
 
 
 def render(w, path, q):
