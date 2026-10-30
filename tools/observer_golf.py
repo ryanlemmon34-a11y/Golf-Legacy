@@ -254,6 +254,13 @@ def _season_file(w, y):
     return OH._season_file(w, y)
 
 
+def _rankings(w, y):
+    """An archived season's weekly rankings (points tables and the top 100's order), kept once read."""
+    import observer_data as OD
+    return OD.season_extract(w, y, 'ranking', lambda d: {'ranking_points': d.get('ranking_points') or {},
+                                                         'rankings': d.get('rankings') or {}})
+
+
 def _archived_points(w, pid, y):
     """The golfer's counted starts of an archived season with their points, or None where the season did not
     record points."""
@@ -264,18 +271,25 @@ def _archived_points(w, pid, y):
         return [(y, wk, eid, pos, pts) for wk, eid, pos, pts in idx.db.execute(
             'SELECT s.week, e.event_id, s.pos, s.points FROM starts s JOIN editions e USING(eid) WHERE s.person = ? '
             'AND s.year = ? AND s.points IS NOT NULL ORDER BY s.week, e.event_id', (pid, y))]
-    d = _season_file(w, y)
-    evs = (d or {}).get('events', [])
-    if not any(e.get('points') for e in evs):
+    import observer_data as OD
+
+    def by_golfer(d):                                  # every golfer's points of the season, worked out once
+        evs = d.get('events', [])
+        if not any(e.get('points') for e in evs):
+            return None
+        got = {}
+        for e in evs:
+            for k, site in enumerate(e.get('points') or []):
+                pos = {g: p for g, p, _ in e['finish'][k]}
+                for g, pts in site.items():
+                    got.setdefault(int(g), []).append((y, e['week'], e['id'], pos.get(int(g)), pts))
+        for rows in got.values():
+            rows.sort(key=lambda r: (r[1], r[2]))
+        return got
+    got = OD.season_extract(w, y, 'points', by_golfer)
+    if got is None:
         return None
-    out = []
-    for e in evs:
-        for k, site in enumerate(e.get('points') or []):
-            if str(pid) in site:
-                pos = next((p for g, p, _ in e['finish'][k] if g == pid), None)
-                out.append((y, e['week'], e['id'], pos, site[str(pid)]))
-    out.sort(key=lambda r: (r[1], r[2]))
-    return out
+    return list(got.get(pid, []))
 
 
 def ranking_at(w, pid, at):
@@ -306,7 +320,7 @@ def position_at(w, pid, at, average=None):
     y, wk = at
     if not (w.a and y in w.a.years):
         return 'position not recorded'
-    d = _season_file(w, y) or {}
+    d = _rankings(w, y) or {}
     snap = (d.get('ranking_points') or {}).get(str(wk))
     if snap:
         pos = next((i for i, (g, _, _) in enumerate(snap, 1) if g == pid), None)
@@ -370,7 +384,7 @@ def rankings_points_page(w, q):
     if w.live is not None and y == w.live.year and not (w.a and y in w.a.years):
         snap = w.live.rank_top.get(wk)
     else:
-        snap = ((_season_file(w, y) or {}).get('ranking_points') or {}).get(str(wk)) if w.a and y in w.a.years else None
+        snap = ((_rankings(w, y) or {}).get('ranking_points') or {}).get(str(wk)) if w.a and y in w.a.years else None
     f = O.filters('/rankings', q, [('kind', 'Ranking', [('points', 'World (points)')]),
                                     ('year', 'Season', [(str(x), str(x)) for x in reversed(years)]),
                                     ('week', 'Week', [(str(x), str(x)) for x in range(1, 53)])])

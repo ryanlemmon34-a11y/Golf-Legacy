@@ -194,10 +194,15 @@ def _season_file(w, y):
 
 def decisions(w, pid, y):
     """This golfer's recorded career decisions in the winter after season y (from the season file)."""
-    d = _season_file(w, y) if w.a and y in w.a.years else None
-    if d is None:
-        return []
-    return [t for t in d.get('transitions', []) if t.get('gid') == pid]
+    import observer_data as OD
+
+    def by_golfer(d):
+        out = defaultdict(list)
+        for t in d.get('transitions', []):
+            out[t.get('gid')].append(t)
+        return dict(out)
+    got = OD.season_extract(w, y, 'transitions', by_golfer) if w.a and y in w.a.years else None
+    return list((got or {}).get(pid, []))
 
 
 def _state(row):

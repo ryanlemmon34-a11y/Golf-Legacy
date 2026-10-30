@@ -350,7 +350,7 @@ class GolfHistoryTests(unittest.TestCase):
                 and (self.a.people[g].get('golfer') or {}).get('status') == 'pro']
         from unittest import mock
         short = {'ranking_points': {'52': snap[:2]}}                         # a golfer with points below the record
-        with mock.patch.object(OG, '_season_file', return_value=short):
+        with mock.patch.object(OG, '_rankings', return_value=short):         # (the season's rankings, as read)
             self.assertEqual(OG.position_at(arch, snap[5][0], (2028, 52), snap[5][1]), 'outside the recorded top 2')
         self.assertTrue(none)
         self.assertEqual(OG.position_at(arch, none[0], (2028, 52), 0.0), 'unranked (no points in the last 104 weeks)')

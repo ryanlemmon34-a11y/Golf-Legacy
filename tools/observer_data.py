@@ -276,3 +276,32 @@ def rating_snapshots(w, pid):
         if row.get('ratings'):
             out[y + 1] = row['ratings']
     return out
+
+
+EXTRACTS = 256                                   # small per-season extracts kept per history reading
+
+
+def season_extract(w, y, name, fn):
+    """fn(season file) for archived season y, worked out once per reading of the history and kept with it (the
+    archive keeps only a few whole seasons decoded; a profile touches more seasons than that, so without this
+    every view decoded them again). The same value as reading the season each time: the extract belongs to this
+    Archive object, which is replaced when the history is republished. None if the season cannot be read."""
+    a = w.a
+    if a is None or y not in a.years:
+        return None
+    from collections import OrderedDict
+    cache = a.__dict__.get('_extracts')
+    if cache is None:
+        cache = a._extracts = OrderedDict()
+    key = (y, name)
+    if key in cache:
+        cache.move_to_end(key)
+        return cache[key]
+    try:
+        d = a.year(y)
+    except Exception:
+        return None
+    v = cache[key] = fn(d)
+    while len(cache) > EXTRACTS:
+        cache.popitem(last=False)
+    return v

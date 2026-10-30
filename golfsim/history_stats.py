@@ -458,7 +458,10 @@ class HistoryStats:
         return self._top([self._row(pid, len(ev), ev) for pid, ev in got.items()], n)
 
     def weeks_at_number_one(self, n=25):
-        return self._top([self._row(pid, w) for pid, w in self.a.weeks_at_number_one().items()], n)
+        weeks = self.__dict__.setdefault('boards', {}).get('_no1')   # (counted once per reading: every list
+        if weeks is None:                                            # length shares it; reset by extend)
+            weeks = self.boards['_no1'] = self.a.weeks_at_number_one()
+        return self._top([self._row(pid, w) for pid, w in weeks.items()], n)
 
     # ---- relationships ---------------------------------------------------------------------------------------
     def longest_partnerships(self, kind='coach', n=25):
