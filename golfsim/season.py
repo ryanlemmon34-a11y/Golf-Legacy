@@ -74,6 +74,50 @@ def _seed(*parts):
     return int.from_bytes(hashlib.blake2b(':'.join(map(str, parts)).encode(), digest_size=8).digest(), 'big')
 
 
+def plan_search(weeks, now, inj_until, slot, playable, costs, base, pace0, major, bar, dp, inj0, inj_b, inj_c, inj_d,
+                net, load4, rest_rec, work_v, dt, can_work, f0, played0, money0, WAGE=None):
+    """The planner's choice for a block of weeks: (value, activities) of the best combination of playable weeks
+    (mask bit j: playable week j), valued week by week. Combinations that agree on their first weeks share
+    that part of the work -- the same arithmetic in the same order for each -- and the best is the first
+    maximum in mask order, exactly as valuing every mask from the first week did (tests:
+    test_performance_equivalence). An unaffordable trip rules its combinations out."""
+    wage = FIN.WORK_WAGE if WAGE is None else WAGE
+    best_val, best_acts = None, None
+    nodes = [(0, f0, 0.0, played0, money0, ())]          # (mask, fatigue, value, events, money, acts)
+    for i, w in enumerate(weeks):
+        grown = []
+        if now + w < inj_until:                          # injured: recovering, and earning if they must
+            act = 'work' if can_work else 'rest'
+            earn = wage if can_work else 0.0
+            for mask, f, val, n, money, acts in nodes:
+                grown.append((mask, f * rest_rec, val, n, money + earn, acts + (act,)))
+            nodes = grown
+            continue
+        j = slot.get(i, -1)
+        for mask, f, val, n, money, acts in nodes:
+            if f > 0.25:                                 # not playing this week
+                grown.append((mask, f * rest_rec, val, n, money, acts + ('rest',)))
+            elif work_v > dt:
+                grown.append((mask, f * 0.8, val + work_v, n, money + wage, acts + ('work',)))
+            else:
+                grown.append((mask, 0.85 * f + 0.02, val + dt, n, money, acts + ('train',)))
+            if j >= 0:                                   # playing it (mask bit j)
+                if costs[i] > 0 and costs[i] > money:
+                    continue                             # they cannot pay for this trip (school-paid: free)
+                pace = pace0[i] - n
+                v = base[i][0] + max(-25.0, min(6.0, 3.5 * pace)) - major[i]
+                eff = max(0.0, f - 0.2) * 1.25
+                grown.append((mask | 1 << j, 1 - (1 - 0.9 * f) * (1 - load4),
+                              val + ((v - bar) + dp - 12 * eff - 400 * (inj0 * (1 + 6 * f * f) * inj_b * inj_c * inj_d)
+                                     - net[i]),
+                              n + 1, money - costs[i], acts + ('play',)))
+        nodes = grown
+    for mask, f, val, n, money, acts in sorted(nodes, key=lambda x: x[0]):
+        if best_val is None or val > best_val:
+            best_val, best_acts = val, list(acts)
+    return best_val, best_acts
+
+
 CLUB_PRO_DRIVING_REGIONS = ('Europe', 'North America')   # neighbouring countries' section events are a drive
 
 
@@ -853,6 +897,13 @@ class Season:
             prefs[g.id] = (want, spare)
         held = defaultdict(list)                             # event_id -> sorted [(priority, gid)]
         limits = {eid: self._limits(by_id[eid].series) for eid in by_id}   # (amateurs, visitors) allowed
+        prio = {}                                            # nothing a priority reads changes during entries
+
+        def priority(gid, s):
+            p = prio.get((gid, s.series_id))
+            if p is None:
+                p = prio[(gid, s.series_id)] = self.priority(self.g[gid], s)
+            return p
         counts = defaultdict(lambda: [0, 0])                 # event_id -> [amateurs, visitors] held
         nxt = {gid: 0 for gid in prefs}
         free = [gid for gid, (want, _) in prefs.items() if want]
@@ -864,7 +915,7 @@ class Season:
             eid = want[nxt[gid]]
             nxt[gid] += 1
             s = by_id[eid].series
-            insort(held[eid], (self.priority(self.g[gid], s), gid))
+            insort(held[eid], (priority(gid, s), gid))
             self._count(counts[eid], gid, s, 1)
             if len(held[eid]) > cap[eid] or self._over(counts[eid], limits[eid]):
                 bumped = self._bump(held[eid], s, cap[eid], counts[eid], limits[eid])
@@ -875,7 +926,7 @@ class Season:
         for eid, ed in by_id.items():
             s = ed.series
             if len(held[eid]) < cap[eid]:
-                extra = sorted((self.priority(self.g[gid], s), gid) for gid, (_, spare) in prefs.items()
+                extra = sorted((priority(gid, s), gid) for gid, (_, spare) in prefs.items()
                                if gid not in placed and eid in spare)
                 for pr, gid in extra:
                     if len(held[eid]) >= cap[eid]:
@@ -2170,7 +2221,6 @@ class Season:
                 work_v = 40.0
             playable = [i for i, w in enumerate(weeks) if base[i] is not None and now + w >= inj_until]
             slot = {i: j for j, i in enumerate(playable)}
-            best_val, best_acts = None, None
             # loop invariants, worked out once with the same arithmetic as before (injury_chance for 4
             # rounds, each week's pace target, major-week caution and net trip cost)
             inj0 = INJURY_BASE * 4 / 4
@@ -2181,43 +2231,9 @@ class Season:
             major = [6 if w + 1 in MAJOR_WEEKS and top100 else 0 for w in weeks]
             net = [(costs[i] - prizes[i]) / unit for i in range(len(weeks))]
             f0 = self.fatigue[g.id]
-            for mask in range(1 << len(playable)):
-                f = f0
-                val, n, money, acts = 0.0, played0, money0, []
-                for i, w in enumerate(weeks):
-                    if now + w < inj_until:                  # injured: recovering, and earning if they must
-                        f *= rest_rec
-                        acts.append('work' if can_work else 'rest')
-                        money += FIN.WORK_WAGE if can_work else 0.0
-                        continue
-                    j = slot.get(i, -1)
-                    if j >= 0 and mask >> j & 1:
-                        if costs[i] > 0 and costs[i] > money:
-                            val = None                       # they cannot pay for this trip (school-paid: free)
-                            break
-                        money -= costs[i]
-                        pace = pace0[i] - n
-                        v = base[i][0] + max(-25.0, min(6.0, 3.5 * pace)) - major[i]
-                        eff = max(0.0, f - 0.2) * 1.25
-                        val += ((v - bar) + dp - 12 * eff - 400 * (inj0 * (1 + 6 * f * f) * inj_b * inj_c * inj_d)
-                                - net[i])
-                        f = 1 - (1 - 0.9 * f) * (1 - load4)
-                        n += 1
-                        acts.append('play')
-                    elif f > 0.25:
-                        f *= rest_rec
-                        acts.append('rest')
-                    elif work_v > dt:
-                        val += work_v
-                        money += FIN.WORK_WAGE
-                        f *= 0.8
-                        acts.append('work')
-                    else:
-                        val += dt
-                        f = 0.85 * f + 0.02
-                        acts.append('train')
-                if val is not None and (best_val is None or val > best_val):
-                    best_val, best_acts = val, acts
+            best_val, best_acts = plan_search(weeks, now, inj_until, slot, playable, costs, base, pace0, major, bar, dp,
+                                              inj0, inj_b, inj_c, inj_d, net, load4, rest_rec, work_v, dt, can_work,
+                                              f0, played0, money0)
             if best_acts is None:                            # nothing affordable: work if they can
                 best_acts = ['work' if g.status == 'pro' and g.lifestyle == 'full_time' else 'train'
                              for _ in weeks]

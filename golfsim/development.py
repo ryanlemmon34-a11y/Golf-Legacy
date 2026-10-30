@@ -194,17 +194,24 @@ def restore_self_views(saved):
             _SELF_VIEW.setdefault((gid, k), v)
 
 
+_SELF_ROWS = {}            # gid -> {attribute: z}: _SELF_VIEW's values for one golfer, for perceived_gaps
+
+
 def perceived_gaps(g, insight=0.0):
     """perceived_gap for every attribute at once (the planner reads them several times a month): the same
-    arithmetic, with the golfer's judgement worked out once."""
+    arithmetic, with the golfer's judgement worked out once and their misreadings read as one row."""
     sd = 2.0 + 6.0 * (1 - max(judgement(g), insight))
-    out, gid, ceil, attrs = {}, g.id, g.ceilings, g.attrs
-    for k in attrs:
-        z = _SELF_VIEW.get((gid, k))
-        if z is None:
-            z = _SELF_VIEW[(gid, k)] = random.Random(f'{gid}:{k}:selfview').gauss(0, 1)
-        out[k] = max(0.0, ceil[k] - attrs[k] + sd * z)
-    return out
+    gid, ceil, attrs = g.id, g.ceilings, g.attrs
+    zs = _SELF_ROWS.get(gid)
+    if zs is None or len(zs) != len(attrs):
+        zs = {}
+        for k in attrs:                                   # the same values perceived_gap reads (or draws)
+            z = _SELF_VIEW.get((gid, k))
+            if z is None:
+                z = _SELF_VIEW[(gid, k)] = random.Random(f'{gid}:{k}:selfview').gauss(0, 1)
+            zs[k] = z
+        _SELF_ROWS[gid] = zs
+    return {k: max(0.0, ceil[k] - attrs[k] + sd * zs[k]) for k in attrs}
 
 
 def development_value(g, activity, age, category=None, insight=0.0, coach=0.3, experience=1.0, gaps=None):
