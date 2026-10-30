@@ -20,7 +20,9 @@ Layout of an archive directory (JSON, gzip):
                         relationship
     records.json.gz     course records per layout; every mark carries golfer id and event id
     years/YYYY.json.gz  one season: every edition (series, week, venues, finishers per site, and the
-                        coach and caddie each golfer had that week), each golfer's season (tour, events,
+                        coach and caddie each golfer had that week; since rules 2026-10-30 also each
+                        golfer's round scores and prize money, each round's conditions, and a major's
+                        hole-by-hole scores), the rules version it was played under, each golfer's season (tour, events,
                         wins, money -- net, income and costs as finally settled after winter expenses,
                         with net_at_decision, the figure the career decisions saw -- rankings, injuries,
                         where they lived that season), career decisions
@@ -114,6 +116,12 @@ class ArchiveWriter:
                                                     'am_end', 'injury_weeks', 'promoted', 'demoted', 'next_tour',
                                                     'zero_start_reason')}
             careers[gid]['rights'] = season.rights.get(year, {}).get(gid)          # Premier status at entry, why
+            careers[gid]['exemption'] = season.earned.get(year, {}).get(gid)      # winner's exemption held (why)
+            careers[gid]['card_reason'] = season.card_reasons.get(year + 1, {}).get(gid)   # why next season's card
+            if gid in season.college and year in season.college[gid]:            # the eligibility ledger
+                used = season.college[gid]
+                careers[gid]['college'] = {'season': used.index(year) + 1, 'first_recorded': used[0],
+                                           'final': (season.g[gid].born + 22) if gid in season.g else None}
             careers[gid]['access'] = dict(season.week_access.get(year, {}).get(gid, {}))
             careers[gid]['denied'] = season.access_log.get(year, {}).get(gid, [])   # (week, outcome, wanted, played)
             home = season.places.residence_at(gid, year, 52)                     # where they lived that season
@@ -133,8 +141,12 @@ class ArchiveWriter:
             if g is not None:                   # ratings as the next season starts (after this one's aging):
                 careers[gid]['ratings'] = ([round(g.overall, 1)] +              # overall, then RATING_KEYS
                                            [round(g.attrs[k], 1) for k in ATTRIBUTE_KEYS])
+        for t in season.transitions.get(year, []):     # that winter's decisions, with the golfer's season too
+            if t.get('gid') in careers:                  # (a profile reads them without the season file)
+                careers[t['gid']].setdefault('decisions', []).append(t)
         log = {gid: [(w, t) for y, w, t in h if y == year] for gid, h in season.history.items()}
-        chunk = {'year': year, 'events': events, 'careers': careers,
+        from .rules import RULES_VERSION
+        chunk = {'year': year, 'rules': RULES_VERSION, 'events': events, 'careers': careers,
                  'transitions': season.transitions.get(year, []),
                  'moves': [dict(m, **{'from': list(m['from']) if m['from'] else None, 'to': list(m['to'])})
                            for m in season.move_log.get(year, [])],
@@ -199,7 +211,24 @@ def edition_record(season, r):
             'purse': ser.purse, 'cut_top': ser.cut_top, 'field_size': ser.field,         # its money and cut then
             'prestige': round(r.prestige, 2), 'playoff': r.playoff, 'finish': r.finish,
             'team': {str(g): list(t) for g, t in r.team.items()},
-            'routes': {str(g): v for g, v in routes.items()}}
+            'routes': {str(g): v for g, v in routes.items()},
+            **_played(r)}
+
+
+def _played(r):
+    """What a result records of how the event was played, when it was kept (seasons played before an
+    engine kept these have none; a reader shows them as not recorded, never reconstructed): each site's
+    stroke-play round scores and the prize money each golfer was paid, each round's conditions, and a
+    major's hole-by-hole scores."""
+    out = {}
+    if getattr(r, 'scores', None):
+        out['scores'] = [{str(g): v for g, v in site.items()} for site in r.scores]
+        out['prizes'] = [{str(g): v for g, v in site.items()} for site in r.prizes]
+        out['conditions'] = list(r.conditions)
+    if getattr(r, 'holes', None):
+        out['holes'] = [{str(g): v for g, v in site.items()} for site in r.holes]
+        out['pars'] = list(r.pars)
+    return out
 
 
 def _staff_earnings(season, kind, pid):

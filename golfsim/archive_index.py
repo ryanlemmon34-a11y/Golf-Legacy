@@ -8,7 +8,8 @@ anything, and dropping seasons beyond a committed point (session recovery) is on
 
 Tables: editions (one per event played, with its classification when played and its first site's
 winner), sites (course and layout of each site), starts (one per golfer per edition and site: position,
-total, the coach and caddie that week, the entry route -- every site's winner is here), seasons (one per
+total, the coach and caddie that week, the entry route -- every site's winner is here -- and, since schema 3,
+the prize money paid, NULL for seasons played before it was kept), seasons (one per
 golfer per season), moments (holes-in-one, albatrosses, playoffs, course records); since schema 2,
 number_one (each week's No. 1, world and amateur) and careers (each golfer's season row, compressed).
 An index written before schema 2 is completed once by the session that owns it (backfill_derived). Indexed by person, event,
@@ -25,7 +26,7 @@ import sqlite3
 import zlib
 from pathlib import Path
 
-SCHEMA = 2
+SCHEMA = 3
 DDL = """
 CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT);
 CREATE TABLE IF NOT EXISTS editions(eid INTEGER PRIMARY KEY, event_id TEXT UNIQUE, year INT, week INT, series TEXT,
@@ -34,7 +35,7 @@ CREATE TABLE IF NOT EXISTS sites(eid INT, site INT, year INT, course TEXT, layou
     PRIMARY KEY(eid, site));
 CREATE TABLE IF NOT EXISTS routes(rid INTEGER PRIMARY KEY, text TEXT UNIQUE);
 CREATE TABLE IF NOT EXISTS starts(person INT, eid INT, year INT, week INT, site INT, pos INT, total INT,
-    coach INT, caddie INT, rid INT);
+    coach INT, caddie INT, rid INT, prize REAL);
 CREATE TABLE IF NOT EXISTS seasons(person INT, year INT, tour TEXT, status TEXT, lifestyle TEXT, events INT,
     wins INT, prize INT, wr_end INT, am_end INT, PRIMARY KEY(person, year));
 CREATE TABLE IF NOT EXISTS moments(year INT, week INT, kind TEXT, person INT, event_id TEXT, layout TEXT,
@@ -73,11 +74,23 @@ class ArchiveIndex:
                 return
             self.db.execute('PRAGMA journal_mode=WAL')    # (refused without shared memory: see snapshot)
             self.db.executescript(DDL)
-            self.db.execute("INSERT OR IGNORE INTO meta VALUES ('schema', ?)", (str(SCHEMA),))
+            if not self._has_prize():                   # schema 3: each start's prize money (NULL for seasons
+                self.db.execute('ALTER TABLE starts ADD COLUMN prize REAL')   # played before it was kept)
+            self.db.execute("INSERT OR REPLACE INTO meta VALUES ('schema', ?)", (str(SCHEMA),))
             self.db.commit()
         except BaseException:
             self.db.close()
             raise
+
+    def _has_prize(self):
+        return any(r[1] == 'prize' for r in self.db.execute('PRAGMA table_info(starts)'))
+
+    @property
+    def has_prize(self):
+        """Whether starts carry prize money (an index written before schema 3, opened read-only, does not)."""
+        if not hasattr(self, '_prize_col'):
+            self._prize_col = self._has_prize()
+        return self._prize_col
 
     def snapshot(self):
         """Readers: begin the read transaction that pins what this connection sees (WAL only; in
@@ -118,6 +131,8 @@ class ArchiveIndex:
             self._delete(year, '=')
             if source is not None:
                 self.db.execute('INSERT OR REPLACE INTO meta VALUES (?, ?)', (f'source:{year}', source))
+            if chunk.get('rules'):                      # the rules version the season was played under
+                self.db.execute('INSERT OR REPLACE INTO meta VALUES (?, ?)', (f'rules:{year}', chunk['rules']))
             rid = dict(self.db.execute('SELECT text, rid FROM routes'))
             site_rows, start_rows = [], []
             for e in chunk['events']:
@@ -129,15 +144,19 @@ class ArchiveIndex:
                 for k, v in enumerate(e.get('sites', [])):
                     site_rows.append((eid, k, year, v[0], v[1], v[2]))
                 team, routes = e.get('team', {}), e.get('routes', {})
+                prizes = e.get('prizes')                # each golfer's prize money, when it was kept
                 for k, site in enumerate(e['finish']):
+                    paid = prizes[k] if prizes and k < len(prizes) else None
                     for g, p, total in site:
                         coach, caddie = team.get(str(g), team.get(g, (0, 0)))
                         route = routes.get(str(g), routes.get(g))
                         if route is not None and route not in rid:
                             rid[route] = self.db.execute('INSERT INTO routes VALUES (NULL, ?)', (route,)).lastrowid
-                        start_rows.append((g, eid, year, e['week'], k, p, total, coach, caddie, rid.get(route)))
+                        prize = None if paid is None else paid.get(str(g), paid.get(g, 0.0))
+                        start_rows.append((g, eid, year, e['week'], k, p, total, coach, caddie, rid.get(route), prize))
             self.db.executemany('INSERT INTO sites VALUES (?,?,?,?,?,?)', site_rows)
-            self.db.executemany('INSERT INTO starts VALUES (?,?,?,?,?,?,?,?,?,?)', start_rows)
+            self.db.executemany('INSERT INTO starts(person, eid, year, week, site, pos, total, coach, caddie, rid, prize) '
+                                'VALUES (?,?,?,?,?,?,?,?,?,?,?)', start_rows)
             self.db.executemany('INSERT INTO moments VALUES (?,?,?,?,?,?,?)', [
                 (year, m.get('week'), m['kind'], m['person'], m['event'], m.get('layout'),
                  json.dumps({k: v for k, v in m.items() if k not in ('kind', 'person', 'event', 'layout', 'week')}))
@@ -174,6 +193,12 @@ class ArchiveIndex:
                 with self.db:
                     self._derived(y, _read(archive.year_path(y)))
 
+    def rules_versions(self):
+        """{season: the rules version it was played under} (seasons archived before versions were recorded
+        have none)."""
+        q = "SELECT key, value FROM meta WHERE key LIKE 'rules:%'"
+        return {int(k.split(':')[1]): v for k, v in self.db.execute(q) if self.through is None or int(k.split(':')[1]) <= self.through}
+
     def sources(self):
         """{season: the season file its rows were indexed from} (seasons indexed before this was recorded
         have none)."""
@@ -201,6 +226,7 @@ class ArchiveIndex:
             self.db.execute(f'DELETE FROM {t} WHERE year {op} ?', (year,))
         self.db.execute(f"DELETE FROM meta WHERE key LIKE 'derived:%' AND CAST(value AS INT) {op} ?", (year,))
         self.db.execute(f"DELETE FROM meta WHERE key LIKE 'source:%' AND CAST(substr(key, 8) AS INT) {op} ?", (year,))
+        self.db.execute(f"DELETE FROM meta WHERE key LIKE 'rules:%' AND CAST(substr(key, 7) AS INT) {op} ?", (year,))
         # (the routes table is a shared dictionary of route texts; unused entries are harmless)
 
     @classmethod
@@ -247,10 +273,13 @@ class ArchiveIndex:
         return [{'year': y, 'event': eid, 'layout': lay, 'winner': w} for y, eid, lay, w in self.db.execute(q, (course_id,))]
 
     def leaderboard(self, event_id):
-        q = ('SELECT s.person, s.site, s.pos, s.total, s.coach, s.caddie, r.text FROM starts s JOIN editions e USING(eid) '
-             'LEFT JOIN routes r USING(rid) WHERE e.event_id = ?' + self.upto('e.year') +
+        """Every start of an edition, by site and position: person, site, pos, total, coach, caddie, route,
+        and prize (the money paid; None where it was not recorded)."""
+        prize = 's.prize' if self.has_prize else 'NULL'
+        q = (f'SELECT s.person, s.site, s.pos, s.total, s.coach, s.caddie, r.text, {prize} FROM starts s '
+             'JOIN editions e USING(eid) LEFT JOIN routes r USING(rid) WHERE e.event_id = ?' + self.upto('e.year') +
              ' ORDER BY s.site, s.pos IS NULL, s.pos')
-        return [dict(zip(('person', 'site', 'pos', 'total', 'coach', 'caddie', 'route'), r))
+        return [dict(zip(('person', 'site', 'pos', 'total', 'coach', 'caddie', 'route', 'prize'), r))
                 for r in self.db.execute(q, (event_id,))]
 
     def moments(self, kind=None, person=None):
