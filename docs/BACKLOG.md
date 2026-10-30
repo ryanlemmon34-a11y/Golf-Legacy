@@ -46,6 +46,21 @@ v2 (a copy, at a season boundary); the performance options in the review (per-go
 incremental checkpoints, outcome-equivalent engines). Blocked: the Test1 archive on Google Drive (the host is
 not reachable from the build environment).
 
+## Build v15 (branch build/v15; report `docs/V15_BUILD_REPORT.md`; HAL's review of 07cecee)
+
+Delivered for review, in order: the four review fixes (Britannia qualifying-series places, Hide results in
+recaps and the Grand Slam, playoff par, restart vs resume); saved table views and navigation state; Where are
+they now; My World; career comparisons; the GOAT Lab; qualification evidence (earned / pending / projected
+views, `docs/STANDINGS_AND_RIGHTS.md`, the zero-start investigation by region and circuit with
+recommendations); exact-result browsing speedups.
+
+Awaiting the owner's decision: the zero-start recommendations (`docs/ZERO_START_REVIEW.md`: the full-time /
+working decision when a full-time amateur cannot afford their cheapest event; amateur cost or event density by
+region); the performance options (per-golfer random streams, incremental checkpoints, outcome-equivalent engines,
+an upgraded index for older archives); the parent/child tour filter; migrating an existing world to v2.
+Deferred (not in this increment): nation development and other large simulation expansions; a day-ordered
+same-week feeder engine; season-100 timing (no checkpoint exists).
+
 ## The pretest review increment (owner roadmap, pinned review of 5bcc6ed, 29 October 2026)
 
 Delivered (`docs/PRETEST_REVIEW_RESPONSE.md`): golf statistics captured per edition with versioned definitions

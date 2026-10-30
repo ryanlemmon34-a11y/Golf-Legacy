@@ -28,8 +28,9 @@ def standing(s, year, week):
     from golfsim import qualification as Q
     view = s.ctx.as_of(year, week)
     out = {}
-    for major, rules in Q.rules_for(s.calendar_version).items():
-        if (year, major, 'field') in s.stage_log:
+    log = getattr(s, 'stage_log', {})                      # (a save from before stage logs: none recorded)
+    for major, rules in Q.rules_for(getattr(s, 'calendar_version', 'v1')).items():
+        if (year, major, 'field') in log:
             continue                                        # the field is set: the rights ledger tells the story
         earned, pending, stages, fills = {}, [], [], []
         for route in rules:

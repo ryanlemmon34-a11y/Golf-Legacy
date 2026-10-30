@@ -30,6 +30,25 @@ worlds choose a *Calendar* when created: **Reference (majors weeks 15, 20, 25, 3
 (the calendar earlier worlds use). A world keeps its calendar for good. If a long run is still going in your
 current folder, install the update in a separate folder until it finishes. What is new: `docs/V14_BUILD_REPORT.md`.
 
+## Trying the v15 build (branch `build/v15`, not in main)
+
+The v15 build is for review; `main` is unchanged. Try it without touching your world:
+
+1. GitHub → Golf-Legacy → switch the branch to **build/v15** → **Code → Download ZIP**; unzip it into a **new
+   folder** (not over your current installation).
+2. Copy your world folder from your current `worlds` folder into the new folder's `worlds` folder (a copy: the
+   original stays where it is), or leave `worlds` empty and create a small new world.
+3. Double-click `RUN_OBSERVER_WINDOWS.bat` in the new folder. Your copied world shows as "another engine":
+   **Browse** it (read-only), or **Copy** it with "continue with this engine" to play on (classic-calendar
+   results are the same as on `main`: tested over two season ends).
+4. Try: *Saved views* (choose a season, scope and sort on Stats, open a golfer, use "Back to Stats"; *Save
+   view*); *Where are they now* (a college championship field, from the menu or any event page); *My World*
+   (shortlist a few golfers into groups; the digest); *Compare careers* (a profile's "compare" link); *GOAT Lab*
+   (change weights, try a formula); *Qualification* (this season's majors: earned, pending and projected);
+   *Standings locks* (`/standings`). Hide results applies to every new page.
+
+What changed and what is measured: `docs/V15_BUILD_REPORT.md`.
+
 ## Updating to a new version
 
 1. Quit the observer.
@@ -143,6 +162,23 @@ it too makes earlier worlds "another engine"; start the next long run on it so i
   pursuing it (currently extending, competing, fixed, closed). **Career Grand Slam** lists winners of all four
   majors. **A season** (from Seasons) is a year-end recap: majors with coach and caddie, most wins, prize money
   leaders, world No. 1s, Premier cards earned, career changes, Grand Slams, moments, the final ranking.
+- **Saved views** (v15): every list keeps its season, scope, filters, sort, direction and page (and a column
+  sorted in the browser) in its address; opening it again from the menu shows the view you left (with "default
+  view" one click away); a profile or event page offers "Back to" the last list view; *Save view* names one,
+  kept with the world (all of them on *Saved views*).
+- **Where are they now** (v15): any edition's field (every entrant, missed cuts included), a tour's golfers in a
+  season, a turning-pro class or an age group, followed through the rest of their careers -- now (retired, club
+  professional, amateur, which tour), seasons, wins, majors, best ranking, highest level, prize money, peak.
+- **My World** (v15): the shortlist in groups you name, with a digest of recorded facts since you last marked it
+  read (wins, top 10s in majors and Premier events, tour and status changes, moments, ranking bands, followed
+  tournaments', tours' and courses' editions); a quiet count in the menu, no pop-ups.
+- **Compare careers** (v15): up to four golfers -- now, current Overall, Peak Overall, totals, season by season
+  and at the same age (the Overall snapshot at each season's start), with "not recorded" where it was not.
+- **GOAT Lab** (v15): rank careers by your weights over ten components (or a formula of them), with each
+  component's definition, scope and coverage, partial careers and missing figures marked.
+- **Qualification** (v15): this season's majors as they stand -- earned and conditional places, what is still
+  pending a list or qualifying (with the weeks), and projections marked as information only; *Standings locks*
+  shows when each tour's money list locks and when cards and rights take effect.
 
 ## Long runs (for example 100 seasons)
 
