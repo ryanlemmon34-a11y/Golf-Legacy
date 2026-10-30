@@ -108,6 +108,14 @@ header .sep { color:var(--muted); }
 .card { border:1px solid var(--line); border-radius:6px; padding:10px 14px; margin:10px 0; background:var(--panel); }
 progress { width:220px; }
 dl.kv { display:grid; grid-template-columns:max-content 1fr; gap:2px 14px; } dl.kv dt { color:var(--muted); }
+.rchart { display:flex; align-items:flex-end; gap:6px; padding:6px 2px 2px; min-height:200px; }
+.rchart.chg { align-items:center; }
+.rbar { flex:none; width:38px; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; }
+.rchart.chg .rbar { justify-content:center; }
+.rbar .rb { display:block; width:26px; background:var(--accent); border-radius:2px 2px 0 0; }
+.rbar .rb.dn { background:#b3412f; } .rbar.gap .rb { height:2px; background:var(--line); }
+.rbar.final .rb, .rbar.now .rb { opacity:.65; outline:1px dashed var(--fg); }
+.rbar .rv { font-size:11px; font-variant-numeric:tabular-nums; } .rbar .ry { font-size:11px; color:var(--muted); }
 @media (max-width: 760px) { nav { display:none; } main { padding:12px 16px; } }
 """
 
@@ -1073,6 +1081,79 @@ def _ratings(w, pid, p):
             + f'<div class="rgrid">{"".join(cards)}</div><p class="muted">{note}</p>')
 
 
+def ratings_series(w, pid, p):
+    """[(year, label, {key: value} or None)] for a golfer's ratings over time, one slot per season from the first
+    recorded to the last: the ratings at the start of each season (recorded when the season before was archived,
+    after its aging), then the current ratings; a retired golfer's last recorded ratings are their final playing
+    ratings, at the end of the season they retired after (retirees skip that winter's aging). A season with no
+    record is a slot without values (never filled from another season)."""
+    from golfsim.ratings import ATTRIBUTE_KEYS
+    keys = (w.a.world.get('rating_keys') if w.a else None) or ['overall', *ATTRIBUTE_KEYS]
+    snaps = OD.rating_snapshots(w, pid)
+    pts = {y: (f'start of {y}', dict(zip(keys, r))) for y, r in snaps.items()}
+    retired = OD.playing_status(p.get('golfer'))[0] == 'retired'
+    lp = w.live.people.get(pid, {}) if w.live else {}
+    final = None
+    if retired and snaps:                                # the last record: final playing ratings, not a new season
+        y = max(snaps)
+        final = (f'{y - 1} end', f'final ratings: retired after the {y - 1} season', pts.pop(y)[1])
+    elif lp.get('ratings'):
+        c = w.live.cursor
+        pts[c['year']] = (f'now ({c["year"]}, week {c["week"]})' if c['year'] not in pts else
+                          f'now ({c["year"]}, week {c["week"]}; started the season at {pts[c["year"]][1]["overall"]:.1f})',
+                          dict(zip(['overall', *ATTRIBUTE_KEYS], lp['ratings'])))
+    out = ([(str(y), *(pts[y] if y in pts else ('not recorded', None))) for y in range(min(pts), max(pts) + 1)]
+           if pts else [])
+    return out + ([final] if final else [])
+
+
+def ratings_history(w, q, pid, p):
+    """Fixed-width annual bars, one per season (scrolling sideways when there are many), for Overall or one
+    attribute, as levels or as changes from the season before; unknown seasons are gaps."""
+    from golfsim.ratings import ATTRIBUTE_KEYS, ATTRIBUTE_LABELS
+    series = ratings_series(w, pid, p)
+    if len(series) < 2:
+        return ''
+    key = one(q, 'rh', 'overall')
+    key = key if key in ('overall', *ATTRIBUTE_KEYS) else 'overall'
+    mode = 'change' if one(q, 'rm') == 'change' else 'level'
+    name = 'Overall' if key == 'overall' else ATTRIBUTE_LABELS[key]
+    vals = [(v or {}).get(key) for _, _, v in series]
+    H = 150
+    bars = []
+    for i, (y, label, v) in enumerate(series):
+        x = vals[i]
+        prev = vals[i - 1] if i else None
+        if x is None or (mode == 'change' and prev is None):
+            text = 'not recorded' if x is None else 'no earlier season to compare'
+            bars.append(f'<div class="rbar gap" title="{esc(y)}: {esc(text)}"><span class="rv">—</span>'
+                        f'<span class="rb"></span><span class="ry">{esc(y)}</span></div>')
+            continue
+        d = x - prev if prev is not None else None
+        tip = f'{y} · {label} · {name} {x:.1f}' + (f' ({d:+.1f} on the season before)' if d is not None else '')
+        if mode == 'level':
+            h, cls, shown = max(2, round(H * x / 100)), 'lv', f'{x:.1f}'
+        else:
+            h, cls, shown = max(2, round(min(H / 2, abs(d) * 12))), 'up' if d >= 0 else 'dn', f'{d:+.1f}'
+        final = ' final' if label.startswith('final') else ' now' if label.startswith('now') else ''
+        bars.append(f'<div class="rbar{final}" title="{esc(tip)}"><span class="rv">{shown}</span>'
+                    f'<span class="rb {cls}" style="height:{h}px"></span><span class="ry">{esc(y)}</span></div>')
+    opts = ''.join(f'<option value="{k}"{" selected" if k == key else ""}>'
+                   f'{esc("Overall" if k == "overall" else ATTRIBUTE_LABELS[k])}</option>' for k in ('overall', *ATTRIBUTE_KEYS))
+    keep = ''.join(f'<input type="hidden" name="{esc(k)}" value="{esc(v[0])}">' for k, v in q.items()
+                   if k not in ('rh', 'rm') and v)
+    modes = ''.join(f'<option value="{m}"{" selected" if m == mode else ""}>{t}</option>'
+                    for m, t in (('level', 'level'), ('change', 'change from the season before')))
+    form = (f'<form class="filters" action="/golfer/{pid}">{keep}<label>Rating<select name="rh">{opts}</select></label>'
+            f'<label>Show<select name="rm">{modes}</select></label><button>Show</button></form>')
+    return ('<h3>Ratings over time</h3>' + form
+            + f'<div class="scroll"><div class="rchart {"chg" if mode == "change" else ""}">{"".join(bars)}</div></div>'
+            + '<p class="muted">One bar per season: the ratings at its start (recorded when the season before was '
+              'archived, after its aging), the current ratings for this season, and for a retired golfer their final '
+              'playing ratings at the end of the season they retired after (no aging is added). “—”: not recorded. '
+              'Hover a bar for its date and value.</p>')
+
+
 def peak_line(w, pid, p):
     """The profile's Peak Overall: the highest recorded base Overall, when it was first recorded and the age then,
     with how much of the career the records cover (a partial record says "Recorded Peak Overall")."""
@@ -1244,7 +1325,7 @@ def ST_person_seasons(db, pid):
 def _playing(w, q, pid, p):
     rows = OD.results(w, pid)
     active = (p.get('golfer') or {}).get('lifestyle') not in (None, 'retired')
-    out = [OH.status_section(w, pid, p), _ratings(w, pid, p), _honors(w, pid, rows, active),
+    out = [OH.status_section(w, pid, p), _ratings(w, pid, p), ratings_history(w, q, pid, p), _honors(w, pid, rows, active),
            OH.grand_slam_line(w, pid), _season_history(w, q, pid, p, rows),
            OG.golf_section(w, pid, one(q, 'scope'))]
     wins = [r for r in rows if r['pos'] == 1 and not OD.is_qualifying(r)]
