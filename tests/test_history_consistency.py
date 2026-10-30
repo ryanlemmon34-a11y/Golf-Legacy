@@ -117,8 +117,10 @@ class SnapshotTests(unittest.TestCase):
         w.reload()
         self.assertEqual(w.a.years, [2027, 2028])
         self.assertIsNone(old.index)                                   # the replaced snapshot was closed
-        self.assertEqual(view(w, pid), before | {'profile': view(w, pid)['profile'],
-                                                 'overview': view(w, pid)['overview']})
+        if w.statistics()[0] is None:                                  # (the republished season's statistics
+            w._builder.wait(300)                                       # are rebuilt in the background: one
+        now = view(w, pid)                                             # view, once they are)
+        self.assertEqual(now, before | {'profile': now['profile'], 'overview': now['overview']})
         s.close()
         w.close()
 
