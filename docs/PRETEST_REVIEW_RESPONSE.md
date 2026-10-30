@@ -150,7 +150,8 @@ view (1.0 s: it reads the season file); ranking reproduction checked exact for 6
 52, top 200).
 
 ## Tests
-The whole suite, one module per process with ResourceWarnings shown: 30 modules pass (no warnings); one
-module (`test_history_consistency`) first failed because a profile now includes golf statistics, which read
-"working out the statistics" until the background store is built -- the test now starts from a built store and
-passes. New: `tests.test_golf_stats` (9) and `tests.test_pretest_fixes` (7).
+Final code (b065935 and the docs after it): the whole suite, one module per process with ResourceWarnings shown
+-- 30 modules, 375 tests, all pass (one skipped, as before), no ResourceWarnings. During development one module
+(`test_history_consistency`) failed because a profile now includes golf statistics, which read "working out the
+statistics" until the background store is built; the test now starts from a built store. New:
+`tests.test_golf_stats` (13) and `tests.test_pretest_fixes` (8).
