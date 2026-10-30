@@ -44,6 +44,7 @@ import observer_history as OH                                         # noqa: E4
 import observer_golf as OG                                            # noqa: E402
 from golfsim import scopes as SC                                      # noqa: E402
 import observer_spoilers as SP                                        # noqa: E402
+import observer_views as V                                            # noqa: E402
 
 PAGE_SIZE = 100
 
@@ -52,6 +53,9 @@ CSS = """
 .rgrid .card { margin:0; padding:8px 10px; } .rgrid h4 { margin:0 0 4px; font-size:13px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
 table.mini { margin:0; font-size:13px; } table.mini td, table.mini th { padding:1px 4px; border:none; }
 form.inline { display:inline; margin-left:8px; } form.inline button { font-size:13px; padding:1px 8px; }
+.views { margin:4px 0 10px; font-size:13px; } .views > a { margin-right:6px; padding:1px 8px; border:1px solid var(--line); border-radius:10px; }
+.views > a.on { background:var(--panel); font-weight:600; } .views input { font-size:13px; width:11em; }
+p.back { margin:0 0 4px; font-size:13px; }
 .up { color:var(--accent); } .down { color:#b3412f; } p.lead { font-size:16px; }
 table.sortable th { cursor:pointer; } table.sortable th[aria-sort=ascending]::after { content:" ▲"; }
 table.sortable th[aria-sort=descending]::after { content:" ▼"; }
@@ -561,7 +565,7 @@ def page(w, title, body, job=None, notices=()):
            '<a href="/rankings">Rankings</a><a href="/stats">Stats</a><a href="/money">Prize money</a>'
            '<h4>Explore</h4><a href="/golfers">Golfers</a><a href="/coaches">Coaches</a><a href="/caddies">Caddies</a>'
            '<a href="/courses">Courses</a><a href="/nations">Nations</a><a href="/tours">Tours</a>'
-           '<a href="/tournaments">Tournaments</a><a href="/shortlist">Shortlist</a>'
+           '<a href="/tournaments">Tournaments</a><a href="/shortlist">Shortlist</a><a href="/views">Saved views</a>'
            '<h4>History</h4><a href="/seasons">Seasons</a><a href="/records">Records &amp; frivolities</a>'
            '<a href="/grand-slam">Career Grand Slam</a><a href="/moments">Moments</a><a href="/rules">Rules</a>'
            '<h4>Worlds</h4><a href="/worlds">World library</a><a href="/export">Report a problem</a>'
@@ -573,7 +577,7 @@ def page(w, title, body, job=None, notices=()):
             f'<style>{CSS}</style></head><body><header><strong>Golf Legacy</strong>{world}'
             f'<span class="date">{esc(date)}</span>{search}{SP.header(w)}{advance_controls(w, job)}</header>'
             f'<div class="layout">{nav}<main>{banners}<h1>{esc(title)}</h1>{body}'
-            f'{history_note(w) if w is not None else ""}</main></div>{POLL_JS if running else ""}{OH.SORT_JS}</body></html>')
+            f'{history_note(w) if w is not None else ""}</main></div>{POLL_JS if running else ""}{V.SORT_JS}</body></html>')
 
 
 def history_note(w):
@@ -627,7 +631,7 @@ def filters(path, q, fields):
             out.append(f'<label>{esc(label)}<select name="{name}">{opts}</select></label>')
     out.append('<button>Apply</button>')
     if any(one(q, n) for n, _, _ in fields):
-        out.append(f'<a href="{path}">Clear</a>')
+        out.append(f'<a href="{path}?default=1">Clear</a>')
     return ''.join(out) + '</form>'
 
 
@@ -1973,7 +1977,7 @@ PAGES = {'/': overview, '/rankings': rankings, '/search': search, '/golfers': go
          '/caddies': caddies, '/records': records, '/moments': moments, '/tournaments': tournaments,
          '/calendar': calendar, '/courses': courses_page, '/nations': nations, '/tours': tours_page, '/seasons': seasons,
          '/stats': stats_page, '/money': money_page, '/shortlist': shortlist_page, '/rules': OH.rules_page,
-         '/grand-slam': OH.grand_slam_page}
+         '/grand-slam': OH.grand_slam_page, '/views': V.views_page}
 
 
 def render(w, path, q):

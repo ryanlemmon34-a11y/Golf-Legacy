@@ -408,7 +408,12 @@ class App:
             self.notices[:0] = notices                  # not shown yet
             return None
         try:
+            q, note = O.V.opened(w, path, q)          # a list page: its last view (browsing state only)
             r = O.render(w, path, q)
+            if r is not None and O.V.is_list(path):
+                r = (r[0], note + O.V.bar(w, path, q) + r[1])
+            elif r is not None:
+                r = (r[0], O.V.back_link(w, path) + r[1])
         except Exception as e:
             J.log(w.path, f'page {path} failed: {e!r}\n{traceback.format_exc()}')
             r = ('Something went wrong', f'<div class="banner err">{esc(type(e).__name__)}: {esc(e)}</div>'
@@ -660,6 +665,21 @@ def make_handler(app):
                         notice = ('warn', 'Open a world (not only its history) to keep a shortlist.')
                     ref = self.headers.get('Referer') or ''
                     to = (urlparse(ref).path + ('?' + urlparse(ref).query if urlparse(ref).query else '')) if ref else '/shortlist'
+                elif u.path in ('/views/save', '/views/remove', '/views/last'):   # browsing state only
+                    w = app.world
+                    ref = self.headers.get('Referer') or ''
+                    to = (urlparse(ref).path + ('?' + urlparse(ref).query if urlparse(ref).query else '')) if ref else '/views'
+                    if w is None:
+                        notice = ('warn', 'Open a world first.')
+                    elif u.path == '/views/last':
+                        app.renderer.call(O.V.remember, w, O.one(form, 'url'))
+                        return self._send(204, '', 'text/plain')
+                    elif u.path == '/views/save':
+                        ok = app.renderer.call(O.V.save, w, O.one(form, 'name'), O.one(form, 'path') or '',
+                                               O.one(form, 'query') or '')
+                        notice = ('ok', 'View saved.') if ok else ('warn', 'Only a list page’s view can be saved.')
+                    else:
+                        app.renderer.call(O.V.remove, w, O.one(form, 'id'))
                 elif u.path == '/spoilers':                # Hide results / Show results / Reveal final result
                     w = app.world
                     ref = self.headers.get('Referer') or ''

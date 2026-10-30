@@ -140,18 +140,19 @@ def _coverage(c):
 
 
 # ---- the Stats directory's golf view --------------------------------------------------------------------------------
-def stats_rows(w, data, sort, qualify):
+def stats_rows(w, data, sort, qualify, worst_first=False):
     """Rows [(pid, counters)] with recorded golf statistics, qualified by rounds, sorted by `sort` (a METRICS key:
-    best first; missing values last) or by rounds."""
+    best first, or worst first; missing values last either way) or by rounds."""
     rows = [(pid, r) for pid, r in data.items() if r.get('golf_starts') and r.get('rounds', 0) >= qualify]
+    sign = -1 if worst_first else 1
     if sort in GS.METRICS:
         better = GS.METRICS[sort][3]
         def key(x):
             v = GS.metric(sort, x[1])
-            return (v is None, -(v or 0) if better else (v or 0), x[0])
+            return (v is None, sign * (-(v or 0) if better else (v or 0)), x[0])
         rows.sort(key=key)
     else:
-        rows.sort(key=lambda x: (-(x[1].get(sort) or 0), x[0]))
+        rows.sort(key=lambda x: (sign * -(x[1].get(sort) or 0), x[0]))
     return rows
 
 
@@ -164,15 +165,18 @@ def golf_table(w, q, data, path, keep, cur_note, single_season):
         qualify = max(0, int(O.one(q, 'min', str(default)) or default))
     except ValueError:
         qualify = default
-    rows = stats_rows(w, data, sort, qualify)
+    worst = O.one(q, 'dir', '') == 'worst'
+    rows = stats_rows(w, data, sort, qualify, worst)
     unqualified = sum(1 for r in data.values() if r.get('golf_starts')) - len(rows)
     chunk, pager = O.paged(rows, q, path)
     start = (max(1, int(O.one(q, 'page', '1') or 1)) - 1) * O.PAGE_SIZE
-    keep = {k: v for k, v in keep.items() if k not in ('sort', 'page')}
+    keep = {k: v for k, v in keep.items() if k not in ('sort', 'page', 'dir')}
     base = {k: v for k, v in keep.items() if k != 'min'}          # the toggle sets or drops the minimum itself
     def th(k, label):
-        mark = ' ▼' if k == sort else ''
-        return f'<th class="n"><a href="{path}?{urlencode({**keep, "sort": k})}">{O.esc(label)}{mark}</a></th>'
+        """Best first; the active heading turns it around (worst first) and back."""
+        mark = (' ▲' if worst else ' ▼') if k == sort else ''
+        args = {**keep, 'sort': k, **({'dir': 'worst'} if k == sort and not worst else {})}
+        return f'<th class="n"><a href="{path}?{urlencode(args)}">{O.esc(label)}{mark}</a></th>'
     head = ('<tr><th class="n">#</th><th>Golfer</th><th>Nation</th>' + th('golf_starts', 'Starts') + th('rounds', 'Rounds')
             + ''.join(th(k, SHORT[k]) for k in SHOWN) + '</tr>')
     body = []
@@ -188,8 +192,8 @@ def golf_table(w, q, data, path, keep, cur_note, single_season):
               'all-time, for review.')
     return (f'<p>{cur_note} · {len(rows):,} golfers · {qual}</p>'
             + f'<div class="scroll"><table>{head}{"".join(body)}</table></div>' + pager
-            + f'<p class="muted">{DEFINITIONS_NOTE} Sorted best first (lowest first for scoring, putts and bogeys); '
-              'N/A last.</p>')
+            + f'<p class="muted">{DEFINITIONS_NOTE} Sorted ' + ('worst first' if worst else 'best first')
+            + ' (best: lowest for scoring, putts and bogeys; the active heading turns the order around); N/A last.</p>')
 
 
 # ---- world ranking points ------------------------------------------------------------------------------------------

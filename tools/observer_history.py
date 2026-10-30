@@ -1213,28 +1213,4 @@ def recap(w, y):
 
 
 # ---- sortable tables ----------------------------------------------------------------------------------------------
-SORT_JS = """<script>
-document.addEventListener('click', function (ev) {
-  var th = ev.target.closest('table.sortable th'); if (!th || ev.target.closest('a,button,input,select')) return;
-  var table = th.closest('table'), tb = table.tBodies[0]; if (!tb) return;
-  var i = Array.prototype.indexOf.call(th.parentNode.children, th);
-  var dir = th.getAttribute('aria-sort') === 'ascending' ? 'descending' : 'ascending';
-  Array.prototype.forEach.call(table.querySelectorAll('th'), function (h) { h.removeAttribute('aria-sort'); });
-  th.setAttribute('aria-sort', dir);
-  function key(r) {
-    var c = r.cells[i]; if (!c) return null;
-    var t = (c.getAttribute('data-sort') !== null ? c.getAttribute('data-sort') : c.textContent).trim();
-    if (t === '' || t === '—' || /^(unknown|unavailable|not recorded|n\\/a)$/i.test(t)) return null;
-    var m = t.replace(/[$,*%+]/g, '').replace(/^T(?=\\d)/, '').replace(/\\u2212/g, '-').match(/^-?\\d+(\\.\\d+)?/);
-    return m ? [0, parseFloat(m[0])] : [1, t.toLowerCase()];
-  }
-  var rows = Array.prototype.slice.call(tb.rows).map(function (r, n) { return [key(r), n, r]; });
-  rows.sort(function (a, b) {
-    var x = a[0], y = b[0];
-    if (x === null || y === null) return x === y ? a[1] - b[1] : (x === null ? 1 : -1);
-    var r = x[0] - y[0] || (x[0] === 0 ? x[1] - y[1] : x[1].localeCompare(y[1]));
-    return (dir === 'ascending' ? r : -r) || a[1] - b[1];
-  });
-  rows.forEach(function (r) { tb.appendChild(r[2]); });
-});
-</script>"""
+from observer_views import SORT_JS                      # noqa: E402  (the sort script now lives with the saved views)
