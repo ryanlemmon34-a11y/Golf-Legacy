@@ -149,5 +149,25 @@ in the backlog: implemented, tested (automated), measured, unverified.
 | Career honors (text trophy case) | Categories by each edition's classification when played; count, first, latest, links | implemented, tested |
 | Season and tour history, expandable, linked, partial current season | Season by season with *show each tour*; current season marked "so far" | implemented, tested |
 
-Not yet: as-of-year views, the university directory, nation development, era filters on records, charts and
-art, a packaged desktop app; course / tour / nation season rollups beyond their existing pages.
+### History increment (2090 world audit and roadmap, 30 October 2026)
+
+| Requirement | Observer | Status |
+|---|---|---|
+| Season starts, wins, top 5/10, missed cuts; year and tour totals and a career total; season links to the season as it was | Season table: missed cuts, a career row, career by tour with *show each tour*; each season opens `?tab=season&year=Y` | implemented, tested |
+| As-of profile from that season's facts; missing baselines unavailable; partial current season | Season page: tour, status, Premier rights at entry, exemption, rankings, card for next season, prize and net, residence, college ledger, ratings at start and end from recorded snapshots, team, decisions, moves, history lines | implemented, tested |
+| Status with membership, card class, level, lifestyle and the dated decision | Status section and "How their status changed" with recorded reasons and the decision's recorded inputs | implemented, tested (reasons recorded from rules 2026-10-30; older seasons show promoted / lost card) |
+| Coach and caddie team history separate, dated, event-time attribution | Coaches / Caddies / School teams sections with starts and wins together | implemented, tested |
+| Residence: birthplace, initial placement, dated moves | "Where they have lived" with the initial placement marked as not a move | implemented, tested |
+| Readable entry explanation linked to a versioned rule; code kept | `golfsim/rules.py`, `/rules`; every route in words with its rule link and code; rules version per season | implemented, tested |
+| Tournament summaries (most-used course, most wins and starts, youngest and oldest winner) | Tournament page summary, each edition with its course | implemented, tested |
+| Edition: course and layout, winner, field size, prize money | Edition page | implemented, tested (payouts recorded from rules 2026-10-30) |
+| Round results; replay labelled differently from live stepping | Rounds & replay (leaderboard after each round, conditions, missed cuts; major scorecards) | implemented, tested; live stepping proposed only (`docs/AUDIT_2090_RESPONSE.md`) |
+| Records with dated evidence and active-pursuit status on every row | When and Now columns on every list; streaks "currently extending", No. 1 now, partnerships ongoing | implemented, tested |
+| Year-end recap linked to evidence | Season page recap (majors and teams, wins, money, No. 1s, Premier cards earned, career changes, Grand Slams, moments) | implemented, tested |
+| Career Grand Slam from four distinct majors | `/grand-slam`, profile line, recap | implemented, tested |
+| Sort every table; reputation sorting; currency formatting | Client-side sorting on every table; coach/caddie sorts by reputation and clients; dollars throughout, unknown apart from zero | implemented, tested |
+| Course use visible | Course page: tournament mix and total starts | implemented, tested |
+| Hall of Fame, prestige and peak prestige | Proposals only (`docs/AUDIT_2090_RESPONSE.md`) | proposed |
+
+Not yet: the university directory, nation development, era filters on records, charts and art, a packaged
+desktop app; tour / nation season rollups beyond their existing pages; Hall of Fame and prestige peaks (proposed).

@@ -31,6 +31,32 @@ requirements are unchanged; no new long run, spending or calibration change is a
 5. **Complete the universe and release proof**: nation development, remaining autonomous pathway details,
    broad long-run validation. Nation-versus-nation events later; nationality and residence history kept.
 
+## The 2090 audit increment (owner roadmap "Fix genuine access defects and make history explain itself", 30 October 2026)
+
+The owner's 63-season world (seed 2027, 2027-2089) was reviewed read-only by the audit and is kept unchanged as
+the evidence baseline; this increment was developed on copies and small test worlds. It changes simulation code
+(the engine fingerprint changes: earlier worlds open read-only or continue through a copy). Details, evidence and
+the owner decisions still needed: `docs/AUDIT_2090_RESPONSE.md`.
+- **Winner's exemptions whatever the membership** (Jack H. Harris): accession to a Premier card by a winner's
+  exemption or Premier money, exempt field priority for non-members, in-season exemptions, amateur major
+  champions turning professional -- implemented, tested (`tests/test_entry_rights.py`).
+- **Amateur golf where an amateur lives** (Jung, Johansson): residence opens a circuit's ordinary amateur events;
+  graduates take the circuit where they live, movers their new home's; national championships stay nationality
+  -- implemented, tested (`tests/test_amateur_residence.py`).
+- **Name variety**: larger banks for arrivals; names unique among active people, retired names may recur;
+  initials last -- implemented, tested, measured by replaying 35,784 arrivals (initials 46.6% -> 0.0%).
+- **Facts kept**: per-start prize money, round scores, round conditions, majors' hole-by-hole cards, rules
+  version, winner's exemption, card reason, decisions per golfer, college eligibility ledger; index schema 3
+  -- implemented, tested (round scores reproduce totals and cuts; payouts reconcile with money paid).
+- **Observer**: rules page and readable entry routes; status and its changes with recorded reasons; season as
+  it was; missed cuts and career totals; separate coach and caddie histories; residence timeline; tournament
+  and course summaries; edition prize money and Rounds & replay with major scorecards; records with when and
+  now; Career Grand Slam; year-end recap; sortable tables; money formatting -- implemented, tested
+  (`tests/test_observer_history.py`).
+- **Proposed, not built** (owner review): college ruleset options, Premier circuit choice, elite venues for
+  curated amateur championships and venue assignment by event standing (the Kohler / USA Amateur cause), Hall
+  of Fame criteria, prestige vs reputation and peaks, live round-by-round play.
+
 ## Observer playtest increment (owner roadmap "Next observer UI increment", 29 October 2026)
 
 The owner runs the 100-year world himself, on its own folder and engine; this increment was developed on

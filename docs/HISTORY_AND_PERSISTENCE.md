@@ -190,6 +190,19 @@ observer's statistics (`tools/observer_stats.py`) recompute each event's payouts
 archives: the calendar's purses) and check them against every golfer's season prize money as paid: on the
 50-season world all 588,797 golfer-seasons reconcile.
 
+**Recorded since rules 2026-10-30 (the 2090 world audit; `docs/AUDIT_2090_RESPONSE.md`):** each season file
+names the rules version it was played under (`rules`, also in the index's meta as `rules:YYYY`); each edition
+carries every golfer's stroke-play round scores per site (`scores`), the prize money each golfer was paid
+(`prizes`), each round's conditions (`conditions`: wind mph, rain, pin difficulty) and, for majors, every
+hole's score (`holes`) with the holes' pars (`pars`); each career row carries the winner's exemption held that
+season (`exemption`), the reason for next season's card (`card_reason`), that winter's decisions
+(`decisions`, the same records as the season's `transitions`) and, for college golfers, the eligibility
+ledger (`college`: season number, first season recorded, last eligible season). The index (schema 3) carries
+each start's prize money (`starts.prize`, NULL for seasons played before it was kept; an older index gains the
+column when its own session next opens it). Seasons archived before these facts show them as not recorded:
+rounds are never reconstructed from totals, money splits stay the reconciled recomputation, ratings history
+starts where snapshots start.
+
 ### Queries (`archive.Archive`)
 
 | Question | Call |

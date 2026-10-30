@@ -33,6 +33,12 @@ The observer listens on 127.0.0.1 only (this computer). Worlds are folders in `w
 The library shows whether each world can still be resumed ("this engine"): updates that change only the
 observer, tools or the save code keep it so.
 
+**The 30 October 2026 update changes the simulation** (the 2090 world audit's fixes: `docs/AUDIT_2090_RESPONSE.md`),
+so worlds made before it -- your 63-season world included -- show as "another engine": browse them read-only,
+or **Copy** one with "continue with this engine" to keep playing it on the new rules (the copy's earlier
+seasons keep what was recorded then). Install this update in a separate folder from any long run still in
+progress.
+
 ## What you can do
 
 - **World library** (`/worlds`): every world with its date, seed, starting year, compatibility and state;
@@ -57,18 +63,39 @@ observer, tools or the save code keep it so.
   money); every number opens the results behind it. Definitions are under the table.
 - **Shortlist**: ☆ Shortlist on any person, course, nation, tour, tournament or edition; the Shortlist page
   lists them. Kept with the world (it travels with copies and problem reports).
-- **A person's page**: age (approximate: season year minus birth year) before the birth year; current ratings
+- **Rules** (`/rules`): how golfers get into fields, keep and earn cards, and which amateur and college golf
+  they may play, in words, with versions; every "How they got in" links to its rule and keeps the recorded code.
+- **Every table sorts**: click a column heading (numbers sort as numbers, missing values last; on a paged list
+  it sorts the page shown). Coaches and caddies also sort by reputation or current clients.
+- **A person's page**: a **Status** section (membership, level, lifestyle, Premier rights and why, a winner's
+  exemption, why they hold their card, college eligibility) and every change of tour, status or lifestyle with
+  its recorded reason; **click a season** to see that season as it was (its tour, rights, rankings, card,
+  where they lived, ratings at its start and end from recorded snapshots only, team, decisions, moves, history
+  lines; the current season marked partial); age (approximate: season year minus birth year) before the birth year; current ratings
   with the archetype and signed changes (this season, last season; "unavailable" where no earlier record
   exists); career honors (major, Premier Tour, Challenger, regional, mini tour, college national and
   postseason champion, college, amateur championship and other wins), with counts, first and latest years
-  and links; a season-by-season table with age, every statistic linked to its results and *show each tour*
-  for the per-tour rows; coaches show their current clients as rows and a season-by-season staff table.
+  and links; a Career Grand Slam line; a season-by-season table with age, missed cuts, a career total, every
+  statistic linked to its results and *show each tour* for the per-tour rows and career totals by tour; where
+  they have lived (birthplace, the residence they started with -- a college placement is not a move -- and each
+  dated move); coaches show their current clients as rows and a season-by-season staff table.
   One identity with a tab per career — *Playing career* (seasons, wins, moments),
-  *Results* (every start with the coach and caddie that week and how they got in), *Coaches & caddies*,
+  *Results* (every start with its prize money, the coach and caddie that week and how they got in; filter by
+  season, tour, finish or tournament), *Coaches & caddies* (coaches and caddies in separate sections, with the
+  starts and wins shared during each stint),
   *Coaching*, *Caddying* (each partnership with dates, starts together, wins and majors).
 - **An edition** (one year of a tournament) is separate from the **tournament** (all its editions), and a
   **course layout** from its course. The current season's editions are linked as soon as they are played and
-  read the same after the season is archived.
+  read the same after the season is archived. An edition shows its winner, field, course, each golfer's prize
+  money and **Rounds & replay**: the leaderboard after each round (a replay of the recorded rounds -- nothing is
+  simulated), each round's conditions, missed cuts, and for majors every golfer's hole-by-hole scorecard.
+  Editions played before this update show "not recorded" there.
+- **A tournament** shows a summary (most wins, most starts, most-used courses, youngest and oldest winners) and
+  every edition with its course; **a course** shows its tournament mix and total starts.
+- **Records** show, on every row, when (the date or first and latest dates) and whether the person is still
+  pursuing it (currently extending, competing, fixed, closed). **Career Grand Slam** lists winners of all four
+  majors. **A season** (from Seasons) is a year-end recap: majors with coach and caddie, most wins, prize money
+  leaders, world No. 1s, Premier cards earned, career changes, Grand Slams, moments, the final ranking.
 
 ## Long runs (for example 100 seasons)
 
@@ -104,7 +131,7 @@ advance, and the observer has nothing unsaved of its own. "Resume" is simply Ope
 | Save | What the observer does |
 |---|---|
 | A world saved by **this engine** (format golf-legacy-session/1, schema 1) | Open and advance it. |
-| A world saved by **another engine** (older code; e.g. the 50-season world, engine commit 7334ffe) | Browse its history read-only, or **Copy** it with "continue with this engine": the copy records which engine saved it and which continues it (`ENGINE_ACCEPTED.json`), and only the copy is opened. The original is never resumed or changed. Its history keeps what the older engine produced; everything after the copy is the new engine's. |
+| A world saved by **another engine** (older code; e.g. the 50-season world, engine commit 7334ffe, and every world made before the 30 October 2026 update) | Browse its history read-only, or **Copy** it with "continue with this engine": the copy records which engine saved it and which continues it (`ENGINE_ACCEPTED.json`), and only the copy is opened. The original is never resumed or changed. Its history keeps what the older engine produced; everything after the copy is the new engine's. |
 | A history archive without a session (a folder with `MANIFEST.json`, or `world.json` from before manifests) | Browse read-only. |
 | An unknown save format or schema | Listed as unsupported; not opened. |
 
@@ -144,6 +171,9 @@ the failure, reproduce with the engine commit it names, and never change your or
    the advance did not finish; the date is the last saved week.
 10. Copy the world, open the copy, advance it; open the original: unchanged.
 11. Report a problem on the copy: a zip appears in `worlds/_diagnostics/` with your note in `ISSUE.md`.
+12. After a season on this version: open a major from Seasons, then *Rounds & replay* (step through the rounds,
+    open the winner's scorecard); open the winner, click the season in the season table (that season as it
+    was), the *Coaches & caddies* tab, and a "How they got in" rule link; sort a table by clicking a heading.
 
 Write down anything surprising, with the world's name and date, and send the diagnostic zip.
 
@@ -169,6 +199,9 @@ it works on a temporary copy and never changes the world.
   marked partial and left out of debut lists.
 - Dated coach and caddie partnerships come from the archive (through the last season end); during a season
   the profile shows the current coach and caddie, and every result shows the team that week.
-- Not yet: as-of-year views, the university directory, nation development over time, charts, portraits.
+- Seasons played before the 30 October 2026 update have no round scores, recorded payouts, rules version or
+  card reasons: their pages say "not recorded" (per-tour prize money there is the reconciled recomputation).
+- Not yet: the university directory, nation development over time, a Hall of Fame (proposed), prestige peaks,
+  live round-by-round play of an event in progress, charts, portraits.
 - Windows: the launcher, file locking and replacing files while they are read were designed for Windows
   but have not been run on Windows by us yet — please tell us if anything fails there.

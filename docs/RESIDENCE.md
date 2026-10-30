@@ -32,6 +32,10 @@ abstraction, **not a named university**.
   family money, backers' money or credit is used and nothing can refuse them; the school pays.
 - **Graduation sends nobody home automatically.** A graduate decides that winter (no waiting period) like
   any career move below, from wherever their college was.
+- **Amateur golf follows where an amateur lives** (since rules 2026-10-30). A graduate who stays amateur takes
+  the amateur circuit of the country they live in (a Korean graduate living in New York keeps North American
+  amateur golf), and an amateur who later moves takes up the circuit of their new home. Their own country's
+  circuit stays open to them by nationality; national championships follow nationality only.
 
 ## Career moves
 
@@ -83,7 +87,9 @@ Every use of a person's country, region or hometown was reviewed one by one:
 | The Challenger tour that is a conditional Premier member's alternative | residence | `Season.bar` |
 | Coaches and caddies: who is near, who scouts whom, same-country bonus, unmet demand | residence of both | `staff.start_of_season`, `staff.end_of_season` |
 | Entry eligibility (`Season.eligible`), national opens' home players, amateur invitations | **nationality** | unchanged |
-| National and elite amateur championships, their regions | **nationality** | unchanged |
+| Ordinary amateur events of a circuit, its championship, USA Amateur open qualifying | nationality **or residence** (since rules 2026-10-30) | `Season.series_amateur` |
+| An amateur's home circuit on graduating or becoming an amateur, and after a move | **residence** (since rules 2026-10-30) | `careers.amateur_series`, `residence.review_moves` |
+| National and elite amateur championships, their regions | **nationality** | unchanged (never residence) |
 | Q-School entrant pools (a route to a card) | **nationality** | unchanged |
 | Tour memberships, cards, promotions, home tours given on career changes | **nationality** | unchanged |
 | Masters international invitations, qualification `Person.country` | **nationality** | unchanged |
