@@ -94,6 +94,7 @@ def capture(session):
         # the ten courses they have played most (course, competitive rounds), most first (rules 2026-11-08)
         people[g.id]['familiar'] = [(k, round(r, 1)) for k, r in FAM.top_courses(g.familiarity)]
         people[g.id]['aggression'] = round(g.personality['aggression'])   # a style, not a grade (rules 2026-11-08)
+        people[g.id]['home_club'] = [list(r) for r in getattr(s, 'home_clubs', {}).get(g.id, ())]   # dated
     for kind, table in (('coach', st.coaches), ('caddie', st.caddies)):
         for c in table.values():
             p = people.setdefault(c.id, {'name': c.name, 'country': c.country, 'born': c.born, 'roles': []})
@@ -153,6 +154,7 @@ def capture(session):
         rank_top={w_: list(rows) for w_, rows in getattr(s, 'rank_top', {}).get(year, {}).items()},
         wr_seed=dict(getattr(s, 'wr_seed', {})),          # (seeded points: the world's first two seasons only)
         editions=editions, by_person=dict(by_person), schedule=schedule, series=series,
+        local_hosting=bool(getattr(s.lib, 'local_first', False)),
         coach_of=dict(st.coach_of), caddie_of=dict(st.caddie_of), am_support=am_support,
         birth=dict(pl.birth), home=dict(pl.home), first=dict(pl.first),
         moves={k: list(v) for k, v in pl.moves.items()}, courses=courses, tours=tours, records=records,

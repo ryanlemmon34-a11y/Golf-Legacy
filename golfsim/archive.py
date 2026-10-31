@@ -152,6 +152,8 @@ class ArchiveWriter:
                  'tours': {k: {'name': t.name, 'tier': t.tier} for k, t in TOUR_BY_KEY.items()},
                  'series': {s.series_id: {'name': s.name, 'tour': s.tour, 'tier': s.tier, 'kind': s.kind,
                                           'category': s.category} for s in cal.series},
+                 # venues follow local hosting (course_library; worlds from rules 2026-11-08)
+                 'local_hosting': bool(getattr(lib, 'local_first', False)),
                  'courses': {cid: {'name': site['name'], 'city': site['city'], 'country': site['country'],
                                    # state / province or equivalent (None = unknown) and how the course came to
                                    # be built (rules 2026-11-08)
@@ -320,7 +322,10 @@ class ArchiveWriter:
                                        # (from rules 2026-11-08)
                                        'familiar': [[k, round(r, 1)] for k, r in FAM.top_courses(g.familiarity)],
                                        # the Aggression personality trait (0-100), shown from rules 2026-11-08
-                                       'aggression': round(g.personality['aggression'])}}
+                                       'aggression': round(g.personality['aggression']),
+                                       # home clubs where they lived, dated: [year, week, course or None, basis,
+                                       # place] (from rules 2026-11-08)
+                                       'home_club': [list(r) for r in getattr(season, 'home_clubs', {}).get(g.id, ())]}}
         for c in st.coaches.values():
             p = people.setdefault(c.id, {'name': c.name, 'country': c.country, 'born': c.born, 'hometown': None})
             p['coach'] = {'speciality': c.speciality, 'youth': c.youth, 'reputation': c.reputation, 'clients': c.clients,

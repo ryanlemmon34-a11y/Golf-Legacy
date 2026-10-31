@@ -45,14 +45,35 @@ rounds there add a little more.
   familiarity section); the baseline is a fraction of it, so it nudges local golfers, it does not decide
   events. Its measured size is one of the checks to run after the CPU hold (below).
 
+### Home clubs (owner decision on unused local courses)
+
+Every golfer whose residence is recorded has a **home club** where they live (`golfsim/home_clubs.py`,
+`Season.home_clubs`): a municipal course in their state / province if there is one, else another course
+there that is not an elite venue; where the state / province has none (or is unknown), the same choice within
+their country. The pick is a stable draw per golfer and place (reproducible, independent of processing
+order). It is recorded with its date when they enter the world and again only when they move
+(`[year, week, course, basis, place]`; `None` when their country has no course), after each winter's moves.
+
+It feeds only the existing familiarity mechanism: the home club counts as at least `REGION_ROUNDS` like any
+course in their own state / province. A club in their own state / province already has that floor, so it
+adds nothing there; only a club found by country gains it. Always the larger of rounds played, the regional
+baseline and that floor -- never a sum, no separate home advantage, no practice-round count.
+
+Archived as `people.json` `golfer.home_club` (the dated list) and captured live; the profile names the home
+club (and earlier ones) and the course page counts the golfers whose home club it is. Venue use of local
+courses: `docs/COURSE_LIBRARY.md`, "Local hosting".
+
 ### Profiles
 
-The playing tab shows the golfer's ten most familiar courses, ranked by competitive rounds played (ties by
-course id): the rounds, the familiarity value the engine uses, a link to each course, and whether the course
-is in their own state / province (or country, where that is unknown). A line states the regional baseline
-their birthplace and residence give, naming identical places once. The live view captures the top ten now;
-archived histories carry the top ten as the history ends (`people.json` `golfer.familiar`, from rules
-2026-11-08; older histories say "not recorded").
+The playing tab shows the golfer's ten most familiar courses, ranked by competitive rounds actually played
+(ties by course id). For each: the rounds played, and separately **the familiarity the engine uses** for
+this golfer there -- `1 - exp(-r / 15)` of the larger of rounds played and the regional baseline (own state /
+province, country where unknown, or home club) -- with where that value comes from, and a link to the course.
+A local golfer with 1 round at a course in their own state shows 1 round played and 18.1 % (the engine's
+3 rounds), not 6.4 %. A line states the baseline their birthplace and residence give, naming identical places
+once, and the home club is named. A caddie's familiarity is the caddie's own (combined in the engine) and is
+not shown here. The live view captures the top ten now; archived histories carry the top ten as the history
+ends (`people.json` `golfer.familiar`, from rules 2026-11-08; older histories say "not recorded").
 
 ## Aggression (roadmap G2)
 
@@ -72,7 +93,9 @@ the value, cautious below 35, balanced 35-65, attacking above 65, and what it me
   weighs choices that are possible, and Course Management sets how well they are judged. So the older
   attacker still goes for the par 5s they can reach and lays up at those they no longer can. The decision was
   moved into `_go_or_lay_up` / `_reach` without changing it (288 rounds identical to the previous engine,
-  same seeds) so the interaction can be tested directly.
+  same seeds) so the interaction can be tested directly. Both take `dfac`, the shot's effective-distance
+  factor for the conditions (1.0 = calm, the current engine): a caller with wind (the weather package)
+  passes its wind-adjusted factor so reach is the physical reach in those conditions.
 - **No second risk score.** None was needed: what a golfer can sensibly attempt already follows from their
   physical state and course management.
 
@@ -85,3 +108,6 @@ writes a trait, no risk score, profile text and rule text).
 - A seeded season with and without the baseline (same seed; `Season.familiar_base_on = False` for the second arm): starts affected (`familiar_base`), the change in
   scoring average for local golfers at regional events (expected a few hundredths of a stroke), timings.
 - `tools/equivalence_check.py` and the determinism replay with the new rules version.
+- In that season: home clubs given to every placed golfer (basis region / country counts), moves giving new
+  ones, archive `golfer.home_club`; venues of the first season against the library replay (local hosting);
+  course pages of an adopted municipal course and of a home club.

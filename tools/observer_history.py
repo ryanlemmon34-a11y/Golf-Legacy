@@ -662,9 +662,25 @@ def familiar_courses(w, pid, p):
     return [], None
 
 
+def home_club_rows(w, pid, p):
+    """A golfer's dated home clubs ([year, week, course or None, basis, place], oldest first): the snapshot's, else
+    the history's as it ended; None where neither recorded them (histories before rules 2026-11-08)."""
+    lp = w.live.people.get(pid) if w.live else None
+    if lp is not None and lp.get('home_club') is not None:
+        return lp['home_club']
+    return ((p or {}).get('golfer') or {}).get('home_club')
+
+
+_FROM = {'played': 'rounds played', 'region': 'regional baseline (own state / province)',
+         'country': 'regional baseline (own country; state / province unknown)',
+         'home club': 'home-club floor (club found by country)'}
+
+
 def familiar_section(w, pid, p, geo):
-    """The ten courses a golfer knows best (competitive rounds, the familiarity value the engine uses, a link to
-    each course), and the regional baseline their birthplace and residence give (rules 2026-11-08)."""
+    """The ten courses a golfer has played most: the competitive rounds actually played, and -- separately -- the
+    golfer's familiarity value the engine plays with there, which is the larger of those rounds and the regional
+    baseline (own state / province, or the home club) (rules 2026-11-08), with where it comes from and a link to
+    each course; then their home club. Caddies' familiarity is their own and is not shown here."""
     O = _o()
     if 'golfer' not in (p or {}).get('roles', ('golfer',)):
         return ''
@@ -680,32 +696,51 @@ def familiar_section(w, pid, p, geo):
         x = (geo or {}).get(key)
         if x:
             places.append((x.get('country'), x.get('region')))
+    clubs = home_club_rows(w, pid, p) or []
+    club = clubs[-1] if clubs and clubs[-1][2] else None
+
+    def engine(cid, rounds):
+        c = cs.get(cid)
+        base = FAM.baseline(course_place(c), places) if c else (0.0, None)
+        return FAM.engine_rounds(rounds, FAM.home_floor(base, bool(club) and club[2] == cid))
+
     body = []
     for i, (cid, rounds) in enumerate(rows, 1):
-        c = cs.get(cid)
-        base, basis = FAM.baseline(course_place(c), places) if c else (0.0, None)
-        note = {'region': 'own state / province', 'country': 'own country (state / province unknown)'}.get(basis, '')
-        body.append([str(i), O.course_link(w, cid), f'{rounds:g}', f'{100 * FAM.value(rounds):.0f}%',
-                     O.esc(note) if note else '<span class="muted">—</span>'])
+        eff, src = engine(cid, rounds)
+        body.append([str(i), O.course_link(w, cid) + (' <span class="tag">home club</span>' if club and club[2] == cid else ''),
+                     f'{rounds:g}', f'{100 * FAM.value(eff):.1f}%', O.esc(_FROM[src])])
     out = ['<h2>Familiar courses</h2>']
     if body:
-        out.append(O.table(['#', 'Course', 'Rounds played', 'Familiarity', 'Local'], body, numeric=(0, 2, 3)))
+        out.append(O.table(['#', 'Course', 'Rounds played (actual)', 'Familiarity the engine uses', 'From'], body,
+                           numeric=(0, 2, 3)))
     else:
         out.append('<p class="muted">No competitive rounds yet.</p>')
+    if club:
+        played = dict(rows).get(club[2])
+        line = (f'Home club: {O.course_link(w, club[2])} since {O.esc(club[0])} '
+                f'({"in their state / province" if club[3] == "region" else "found by country: none in their state / province"})')
+        if played is None:
+            eff, src = engine(club[2], 0.0)
+            line += f'; familiarity the engine uses there {100 * FAM.value(eff):.1f}% ({O.esc(_FROM[src])})'
+        out.append(f'<p>{line}.</p>')
+        if len(clubs) > 1:
+            out.append('<p class="muted">Earlier home clubs: ' + '; '.join(
+                f'{O.course_link(w, r[2]) if r[2] else "none"} from {O.esc(r[0])}' for r in clubs[:-1]) + '.</p>')
     regions = []
     for x in places:
         text = O.where({'country': x[0], 'region': x[1]})
         if text not in regions:
             regions.append(text)
+    rule = '(<a href="/rules#course-familiarity">rule</a>)'
     if regions:
-        out.append(f'<p class="muted">Ranked by competitive rounds played ({O.esc(as_of)}); familiarity is the value the '
-                   f'engine uses, 1 - exp(-rounds / {FAM.SCALE:g}). Courses in {O.esc(" and ".join(regions))} start as '
-                   f'if {FAM.REGION_ROUNDS:g} rounds had been played there ({100 * FAM.value(FAM.REGION_ROUNDS):.0f}%; '
-                   f'{FAM.COUNTRY_ROUNDS:g} by country where the state or province is unknown): a floor, never added '
-                   f'to rounds played, counted once (<a href="/rules#course-familiarity">rule</a>).</p>')
+        out.append(f'<p class="muted">Ranked by competitive rounds actually played ({O.esc(as_of)}). The engine uses '
+                   f'1 - exp(-rounds / {FAM.SCALE:g}) of the larger of those rounds and the regional baseline: courses '
+                   f'in {O.esc(" and ".join(regions))} and their home club count as at least {FAM.REGION_ROUNDS:g} '
+                   f'rounds ({100 * FAM.value(FAM.REGION_ROUNDS):.1f}%; {FAM.COUNTRY_ROUNDS:g} by country where the state '
+                   f'or province is unknown) -- a floor, never added to rounds played, counted once {rule}.</p>')
     else:
-        out.append(f'<p class="muted">Ranked by competitive rounds played ({O.esc(as_of)}). Birthplace and residence '
-                   f'unknown: no regional baseline (<a href="/rules#course-familiarity">rule</a>).</p>')
+        out.append(f'<p class="muted">Ranked by competitive rounds actually played ({O.esc(as_of)}). Birthplace and '
+                   f'residence unknown: no regional baseline, so the engine uses the rounds played {rule}.</p>')
     return ''.join(out)
 
 
@@ -776,6 +811,17 @@ _ORIGIN = {'calendar': 'built because an event needed a course here when the lib
            'hand-built': 'one of the hand-built reference courses'}
 
 
+def home_club_count(w, cid):
+    """(golfers whose home club this course is, as of) -- the snapshot's people now, else the history's as it
+    ended; (0, None) where home clubs were not recorded."""
+    if w.live is not None and any('home_club' in lp for lp in w.live.people.values()):
+        return sum(1 for lp in w.live.people.values() if lp.get('home_club') and lp['home_club'][-1][2] == cid), 'now'
+    if w.a is not None and any('home_club' in (q.get('golfer') or {}) for q in w.a.people.values()):
+        return sum(1 for q in w.a.people.values() if (q.get('golfer') or {}).get('home_club')
+                   and q['golfer']['home_club'][-1][2] == cid), 'as the history ends'
+    return 0, None
+
+
 def course_place_section(w, cid, c, hosted):
     """A course's state / province (normalised from its city; 'unknown' when the geography lacks it) and its
     role: an event venue, or a local club no event has chosen, with the venue policy's reason
@@ -783,14 +829,18 @@ def course_place_section(w, cid, c, hosted):
     O = _o()
     from golfsim.course_library import course_place, venue_role
     sub = c['subdivision'] if 'subdivision' in c else course_place(c)[1]
-    role, why = venue_role(w.courses(), cid, hosted)
+    local = (w.a.world.get('local_hosting', False) if w.a else getattr(w.live, 'local_hosting', False))
+    role, why = venue_role(w.courses(), cid, hosted, local_first=bool(local))
     origin = _ORIGIN.get(c.get('origin'))
     out = [f'<p>State / province: {O.esc(sub) if sub else "<span class=\'muted\'>unknown</span>"} · '
            f'role: <b>{O.esc(role)}</b>' + (f' · {O.esc(origin)}' if origin else '') + '</p>']
+    n, as_of = home_club_count(w, cid)
+    if as_of is not None:
+        out.append(f'<p>Home club of {n:,} golfer{"" if n == 1 else "s"} ({O.esc(as_of)}).</p>')
     if why:
-        out.append(f'<p class="muted">No event has been played here yet. {O.esc(why)} Local golfers still know it: '
-                   f'a course in a golfer\'s own state or province starts partly familiar '
-                   f'(<a href="/rules#course-familiarity">rule</a>).</p>')
+        out.append(f'<p class="muted">{"" if hosted else "No event has been played here yet. "}{O.esc(why)} Local '
+                   f'golfers know it: a course in a golfer\'s own state or province, and their home club, start partly '
+                   f'familiar (<a href="/rules#course-familiarity">rule</a>).</p>')
     return ''.join(out)
 
 

@@ -46,9 +46,11 @@ VERSIONS = (
     ('2026-11-08', 'Course familiarity has a regional baseline: a golfer plays a course in the state or province where '
                    'they were born or live (the country, where the state or province is unknown) as if they had played '
                    'a few rounds there, unless they have played more; it is a floor, never added to experience, and '
-                   'counted once. Each course records its state or province, and each season the starts where the '
-                   'baseline applied. Aggression, an existing personality trait, is shown on profiles (unchanged in '
-                   'play).'),
+                   'counted once. Every golfer has a recorded home club where they live, which counts the same way. '
+                   'Local hosting: a low- or entry-level event playing in a city for the first time takes a free '
+                   'municipal course no event has used yet, and keeps it; established venues are unchanged. Each '
+                   'course records its state or province, and each season the starts where the baseline applied. '
+                   'Aggression, an existing personality trait, is shown on profiles (unchanged in play).'),
 )
 EARLIER = ('Seasons archived before rules versions were recorded were played under earlier rules. The '
            'differences that matter for reading old results: a winner without a Premier card held no '
@@ -286,9 +288,24 @@ RULES = {
         'engine is given at least 3 rounds; where the state or province is unknown for the golfer or the course, '
         'the same country gives at least 1.5. It is a floor: the engine uses the larger of rounds played and the '
         'baseline, never their sum, and birthplace and residence count once even when they differ (the larger '
-        'match). No other home advantage exists. People whose places were never recorded get no baseline. The '
-        'rounds a golfer has actually played are recorded unchanged. A caddie\'s familiarity is rounds caddied '
-        'there only.',
+        'match). Home club: every golfer whose residence is recorded has one, recorded with its date: a municipal '
+        'course in the state or province they live in (else another course there that is not an elite venue; '
+        'where there is none, the same choice within their country), a stable draw per golfer and place, changed '
+        'only when they move. Their home club counts as at least 3 rounds too -- the same floor, which adds nothing '
+        'where the club is in their own state or province, never on top of another baseline. No other home '
+        'advantage exists. People whose places were never recorded get no baseline and no home club. The rounds a '
+        'golfer has actually played are recorded unchanged; profiles show them and, separately, the value the '
+        'engine uses. A caddie\'s familiarity is rounds caddied there only.',
+        '2026-11-08'),
+    'local-hosting': (
+        'Venues: home courses and local hosting',
+        'An event in a city returns to the course it last used there (its home course) whenever that course is '
+        'free; otherwise it takes the free course whose layouts rank highest for its level in that city, or moves '
+        'to another city in its pool. Local hosting: when a low-level event (mini events, small-college golf, 54-72 '
+        'hole amateur and club-professional events) or an entry-level event (18-36 hole regional amateur events) '
+        'plays in a city for the first time, it takes a free municipal course there that no event has used yet, if '
+        'there is one, and keeps it as its home. Established home courses never change because of this, no course '
+        'hosts two events in a week, and no event is rotated between courses.',
         '2026-11-08'),
     'aggression': (
         'Aggression (playing style)',

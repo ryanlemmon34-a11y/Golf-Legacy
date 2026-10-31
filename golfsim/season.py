@@ -40,6 +40,7 @@ from . import prestige as PR
 from . import qualification as Q
 from . import residence as RES
 from . import familiarity as FAM
+from . import home_clubs as HC
 from .calendar import TOUR_BY_KEY, _in_window
 from . import schedule as SCH
 from . import work_pathway as WP
@@ -449,6 +450,8 @@ class Season:
         self.wr_seed = {}                                    # gid -> [[abs week, points]]: pre-history (archived once)
         self._seed_world()
         RES.settle(self, self.first_year, 0)                 # everyone's birthplace and where they live
+        self.home_clubs = {}                                 # gid -> [[year, week, course, basis, place]] (HC)
+        HC.assign(self, self.first_year, 0)                  # each golfer's home club where they live
         self.major_rights = defaultdict(dict)                # year -> major -> gid -> right (note_right)
         self.peak_overall = {}                               # gid -> (highest Overall, year, week): note_peaks
         self.peak_since = self.first_year
@@ -1865,6 +1868,7 @@ class Season:
         state.setdefault('new_pros_added', {})              # saves from before new professionals arrived
         state.setdefault('familiar_base', defaultdict(Counter))  # saves from before the regional baseline: none
         state.setdefault('familiar_base_on', True)
+        state.setdefault('home_clubs', {})                   # saves from before home clubs: given at the next winter
         state.setdefault('club_trips', defaultdict(Counter))   # saves from before payers were told apart
         state.setdefault('backer_flows', defaultdict(Counter))
         state.setdefault('support_start', {})
@@ -2340,6 +2344,7 @@ class Season:
             RES.review_moves(self, year, snap)               # career moves (and staying put, or going home)
             RES.staff_moves(self, year)
         RES.settle(self, year, 53)                           # arrivals' places; college bases (school-paid)
+        HC.assign(self, year, 53)                            # home clubs: arrivals, and anyone who moved
         self._active = None
         if self.development:                                 # after aging (it can raise the mental game) and arrivals
             self.note_peaks(year + 1, 0, [g for g in self.world.golfers if g.lifestyle != 'retired'])
@@ -2820,14 +2825,16 @@ class Season:
 
     def course_baseline(self, gid, course_id):
         """(rounds, basis) of a person's regional familiarity baseline for a library course (familiarity.baseline):
-        from their birthplace and their residence now (Places), each matched once. None for people whose
+        from their birthplace and their residence now (Places), each matched once, and the same regional floor
+        for their home club (home_clubs; it matters only for a club found by country). None for people whose
         places were never recorded (legacy), for courses outside the library, and in a comparison arm played
         with the baseline switched off (`familiar_base_on`)."""
         P = self.places
         site = self.lib.sites.get(course_id)
         if not getattr(self, 'familiar_base_on', True) or site is None or gid in P.legacy or not P.known(gid):
             return 0.0, None
-        return FAM.baseline(course_place(site), (P.birth.get(gid), P.home.get(gid)))
+        base = FAM.baseline(course_place(site), (P.birth.get(gid), P.home.get(gid)))
+        return FAM.home_floor(base, HC.current(self, gid) == course_id)   # the same floor, once
 
     def money_unit(self, g, year):
         return FIN.money_unit(max(0.0, self.funds(g, year)))

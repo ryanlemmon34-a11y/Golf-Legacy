@@ -35,6 +35,13 @@ Event venues and local clubs
     course there), 'club' (added where golf is busiest) or 'hand-built'. A course no event chooses is a
     local club, not a defect: `venue_role` says why from the exported course data (see
     docs/COURSE_LIBRARY.md, "Courses that host no events").
+
+Local hosting (rules 2026-11-08; the owner's decision on unused local courses)
+    When a low- or entry-level series (the only levels a municipal course is eligible for) plays in a city
+    for the first time, it takes a free, eligible municipal course that no event has used yet, if the city
+    has one; otherwise the usual ranking. Succession then keeps it there like any home course. Established
+    homes never move and nothing rotates: each such course gains at most the series that first adopts it.
+    Applied when venues are assigned, not when the library is sized, so the 520 courses are unchanged.
 """
 from __future__ import annotations
 
@@ -67,6 +74,7 @@ LEVEL_LAYOUTS = {
     'entry': (('standard', 'Forward'), ('municipal', 'Regular'), ('standard', 'Club'), ('municipal', 'Forward'),
               ('championship', 'Club')),
 }
+LOCAL_LEVELS = ('low', 'entry')         # the levels a municipal course is eligible for (LEVEL_LAYOUTS)
 TOP_QUALIFIERS = {'USA_OPEN_FINAL', 'USA_OPEN_FINAL_INTL', 'BRITANNIA_FINAL', 'CLUB_PRO_CHAMPIONSHIP',
                   'PT_QSCHOOL_FINAL', 'EU_QSCHOOL_FINAL', 'JP_QSCHOOL_FINAL', 'ASIA_QSCHOOL_FINAL',
                   'COLLEGE_NATIONAL_CHAMPIONSHIP'}
@@ -116,8 +124,10 @@ class Venue:
 class CourseLibrary:
     """All courses in the world, plus the venue for every edition of every event."""
 
-    def __init__(self, calendar=None, seed=2027, target=TARGET_COURSES, first_year=2027, plan_years=PLAN_YEARS):
+    def __init__(self, calendar=None, seed=2027, target=TARGET_COURSES, first_year=2027, plan_years=PLAN_YEARS,
+                 local_first=True):
         self.calendar = calendar or WorldCalendar(seed)
+        self.local_first = local_first        # local hosting (module notes); False: the policy before 2026-11-08
         self.seed = seed
         self.first_year = first_year
         self.sites = {}                       # course_id -> site dict (see course_gen.generate_site)
@@ -125,11 +135,13 @@ class CourseLibrary:
         self._names = set()
         self._home = {}                       # (series_id, city) -> course_id last used
         self._venues = {}                     # year -> {event_id: [Venue per site]}
+        self._used = set()                    # course ids any event has used so far (in assignment order)
         self._seed_hand_built()
         self._grow_to_demand(plan_years)
         self._fill_to(target)
         self._venues.clear()
         self._home.clear()
+        self._used.clear()
 
     # -- building ------------------------------------------------------------------------------
     def _register(self, site, origin='calendar'):
@@ -221,9 +233,22 @@ class CourseLibrary:
                 return rank, layout
         return None
 
-    def _pick(self, city, ed, level, busy):
+    def _pick(self, city, ed, level, busy, grow=False):
         best = None
         home = self._home.get((ed.series.series_id, city))
+        if home is None and not grow and getattr(self, 'local_first', False) and level in LOCAL_LEVELS:
+            # a series new to this city: a free, eligible municipal course no event has used yet (local hosting)
+            used = self.__dict__.setdefault('_used', set())
+            for cid in self.by_city.get(city, ()):
+                if cid in busy or cid in used or self.sites[cid]['cls'] != 'municipal':
+                    continue
+                ok = self._eligible(cid, level)
+                if ok:
+                    key = (ok[0], _h(ed.series.series_id, cid))
+                    if best is None or key < best[0]:
+                        best = (key, cid, ok[1])
+            if best is not None:
+                return best
         for cid in self.by_city.get(city, ()):
             if cid in busy:
                 continue
@@ -260,7 +285,7 @@ class CourseLibrary:
                 else:
                     tries = ordered + others
                 for city in tries:
-                    p = self._pick(city, ed, level, busy[ed.week])
+                    p = self._pick(city, ed, level, busy[ed.week], grow)
                     if p:
                         pick = (city,) + p[1:]
                         break
@@ -272,6 +297,7 @@ class CourseLibrary:
                     raise RuntimeError(f'no course available for {ed.event_id} site {site_no + 1}')
                 city, cid, layout = pick
                 busy[ed.week].add(cid)
+                self.__dict__.setdefault('_used', set()).add(cid)
                 self._home[(ed.series.series_id, city)] = cid
                 venues.append(Venue(ed.event_id, site_no, cid, layout, city))
             out[ed.event_id] = venues
@@ -358,18 +384,32 @@ def _rank(course, level):
     return None
 
 
-def venue_role(courses, cid, hosted):
+LOCAL_HOSTING = ('Local hosting (rules 2026-11-08): a low- or entry-level event playing in its city for the first '
+                 'time takes a free municipal course that no event has used yet, and returns to it like any home '
+                 'course; established events keep their venues and nothing rotates.')
+
+
+def venue_role(courses, cid, hosted, local_first=True):
     """(role, why) of one course, from the courses as exported ({cid: {name, city, class, layouts}}) and
-    how many editions it has hosted. role: 'event venue' (it has hosted) or 'local club' (no event has
-    chosen it yet). `why` explains a local club in terms of the venue policy itself: which levels of event
-    could use it, and which courses in its city those events prefer. Nothing here changes a venue."""
+    how many editions it has hosted. role: 'event venue' (it has hosted; a municipal course that has hosted is
+    'local club and event venue') or 'local club' (no event has chosen it yet). `why` explains it in terms of
+    the venue policy itself. `local_first`: whether the world's venues follow local hosting (worlds from rules
+    2026-11-08). Nothing here changes a venue."""
     c = courses[cid]
+    municipal = c.get('class', c.get('cls')) == 'municipal'
     if hosted:
+        if municipal and local_first:
+            return 'local club and event venue', LOCAL_HOSTING
         return 'event venue', ''
     levels = [lv for lv in LEVEL_LAYOUTS if _rank(c, lv)]
     if not levels:
         return 'local club', 'No level of event can use its layouts.'
     city = c.get('city')
+    lv_text = ' and '.join(LEVEL_TEXT[lv] for lv in levels)
+    if municipal and local_first:
+        return 'local club', (f'Only {lv_text} events can use its layouts, and none has come to it yet: the next '
+                              f'such event to play in {city} for the first time while it is free will make it its '
+                              f'home. ' + LOCAL_HOSTING)
     ahead = {}
     for lv in levels:
         mine = _rank(c, lv)[0]
@@ -380,7 +420,6 @@ def venue_role(courses, cid, hosted):
             break
         ahead[lv] = better
     names = lambda ids: ', '.join(courses[x].get('name', x) for x in ids)
-    lv_text = ' and '.join(LEVEL_TEXT[lv] for lv in levels)
     if ahead is None:
         return 'local club', (f'It ranks first in {city} for {lv_text} events, but no such event has chosen it: '
                               f'either none is played in {city}, or each one played there had already settled on '

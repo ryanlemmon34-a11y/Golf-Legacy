@@ -56,6 +56,23 @@ def baseline(course_place, places):
     return best
 
 
+def home_floor(base, is_home_club):
+    """The regional baseline (rounds, basis) with a golfer's home club (home_clubs) given the same regional floor:
+    it changes anything only for a club found by country; never more than REGION_ROUNDS, never a sum."""
+    if is_home_club and base[0] < REGION_ROUNDS:
+        return REGION_ROUNDS, 'home club'
+    return base
+
+
+def engine_rounds(played, base):
+    """(rounds the engine is given, where they come from): 'played' (rounds played, when at least the baseline)
+    or the baseline's basis ('region', 'country', 'home club')."""
+    played = played or 0.0
+    if base[1] and base[0] > played:
+        return base[0], base[1]
+    return played, 'played'
+
+
 def effective_rounds(played, base_rounds):
     """What the engine is given: rounds played, or the baseline if that is more (a floor, never a sum)."""
     return max(played or 0.0, base_rounds or 0.0)
