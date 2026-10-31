@@ -74,7 +74,9 @@ report, exact when the editions carry their format (or the calendar is unchanged
 ## Familiarity
 
 Familiarity is with the course, not the tees: rounds on any layout of a course count
-(`Course.familiarity_key`).
+(`Course.familiarity_key`). Since rules 2026-11-08 a course in the golfer's own state / province
+(birthplace or residence) starts partly familiar, as a floor of a few rounds, never added to experience
+(`docs/FAMILIARITY_AND_AGGRESSION.md`).
 
 ## State / province and venue roles (rules 2026-11-08)
 

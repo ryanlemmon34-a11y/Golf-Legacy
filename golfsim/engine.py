@@ -36,6 +36,7 @@ from dataclasses import dataclass, field
 
 from . import ratings as R
 from .baseline import expected as baseline
+from .familiarity import SCALE as FAM_SCALE
 from .golfer import neutral_caddie
 
 TOUR_DRIVE = 298.0          # tour-average driver distance, the club-selection reference
@@ -151,8 +152,8 @@ class Player:
         self.c_yard = (cad.skills['yardage'] - 50) / 50 * comm
         self.c_strat = (cad.skills['strategy'] - 50) / 50 * comm
         self.c_mental = (cad.skills['mental_support'] - 50) / 50 * comm
-        fam = 1 - math.exp(-golfer.familiarity.get(course.familiarity_key, 0) / 15.0)
-        cfam = 1 - math.exp(-cad.familiarity.get(course.familiarity_key, 0) / 15.0)
+        fam = 1 - math.exp(-golfer.familiarity.get(course.familiarity_key, 0) / FAM_SCALE)
+        cfam = 1 - math.exp(-cad.familiarity.get(course.familiarity_key, 0) / FAM_SCALE)
         cfam *= R.norm(cad.skills['course_knowledge']) * comm
         self.fam = fam + (1 - fam) * 0.5 * cfam
 

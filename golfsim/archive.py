@@ -278,6 +278,9 @@ class ArchiveWriter:
         chunk['work_pathway'] = [dict(t) for t in getattr(season, 'work_pathway', {}).get(year, [])]
         chunk['cash_blocked_max'] = {str(g): n for g, n in sorted(getattr(season, 'cash_blocked_max', {}).get(year, {}).items())}
         chunk['amateur_support_on'] = getattr(season, 'amateur_support_on', True)
+        # the regional familiarity baseline (rules 2026-11-08): each golfer's starts this season where the baseline
+        # for a course in their own state / province (or country) was more than their rounds played there
+        chunk['familiar_base'] = {str(g): n for g, n in sorted(getattr(season, 'familiar_base', {}).get(year, {}).items())}
         # development evidence -- diagnostics only (hidden facts included; never shown to the player): how each
         # golfer arriving this season started, and what each source moved this season (development.SOURCES)
         from . import development as D

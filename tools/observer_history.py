@@ -704,7 +704,9 @@ def course_place_section(w, cid, c, hosted):
     out = [f'<p>State / province: {O.esc(sub) if sub else "<span class=\'muted\'>unknown</span>"} · '
            f'role: <b>{O.esc(role)}</b>' + (f' · {O.esc(origin)}' if origin else '') + '</p>']
     if why:
-        out.append(f'<p class="muted">No event has been played here yet. {O.esc(why)}</p>')
+        out.append(f'<p class="muted">No event has been played here yet. {O.esc(why)} Local golfers still know it: '
+                   f'a course in a golfer\'s own state or province starts partly familiar '
+                   f'(<a href="/rules#course-familiarity">rule</a>).</p>')
     return ''.join(out)
 
 

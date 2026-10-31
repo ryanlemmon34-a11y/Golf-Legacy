@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import re
 
-RULES_VERSION = '2026-11-03'
+RULES_VERSION = '2026-11-08'
 RANKING_RULE = 'world-ranking-1'     # the world ranking's formula (unchanged since the world began; named now)
 VERSIONS = (
     ('2026-10-30', 'Winners\' exemptions count whatever a golfer\'s membership (a non-member champion earns a '
@@ -43,6 +43,11 @@ VERSIONS = (
                    '(it had been one edition more). The work pathway: a full-time adult amateur outside the top 300, '
                    'without support or family money, who cannot afford any eligible event for eight counted weeks '
                    'takes a job at the next monthly plan and keeps playing as a working amateur.'),
+    ('2026-11-08', 'Course familiarity has a regional baseline: a golfer plays a course in the state or province where '
+                   'they were born or live (the country, where the state or province is unknown) as if they had played '
+                   'a few rounds there, unless they have played more; it is a floor, never added to experience, and '
+                   'counted once. Each course records its state or province, and each season the starts where the '
+                   'baseline applied.'),
 )
 EARLIER = ('Seasons archived before rules versions were recorded were played under earlier rules. The '
            'differences that matter for reading old results: a winner without a Premier card held no '
@@ -271,6 +276,19 @@ RULES = {
         'Nobody is given money and no cost is waived; the way back to full-time golf is turning professional, as '
         'for every working amateur.',
         '2026-11-03'),
+    'course-familiarity': (
+        'Course familiarity',
+        'Familiarity with a course is the competitive rounds a golfer has played on it, any layout (rounds of an '
+        'event, and match-play and playoff holes in rounds\' worth). The engine uses 1 - exp(-rounds / 15): small, '
+        'bounded help with decisions, approach distance control and reading greens. Regional baseline: on a '
+        'course in the same state or province as the golfer\'s birthplace or where they live at the time, the '
+        'engine is given at least 3 rounds; where the state or province is unknown for the golfer or the course, '
+        'the same country gives at least 1.5. It is a floor: the engine uses the larger of rounds played and the '
+        'baseline, never their sum, and birthplace and residence count once even when they differ (the larger '
+        'match). No other home advantage exists. People whose places were never recorded get no baseline. The '
+        'rounds a golfer has actually played are recorded unchanged. A caddie\'s familiarity is rounds caddied '
+        'there only.',
+        '2026-11-08'),
     'injuries': (
         'Injuries',
         'A golfer can be hurt playing an event; the chance rises with tiredness, age and the rounds played and falls '
