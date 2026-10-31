@@ -174,6 +174,38 @@ class AvailableWeekBoundary(unittest.TestCase):
         self.assertNotIn(gid, field)
 
 
+class RealCases(unittest.TestCase):
+    """The three golfers found in the Test2 save (seed 386509): injured at their regional in week 21 and archived as
+    playing the week-22 national championship anyway. Their recorded injuries, replayed on the injury clock, now
+    withdraw them; everyone else who earned a place still plays."""
+
+    CASES = (   # (year, regional, regional position, gid, kind, weeks out, available (year, week)) as archived
+        (2055, 2, 31, 27970, 'ankle', 12, (2055, 34)),   # Barnaby Read: played 71/80/74/81
+        (2055, 2, 2, 30440, 'hand', 12, (2055, 34)),     # Cole Lowery: played 76/86
+        (2027, 3, 18, 4421, 'back', 2, (2027, 24)),      # Robert Miller: played 83/87
+    )
+
+    def test_each_withdraws_and_the_rest_play(self):
+        for year, k, pos, gid, kind, weeks, available in self.CASES:
+            fin, gs = regionals()
+            rows = fin[k]
+            rows[pos - 1] = (gid, pos)                                # the golfer at their archived position
+            gs.append(golfer(gid))
+            s = Stub(gs, fin)
+            s.first_year = FIRST
+            s.injuries = defaultdict(list)
+            s.injure(gid, year, REGIONAL_WEEK, weeks, kind)
+            back = s.injured[gid][0]
+            self.assertEqual(back, s.abs_week(*available))           # the archived "available" week
+            s.update_fatigue(year, REGIONAL_WEEK)                       # the regional week ends
+            field = s.college_postseason(NS(series=NS(series_id='COLLEGE_NATIONAL_CHAMPIONSHIP', field=156,
+                                                      name='College National Championship'), week=NATIONALS_WEEK),
+                                         year, s.free)[0]
+            self.assertNotIn(gid, field, gid)
+            self.assertEqual(s.nationals_withdrawn[year], {gid: 'injured'})
+            self.assertEqual(field, [g for g in earned(fin) if g != gid])
+
+
 class RulesText(unittest.TestCase):
     def test_versioned(self):
         self.assertGreaterEqual(R.RULES_VERSION, '2026-11-12')
