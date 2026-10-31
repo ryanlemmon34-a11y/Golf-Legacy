@@ -323,12 +323,48 @@ def apply_arm(data, season, arm):
     """A controlled comparison arm (session mode, new worlds): set the named per-world rule settings on the world
     before it plays, and keep them in the run state; a resume must ask for the same arm (refused otherwise, as the
     support setting is). Settings not named keep the build's defaults for a new world."""
-    asked = {k: v for k, v in arm.items() if v is not None}
-    if 'arm' in data and data['arm'] != asked:
-        raise SystemExit(f'this run was made as arm {data["arm"]}; resume it with the same settings, not {asked}')
+    asked = normal_arm(arm)
+    check_arm(data, asked)
+    if 'arm' not in data and data.get('years'):          # an existing world made without an arm: as it is
+        return
     for k, v in asked.items():
         setattr(season, ARM_SETTINGS[k], v)
     data['arm'] = asked
+
+
+def normal_arm(arm):
+    """The arm as compared and recorded: only the settings named (None: the build's default, not a setting)."""
+    return {k: v for k, v in (arm or {}).items() if v is not None}
+
+
+def check_arm(data, asked):
+    """A resume must ask for the arm the run was made with; a world made without an arm record (before arms existed,
+    or a baseline run) keeps its actual settings and cannot take one (arms are for new worlds only)."""
+    if 'arm' in data:
+        if data['arm'] != asked:
+            raise SystemExit(f'this run was made as arm {data["arm"]}; resume it with the same settings, not {asked}')
+    elif data.get('years') and asked:
+        raise SystemExit(f'this run was made without an arm (its world keeps its own settings); an arm {asked} can '
+                         'only start a new world')
+
+
+def check_arms_before_writing(out, seeds, asked, session, resume):
+    """Every arm check, before the folder's manifest or any run state is written: arm settings need --session (new
+    session worlds only); a resume must match each seed's recorded arm (or have none, for a world made without)."""
+    if asked and not session:
+        raise SystemExit('--pathway-min-age and --college-open-access need --session (comparison arms are session '
+                         'worlds only)')
+    if not resume:
+        return
+    man = load_manifest(out)
+    if 'arm' in man and normal_arm(man['arm']) != asked:
+        raise SystemExit(f'{out} was made as arm {man["arm"]}; resume it with the same settings, not {asked}')
+    import pickle
+    for seed in seeds:
+        state = out / f'seed_{seed}.state.pkl'
+        if state.exists():
+            with open(state, 'rb') as f:
+                check_arm(pickle.load(f)[0], asked)
 
 
 def record_world_rules(data, season):
@@ -1034,6 +1070,10 @@ def main():
                     'the next season\'s digests, for a determinism replay (tools/determinism_replay.py)')
     a = ap.parse_args()
     out = Path(a.out)
+    asked = normal_arm({'work_pathway_min_age': a.pathway_min_age,
+                        'college_open_access': None if a.college_open_access is None else a.college_open_access == 'on'})
+    if not a.report_only:                                 # (before anything is written to the folder)
+        check_arms_before_writing(out, a.seeds, asked, a.session, a.resume)
     out.mkdir(parents=True, exist_ok=True)
     if not a.report_only:
         commit, dirty = git_state()
@@ -1052,15 +1092,13 @@ def main():
                     'machine': machine(),
                     'started': time.strftime('%Y-%m-%d %H:%M:%S'), 'years_requested': a.years,
                     'config': config(), 'mature': a.mature, 'amateur_support': not a.no_amateur_support,
-                    'arm': {'pathway_min_age': a.pathway_min_age, 'college_open_access': a.college_open_access}})
+                    'arm': asked})
         man.setdefault('seeds', {})
         (out / 'manifest.json').write_text(json.dumps(man, indent=1, default=str))
         for seed in a.seeds:
             if a.session:
-                arm = {'work_pathway_min_age': a.pathway_min_age,
-                       'college_open_access': None if a.college_open_access is None else a.college_open_access == 'on'}
                 run_world_session(seed, a.years, a.workers, out, a.resume, a.scale, not a.no_amateur_support,
-                                  a.keep_after, arm)
+                                  a.keep_after, asked)
             else:
                 run_world(seed, a.years, a.workers, out, a.resume, a.save_every)
     man = load_manifest(out)

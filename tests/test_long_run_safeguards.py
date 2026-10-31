@@ -147,5 +147,72 @@ class ComparisonArms(unittest.TestCase):
         self.assertEqual(season.work_pathway_min_age, 21)
 
 
+class ArmChecksBeforeWriting(unittest.TestCase):
+    """Review of 9df86eb: every arm check runs before the folder is touched. A refused resume leaves the manifest, the
+    run state and the world exactly as they were; arm switches without --session are refused; a world made without
+    an arm record cannot take one."""
+
+    def folder(self, data):
+        import pickle
+        out = Path(tempfile.mkdtemp())
+        self.addCleanup(__import__('shutil').rmtree, out, True)
+        (out / 'manifest.json').write_text('{"seeds": {"7": {}}, "amateur_support": true, "marker": 1}')
+        with open(out / 'seed_7.state.pkl', 'wb') as f:
+            pickle.dump((data, {}, {}, set()), f)
+        (out / 'world_7').mkdir()
+        (out / 'world_7' / 'CURRENT').write_text('{"generation": 3}')
+        return out
+
+    def snapshot(self, out):
+        return {p.relative_to(out): p.read_bytes() for p in sorted(out.rglob('*')) if p.is_file()}
+
+    def run_main(self, out, *args):
+        argv = ['long_world.py', '--out', str(out), '--seeds', '7', '--years', '10', *args]
+        with mock.patch.object(sys, 'argv', argv), mock.patch.object(LW, 'run_world_session') as play, \
+                mock.patch.object(LW, 'run_world') as play_old, mock.patch.object(LW, 'git_state') as git:
+            git.side_effect = AssertionError('the folder must not be touched')
+            with self.assertRaises(SystemExit) as e:
+                LW.main()
+        self.assertFalse(play.called or play_old.called)
+        return str(e.exception)
+
+    def test_a_mismatched_resume_changes_nothing(self):
+        out = self.folder({'years': 4, 'arm': {'work_pathway_min_age': 21}})
+        before = self.snapshot(out)
+        msg = self.run_main(out, '--session', '--resume', '--pathway-min-age', '18')
+        self.assertIn('same settings', msg)
+        self.assertEqual(self.snapshot(out), before)                    # manifest, state, checkpoint untouched
+
+    def test_a_world_without_an_arm_cannot_take_one(self):
+        out = self.folder({'years': 4})                                 # a baseline run, no arm record
+        before = self.snapshot(out)
+        msg = self.run_main(out, '--session', '--resume', '--college-open-access', 'off')
+        self.assertIn('only start a new world', msg)
+        self.assertEqual(self.snapshot(out), before)
+
+    def test_arm_switches_need_session(self):
+        out = Path(tempfile.mkdtemp()) / 'new'
+        self.addCleanup(__import__('shutil').rmtree, out.parent, True)
+        msg = self.run_main(out, '--pathway-min-age', '21')             # (no --session)
+        self.assertIn('need --session', msg)
+        self.assertFalse(out.exists())                                  # nothing written, not even the folder
+
+    def test_the_manifest_arm_must_match_too(self):
+        out = self.folder({'years': 4, 'arm': {'work_pathway_min_age': 21}})
+        m = out / 'manifest.json'
+        m.write_text('{"seeds": {"7": {}}, "arm": {"work_pathway_min_age": 21}}')
+        before = self.snapshot(out)
+        msg = self.run_main(out, '--session', '--resume')               # asks for the default arm
+        self.assertIn('same settings', msg)
+        self.assertEqual(self.snapshot(out), before)
+
+    def test_untagged_resume_without_an_arm_is_left_as_it_is(self):
+        from types import SimpleNamespace as NS
+        season, data = NS(work_pathway_min_age=21, college_open_access=False), {'years': 4}
+        LW.apply_arm(data, season, {})
+        self.assertNotIn('arm', data)                                   # not tagged after the fact
+        self.assertEqual((season.work_pathway_min_age, season.college_open_access), (21, False))
+
+
 if __name__ == '__main__':
     unittest.main()
