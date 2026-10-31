@@ -82,6 +82,8 @@ def parts(s, session_dir):
         # development evidence is observation only (nothing reads it back): digested on its own, so a change that
         # adds or extends it can still be shown to leave every outcome as it was
         out['diagnostics'] = {y: digest(canon(d.pop('diagnostics', None))) for y, d in seasons.items()}
+        # decision evidence likewise (recording only: golfsim.decision_evidence)
+        out['decision_evidence'] = {y: digest(canon(d.pop('decision_evidence', None))) for y, d in seasons.items()}
         out['published'] = (man['years'], {y: digest(canon(d)) for y, d in seasons.items()},
                             {k: digest(canon(_read(a / f) if f.endswith('.gz') else json.loads((a / f).read_text())))
                              for k, f in man['files'].items() if k != 'years'})
