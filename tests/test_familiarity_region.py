@@ -219,15 +219,17 @@ class ProfileTests(unittest.TestCase):
         import observer_history as OH
         cls.OH = OH
 
-    def world(self, live_familiar=None, home_club=None):
+    def world(self, live_familiar=None, home_club=None, club_familiarity=None):
         courses = {f'c{i}': {'name': f'Course {i}', 'city': 'Southport' if i % 2 else 'Helsinki',
                              'country': 'England' if i % 2 else 'Finland', 'class': 'standard', 'layouts': {}}
-                   for i in range(1, 13)}
+                   for i in range(0, 13)}
         courses['far'] = {'name': 'Far Club', 'city': 'Nowhere Town', 'country': 'England', 'class': 'municipal',
                           'layouts': {}}
         people = {}
         if live_familiar is not None:
             people[7] = {'familiar': live_familiar, 'home_club': home_club or []}
+            if club_familiarity is not None:
+                people[7]['home_club_familiarity'] = club_familiarity
         return SimpleNamespace(live=SimpleNamespace(people=people), a=None, courses=lambda: courses)
 
     GEO = {'birthplace': {'country': 'England', 'region': 'Merseyside'},
@@ -262,15 +264,59 @@ class ProfileTests(unittest.TestCase):
 
     def test_home_club_line_and_floor(self):
         clubs = [[2027, 0, 'c3', 'region', ['England', 'Merseyside']]]
-        html = self.OH.familiar_section(self.world([('c1', 5.0)], clubs), 7, self.P, self.GEO)
+        rec = {'course': 'c3', 'rounds': 0.0, 'engine_rounds': 3.0, 'value': round(FAM.value(3.0), 4), 'from': 'region'}
+        html = self.OH.familiar_section(self.world([('c1', 5.0)], clubs, rec), 7, self.P, self.GEO)
         self.assertIn('Home club: <a href="/course/c3">Course 3</a> since 2027 (in their state / province)', html)
-        self.assertIn('familiarity the engine uses there 18.1% (regional baseline (own state / province))', html)
+        self.assertIn('rounds played there 0; familiarity the engine uses there 18.1% '
+                      '(regional baseline (own state / province))', html)
         clubs = [[2027, 0, 'c3', 'region', ['England', 'Merseyside']], [2030, 53, 'far', 'country', ['England', None]]]
         geo = {'birthplace': None, 'residence': {'country': 'Wales', 'region': 'Cardiff'}}
         html = self.OH.familiar_section(self.world([('far', 1.0)], clubs), 7, self.P, geo)
         self.assertIn('home-club floor', html)                                     # the floor, from the club alone
         self.assertIn('18.1%', html)
         self.assertIn('Earlier home clubs: <a href="/course/c3">Course 3</a> from 2027', html)
+
+    def test_home_club_outside_the_top_ten_uses_its_recorded_rounds(self):
+        """Review fixture: home club c10 has 10 rounds, c0-c9 have 20 each, so the club is not in the top ten.
+        The engine uses 10 rounds there (48.6583%); the profile must show that, never 18.1% from an assumed 0."""
+        rows = [(f'c{i}', 20.0) for i in range(10)]
+        clubs = [[2027, 0, 'c10', 'region', ['England', 'Merseyside']]]
+        eff, src = FAM.engine_rounds(10.0, FAM.home_floor(FAM.baseline(('Finland', 'Uusimaa'), [MERSEY]), True))
+        self.assertEqual((eff, src), (10.0, 'played'))
+        self.assertAlmostEqual(100 * FAM.value(eff), 48.6583, places=4)
+        rec = {'course': 'c10', 'rounds': 10.0, 'engine_rounds': 10.0, 'value': round(FAM.value(10.0), 4),
+               'from': 'played'}
+        html = self.OH.familiar_section(self.world(rows, clubs, rec), 7, self.P, self.GEO)
+        self.assertNotIn('/course/c10">Course 10</a></td>', html)                 # not in the table
+        self.assertIn('Home club: <a href="/course/c10">Course 10</a>', html)
+        self.assertIn('rounds played there 10; familiarity the engine uses there 48.7% (rounds played)', html)
+        self.assertNotIn('18.1%', html.split('Home club:')[1].split('</p>')[0])
+
+    def test_home_club_without_a_record_claims_no_value(self):
+        rows = [(f'c{i}', 20.0) for i in range(10)]
+        clubs = [[2027, 0, 'c10', 'region', ['England', 'Merseyside']]]
+        html = self.OH.familiar_section(self.world(rows, clubs), 7, self.P, self.GEO)
+        line = html.split('Home club:')[1].split('</p>')[0]
+        self.assertNotIn('%', line)
+        self.assertNotIn('rounds played there', line)
+        stale = {'course': 'c3', 'rounds': 4.0, 'engine_rounds': 4.0, 'value': 0.2341, 'from': 'played'}
+        html = self.OH.familiar_section(self.world(rows, clubs, stale), 7, self.P, self.GEO)
+        self.assertNotIn('%', html.split('Home club:')[1].split('</p>')[0])        # another club's record: ignored
+
+    def test_season_records_the_club_figures_explicitly(self):
+        P = Places()
+        P.arrive(1, MERSEY, MERSEY, 2027, 0)
+        s = _hc_season(P, (1,))
+        s.course_baseline = lambda gid, cid: Season.course_baseline(s, gid, cid)
+        HC.assign(s, 2027, 0)
+        club = HC.current(s, 1)
+        g = SimpleNamespace(id=1, familiarity={club: 10.0, 'merse-std': 20.0})
+        self.assertEqual(HC.familiarity_at_club(s, g), {'course': club, 'rounds': 10.0, 'engine_rounds': 10.0,
+                                                        'value': round(FAM.value(10.0), 4), 'from': 'played'})
+        g = SimpleNamespace(id=1, familiarity={})
+        self.assertEqual(HC.familiarity_at_club(s, g)['engine_rounds'], FAM.REGION_ROUNDS)
+        self.assertEqual(HC.familiarity_at_club(s, g)['from'], 'region')
+        self.assertIsNone(HC.familiarity_at_club(s, SimpleNamespace(id=2, familiarity={})))
 
     def test_archived_history_and_unrecorded(self):
         w = self.world()

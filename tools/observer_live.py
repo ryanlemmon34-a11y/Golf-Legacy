@@ -78,6 +78,7 @@ def capture(session):
     people = {}
     from golfsim.ratings import ATTRIBUTE_KEYS
     from golfsim import familiarity as FAM
+    from golfsim import home_clubs as HC
     peaks = getattr(s, 'peak_overall', {})
     initial = set((session.state.get('archive') or {}).get('initial') or ())   # golfers who were there at the start
     for g in s.world.golfers:
@@ -95,6 +96,7 @@ def capture(session):
         people[g.id]['familiar'] = [(k, round(r, 1)) for k, r in FAM.top_courses(g.familiarity)]
         people[g.id]['aggression'] = round(g.personality['aggression'])   # a style, not a grade (rules 2026-11-08)
         people[g.id]['home_club'] = [list(r) for r in getattr(s, 'home_clubs', {}).get(g.id, ())]   # dated
+        people[g.id]['home_club_familiarity'] = HC.familiarity_at_club(s, g)   # rounds there, engine's value
     for kind, table in (('coach', st.coaches), ('caddie', st.caddies)):
         for c in table.values():
             p = people.setdefault(c.id, {'name': c.name, 'country': c.country, 'born': c.born, 'roles': []})

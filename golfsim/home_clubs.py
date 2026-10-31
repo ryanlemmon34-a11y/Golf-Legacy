@@ -65,6 +65,21 @@ def current(season, gid):
     return rows[-1][2] if rows else None
 
 
+def familiarity_at_club(season, g):
+    """A golfer's familiarity at their current home club, explicitly (never inferred from a top-ten list):
+    {'course', 'rounds' (competitive rounds actually played there), 'engine_rounds' (what the engine is given:
+    the larger of those and the regional / home-club floor), 'value' (1 - exp(-engine_rounds / 15)), 'from'
+    ('played', 'region', 'country' or 'home club')}; None without a home club."""
+    from . import familiarity as FAM
+    cid = current(season, g.id)
+    if cid is None:
+        return None
+    rounds = float(g.familiarity.get(cid, 0.0))
+    eff, src = FAM.engine_rounds(rounds, season.course_baseline(g.id, cid))
+    return {'course': cid, 'rounds': round(rounds, 1), 'engine_rounds': round(eff, 2),
+            'value': round(FAM.value(eff), 4), 'from': src}
+
+
 def assign(season, year, week):
     """Give every golfer whose residence is recorded a home club where they live, recording a new dated entry
     only when they have none or have moved since (their club's place differs from where they live)."""

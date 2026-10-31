@@ -48,6 +48,7 @@ from .calendar import TOUR_BY_KEY
 from .history import Relations
 from .course_library import course_place
 from . import familiarity as FAM
+from . import home_clubs as HC
 
 FORMAT = 'golf-legacy-archive/1'
 
@@ -325,7 +326,10 @@ class ArchiveWriter:
                                        'aggression': round(g.personality['aggression']),
                                        # home clubs where they lived, dated: [year, week, course or None, basis,
                                        # place] (from rules 2026-11-08)
-                                       'home_club': [list(r) for r in getattr(season, 'home_clubs', {}).get(g.id, ())]}}
+                                       'home_club': [list(r) for r in getattr(season, 'home_clubs', {}).get(g.id, ())],
+                                       # their familiarity at the current home club, explicitly: rounds played
+                                       # there and the value the engine uses (home_clubs.familiarity_at_club)
+                                       'home_club_familiarity': HC.familiarity_at_club(season, g)}}
         for c in st.coaches.values():
             p = people.setdefault(c.id, {'name': c.name, 'country': c.country, 'born': c.born, 'hometown': None})
             p['coach'] = {'speciality': c.speciality, 'youth': c.youth, 'reputation': c.reputation, 'clients': c.clients,

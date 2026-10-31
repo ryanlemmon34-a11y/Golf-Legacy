@@ -59,8 +59,11 @@ course in their own state / province. A club in their own state / province alrea
 adds nothing there; only a club found by country gains it. Always the larger of rounds played, the regional
 baseline and that floor -- never a sum, no separate home advantage, no practice-round count.
 
-Archived as `people.json` `golfer.home_club` (the dated list) and captured live; the profile names the home
-club (and earlier ones) and the course page counts the golfers whose home club it is. Venue use of local
+Archived as `people.json` `golfer.home_club` (the dated list) and captured live, together with the
+golfer's familiarity at the current club recorded explicitly (`golfer.home_club_familiarity`: rounds actually
+played there, the rounds and value the engine uses, and their source; `home_clubs.familiarity_at_club`). The
+profile names the home club (and earlier ones) and shows those recorded figures -- never a value inferred from
+the top-ten list, which a home club may be outside of; with no record, no figure is claimed and the course page counts the golfers whose home club it is. Venue use of local
 courses: `docs/COURSE_LIBRARY.md`, "Local hosting".
 
 ### Profiles

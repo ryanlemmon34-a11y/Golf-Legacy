@@ -662,6 +662,15 @@ def familiar_courses(w, pid, p):
     return [], None
 
 
+def home_club_familiarity(w, pid, p):
+    """The golfer's familiarity at their current home club as the season recorded it ({'course', 'rounds',
+    'engine_rounds', 'value', 'from'}), from the snapshot, else the history; None where not recorded."""
+    lp = w.live.people.get(pid) if w.live else None
+    if lp is not None and 'home_club_familiarity' in lp:
+        return lp['home_club_familiarity']
+    return ((p or {}).get('golfer') or {}).get('home_club_familiarity')
+
+
 def home_club_rows(w, pid, p):
     """A golfer's dated home clubs ([year, week, course or None, basis, place], oldest first): the snapshot's, else
     the history's as it ended; None where neither recorded them (histories before rules 2026-11-08)."""
@@ -716,12 +725,14 @@ def familiar_section(w, pid, p, geo):
     else:
         out.append('<p class="muted">No competitive rounds yet.</p>')
     if club:
-        played = dict(rows).get(club[2])
         line = (f'Home club: {O.course_link(w, club[2])} since {O.esc(club[0])} '
                 f'({"in their state / province" if club[3] == "region" else "found by country: none in their state / province"})')
-        if played is None:
-            eff, src = engine(club[2], 0.0)
-            line += f'; familiarity the engine uses there {100 * FAM.value(eff):.1f}% ({O.esc(_FROM[src])})'
+        # the club's own recorded figures; never inferred from the top-ten list (a club outside it may have
+        # many rounds): without a record, no familiarity figure is claimed
+        hf = home_club_familiarity(w, pid, p)
+        if hf and hf.get('course') == club[2]:
+            line += (f'; rounds played there {hf["rounds"]:g}; familiarity the engine uses there '
+                     f'{100 * hf["value"]:.1f}% ({O.esc(_FROM.get(hf["from"], hf["from"]))})')
         out.append(f'<p>{line}.</p>')
         if len(clubs) > 1:
             out.append('<p class="muted">Earlier home clubs: ' + '; '.join(
