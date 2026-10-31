@@ -70,6 +70,13 @@ three a winter (`career_rows`):
 not part of the model in that case) and the inputs behind them that the season file does not already hold
 (`None`: not available at the decision). Terms are signed as they enter the logit.
 
+**Stored figures are rounded; the recorded outcome is authoritative.** The decision was made with the unrounded
+`p` and `u` (and the model's unrounded terms); the row keeps them rounded (`p` and `u` to 4 decimals here, terms to
+2, mortality's `p` and `u` to 5). So a row can show `p` and `u` equal, or even `u` just above `p`, with outcome 1:
+for example p = 0.250049 and u = 0.250041 decide yes (u < p) and are stored as 0.25 and 0.25 with outcome 1. Read
+`outcome` (and the transitions and `deaths`, which record what happened) as the fact; recomputing `u < p` from the
+stored, rounded values is not, and the rounded terms sum to logit(p) only to within their rounding.
+
 | model | when | terms | inputs |
 |---|---|---|---|
 | `retire_tour` | full-time professionals and full-time amateurs outside college | `base` -6.5, `age` 0.22 x (age - 30), `standing` 1.2 x (1 - money-list standing), `opportunity` -1.0 x the tier's opportunity, `injury` (0.06 x injury weeks + 0.8 x lasting-damage injuries) | age, tier, money_rank_pct (None for non-professionals: standing 0.5), lasting_damage |
