@@ -11,21 +11,43 @@ and no season was simulated. The only computations were reading the recorded dat
 
 ## Verdict (summary)
 
-**Vaughan is a rare outlier that the model's rules justify. He is not evidence of a generation bug or of an
-early-maturation bug specific to him. Confidence: high (about 85 %) for "no bug in generation or development".**
-Three model-wide calibration properties make a player like him possible in roughly a quarter of 45-season worlds.
-Whether that is acceptable is a design decision, not a defect:
+**Vaughan is a rare outlier that the model's rules produce. These checks found no defect in generation or
+development, and no early-maturation defect specific to him. Calibration is not validated: there are no agreed
+target frequencies to validate against.**
+
+Three model-wide calibration properties explain him. Whether they are acceptable is a design decision, not a
+defect:
 
 1. **Potential has a Gaussian tail up to the 99 cap.** Potential is drawn as N(mu ≈ 35, 13) for about 10,000
    juniors a year. Over 44 cohorts that gives an expected 0.29 juniors with potential ≥ 97 (25 % of worlds analytic,
    31/100 sampled) and 0.13 juniors at the 99 cap (12-14 % of worlds).
+
+   That 25-31 % is the chance of a **potential-97+ junior** in 44 cohorts. It is **not** the chance of the full
+   Vaughan phenotype (potential 97+, then 30 majors and about 25 seasons as the top-rated pro). The career outcome
+   also needed a large lead over the next junior (11/100 sampled worlds) and a run of weak rival cohorts. That joint
+   frequency was not measured and is lower.
 2. **Development closes about 25-28 % of the remaining gap each year, whatever the golfer's drawn peak age.** The
    peak age is drawn but only used for aging. So high-potential juniors run about a year ahead of the generator's own
    age curve between 19 and 22. Vaughan runs further ahead because he has a top-decile rate (work ethic 71.8, a
    coach of quality about 0.7).
-3. **Dominance comes from the gap to the next-best golfer, not from thin depth.** His potential is 5.6 points above
-   any other junior of the run, and the 2048-2067 cohorts produced no potential ≥ 90 rival (P = 19 %). The number
-   of pros at Overall ≥ 85 in his era (6.6 a season) matches the earlier eras (6.7, 7.5).
+3. **Dominance comes from the gap between him and No. 2, not from fewer good pros.** His potential is 5.6 points
+   above any other junior of the run, and the 2048-2067 cohorts produced no potential ≥ 90 rival. The model puts
+   such a drought at P = 19 %, but that is a model figure and does not show the era is realistic.
+
+   The number of pros at Overall ≥ 85 in his era (6.6 a season) matches the earlier eras (6.7, 7.5). Relative to a
+   96-97 golfer, though, competition *was* thin: in all 21 seasons of his era no pro was within 3 points of him,
+   and in 19 of 21 nobody was within 5.
+
+   **His record:**
+
+   | Event type | Wins / starts | Win rate |
+   |---|---|---|
+   | All professional events (career) | 123 / 399 | 31 % |
+   | Premier Tour (tier-1) events | 89 / 293 | 30 % |
+   | Majors | 30 / 100 | 30 % |
+   | Majors, 2059-2069 | 18 / 44 | 41 % |
+
+   Wei Fu at his peak (2038-2048) won 15 % of his tier-1 starts and 26 % of his major starts.
 
 **Created Overall vs season-end Overall.** The "89.1 at 18" is the season-end Overall of his first season (after
 the winter's aging). His **created (generated) Overall was 85.31**, with potential 97.0116 (shown as 97.1) and peak
@@ -81,8 +103,11 @@ All procedural golfers recorded at 18 or 19 are juniors; new professionals arriv
 | Seeded world (all ages) | 6,656 | 92.9 (Kincaid, 33 in 2027) | 12 (0.18%) | 1 | 1 | 0 | 0 |
 | Seeded world, aged ≤ 22 in 2027 | 1,545 | 86.8 | 1 | 0 | 0 | 0 | 0 |
 
-New professionals cannot be superstars by construction. A candidate the junior class would have kept is excluded
-from that pathway (`population.py:341-345`), and every high-potential candidate is kept as a junior.
+The new-professional maximum (potential 80.9, created 77.0) is the **observed sample only, not a structural
+bound**. The new-professional pathway excludes candidates the junior filter would have kept (`population.py:341-345`).
+That filter judges current Overall at 18 plus scouting noise, not potential. A very-high-potential candidate with
+an exceptionally late peak, and so a low Overall at 18, can fail it and arrive later as a new professional. At these
+potentials it is very rare, but the code does not prohibit it.
 
 **Where Vaughan sits.** He is rank 1 of the procedural juniors on all four measures:
 
@@ -167,8 +192,10 @@ draw loop of the pinned `junior_class`.
 The median best potential per world is 94.2 (range 89.0-99.0), and the median gap from best to second is 1.9.
 Some sampled worlds have created Overall 90-92 at 18. Vaughan is not even at the generator's extreme.
 
-**Section 1 conclusion.** The created 85.3 is about what one 44-cohort world produces (expected 1.0). Potential
-97.1 is about a 1-in-4 world event. The runaway gap to the next junior is about a 1-in-9 world event. The observed
+**Section 1 conclusion.** The created 85.3 is about what one 44-cohort world produces (expected 1.0). A
+potential-97.1 junior is about a 1-in-4 world event. That is the chance of the *junior*, not of his 30-major,
+25-season career. A gap of 5.6 or more to the next junior is about a 1-in-9 world event. The joint frequency of
+the whole phenotype was not measured. The observed
 tail rates of run A (3 juniors ≥ 90 against 3.68 expected, 15 ≥ 85 against 19.3) are, if anything, slightly
 *below* expectation. The tail is not fatter than the code specifies.
 
@@ -304,9 +331,14 @@ Nothing is broken:
 ## 3. Elite competitive depth (run A)
 
 Per season, among active professionals ranked by season-end Overall. The full table is in `depth_A.out.md`.
+
+**Labelling note.** The "tier-1 wins / all" columns below divide the top golfer's wins by **all tier-1 events
+played**: the 36 Premier Tour events of a season, majors excluded (`wins_by_tier[1]`). They are *not* his win rate
+per start. His actual starts and win rates are in the record tables further down.
+
 Selected seasons:
 
-| Season | Pros ≥85 | Pros ≥90 | Top Overall | No.2 | No.10 | Gap 1-2 | Gap 1-10 | Top golfer's majors | Top golfer's tier-1 wins / all |
+| Season | Pros ≥85 | Pros ≥90 | Top Overall | No.2 | No.10 | Gap 1-2 | Gap 1-10 | Top golfer's majors | Top golfer's tier-1 wins / all tier-1 events played |
 |---|---|---|---|---|---|---|---|---|---|
 | 2027 | 8 | 1 | 92.3 Kincaid | 89.4 Haskins | 84.9 | 2.9 | 7.4 | 0 | 5/36 |
 | 2032 | 7 | 0 | 88.8 Mthembu | 88.7 | 83.4 | 0.1 | 5.4 | 0 | 0/36 |
@@ -323,19 +355,60 @@ Selected seasons:
 
 ### Eras
 
-| Era | Seasons | Mean pros ≥85 | Mean pros ≥90 | Mean top Overall | Mean gap 1-2 | Mean gap 1-10 | Top golfer's share of majors | Top golfer's share of tier-1 wins |
+| Era | Seasons | Mean pros ≥85 | Mean pros ≥90 | Mean top Overall | Mean gap 1-2 | Mean gap 1-10 | Top golfer's share of all majors played | Top golfer's share of all tier-1 events played |
 |---|---|---|---|---|---|---|---|---|
 | Seeded stars (Beaumont, Haskins, Kincaid) | 2027-2037 | 6.7 | 0.3 | 89.6 | 1.05 | 5.94 | 2% | 4% |
 | Wei Fu | 2038-2048 | 7.5 | 1.4 | 90.9 | 1.76 | 6.61 | 25% | 5% |
 | Vaughan | 2049-2069 | 6.6 | 1.6 | 96.0 | **6.50** | **12.11** | 33% | 10% |
 | End of the run | 2066-2071 | 4.7 | 1.0 | 93.9 | 5.94 | 11.00 | 25% | 8% |
 
-Rolling 5-season windows:
+Rolling 5-season windows, as shares of **all events played**:
 
-- Wei Fu peaked at 6 of 20 majors (30 %) and at most 6 % of tier-1 wins.
-- Vaughan held 4-9 of 20 majors (20-45 %, peak 2060-2064 and 2064-2068) and 8-13 % of tier-1 wins (peak 23 of 180
-  in 2056-2060 and 2057-2061).
+- Wei Fu peaked at 6 of 20 majors (30 %) and at most 6 % of all tier-1 events played.
+- Vaughan held 4-9 of 20 majors (20-45 %, peak 2060-2064 and 2064-2068) and 8-13 % of all tier-1 events played
+  (peak 23 of 180 in 2056-2060 and 2057-2061).
 - During his windows the mean gap from No. 1 to No. 2 was 5-7.5 points; in all earlier windows it was 0.4-2.3.
+
+### Actual record: starts, wins and win rate
+
+Taken from the archived event results of every season (`record_A.py`). Professional events are those of kind
+pro, premier and major. Tier-1 means the Premier Tour events, majors excluded. A win is position 1. All 180 major
+winners agree with the run data.
+
+| Span | Golfer | Professional wins / starts | Tier-1 wins / starts | Major wins / starts |
+|---|---|---|---|---|
+| Career 2046-2071 | **Rupert Vaughan** | 123/399 (31%) | 89/293 (30%) | **30/100 (30%)** |
+| Career 2035-2071 | Wei Fu | 52/553 (9%) | 36/416 (9%) | 16/137 (12%) |
+| Career 2041-2069 | Weston Wolfe | 48/549 (9%) | 37/418 (9%) | 6/112 (5%) |
+| Career 2040-2069 | Taj Healy | 51/441 (12%) | 41/336 (12%) | 9/98 (9%) |
+| Career 2027-2036 | Carson Kincaid (seeded) | 18/187 (10%) | 16/147 (11%) | 2/40 (5%) |
+| Career 2027-2044 | Colby Haskins (seeded) | 31/319 (10%) | 25/248 (10%) | 6/71 (8%) |
+| Career 2027-2043 | Romain Beaumont (seeded) | 19/308 (6%) | 11/240 (5%) | 8/68 (12%) |
+| 2038-2048 (his era) | Wei Fu | 31/180 (17%) | 20/137 (15%) | 11/43 (26%) |
+| 2047-2048 (ages 19-20) | Vaughan | 11/41 (27%) | 5/28 (18%) | 2/7 (29%) |
+| 2049-2069 (his era) | Vaughan | 107/330 (32%) | 79/246 (32%) | 28/84 (33%) |
+| 2049-2058 | Vaughan | 51/168 (30%) | 41/128 (32%) | 10/40 (25%) |
+| 2059-2069 | Vaughan | 56/162 (35%) | 38/118 (32%) | 18/44 (41%) |
+| 2066-2071 (ages 38-43) | Vaughan | 24/84 (29%) | 18/60 (30%) | 6/24 (25%) |
+
+- In rolling 5-season windows Vaughan won 24-40 % of his tier-1 starts and 20-45 % of his major starts. The peak
+  was 23/57-58 tier-1 (40 %) in 2056-2061 and 9/20 majors in 2060-2064 and 2064-2068.
+- He plays about 10-13 tier-1 events and 4 majors a season.
+- **The rule-of-thumb win shares of about 10-13 % (of all tier-1 events played) understate his per-start
+  dominance.** Per start he wins about 3 times as often as Wei Fu or the seeded stars at their best (about 30 %
+  against 9-15 %).
+
+### Competition close to No. 1
+
+Active professionals other than the top-Overall pro, within a given number of points of the top season-end Overall
+(`depth_close.py`):
+
+| Era | Seasons | Mean top Overall | Mean pros within 3 of No.1 | Within 5 | Within 8 | Seasons with nobody within 3 | Seasons with nobody within 5 | Mean pros ≥ 88 |
+|---|---|---|---|---|---|---|---|---|
+| Seeded stars | 2027-2037 | 89.6 | 3.5 | 6.5 | 19.0 | 0 of 11 | 0 of 11 | 2.5 |
+| Wei Fu | 2038-2048 | 90.9 | 1.3 | 4.4 | 14.3 | 0 of 11 | 0 of 11 | 2.0 |
+| Vaughan | 2049-2069 | 96.0 | **0.0** | **0.2** | 2.3 | **21 of 21** | **19 of 21** | 3.3 |
+| End of run | 2066-2071 | 93.9 | 0.0 | 0.2 | 2.7 | 6 of 6 | 5 of 6 | 1.8 |
 
 Stars:
 
@@ -346,21 +419,28 @@ Stars:
 | Carson Kincaid (seeded) | 92.9 | 92.3 | 4 | 2 | 16 | 2.9 |
 | Colby Haskins (seeded) | 89.5 | 89.4 | 1 | 6 | 25 | 0.2 |
 
-The top-Overall golfer's tier-1 win share rises with his gap over No. 2: 2 % at a gap of 0-1 (11 seasons), 6 % at
-1-2 (4 seasons), 8 % at 2-3 (7 seasons) and 8 % at 3-5 (3 seasons). At a gap of 5-7.7 it is about 10-13 %, which is
-Vaughan alone.
+The top-Overall golfer's share of all tier-1 events played (not per start) rises with his gap over No. 2: 2 % at a
+gap of 0-1 (11 seasons), 6 % at 1-2 (4 seasons), 8 % at 2-3 (7 seasons) and 8 % at 3-5 (3 seasons). At a gap of
+5-7.7 it is about 10-13 %, which is Vaughan alone.
 
-**Is dominance a consequence of thin depth at the top?** Mostly no.
+**Is dominance a consequence of thin depth at the top?** It depends on what "depth" means.
 
-- Elite depth in his era (6.6 pros ≥ 85, 1.6 ≥ 90, No. 10 about 84) is the same as in the earlier eras.
-- What differs is the **gap from No. 1 to No. 2**: 6.5 against 1-1.8. It comes from Vaughan's own potential being
-  5.6 points above anyone else's, together with a chance drought of rivals. The 20 cohorts from 2048 to 2067
-  produced no junior with potential ≥ 90; 1.67 were expected, and none happens with P = 19 %.
-- Depth does thin at the end of the run (4-5 pros ≥ 85 in 2066-2071). This is why he is still No. 1 at 43 with
+- **Measured by an absolute level, depth was not thinner.** His era had 6.6 pros ≥ 85, 1.6 ≥ 90 and a No. 10 of
+  about 84, the same as the earlier eras.
+- **Measured relative to him, competition was very thin.** No pro was within 3 points of him in any of the 21
+  seasons, and nobody was within 5 in 19 of them. Earlier eras always had someone within 3: 3.5 pros a season in the
+  seeded era, 1.3 in Wei Fu's. The 6.5-point gap from No. 1 to No. 2 (against 1-1.8 before) means the unchanged
+  count at ≥ 85 does **not** rule out thin competition for a 96.7 golfer.
+- **Where the gap comes from:** his own potential, 5.6 points above anyone else's, plus a drought of rivals. The 20
+  cohorts from 2048 to 2067 produced no junior with potential ≥ 90 (1.67 expected). The model gives P = 19 % for no
+  such junior in 20 *fixed* cohorts. This is a model-based figure for a window chosen after seeing it, so it is no
+  independent evidence that this era is realistic.
+- Depth also thins at the end of the run (4-5 pros ≥ 85 in 2066-2071). This is why he is still No. 1 at 43 with
   92.3. The seeded era showed a similar dip (4 pros ≥ 85 in 2038).
-- His share of tier-1 wins (about 10-13 %) is modest for a 7-point Overall gap. The 30 majors come from 25 seasons
-  at No. 1 (about 1.2 majors a season), not from an absurd win rate. Whether a 7-point gap *should* convert into
-  about 1.2-1.5 majors a season is an engine/outcome calibration question, outside this diagnosis.
+- **Per start he is dominant:** 30 % of tier-1 starts and 30 % of major starts (41 % of major starts in 2059-2069),
+  against Wei Fu's 15 % and 26 % at his peak. The 30 majors come from about 4 major starts a season over 25 seasons
+  at a 30 % win rate. Whether a 5-7.7-point Overall lead *should* convert into about a 30 % win rate per start is an
+  engine/outcome calibration question this diagnosis did not assess.
 
 ## 4. Pinned (473690a) vs candidate (0a05310)
 
@@ -421,18 +501,30 @@ Wiring is in `wt_final/golfsim/careers.py:570-574` (`_cohort_args`), `:577-606` 
 
 ## 5. Verdict and what would settle it
 
-**Verdict: a justified, rare-but-expected outlier, and the model behaves as written. Confidence: about 85 % that
-there is no generation or development defect.**
+**Verdict: a rare outlier that the model's rules produce. No defect was found in these checks. Calibration is not
+validated, because there are no agreed target frequencies to validate it against.**
 
 - His created Overall of 85.3 matches what one 44-cohort world produces (expected 1.01).
-- Potential ≥ 97 occurs in 25-31 % of worlds.
+- A potential-97+ junior occurs in 25-31 % of 44-cohort worlds. That is the chance of the junior, not of the full
+  Vaughan phenotype (97+ potential, 30 majors, about 25 seasons as the top-rated pro). The phenotype's frequency was
+  not measured and is lower.
 - His first-season +3.77 (32 % of the gap) and his later 34-37 % a year are upper-decile but explained by work
   ethic 71.8 and coaching.
-- His era's dominance comes from a 5.6-point potential lead plus a chance (P about 19 %) rival drought, not from
-  thin elite depth.
+- His era's dominance comes from a 5.6-point potential lead plus a rival drought. The drought's P ≈ 19 % is a model
+  figure for a window chosen after the fact. Measured by an absolute level (pros ≥ 85), elite depth was unchanged.
+  Relative to him, competition was thin: nobody within 3 points in 21 of 21 seasons, and nobody within 5 in 19 of
+  21. Per start he won 30 % of tier-1 events and 30 % of majors.
 
-There are two **calibration properties** the owner may still want to change. Both are design choices with
-documented effects, not bugs:
+The corrections above (phenotype vs junior frequency, per-start record, thinness relative to No. 1, the model-based
+drought figure, new-professional maximum as an observation) **do not reverse the rarity result**.
+
+**Recommendation (agreed with the independent calibration review): no tuning now.**
+
+- Keep organic extreme potential for the next test.
+- Treat maturation timing as a specific design consideration for the next playthrough, not a proven bug: growth does
+  not read the drawn peak age (property (b) below).
+
+Two **calibration properties** to keep in view. Both are design choices with documented effects, not bugs:
 
 - **(a) Potential tail and the 99 cap.** POTENTIAL_SD = 13 around mu ≈ 35 for about 10k juniors a year puts a
   potential ≥ 97 junior in about a quarter of 45-year worlds, and a capped 99 in about 1 in 8. Some worlds create
@@ -442,9 +534,12 @@ documented effects, not bugs:
   fast learners 2-3 years ahead. Late-peak golfers like Vaughan (28.5) do not mature late. This is model-wide and
   mild. Making the learning rate depend on age relative to `peak_age` would align the two.
 
-Remaining 15 % uncertainty: (i) the personality and coach effect on his growth rate is inferred from a re-derived
-personality (exact attribute Overall match) and the recorded coaching quality, not from archived personality; (ii)
-the outcome side (how many majors a 7-point gap should yield) was not assessed.
+Not covered by these checks:
+
+- The personality and coach effect on his growth rate is inferred from a re-derived personality (exact attribute
+  Overall match) and the recorded coaching quality. The archive does not keep personality.
+- The outcome side was not assessed: whether a 5-7.7-point Overall lead should win about 30 % of starts.
+- The joint frequency of the full phenotype (junior, lead and rival drought, career) was not measured.
 
 **What would settle it.** None of these need full seasons.
 
@@ -460,9 +555,9 @@ the outcome side (how many majors a 7-point gap should yield) was not assessed.
    quality.
    - This gives the season-end distribution at 18-22 for a given created Overall and potential. It would confirm
      that 32-37 % a year is the upper decile and quantify (b), with and without a `peak_age`-relative learning rate.
-3. **Outcome check** (optional, small). From existing run data only, map the top golfer's tier-1 win and major
-   share against his Overall gap over No. 2 across all saved runs, to judge whether about 1.2-1.5 majors a season at
-   a 7-point gap is the intended conversion.
+3. **Outcome check** (optional, small). From existing run data only, map each top golfer's win rate per start
+   (tier-1 and majors) against his Overall gap over No. 2 across all saved runs. That would judge whether about 30 %
+   per start at a 5-7.7-point gap is the intended conversion.
 
 ## Scripts and outputs
 
@@ -478,6 +573,8 @@ and were run with `nice -n 19`. They read only the run folders and the two check
 | `gen_curve_vs_actual.py` | Vaughan vs the generator's age curve | `gen_curve_vs_actual.out.md` |
 | `vaughan_personality.py` | Re-derives his generated personality (work ethic 71.8, coachability 52.9) | `vaughan_personality.out.md` |
 | `depth_A.py` | Elite depth per season, rolling 5-season dominance, eras | `depth_A.out.md` |
+| `record_A.py` | Starts, wins and win rates (professional, tier-1, majors) from the archived event results; major winners cross-checked (180/180) | `record_A.out.md` |
+| `depth_close.py` | Pros within 3 / 5 / 8 points of No. 1, per season and by era | `depth_close.out.md` |
 | `bcd_freq.py` | Runs B, C, D frequencies | `bcd_freq.out.md` |
 | `gen_expect.py` | Analytic expectations, exact reproduction of seed 360013's 44 cohorts, pure-generator sample of 100 worlds (pinned code) | `gen_expect.out.md` |
 | `shares_effect.py` | Candidate nation-share effect on the elite tail (candidate `pass_chance`/`expected_shares`) | `shares_effect.out.md` |
