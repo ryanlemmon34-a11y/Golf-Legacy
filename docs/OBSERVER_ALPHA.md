@@ -21,6 +21,15 @@ history archive), `--worlds DIR` for another library folder, `--port`, `--worker
 
 The observer listens on 127.0.0.1 only (this computer). Worlds are folders in `worlds/` (not tracked by git).
 
+## Fresh worlds only (from 31 October 2026)
+
+Only worlds created and saved by the build you are running can be continued (the owner's decision: no
+compatibility with older worlds, no migrations). Every other save -- one made by an earlier engine, an older
+save format, or the classic calendar -- is listed in the world library as an **unsupported save** with its
+reasons. Its published history can still be browsed read-only and the folder copied; it is never continued,
+changed or deleted. New worlds always play the reference calendar (majors in weeks 15, 20, 25 and 30). The
+earlier sections below describe what earlier builds offered ("continue with this engine" is gone).
+
 ## The v14 update (in main from 30 October 2026)
 
 It changes the simulation (the reference calendar for new worlds, the performance work, the rights ledger and
@@ -221,7 +230,7 @@ advance, and the observer has nothing unsaved of its own. "Resume" is simply Ope
 | Save | What the observer does |
 |---|---|
 | A world saved by **this engine** (format golf-legacy-session/1, schema 1) | Open and advance it. |
-| A world saved by **another engine** (older code; e.g. the 50-season world, engine commit 7334ffe, and every world made before the 30 October 2026 update) | Browse its history read-only, or **Copy** it with "continue with this engine": the copy records which engine saved it and which continues it (`ENGINE_ACCEPTED.json`), and only the copy is opened. The original is never resumed or changed. Its history keeps what the older engine produced; everything after the copy is the new engine's. |
+| A world saved by **another engine** (older code), or one playing the **classic calendar** | An unsupported save, listed with its reasons: browse its history read-only, or copy the folder. It is never continued, changed or deleted (from 31 October 2026; earlier builds offered a "continue with this engine" copy, and such copies are unsupported too). |
 | A history archive without a session (a folder with `MANIFEST.json`, or `world.json` from before manifests) | Browse read-only. |
 | An unknown save format or schema | Listed as unsupported; not opened. |
 

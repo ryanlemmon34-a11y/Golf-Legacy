@@ -347,7 +347,7 @@ os._exit(9)                                   # the window closed: no cleanup at
         self.assertEqual(files_digest(lib / 'demo'), before)
         self.assertEqual(WL.inspect(lib / 'demo copy')['cursor'], WL.inspect(lib / 'demo')['cursor'])
         self.assertFalse((lib / 'demo copy' / 'lock').exists())
-        # a world saved by another engine: never resumed in place
+        # a world saved by another engine: an unsupported save, never continued (owner, 31 October 2026)
         other = lib / 'old engine'
         shutil.copytree(self.base, other)
         cur = json.loads((other / 'CURRENT').read_text())
@@ -355,23 +355,44 @@ os._exit(9)                                   # the window closed: no cleanup at
         meta['engine'], meta['commit'] = 'an-older-engine', '7334ffe'
         (other / cur['dir'] / 'meta.json').write_text(json.dumps(meta))
         os.utime(other / cur['dir'] / 'meta.json')
+        before = files_digest(other)
         info = WL.inspect(other)
         self.assertFalse(info['same_engine'] or info['can_resume'])
-        self.assertIn('other engine', self.draw_library(app))
-        self.assertEqual(app.open({'name': ['old engine']})[0], 'err')
+        self.assertEqual(info['unsupported'], ['saved by an earlier engine (commit 7334ffe)'])
+        page = self.draw_library(app)
+        self.assertIn('unsupported save', page)
+        self.assertIn('saved by an earlier engine (commit 7334ffe)', page)
+        self.assertNotIn('continue with this engine', page)
+        err = app.open({'name': ['old engine']})
+        self.assertEqual(err[0], 'err')
+        self.assertIn('cannot be continued', err[1])
         with self.assertRaises(ValueError):                             # the guard itself is untouched
             Session.open(other, workers=1)
-        self.assertIsNone(app.copy({'name': ['old engine'], 'new_name': ['old engine continued'],
-                                    'accept_engine': ['yes']}))
+        self.assertEqual(app.copy({'name': ['old engine'], 'new_name': ['old engine continued'],
+                                   'accept_engine': ['yes']})[0], 'err')  # no continuation, even of a copy
+        self.assertFalse((lib / 'old engine continued').exists())
+        self.assertIsNone(app.copy({'name': ['old engine'], 'new_name': ['old engine copy']}))
         app.jobs.wait(120)
-        accepted = json.loads((lib / 'old engine continued' / WL.ENGINE_ACCEPTED).read_text())
-        self.assertEqual(accepted['saved_by_commit'], '7334ffe')
-        self.assertTrue(WL.inspect(lib / 'old engine continued')['can_resume'])
-        self.assertIsNone(app.open({'name': ['old engine continued']}))
-        app.jobs.wait(120)
-        self.assertEqual(app.job()['state'], 'done', app.job()['message'])
-        self.assertEqual(app.world.label, 'old engine continued')
-        self.assertFalse((other / WL.ENGINE_ACCEPTED).exists())       # the original records nothing
+        self.assertFalse(WL.inspect(lib / 'old engine copy')['can_resume'])   # a copy is unsupported too
+        (lib / 'old engine copy' / WL.ENGINE_ACCEPTED).write_text('{"saved_by_commit": "7334ffe"}')
+        self.assertFalse(WL.inspect(lib / 'old engine copy')['can_resume'])   # an earlier build's acceptance too
+        app.open_now(other)                                             # the command line: read-only, as recorded
+        self.assertTrue(app.world.read_only)
+        self.assertEqual(files_digest(other), before)                   # nothing in it changed or deleted
+        # the classic calendar: unsupported even when this engine saved it; new worlds are always v2
+        classic = lib / 'classic'
+        shutil.copytree(self.base, classic)
+        cur = json.loads((classic / 'CURRENT').read_text())
+        meta = json.loads((classic / cur['dir'] / 'meta.json').read_text())
+        self.assertEqual(meta['calendar'], 'v2')
+        meta['calendar'] = 'v1'
+        (classic / cur['dir'] / 'meta.json').write_text(json.dumps(meta))
+        info = WL.inspect(classic)
+        self.assertTrue(info['same_engine'])
+        self.assertEqual((info['can_resume'], info['unsupported']), (False, ['the classic calendar (v1)']))
+        self.assertEqual(app.open({'name': ['classic']})[0], 'err')
+        self.assertEqual(app.create({'name': ['classic new'], 'seed': ['5'], 'calendar': ['v1']})[0], 'err')
+        self.assertNotIn('name="calendar"', self.draw_library(app))
         # read-only browsing of a world with no archived season yet
         self.assertIsNone(app.open({'name': ['demo']}, read_only=True))
         app.jobs.wait(60)

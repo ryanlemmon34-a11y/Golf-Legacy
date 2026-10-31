@@ -90,10 +90,12 @@ class App:
             w.close()
 
     def open_now(self, path, read_only=False):
-        """Open a world here and now (the command line's WORLD argument)."""
+        """Open a world here and now (the command line's WORLD argument). An unsupported save (WL.unsupported) is
+        opened read-only: its history as recorded, never continued."""
         info = WL.inspect(path)
-        allow = bool(info and info.get('accepted'))
-        return self.renderer.call(self._install, Path(path), None, read_only, allow)
+        if info and info.get('kind') == 'session' and not info.get('can_resume'):
+            read_only = True
+        return self.renderer.call(self._install, Path(path), None, read_only)
 
     def start(self, kind, title, fn, op=None, world_dir=None, cancellable=False):
         job = J.Job(kind, title, op_key=op, world_dir=world_dir, cancellable=cancellable)
@@ -218,10 +220,9 @@ class App:
             start = int(O.one(form, 'start_year') or 2027)
             if not 1900 <= start <= 2200:
                 raise ValueError('The starting year must be from 1900 to 2200.')
-            from golfsim import schedule as SCH
-            calendar = O.one(form, 'calendar') or SCH.DEFAULT
-            if calendar not in SCH.SPECS:
-                raise ValueError('Unknown calendar version.')
+            calendar = O.one(form, 'calendar') or 'v2'
+            if calendar != 'v2':                              # (the classic calendar is not offered for new worlds)
+                raise ValueError('New worlds play the reference calendar (v2).')
         except (ValueError, FileExistsError) as e:
             return ('err', esc(e))
 
@@ -246,19 +247,21 @@ class App:
         if info is None:
             return ('err', 'No such world.')
         if not read_only and not info['can_resume']:
-            return ('err', 'This world cannot be resumed with this engine. Browse its history read-only, or make a copy '
-                           'to continue it with this engine.')
+            return ('err', 'This world cannot be continued: ' + esc('; '.join(info.get('unsupported') or ['not a saved world']))
+                    + '. Only worlds this build created can be continued; its history can still be browsed read-only.')
 
         def run(job):
             if read_only or info['kind'] == 'archive':
                 job.update(phase='reading the history')
                 self.renderer.call(self._install, d, None, True)
-                job.finish('done', f'“{d.name}” open read-only: its published history only, nothing can change it.')
+                why = info.get('unsupported') or []
+                job.finish('done', f'“{d.name}” open read-only: its published history only, nothing can change it.'
+                           + (f' Unsupported save ({"; ".join(why)}): browsing only, as recorded.' if why else ''))
                 return
             from golfsim.session import Session
             job.update(phase='loading the committed world (and recovering if an advance was interrupted)')
             self.renderer.call(self._close_world)
-            s = Session.open(d, workers=self.workers, allow_other_engine=info.get('accepted') is not None)
+            s = Session.open(d, workers=self.workers)
             job.update(phase='reading its history')
             w = self.renderer.call(self._install, d, s)
             extra = ''
@@ -280,7 +283,9 @@ class App:
             dst = WL.check_name(self.lib, O.one(form, 'new_name'))
         except (ValueError, FileExistsError) as e:
             return ('err', esc(e))
-        accept = O.one(form, 'accept_engine') == 'yes'
+        if O.one(form, 'accept_engine') == 'yes':
+            return ('err', 'Continuing a world saved by an earlier engine is not supported: copy it to browse its history.')
+        accept = False
 
         def run(job):
             w = self.world
@@ -290,8 +295,7 @@ class App:
                     WL.copy_world(src, dst, job, accept_engine=accept)
             else:
                 WL.copy_world(src, dst, job, accept_engine=accept)
-            job.finish('done', f'Copied “{src.name}” to “{dst.name}”' + (
-                ' (to be continued with this engine)' if accept else '') + '. The original is unchanged.')
+            job.finish('done', f'Copied “{src.name}” to “{dst.name}”. The original is unchanged.')
         _, started = self.start('copy', f'Copy “{src.name}” to “{dst.name}”', run, world_dir=None)
         return None if started else ('warn', 'Another operation is running: one at a time.')
 
@@ -436,16 +440,11 @@ class App:
                 compat = '<span class="tag">browse only</span>'
             else:
                 date = O.date_text(i['cursor']) if i.get('cursor') else '?'
-                if not i['format_ok']:
-                    compat = f'<span class="tag">unsupported save {esc(i.get("format"))} schema {esc(i.get("schema"))}</span>'
-                elif i['same_engine']:
-                    compat = '<span class="tag">this engine</span>'
-                elif i['accepted']:
-                    compat = (f'<span class="tag">continued with this engine</span> <span class="muted">saved by '
-                              f'{esc((i["accepted"].get("saved_by_commit") or "")[:10])}</span>')
+                if i.get('unsupported'):
+                    compat = ('<span class="tag">unsupported save</span> <span class="muted">'
+                              + esc('; '.join(i['unsupported'])) + ': browse its history only</span>')
                 else:
-                    compat = (f'<span class="tag">other engine</span> <span class="muted">commit '
-                              f'{esc((i.get("commit") or "?")[:10])}</span>')
+                    compat = '<span class="tag">this engine</span>'
                 state = f'generation {esc(i.get("generation"))}, {esc(i.get("weeks_played"))} weeks played'
                 if i['years']:
                     state += f'; {span(i["years"])} archived'
@@ -463,11 +462,9 @@ class App:
                 acts.append(f'<form method="post" action="/worlds/open">{hidden}<button class="primary">Open</button></form>')
             if i['years'] or i['kind'] == 'archive':
                 acts.append(f'<form method="post" action="/worlds/browse">{hidden}<button>Browse history</button></form>')
-            other = i['kind'] == 'session' and not i['same_engine'] and not i['accepted'] and i['format_ok']
             acts.append(f'<form method="post" action="/worlds/copy">{hidden}<input name="new_name" required '
                         f'aria-label="Name of the copy" placeholder="name of the copy" size="14" value="{name} copy">'
-                        + ('<label class="muted"><input type="checkbox" name="accept_engine" value="yes" required> continue '
-                           'with this engine</label>' if other else '') + '<button>Copy</button></form>')
+                        '<button>Copy</button></form>')
             acts.append(f'<a class="button" href="/export?name={quote(i["name"])}">Report a problem</a>')
             if not (self.world is not None and self.world.path == i['path']):
                 acts.append(f'<form method="post" action="/worlds/remove">{hidden}<label class="muted"><input type="checkbox" '
@@ -481,23 +478,21 @@ class App:
                          + ''.join(acts) + '</div>'])
         out.append(O.table(['World', 'Date', 'Seed', 'Start', 'Compatibility', 'State', ''], rows) if rows else
                    '<p class="muted">No worlds yet: create one below.</p>')
-        out.append('<p class="muted">A world saved by another engine cannot be resumed in place: browse its history, or '
-                   'tick “continue with this engine” to copy it and continue the copy (the copy records which engine '
-                   'saved it). The original is never changed.</p>')
+        out.append('<p class="muted">Only worlds created and saved by this build can be continued. Any other save -- an '
+                   'earlier engine, an older save format or the classic calendar -- is listed as unsupported with its '
+                   'reasons: its published history can be browsed read-only and the folder copied, and nothing in it is '
+                   'changed or deleted.</p>')
         out.append('<h2>Create a world</h2><form method="post" action="/worlds/create" class="filters">'
                    '<label>Name<input name="name" required placeholder="my world"></label>'
                    '<label>Starting year<input name="start_year" type="number" min="1900" max="2200" value="2027"></label>'
                    f'<label>Seed<input name="seed" type="number" min="0" max="2147483647" value="{random.randrange(1, 1000000)}">'
-                   '</label><label>Calendar<select name="calendar"><option value="v2" selected>Reference (majors weeks '
-                   '15, 20, 25, 30)</option><option value="v1">Classic (majors weeks 18, 24, 25, 30)</option></select>'
                    '</label><button class="primary">Create</button></form>'
                    '<p class="muted">The starting year is the first season’s calendar year (golfers’ ages are set '
                    'from it); the seed is separate. The seed is the world’s starting point: the same seed always makes the same world -- the '
                    'same golfers and, shot for shot, the same history (that is what makes a problem report replayable). '
                    'A new seed is suggested each time; type an earlier world’s seed (shown in the library) to make that '
-                   'world again. The whole world is generated: every nation, golfer, coach and caddie. Calendar: new '
-                   'worlds play the reference calendar (roadmap v14); the classic calendar is the one earlier worlds '
-                   'were played on (for comparison). A world keeps its calendar for good.</p>')
+                   'world again. The whole world is generated: every nation, golfer, coach and caddie. Every new world '
+                   'plays the reference calendar (majors in weeks 15, 20, 25 and 30).</p>')
         trash = WL.trashed(self.lib)
         if trash:
             out.append('<h2>Removed worlds (trash)</h2>' + O.table(['World', 'Removed', 'Size', ''], [

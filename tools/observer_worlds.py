@@ -4,13 +4,15 @@ A world is a session directory (golfsim.session): CURRENT, checkpoint generation
 published history in archive/. A folder holding only a history archive (MANIFEST.json, or world.json for
 archives written before manifests) can be browsed read-only.
 
-Compatibility (shown for every world, decided before anything is opened):
+Compatibility (shown for every world, decided before anything is opened). Only worlds this engine created and
+saved can be continued (owner's decision, 31 October 2026: no compatibility with older worlds, no migrations):
 - the save format and schema must be this version's (golf-legacy-session/1, schema 1);
-- the engine that saved it (a fingerprint of the simulation code, golfsim/savegame.engine_id) must be
-  this one to resume it. A world saved by another engine is never resumed in place: it can be browsed
-  read-only, or copied with an explicit acceptance (ENGINE_ACCEPTED.json in the copy records which engine
-  saved it, which engine continues it and when), and only that copy is opened with the guard lifted.
-  Commits that change only the observer, tools, docs or persistence code keep the engine the same.
+- the engine that saved it (a fingerprint of the simulation code, golfsim/savegame.engine_id) must be this one;
+- it must play the reference calendar (v2); the classic calendar (v1) is not offered for new worlds.
+Anything else is an unsupported save, said so with its reasons (`unsupported`): its published history can
+still be browsed read-only and the folder copied, but it is never continued and never changed or deleted.
+Copies made by earlier builds to continue another engine's world (ENGINE_ACCEPTED.json) are treated the same
+way. Commits that change only the observer, tools, docs or persistence code keep the engine the same.
 
 Copies and diagnostic packages are made under the world's lock (no advance can commit while they are
 read), from the committed generation; the source is never changed (the lock file aside, which is removed
@@ -138,6 +140,34 @@ def check_name(lib, name):
     return d
 
 
+def _calendar_of(p):
+    """The calendar version a session plays, from what it records beside its checkpoint (saves written before
+    meta.json carried it): the creation record, else its published history's world file; None if unknown."""
+    try:
+        c = json.loads((p / WORLD_INFO).read_text()).get('calendar')
+        if c:
+            return c
+    except (OSError, ValueError):
+        pass
+    try:
+        m = read_manifest(p / 'archive')
+        return json.loads((p / 'archive' / m['files']['world']).read_text()).get('calendar') if m else None
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+
+
+def unsupported(info):
+    """Why a saved session cannot be continued by this build (empty when it can), in words."""
+    out = []
+    if not info.get('format_ok'):
+        out.append(f'an older save format ({info.get("format")}, schema {info.get("schema")})')
+    if not info.get('same_engine'):
+        out.append(f'saved by an earlier engine (commit {(info.get("commit") or "unknown")[:10]})')
+    if info.get('calendar') not in (None, 'v2'):
+        out.append(f'the classic calendar ({info.get("calendar")})')
+    return out
+
+
 def inspect(path):
     """What the library shows about a folder, read from small files only (nothing is loaded or changed):
     kind ('session' or 'archive'), date, generation, seed, engine and format compatibility. None if the
@@ -170,7 +200,9 @@ def inspect(path):
             info['accepted'] = json.loads((p / ENGINE_ACCEPTED).read_text())
         except (OSError, ValueError):
             info['accepted'] = None
-        info['can_resume'] = bool(meta) and info['format_ok'] and (info['same_engine'] or info['accepted'] is not None)
+        info['calendar'] = meta.get('calendar') or _calendar_of(p)
+        info['unsupported'] = unsupported(info) if meta else ['its checkpoint could not be read']
+        info['can_resume'] = bool(meta) and not info['unsupported']
         try:                                            # a lock whose owner certainly died is taken over on opening
             info['busy'] = not SES._owner_gone((p / 'lock').read_text())
         except OSError:

@@ -387,7 +387,8 @@ class Session:
                 'cursor': self.state['cursor'], 'engine': engine_id(), 'commit': engine_commit(),
                 'archive_through': self.state['archive_through'], 'weeks_played': self.state['weeks_played'],
                 'sha256': digest, 'archive_staged': sorted(self._pending['chunks']) if self._pending else [],
-                'archive_files': staged, 'history_gen': history, 'written': time.strftime('%Y-%m-%d %H:%M:%S')}
+                'archive_files': staged, 'history_gen': history, 'written': time.strftime('%Y-%m-%d %H:%M:%S'),
+                'calendar': getattr(self.season, 'calendar_version', None)}
         _write_synced(tmp / 'meta.json', json.dumps(meta, indent=1).encode())
         if _sha256(tmp / 'state.pkl.gz') != digest:                    # read back: what was written is whole
             raise IOError('checkpoint did not read back intact')
