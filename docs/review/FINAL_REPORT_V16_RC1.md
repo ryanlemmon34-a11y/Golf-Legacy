@@ -90,7 +90,7 @@ The first final suite, run on `0a05310`, found 5 defects: 3 errors in `test_amat
 - **College open access (retained, D19).**
   - College open starts per player in year 10: 6.58 → 9.15.
   - North America members' cumulative open starts per head: 81.8 → 72.1, with shut-out weeks 74.6 → 136.6.
-  - No group's zero-start share rose. The cost to members is disclosed; fields were not expanded.
+  - In 2036, all-region end-status groups had zero-start shares of 0 % in both arms. Earlier regional years show small increases, for example North America in 2032 and 2034 and Africa in 2033 and 2034. The cost to members is disclosed; fields were not expanded.
 - **Return and re-block (D5.c).**
   - 1,166 returns by 1,125 people; 157 are censored.
   - Of the 1,009 observed, none was cash-blocked again or re-entered the pathway in the next season.
