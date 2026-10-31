@@ -35,6 +35,13 @@ def mean(xs):
     return sum(xs) / len(xs)
 
 
+def kept(root, p):
+    """Whether a file in the world folder belongs to the simulation (as tests/test_myworld_events.kept): not the
+    observer's own, nor an index reader's SQLite shared memory or empty write-ahead log."""
+    return (p.is_file() and not p.relative_to(root).parts[0].startswith('observer') and not p.name.endswith('-shm')
+            and not (p.name.endswith('-wal') and not p.stat().st_size))
+
+
 def bars(page):
     """{season label: (bar label, value shown in the title)} of the Ratings over time chart."""
     out = {}
@@ -119,7 +126,8 @@ class RatingsGroups(unittest.TestCase):
         self.assertIn('Overall is not their mean', html.unescape(page))
         for g in ('physical', 'mental', 'overall', 'power'):
             self.assertIn(f'<option value="{g}"', page)
-        self.assertIn('plain mean of their attributes', html.unescape(self.page(f'/golfer/{self.pid}?tab=season&year={self.year + 1}')))
+        season = self.page(f'/golfer/{self.pid}?tab=season&year={self.year + 1}')
+        self.assertIn('plain mean of their attributes', html.unescape(season))
 
     def test_change_mode_and_unknown_choices(self):
         page = self.page(f'/golfer/{self.pid}?rh=mental&rm=change')
@@ -139,7 +147,7 @@ class RatingsGroups(unittest.TestCase):
     def test_drawing_changes_nothing(self):
         def state():
             files = {p.relative_to(self.path).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
-                     for p in sorted(self.path.rglob('*')) if p.is_file() and not p.name.startswith('observer')}
+                     for p in sorted(self.path.rglob('*')) if kept(self.path, p)}
             return EQ.parts(self.w.session, self.path), files
         before = state()
         for g in ('overall', *OD.RATING_GROUPS, 'power'):

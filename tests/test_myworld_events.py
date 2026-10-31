@@ -38,11 +38,18 @@ def text(h):
     return re.sub(r'<[^>]+>', '', h)
 
 
+def kept(root, p):
+    """Whether a file in the world folder belongs to the simulation: not the observer's own (its shortlist, views
+    and caches), nor an index reader's SQLite shared memory or empty write-ahead log (SQLite's bookkeeping, not
+    writes: a log with anything in it is compared)."""
+    return (p.is_file() and not p.relative_to(root).parts[0].startswith('observer') and not p.name.endswith('-shm')
+            and not (p.name.endswith('-wal') and not p.stat().st_size))
+
+
 def world_state(w):
-    """Everything the simulation keeps: the running world's parts (tools/equivalence_check) and every file that is
-    not the observer's own."""
+    """Everything the simulation keeps: the running world's parts (tools/equivalence_check) and every file of it."""
     files = {p.relative_to(w.path).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
-             for p in sorted(w.path.rglob('*')) if p.is_file() and not p.name.startswith('observer')}
+             for p in sorted(w.path.rglob('*')) if kept(w.path, p)}
     return EQ.parts(w.session, w.path), files
 
 
@@ -247,14 +254,15 @@ class MyWorldEvents(unittest.TestCase):
         # the same stint in both places (the snapshot's later record of an archived stint): one start, one end
         open_ = next(x for x in self.w.a.rel.stints if x.kind != 'school' and x.staff and x.end is None
                      and x.start < (self.w.live.cursor['year'], 0))
-        ended = {**{n: getattr(open_, n) for n in ('id', 'kind', 'staff', 'golfer', 'start', 'arrangement', 'started_by',
-                                                    'reason_start', 'terms')},
+        keep = ('id', 'kind', 'staff', 'golfer', 'start', 'arrangement', 'started_by', 'reason_start', 'terms')
+        ended = {**{n: getattr(open_, n) for n in keep},
                  'end': (self.w.live.cursor['year'], 2), 'reason_end': 'moved on', 'ended_by': 'staff'}
         with mock.patch.object(self.w.live, 'stints', [d for d in self.w.live.stints if d['id'] != open_.id] + [ended]):
             got = [x for x in MW.digest(self.w, [('person', open_.golfer, '', None)], (open_.start[0] - 1, 0))
                    if f'/golfer/{open_.staff}"' in x[3]]
             self.assertEqual(sorted(x[2] for x in got), ['departure', 'partnership'])
-            self.assertIn('ended by the coach or caddie: moved on', text(next(x for x in got if x[2] == 'departure')[3]))
+            gone = next(x for x in got if x[2] == 'departure')
+            self.assertIn('ended by the coach or caddie: moved on', text(gone[3]))
 
     def test_the_page_lists_them_and_changes_nothing(self):
         before = world_state(self.w)
@@ -262,8 +270,9 @@ class MyWorldEvents(unittest.TestCase):
             self.assertTrue(O.set_shortlist(self.w, 'person', p, True))
         html = text(self.page('/my-world?since=52'))
         self.assertIn('injuries and returns', html)
-        for path in ['/my-world', '/my-world?since=season', f'/my-world?since={self.w.a.years[0]}.0'] + [
-                f'/golfer/{p}' for _, p, *_ in self.items[:12]] + [f'/golfer/{p}?tab=coaching' for _, p, *_ in self.items[:12]]:
+        people = [p for _, p, *_ in self.items[:12]]
+        for path in (['/my-world', '/my-world?since=season', f'/my-world?since={self.w.a.years[0]}.0']
+                     + [f'/golfer/{p}' for p in people] + [f'/golfer/{p}?tab=coaching' for p in people]):
             self.page(path)
         MW.new_count(self.w)
         self.assertEqual(world_state(self.w), before)
