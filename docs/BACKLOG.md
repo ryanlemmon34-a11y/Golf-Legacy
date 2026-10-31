@@ -93,10 +93,11 @@ Waiting for the owner (listed in the report): the amateur sponsorship settings
 (`docs/AMATEUR_SPONSORSHIP_PROPOSAL.md`); v1 worlds browse-only (blocks advancing the paused v1 playthrough);
 the proposed simulation runs (seeds, lengths, times, questions); whether a coach's teaching and scouting stay
 hidden; "last N years" routes that include the current year (six editions once it is played); injuries keeping
-a golfer out of one more week of entries than announced. Next once approved: sponsorship, the runs and
-calibration from their evidence, retiring v1; then My World injury and return items, and staff "fit" (needs a
-definition). Deferred: small screens, the death system; geography, course usage, prestige and deeper staff
-careers later. Hide results stays removed.
+a golfer out of one more week of entries than announced; how exported histories without an index become
+browsable (an index beside a read-only copy, or exports that include it). Next once approved: sponsorship, the
+runs and calibration from their evidence, retiring v1; then My World injury and return items, and staff "fit"
+(needs a definition). Deferred: small screens, the death system; geography, course usage, prestige and deeper
+staff careers later. Hide results stays removed.
 
 ## The pretest review increment (owner roadmap, pinned review of 5bcc6ed, 29 October 2026)
 

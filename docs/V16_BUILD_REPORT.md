@@ -5,8 +5,8 @@ and correctness first; development evidence; ratings histories, injuries and sta
 after evidence and approved runs). **Build**: branch `build/v16` from `main` at `33e1fa2`; one commit per
 package (below). **Not merged into `main`**: that needs your approval for this pass.
 
-What was not touched: the Test 1 10.30 download (only an extracted copy was read), the 50-season world (only
-read), your paused playthrough (not resumed), every past result (nothing in an archive is rewritten). No long
+What was not touched: the Test 1 10.30 download (only copies were read), the 50-season world (not opened),
+your paused playthrough (not resumed), every past result (nothing in an archive is rewritten). No long
 simulation was run: the simulation runs below are proposals waiting for your approval. Nothing was bought or
 sent anywhere.
 
@@ -20,9 +20,9 @@ sent anywhere.
 | 3 | Why golfers enter or miss a major: the money facts | `289a0c9` | no: records only, outcomes shown identical |
 | 4 | An earned major place is never lost for money alone | `45151e1` | **yes**: golfers who would have declined now play |
 | 5 | Development evidence (creation, sources, aging) | `d7dacfc`, `92b3925` | no: records only, outcomes shown identical |
-| 6 | Ratings over time, injuries and recovery, coach and caddie profiles | `e2e60f4`, `7d63213`, `eba01e1` | no: records and observer, outcomes shown identical |
+| 6 | Ratings over time, injuries and recovery, coach and caddie profiles | `e2e60f4`, `7d63213`, `eba01e1`, `70ed2d5` | no: records and observer, outcomes shown identical |
 | - | Two tests made independent of who won what | `fd72973` | no |
-| 7 | Validation, this report, backlog | this commit | no |
+| 7 | Validation, this report, backlog | `caf1247`, `e7c7ad6` and this commit | no |
 
 Packages 2 and 4 change the engine's fingerprint and its rules version (`2026-11-01`, on the Rules page). A world
 saved by an earlier engine (Test 1 10.30, the 50-season world) is therefore never resumed in place by this
@@ -148,7 +148,7 @@ creation record. For Test 1's 2083 season (13,212 golfers, 13.5 MB) that is **ab
 unknown and is not inferred. New worlds record creation exactly, so the runs below can show how a golfer of that
 kind starts. No cap was added.
 
-## 6. Ratings over time, injuries, coaches and caddies (`e2e60f4`, `7d63213`, `eba01e1`)
+## 6. Ratings over time, injuries, coaches and caddies (`e2e60f4`, `7d63213`, `eba01e1`, `70ed2d5`)
 
 **Changed**
 - **Ratings over time** (profile, under Ratings): Overall or any attribute, as levels or as changes from the
@@ -168,27 +168,36 @@ kind starts. No cap was added.
   game is designed (decision below). No "fit" is shown: there is no recorded measure of it, and inventing
   thresholds would present a guess as a fact.
 
-**Tested**: `test_living_views`, 10 tests (an active golfer's bars and current ratings; a retired golfer ends
-at their retirement season; a missing season is a gap; levels and signed changes; each injury episode adds up to
-the season's injury weeks and no start falls while the golfer is out; the profile; older seasons; injured now;
-the coach card with hidden facts absent from the archive; partnership rows from the recorded stints; the
-golfer's team page names the same coach; caddie skills; older worlds say "not recorded"). **Outcomes identical**:
-the final build against `d7dacfc`, 16 weeks across a season end: identical in every outcome part and in the
-published history once the two new records (injury episodes, caddie skills) are left out; only the development
-section differs (its precision changed in `92b3925`).
+**Tested**: `test_living_views`, 10 tests, 11 with the fix below (an active golfer's bars and current ratings; a
+retired golfer ends at their retirement season; a missing season is a gap; levels and signed changes; each injury
+episode adds up to the season's injury weeks and no start falls while the golfer is out; the profile; older
+seasons; injured now; the coach card with hidden facts absent from the archive; partnership rows from the recorded
+stints; the golfer's team page names the same coach; caddie skills; older worlds say "not recorded"). **Outcomes
+identical**: the final build against `d7dacfc`, 16 weeks across a season end: identical in every outcome part and
+in the published history once the two new records (injury episodes, caddie skills) are left out; only the
+development section differs (its precision changed in `92b3925`).
 
 **Found and reported, not changed**: an injury announced as *n* weeks keeps a golfer out of *n + 1* weeks of
 entries (an injury after week W with *n* weeks returns them for week W+n+2). The profile shows both numbers
 separately. See *Decisions*.
+
+**Found in validation and fixed** (`70ed2d5`): a history exported without its index (the Test 1 download is
+one) and browsed read-only answers every career from the season files. The new sections read a golfer's career
+several times per profile, each read decoding all 57 seasons. A career is now read once per golfer and kept with
+that reading of the history (the same rows; worlds with an index are unaffected). Test: two profile views of an
+exported copy read the career once (twelve times before).
 
 **Not built in this pass**: My World does not yet announce injuries and returns (one item per episode is the
 plan); "fit" between golfer and staff (needs a definition from you first).
 
 ## Validation
 
-- **Whole suite on the final code** (`eba01e1`; the commits after it change documents only): **51 modules, 539
-  tests, all passed**, 1 skipped by design (`test_observer_profiles`, as before); six modules at a time, 19
-  minutes, 4 CPUs.
+- **Whole suite** (on `eba01e1`): **51 modules, 539 tests, all passed**, 1 skipped by design
+  (`test_observer_profiles`, as before); six modules at a time, 19 minutes, 4 CPUs. After the fix found on the
+  Test 1 copy (`70ed2d5`, one observer function), the modules that read careers were run again on it:
+  `test_living_views` (11, with its new test), `test_compare`, `test_goat_peaks`, `test_history_index`,
+  `test_history_consistency`, `test_observer_history`, `test_observer_app`, `test_peak_overall`, `test_cohort`
+  and `test_myworld` (100 tests): all passed.
 - **The new tests fail on the code before each change** (a separate checkout with the new test files):
   package 1, 5 of 5 (on `0cbfebf`); package 2, 2 of 4 (the other two pin windows that were already right);
   package 3, 3 of 3 (on `2ab1176`); package 4, the 4 guarantee scenarios (on `289a0c9`: a broke golfer's place
@@ -208,7 +217,17 @@ plan); "fit" between golfer and staff (needs a definition from you first).
   wraps at its reading width, checked on a screenshot); at 2,560 wide tables fit the content width (2,296 px)
   and wrap. Ratings bars are 38 px at both widths. *Correction*: package 1's commit message said data tables
   reach 1,880 px; its own measurement had the same ledger (6 columns then) at 2,178 px.
-- **A copy of Test 1 10.30** (read-only, archive only): *in progress*; the result is added when it finishes.
+- **A copy of Test 1 10.30**, browsed read-only (archive only: it was saved by another engine, and the download
+  carries no index): Harper's profile shows **37 bars ending "final ratings: retired after the 2082 season"**
+  (no season after it); his injuries say "episodes not recorded" with each season's announced weeks; caddie
+  skills say "not recorded (recorded from rules 2026-11-01)" (none of its 8,844 caddies has them); coach cards
+  show speciality, youth focus and capacity, with teaching and scouting not shown; nothing is reconstructed.
+  **Speed without an index is poor**: Harper's profile took 651 s on `eba01e1` and 243 s after `70ed2d5` (166 s
+  for a second view); the rest is reading results and other facts from 57 season files, which was already so
+  before this pass, and a coach's partnership page (starts, wins and majors together, columns that already
+  existed) had not finished after 34 minutes. These times include the statistics store being built alongside,
+  as it is on first opening. With an index (any world you play, or a copy opened once as a session) these are
+  single queries. See *Not verified*.
 - **Originals**: the Test 1 10.30 download is unchanged (SHA-256 `df90dd2f...e515`, as when it was fetched);
   its extracted copy unchanged (names, sizes and modification times); checks used a further copy. The 50-season
   world was not opened in this pass.
@@ -232,6 +251,9 @@ plan); "fit" between golfer and staff (needs a definition from you first).
    is played (as now, per HAL), or count exactly N editions?
 6. **Injury length**: keep "n weeks announced, n + 1 weeks of entries missed" (as now, both shown), or make the
    missed entries match the announcement? The second changes simulation behaviour.
+7. **Browsing exported histories**: build an index beside a read-only copy when it has none (minutes once, then
+   pages are quick; the original is never written), or include the index in exports by default? Either makes
+   Test 1-sized downloads browsable; neither changes the simulation.
 
 ## Proposed simulation runs (nothing runs until you approve)
 
@@ -252,6 +274,23 @@ stopped and reported. The results come back as a report with the evidence before
 Optional, only with your explicit engine-change acceptance: a *copy* of Test 1 10.30 continued for 3 seasons on
 this build, to see the guarantee and the USA Open window in a mature world (about 13,000 active golfers;
 estimated 3.5-5 min a season, not measured on this build).
+
+## Not verified
+
+- **The two simulation changes at full scale**: how many major trips the guarantee pays for each season, what
+  they cost and what they change in careers; the USA Open window over many seasons. Shown on small test
+  worlds and reconstructed scenarios only, until the runs above.
+- **Development evidence over whole careers**: checked over two to three seasons of small worlds (every
+  golfer-season reconciles); full careers need run B.
+- **Outcome identity** was shown over 10-16 weeks of small worlds (one season end), not over long runs.
+- **Wide screens**: Chromium only, on a small test world. Long-history pages of Test 1 were checked for content,
+  not measured in the browser: without an index they take minutes to render (below).
+- **Browsing a long exported history without its index** (a diagnostic package or a download like Test 1's,
+  opened read-only): profiles take minutes and a coach's partnership table did not finish. This was already
+  so before this pass; the fix above removes this pass's share. A remedy to decide: build an index for a
+  read-only copy beside it (the original untouched), or include the index in exports (an option the export
+  already has, off by default).
+- **Small screens and phones**: not built or checked, as asked.
 
 ## Not done in this pass (and why)
 
