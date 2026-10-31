@@ -575,6 +575,7 @@ def team_history(w, pid):
     if not stints:
         out.append('<p class="muted">Dated stints are archived when a season ends.</p>' if not w.a else
                    '<p class="muted">No coaches or caddies recorded.</p>')
+        out.append(O.refusals_section(w, pid))             # approaches turned down, even with no partnership
         return ''.join(out)
     rows = OD.results(w, pid)
     through = w.a.years[-1]

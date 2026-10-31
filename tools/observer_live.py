@@ -149,6 +149,7 @@ def capture(session):
         editions=editions, by_person=dict(by_person), schedule=schedule, series=series,
         coach_of=dict(st.coach_of), caddie_of=dict(st.caddie_of), am_support=am_support,
         stints=_stints(st.rel, archived, s.first_year),
+        refusals=_refusals(st.rel, archived, s.first_year),
         birth=dict(pl.birth), home=dict(pl.home), first=dict(pl.first),
         moves={k: list(v) for k, v in pl.moves.items()}, courses=courses, tours=tours, records=records,
         prize={gid: led.prize for gid, led in s.ledgers.get(year, {}).items()},
@@ -162,7 +163,7 @@ def capture(session):
 
 
 STINT_FIELDS = ('id', 'kind', 'staff', 'golfer', 'start', 'end', 'arrangement', 'started_by', 'reason_start',
-                'reason_end', 'ended_by', 'terms')
+                'reason_end', 'ended_by', 'terms', 'reason_accept', 'declined')
 
 
 def _stints(rel, archived, first_year):
@@ -170,8 +171,21 @@ def _stints(rel, archived, first_year):
     plain data (the history's relations table holds the rest, as they stood at its last season's end). A stint keeps
     its id for good, so one read from both places is the same stint."""
     since = (max(archived) + 1 if archived else first_year, 0)
-    return [{n: getattr(x, n) for n in STINT_FIELDS} for x in rel.stints
+    return [{n: _plain(getattr(x, n, None)) for n in STINT_FIELDS} for x in rel.stints
             if x.kind != 'school' and (tuple(x.start) >= since or (x.end is not None and tuple(x.end) >= since))]
+
+
+def _plain(v):
+    """A stint's value as the snapshot keeps it (a copy of a list, so a later change to the stint is not seen)."""
+    return [list(x) if isinstance(x, (list, tuple)) else x for x in v] if isinstance(v, list) else v
+
+
+def _refusals(rel, archived, first_year):
+    """[[kind, staff, golfer, year, week, asked by, refused by, why asked, why not, kept stint]] of the approaches
+    turned down in seasons the history does not hold yet (history.Relations.refuse; recorded from rules
+    2026-11-04), as plain data; the history's relations table holds the earlier ones."""
+    since = max(archived) + 1 if archived else first_year
+    return [list(r) for r in getattr(rel, 'refusals', ()) if r[3] >= since]
 
 
 def _qual(s, year, cursor):

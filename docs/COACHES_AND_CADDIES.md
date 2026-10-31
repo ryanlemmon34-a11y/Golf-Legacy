@@ -139,7 +139,8 @@ recorded**: why each partnership was proposed (`reason_start`) and why the other
 (`reason_accept`) on the stint both people share; every refusal (both people, who asked and why, who said no
 and why) in `Relations.refusals`, and on the partnership a golfer kept when they said no out of loyalty
 (`declined`); all archived in `relations.json.gz` and shown on both profiles (how each partnership began, and
-the approaches turned down). The weights are proposed starting values awaiting approval
+the approaches turned down, also for someone no partnership ever began with, and this season's before it is
+archived). The weights are proposed starting values awaiting approval
 (`docs/RECRUITMENT_PACKAGE.md`).
 
 **Fit is recorded and shown.** Each pairing's fit is drawn once (normal, clipped to −2..+2) and saved with the

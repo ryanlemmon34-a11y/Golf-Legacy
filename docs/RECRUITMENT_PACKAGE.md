@@ -41,7 +41,10 @@ are treated as settled.
    why, and the partnership the golfer kept (if any), where it is also listed (`Stint.declined`). A golfer who
    leaves for an approach has `left for an approach from <coach>` as the stint's end reason. All of it is in the
    archive's `relations.json.gz`. Profiles show how each partnership began (with the acceptance reason), how many
-   approaches a golfer turned down while in it, and a table of approaches turned down.
+   approaches a golfer turned down while in it, and a table of approaches turned down -- for a golfer, coach or
+   caddie whether or not any partnership ever began, and for the current season before it is archived (the live
+   snapshot, `tools/observer_live.py`, carries this season's refusals and each stint's acceptance reason and
+   declined approaches, as it already carried this season's stints).
 
 ## The constants (proposed)
 
@@ -181,12 +184,14 @@ What the numbers say:
 
 ## Status: what has and has NOT been run
 
-Run (on this branch's code, final proposed constants):
+Run (on this branch's code, final proposed constants; HEAD after the review fix also merges origin/build/v16):
 - Measurement, seed 2027, scale 0.15, three seasons, both arms (table above).
 - `tests.test_recruitment`: AssessmentTests, MotivationTests, TwoWayTests, LoyaltyTests and
   HiddenTests.test_new_decision_code_never_reads_potential_or_ceilings -- 9 tests, OK. (An earlier run of
   these plus the other two HiddenTests -- 11 tests, OK -- was on the first constants, before
   `COACH_TAKES_BASE/_FULL` were softened from 5.0/6.0 to 5.5/5.0.)
+- After the review fix (refusals shown without any partnership, and live): the same 9 plus
+  `tests.test_recruitment.ObserverRefusalTests` (3 fixture tests, no world) -- 12 tests, OK, with `nice -n 19`.
 
 NOT yet run (blocked by the CPU hold):
 - Measurement, seed 3031, after arm:

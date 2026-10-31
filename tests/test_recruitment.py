@@ -33,8 +33,16 @@ def fresh(seed=41, scale=0.05):
     return Season(generate_world(seed=seed, scale=scale), seed=seed, development=True, workers=1)
 
 
-SMALL = fresh(41, 0.1)
-SMALL.start_year(2027)                                                # the first winter's market
+_SMALL = []
+
+
+def small():
+    """A scale-0.1 world after its first winter's market (built once, when a test first needs it)."""
+    if not _SMALL:
+        s = fresh(41, 0.1)
+        s.start_year(2027)
+        _SMALL.append(s)
+    return _SMALL[0]
 
 
 class _Stub:
@@ -62,7 +70,7 @@ class AssessmentTests(unittest.TestCase):
     def test_error_shrinks_with_seasons_watched_from_observable_inputs(self):
         """The same coach's error about the same player shrinks exactly by firming(n); what is left is the
         observable projection (level seen, growth for the age, last year's rise)."""
-        s = SMALL
+        s = small()
         players = young(s, 30)
         for cid in (11, 12, 13):
             for g in players:
@@ -147,7 +155,8 @@ class MotivationTests(unittest.TestCase):
 
 class TwoWayTests(unittest.TestCase):
     def test_refusals_happen_on_every_side_and_are_recorded_with_reasons(self):
-        s, st = SMALL, SMALL.staff
+        s = small()
+        st = s.staff
         refs = st.rel.refusals
         self.assertEqual({r[6] for r in refs}, {'golfer', 'coach', 'caddie'})
         for kind, staff, golfer, year, week, asked, said_no, why, no, kept in refs:
@@ -168,7 +177,8 @@ class TwoWayTests(unittest.TestCase):
         self.assertTrue(all(x.reason_start and x.reason_accept for x in new))
 
     def test_a_caddie_weighs_earnings_fit_and_stability(self):
-        s, st = SMALL, SMALL.staff
+        s = small()
+        st = s.staff
         k = copy.deepcopy(next(iter(st.caddies.values())))
         k.id, k.reputation = -5, 85.0
         premier = next(g for g in s.world.golfers if g.tour.startswith('PT_') and g.lifestyle != 'retired')
@@ -315,6 +325,80 @@ class HiddenTests(unittest.TestCase):
         self.assertTrue(all(x.declined == [] for x in t.staff.rel.stints))
         s.close()
         t.close()
+
+
+class ObserverRefusalTests(unittest.TestCase):
+    """Approaches turned down show on the profiles of a golfer, coach or caddie with whom no partnership ever began,
+    from the history and, before the season is archived, from the running world's snapshot (no world needed)."""
+    GOLFER, COACH, CADDIE = 101, 201, 301
+
+    @classmethod
+    def setUpClass(cls):
+        import observer as O
+        import observer_history as OH
+        import observer_live as OL
+        cls.O, cls.OH, cls.OL = O, OH, OL
+
+    def relations(self, year):
+        rel = Relations(1)
+        rel.refuse('coach', self.COACH, self.GOLFER, (year, 1), 'coach', 'golfer', 'saw promising growth',
+                   'happy with their college team\'s coaching')
+        rel.refuse('caddie', self.CADDIE, self.GOLFER, (year, 1), 'golfer', 'caddie', 'the best caddie they could afford',
+                   'wanted a bag with bigger earnings')
+        return rel
+
+    def world(self, archive_rel=None, live_rel=None):
+        people = {self.GOLFER: {'name': 'G', 'golfer': {}}, self.COACH: {'name': 'C', 'coach': {'status': 'active'}},
+                  self.CADDIE: {'name': 'K', 'caddie': {'status': 'active'}}}
+        a = None
+        if archive_rel is not None:
+            a = SimpleNamespace(rel=archive_rel, people=people, years=[2027], golfer_staff=archive_rel.of_golfer,
+                                staff_clients=lambda pid, role=None: [])
+        live = None
+        if live_rel is not None:
+            live = SimpleNamespace(people=people, coach_of={}, caddie_of={}, wr={},
+                                   refusals=self.OL._refusals(live_rel, [2027] if a else [], 2027))
+        return SimpleNamespace(a=a, live=live, person_link=lambda pid: f'[{pid}]',
+                               person=lambda pid: people.get(pid))
+
+    def check(self, w, year):
+        golfer = self.OH.team_history(w, self.GOLFER)
+        self.assertIn('Approaches turned down (2)', golfer)
+        self.assertIn('happy with their college team&#x27;s coaching', golfer)
+        self.assertIn('wanted a bag with bigger earnings', golfer)
+        self.assertIn(f'{year} wk 1', golfer)
+        for pid, role, why in ((self.COACH, 'coach', 'saw promising growth'),
+                               (self.CADDIE, 'caddie', 'the best caddie they could afford')):
+            page = self.O._staff(w, pid, role)
+            self.assertIn('Approaches turned down (1)', page)
+            self.assertIn(why, page)
+        return golfer
+
+    def test_refusal_only_people_show_their_refusals_from_the_history(self):
+        golfer = self.check(self.world(archive_rel=self.relations(2027)), 2027)
+        self.assertNotIn('(this season)', golfer)
+
+    def test_this_seasons_refusals_show_before_the_season_is_archived(self):
+        golfer = self.check(self.world(archive_rel=Relations(1), live_rel=self.relations(2028)), 2028)
+        self.assertIn('(this season)', golfer)
+        golfer = self.check(self.world(live_rel=self.relations(2027)), 2027)        # nothing archived yet
+        # a refusal in both the history and the snapshot is one record, read once
+        both = self.world(archive_rel=self.relations(2027), live_rel=self.relations(2027))
+        both.live.refusals = [list(r) for r in self.relations(2027).refusals]
+        self.assertIn('Approaches turned down (2)', self.OH.team_history(both, self.GOLFER))
+
+    def test_live_snapshot_stints_carry_acceptance_and_declined(self):
+        rel = Relations(1)
+        s = rel.begin('coach', self.COACH, self.GOLFER, (2028, 1), 'share', 'coach', 'saw promising growth',
+                      accept='a share deal costs nothing now')
+        rel.refuse('coach', 999, self.GOLFER, (2028, 1), 'coach', 'golfer', 'established results',
+                   'stayed with C: a good fit')
+        got = self.OL._stints(rel, [2027], 2027)
+        self.assertEqual(got[0]['reason_accept'], 'a share deal costs nothing now')
+        self.assertEqual(got[0]['declined'], [[2028, 1, 999, 'stayed with C: a good fit']])
+        s.declined.append((2028, 2, 998, 'later'))
+        self.assertEqual(len(got[0]['declined']), 1)                      # the snapshot is a copy
+        self.assertEqual(self.OL._refusals(rel, [2027], 2027)[0][9], s.id)
 
 
 if __name__ == '__main__':
