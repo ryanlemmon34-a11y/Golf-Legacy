@@ -1,5 +1,11 @@
 # v16 release candidate: final report (31 October 2026)
 
+> **Released.** After the independent final review, and with the owner's explicit permission, `main` was
+> fast-forwarded (no force) from `33e1fa2` to **`afb68f3d4c74bfca8c3a7e4e4602afcfd80f3d72`**.
+> - That commit is the tested candidate `c0d1ea5` plus the two reviewed docs-only commits.
+> - Every path outside `docs/` (`golfsim`, `tools`, `tests`, `data`, launchers) is identical to `c0d1ea5`. The 7 changed files are all `docs/*.md`.
+> - Windows runs and local timing on the owner's machine are forthcoming. Nothing here claims them.
+
 > **Status: HELD for review.** Nothing is merged to main.
 > - **Candidate:** `integration/v16-rc1` at **`c0d1ea5`** (`c0d1ea598bc784611e7e26cc414f754671965530`).
 > - **Docs-only follow-up for review:** branch `build/v16-docs-final`, two commits on top of `c0d1ea5`: `a2d56fb`, then `afb68f3`.
