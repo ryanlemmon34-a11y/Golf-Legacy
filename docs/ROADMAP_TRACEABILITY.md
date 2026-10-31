@@ -3,6 +3,11 @@
 This refresh replaces the matrix of 31 October 04:53 UTC (`b796c03`, read against `build/v16` at `87c2a21`). Every
 row is read against the release candidate **`integration/v16-rc1` at `0a05310`** (31 October 2026, 08:01 UTC).
 
+**Revised after review.** rc1 has since moved to `376c7a9`, a decision-evidence fix found by the final suite on
+`0a05310` (E1.f.8, X10). This revision adds that fix and records the independent acceptances of DL1, DL2, `d39d613`
+and `c2a1391`. It also consolidates the open rows into distinct open items O1-O9 (section 7) and marks weather
+temperature/firmness and injury tuning as excluded from this pass by decision.
+
 Sources:
 - the commits `473690a..0a05310` and their merge messages, which give the packages, rules versions 2026-11-03 ..
   2026-11-11, conflict resolutions and quick tests;
@@ -25,7 +30,7 @@ Scope:
 
 ## 1. How to read it
 
-### Status: one of four values
+### Status: one of five values
 
 | Status | Meaning |
 |---|---|
@@ -33,17 +38,25 @@ Scope:
 | `done with known limitation` | Implemented on rc1; the stated limitation remains (anything requested that is unresolved has its own open row) |
 | `open: design decision pending` | Requested and unresolved; closing it needs an owner or reviewer decision (calibration, constants, scope), usually after a measurement |
 | `open: not started` | Requested and not done (often a measurement or analysis) |
+| `excluded from this pass by decision` | Out of scope for this pass by the reviewer's decision; not a missing feature |
 
-A row is not marked done because it is a design question rather than a crash, and nothing is called deferred
-except what the owner deferred (section 2.17).
+A row is not marked done because it is a design question rather than a crash. Nothing is called deferred or
+excluded except what the owner deferred (section 2.17) or the reviewer excluded.
+
+Each open row names the consolidated open item it belongs to (**O1-O9**, section 7). Several rows often share one
+question; for example, many audit rows wait on the same calibration assessment. So section 7, not the count of
+open rows, is the list of distinct open work. Rows in sections 3 and 4 that only restate a consolidated item point
+to it ("see O5") and carry no status of their own.
 
 ### Commits
 
 - "Merge" is the commit on rc1's first-parent line, either a merge or a direct commit.
 - "Package" lists the commits the merge brings in.
 - Rules versions are those in `golfsim/rules.py` (`VERSIONS`; `RULES_VERSION` is `2026-11-11` at `0a05310`).
-- Every SHA cited exists. All are in the history of `0a05310` except three: `9f2ac00` and `9baea7a`, which are
-  marked "not on rc1", and `b796c03`, the earlier matrix, which this branch merges.
+- Every SHA cited exists. All are in the history of `0a05310` except these:
+  - `376c7a9`, rc1's new tip after `0a05310`;
+  - `9f2ac00`, `9baea7a` and `b613b3b`, on `origin/build/v16-report` only;
+  - `b796c03`, the earlier matrix, which this branch merges.
 
 ### Evidence
 
@@ -53,7 +66,7 @@ except what the owner deferred (section 2.17).
 
   | Gate | Run | State |
   |---|---|---|
-  | **G1** | full suite (`python -m unittest discover -s tests`) | running |
+  | **G1** | full suite (`python -m unittest discover -s tests`) | running at the time of writing. It has already found 3 errors in `tests.test_amateur_residence` (KeyError: None), fixed by `376c7a9` (X10); the final rerun will be on a later head |
   | **G2** | fresh full-population smoke (seed 4207: 2 seasons with decision evidence, plus 1 season without) | pending |
   | **G3** | wide-screen navigation (`nav_check.js` at 1920 and 1366 px on a copy of the smoke world) | pending |
   | **G4** | E1.f outcome equivalence on the exact final head | pending |
@@ -128,6 +141,7 @@ All queue runs used a clean detached worktree of the named commit:
 | X7 | Report and rule text inconsistent with the approved pathway age | `e759903` | PathwayAgeInForce 2 OK |
 | X8 | Report tool killed by the memory limit (12.6 GB) on the 45-season run | `c2a1391` | SeasonFilesTrimmed; module 13 OK |
 | X9 | `run_world` (default mode) did not record the pathway age in force; team-history footer said "end of None" | `d39d613` | WorldRulesRecorded (3) |
+| X10 | Decision evidence: an evaluation without a named model crashed the winter. Found by the final suite (G1) on `0a05310`: `tests.test_amateur_residence`, 3 errors, `KeyError: None` in `decision_evidence.record_career`. The tests stand in mocks for `careers.p_retire` and `p_turn_pro` | `376c7a9` (on rc1, its tip) | `test_decision_evidence.WinterDecisions.test_models_stood_in_for_record_nothing_and_change_nothing`; tests.test_decision_evidence + tests.test_amateur_residence: 24 OK (commit message) |
 
 The ledger has no section 3.5 item numbered X5. Its section 3.5 table (package-branch review fixes) is cited by
 commit in the rows below.
@@ -142,6 +156,10 @@ commit in the rows below.
 | R4 | `2516d86` winter boundary: 32 tests pass (scoped acceptance; rerun on final head) |
 | R5 | Stories `2306549`: accepted, 47 story tests + cache/version/qualifier checks |
 | R6 | Integration `fe04ab5`: 116 weather/geography/engine/familiarity/playoff tests and 216 classic-round exact comparisons; conditions/replay/match-play/gust display; 49 story/merge + 24 upset tests; simulated-edition story/data/save-reopen. No new in-scope blockers |
+| R7 | College open access `459322c` (reviewer's correction to this matrix): independently accepted. 10 tests plus an actual 5 % world (weeks 17-18: 145 open-amateur starts by 112 golfers); exact counter/result match; nonzero save/reopen priority equality; next-year counter reset |
+| R8 | Pathway from 18 `c848952` (reviewer's correction): independently tested, including a real monthly in-season transition (age 18, rank 301; unchanged cutoff; no cash grant) |
+| R9 | `d39d613` (both harness modes record the pathway age; the no-archive footer) and `c2a1391` (report memory reduced, not constant: each year's development section is retained): independently accepted (reviewer's correction) |
+| R10 | 89-at-18 diagnosis `b613b3b` (`docs/review/VAUGHAN_OUTLIER_DIAGNOSIS.md`, on `origin/build/v16-report`, not on rc1). Verdict: a rare organic tail the rules produce (created Overall 85.31, potential 97.01). The independent calibration review recommends keeping rare organic potential for the next test and investigating individualized maturation separately (learning rate relative to the drawn peak age), rather than flattening talent |
 
 **Results stated in commit messages only (M)**
 
@@ -153,6 +171,7 @@ commit in the rows below.
 | `d39d613` | WorldRulesRecorded (3) and the extended LivePartnerships case, with test_diagnostic_report: 25 OK |
 | `9cac183` | 1 test OK (46 s) |
 | `c2a1391` | module 13 OK |
+| `376c7a9` | tests.test_decision_evidence + tests.test_amateur_residence: 24 OK |
 
 ## 2. The overnight roadmap scope (reviewer)
 
@@ -163,11 +182,11 @@ Columns: Merge / package (rules) · Tests · Evidence (latest pre-final run, the
 | Id | Requirement | Status | Merge / package (rules) | Tests | Evidence | Review | Remaining |
 |---|---|---|---|---|---|---|---|
 | N1 | Qualification windows: the N most recent editions for P2, U5, B3 (five majors) and M3, P3, U6, B4 (three Players); this season's edition only when played before the field (D1) | `done` | `32a0a6f` (direct, before `473690a`; boundary tests from `c28bf77`); rules 2026-11-03; `docs/QUALIFICATION_WINDOWS.md` | `test_exemption_window` (Windows, USAOpenChampions) | No ledger run; in the pinned build, so runs A-D played it; G1 pending | D1 records it done | -- |
-| N2 | Work pathway for persistently cash-blocked adult amateurs: 8 counted weeks, no support, no family money, outside the amateur top 300, full-time non-college, monthly decision (D2) | `done with known limitation` | `3d3090e`; rules 2026-11-03; age 18 from rules 2026-11-10 (DL1); rule text names both ways back `e759903` | `test_work_pathway` (Golfer, Counting, Deciding, InASeason) | L01, L10, L19 (`d70a725`, 116 OK); pinned A-D "took work by the pathway" seasons: A 1224, B 224, C 247, D 246; G1 pending | D2 approved it as an initial calibration | Calibration is provisional (D2); the age-18 outcomes are unmeasured (DL1.m) |
-| N3 | Amateur-support switch for a comparison arm on the same build; frozen, pinned diagnostic builds | `done` | `3d3090e` (`Season(amateur_support=False)`, `Session.create(amateur_support=False)`); `473690a` (`tools/long_world.py --no-amateur-support`, `--keep-after`, stopping safeguards, `tools/determinism_replay.py`); `43bf2c4` (a resume refuses a mismatched support setting); `e759903`, `d39d613` (the run records the pathway age in force, both run modes) | `test_long_run_safeguards` (Safeguards, ResumedSupportSetting, WorldRulesRecorded) | M `e759903` (7 OK), M `d39d613` (25 OK), X9; every A-D segment ran on a clean `473690a` checkout (provenance); G1 pending | D4 (one build for both arms) | -- |
-| N4.a | Long runs A (seed 360013, 45 seasons), B and C (2027, 10 seasons, support on and off), D (3031, 10 seasons) | `done with known limitation` | Runs on `473690a`; report and provenance `0a05310` (`docs/review/DIAGNOSTIC_RUNS_ABCD.md`, `docs/review/DIAGNOSTIC_RUNS_PROVENANCE.md`) | `test_diagnostic_report`, `test_long_run_safeguards` | Ledger section 5: B, C, D complete (10 seasons each), reconcile errors 0; A complete 45/45 (segments 2027-2033, 2034-2054, 2055-2071), reconcile errors 0 every season. Guard stops at season 2033 (A 487 s, B 491 s; CPU contention) are recorded | Report tool accepted at `5ad7a50` (R3); the A-D report at `0a05310` has no recorded review | Evidence about the pinned build only (section 6). The population flag and the calibration questions are open (section 2.16) |
+| N2 | Work pathway for persistently cash-blocked adult amateurs: 8 counted weeks, no support, no family money, outside the amateur top 300, full-time non-college, monthly decision (D2) | `done with known limitation` | `3d3090e`; rules 2026-11-03; age 18 from rules 2026-11-10 (DL1); rule text names both ways back `e759903` | `test_work_pathway` (Golfer, Counting, Deciding, InASeason) | L01, L10, L19 (`d70a725`, 116 OK); pinned A-D "took work by the pathway" seasons: A 1224, B 224, C 247, D 246; G1 pending | D2 approved it as an initial calibration; R8 for the age-18 change | Calibration is provisional (D2); the age-18 outcomes are unmeasured (DL1.m, O2) |
+| N3 | Amateur-support switch for a comparison arm on the same build; frozen, pinned diagnostic builds | `done` | `3d3090e` (`Season(amateur_support=False)`, `Session.create(amateur_support=False)`); `473690a` (`tools/long_world.py --no-amateur-support`, `--keep-after`, stopping safeguards, `tools/determinism_replay.py`); `43bf2c4` (a resume refuses a mismatched support setting); `e759903`, `d39d613` (the run records the pathway age in force, both run modes) | `test_long_run_safeguards` (Safeguards, ResumedSupportSetting, WorldRulesRecorded) | M `e759903` (7 OK), M `d39d613` (25 OK), X9; every A-D segment ran on a clean `473690a` checkout (provenance); G1 pending | D4 (one build for both arms); `d39d613` accepted (R9) | -- |
+| N4.a | Long runs A (seed 360013, 45 seasons), B and C (2027, 10 seasons, support on and off), D (3031, 10 seasons) | `done with known limitation` | Runs on `473690a`; report and provenance `0a05310` (`docs/review/DIAGNOSTIC_RUNS_ABCD.md`, `docs/review/DIAGNOSTIC_RUNS_PROVENANCE.md`) | `test_diagnostic_report`, `test_long_run_safeguards` | Ledger section 5: B, C, D complete (10 seasons each), reconcile errors 0; A complete 45/45 (segments 2027-2033, 2034-2054, 2055-2071), reconcile errors 0 every season. Guard stops at season 2033 (A 487 s, B 491 s; CPU contention) are recorded | Report tool accepted at `5ad7a50` (R3); the A-D report at `0a05310` has no recorded review | Evidence about the pinned build only (section 6). The initialization-to-steady-state assessment (O7) and the calibration questions (O5, O6) are open (section 2.16) |
 | N4.b | Determinism spot check (run B) | `done` | `tools/determinism_replay.py` (`473690a`) | -- | B season 5 (2031) replayed from the copy kept after season 4: identical in all 15 recorded parts (ledger section 5, provenance) | -- | Pinned build only; see N4.c |
-| N4.c | Determinism of the final feature world on a full population | `open: not started` | -- | Small-world determinism per package: `test_recruitment.WorldTests`, `test_mortality_world.SmallWorld.test_saved_and_resumed_the_same`, `test_nation_shares.InTheWorld`, `test_decision_evidence_world.DecisionEvidenceWorld` | No replay of a `0a05310` world recorded | -- | Closes with a `tools/determinism_replay.py` replay on a fresh `0a05310` full-population world (for example the G2 smoke world) |
+| N4.c | Determinism of the final feature world on a full population | `open: not started` | -- | Small-world determinism per package: `test_recruitment.WorldTests`, `test_mortality_world.SmallWorld.test_saved_and_resumed_the_same`, `test_nation_shares.InTheWorld`, `test_decision_evidence_world.DecisionEvidenceWorld` | No replay of a final-build world recorded | -- | **O3**: a `tools/determinism_replay.py` replay on a fresh full-population world of the final build |
 | N5.a | My World: injury, return and partnership items for followed people (E3.c, E3.d, S1.d) | `done` | `ccddd36` / `81cae53`, `b07b072` | `test_myworld_events` (MyWorldEvents) | L06 (`c29f6b0`, 103 OK); also in L17; G1 pending | HAL reviewed at `b07b072` (21 new tests, compileall, targeted synthetic assertions; `ccddd36`) | -- |
 | N5.b | Ratings over time: Physical, Technical and Mental group views (E2.c) | `done` | `ccddd36` / `a9e5e98` | `test_ratings_groups` (RatingsGroups) | L06; G1 pending | As N5.a | -- |
 | N5.c | Nation counts link to exactly the people they count (R9.d, N08) | `done` | `ccddd36` / `3f0c036` (kept through the prestige merge `787eda7`) | `test_nation_links` (NationLinks) | L06; G1 pending | As N5.a | -- |
@@ -183,15 +202,14 @@ The package merged at `7d8489f` (package `cab6e45`, `6ada329`, `a1b3aad`, `b7e83
 
 | Id | Requirement | Status | Merge / package | Tests | Evidence | Remaining |
 |---|---|---|---|---|---|---|
-| S2.a | Scouting firms up with seasons watched and partly recognises upside from observed development; never reads potential or ceilings; error, late bloomers and disappointments kept | `done` | `7d8489f` / `cab6e45` | `test_recruitment` (AssessmentTests, HiddenTests) | L16; U10; G1 pending | Constants are proposals (S3.h) |
+| S2.a | Scouting firms up with seasons watched and partly recognises upside from observed development; never reads potential or ceilings; error, late bloomers and disappointments kept | `done` | `7d8489f` / `cab6e45` | `test_recruitment` (AssessmentTests, HiddenTests) | L16; U10; G1 pending | Constants are proposals (S3.g, O4) |
 | S3.a | Staff pursue golfers; development and established coaches and caddies weigh different things | `done` | `7d8489f` / `cab6e45`, `b7e835c` | MotivationTests, TwoWayTests | L16; G1 pending | -- |
 | S3.b | Staff-initiated recruitment: established coaches court established golfers; idle caddies offer to carry bags | `done` | `7d8489f` / `b7e835c` | InitiativeTests | InitiativeTests 5 OK at `b7e835c` (ledger section 3.5); U10; L16; G1 pending | -- |
 | S3.c | Loyalty and shared history; a better offer does not dissolve a good partnership | `done` | `7d8489f` / `cab6e45` | LoyaltyTests | L16; G1 pending | -- |
 | S3.d | Approach, acceptance, refusal and departure reasons visible on both sides, including refusals with no archived stint and this season's refusals | `done` | `7d8489f` / `cab6e45`, `a1b3aad` | ObserverRefusalTests | U3, U10; G1 pending | Accepted partnerships shown live: LP1 |
 | S3.e | Winter order: caddie reputations and fees move before the career decisions; own-way decisions keep their figures | `done` | `16c83e8` / `c0932d0` | WinterOrderTests; `test_finance_integration.PromotionTests` | X2; L16; U10; G1 pending | R2. This changes winter ordering in every world (merge message) |
 | S3.f | Deterministic, capacity- and money-safe in a world; old saves load | `done` | `7d8489f` | WorldTests; HiddenTests | L16 (the test_recruitment module); G1 pending | -- |
-| S3.g | Compare offer rates, retention, quality distribution and development across seeds | `open: not started` | `tools/staff_market_measure.py`, `tools/staff_market_compare.py` | -- | `docs/RECRUITMENT_PACKAGE.md`: "NOT yet run", which includes any measurement with staff initiative and the seed 3031 after arm | Closes with both seeds' before/after measurements on the final build |
-| S3.h | Scouting error model and the recruitment/retention weights | `open: design decision pending` | `docs/RECRUITMENT_PACKAGE.md` (proposed constants) | -- | -- | Closes when the owner or reviewer confirms the constants after S3.g |
+| S3.g | Compare offer rates, retention, quality distribution and development across seeds, then confirm the proposed constants (scouting error model, recruitment and retention weights) | `open: not started` | `tools/staff_market_measure.py`, `tools/staff_market_compare.py`; `docs/RECRUITMENT_PACKAGE.md` (proposed constants) | -- | `docs/RECRUITMENT_PACKAGE.md`: "NOT yet run", which includes any measurement with staff initiative and the seed 3031 after arm | **O4**: both seeds' before/after measurements on the final build, then confirmation of the constants |
 
 ### 2.3 P2: five-year event, course and nation prestige; nation shares; venue moves (rules 2026-11-05)
 
@@ -205,8 +223,7 @@ d187a56") and its fix at `f5ac938` (`68676fd`).
 | P2.c | Nation prestige from success beyond expectation; each nation's share of the fixed new-golfer cohort, normalised, smoothed, bounded, future entrants only, talent unchanged (D7) | `done` | `787eda7` / `7ac03c4`; `f5ac938` / `68676fd` (no draw cap) | `test_nation_shares` (TotalsAndAllocation, SmoothingAndBounds, TalentUnchanged, Baseline, DrawCap, InTheWorld) | L09 failed, fixed by X1; U9; L16 (113 OK); G1 pending | R1 |
 | P2.d | Events that outgrow their venue move to a better course in the same city; effective-dated history | `done` | `787eda7` / `ace3b2e`, `d187a56` | `test_venue_moves` (Stand, VenueMoves, SeasonSave) | VenueMoves 7 OK at `d187a56` (ledger section 3.5); L18 (184 OK); G1 pending | -- |
 | P2.e | Sortable Prestige columns and dated history bars on tournament, course and nation pages; share history | `done` | `787eda7` / `7ac03c4` (`tools/observer_prestige.py`); Nations page conflict resolved in `787eda7` | InASession (one season and three weeks, every observer view); `test_observer_gaps.UnitDirectorySort` | L16; L17; G1 pending | -- |
-| P2.f | Measure on two seeds at scale 0.05: cohort totals, prestige moves and limit hits, share movers, expectation calibration table | `open: not started` | script ready (`docs/WORLD_PRESTIGE_PACKAGE.md` section 5) | -- | Package doc: "Not run yet" | Closes with the two-seed measurement on the final build |
-| P2.g | Constants: expectation blend, share bounds 0.25-4, 10 % step, venue-move thresholds; how often moves happen | `open: design decision pending` | `docs/WORLD_PRESTIGE_PACKAGE.md` section 7, questions 1-3 | -- | -- | Closes with an owner or reviewer decision after P2.f |
+| P2.f | Measure on two seeds at scale 0.05 (cohort totals, prestige moves and limit hits, share movers, expectation calibration table, how often venues move), then settle the constants (expectation blend, share bounds 0.25-4, 10 % step, venue-move thresholds) | `open: not started` | script ready (`docs/WORLD_PRESTIGE_PACKAGE.md` sections 5 and 7) | -- | Package doc: "Not run yet" | **O4**: the two-seed measurement on the final build, then the owner's or reviewer's decision on the constants |
 
 ### 2.4 G1-G3: geography, familiarity, Aggression, seasonal weather
 
@@ -222,7 +239,7 @@ U8; reviewer R6.
 | G1.b | Bounded regional baseline inside the existing familiarity mechanism (a floor, never added, counted once) | `done` | `b1158d8` / `39c8cf3` | BaselineTests, SeasonBaselineTests, EngineInputTests | L12, L18; G1 pending | Seeded comparison: G1.e |
 | G1.c | Top 10 familiar courses on profiles with the value the engine uses | `done` | `b1158d8` / `172b787`, `23e288c` | TopCoursesTests, ProfileTests | L12; G1 pending | -- |
 | G1.d | Home clubs, recorded explicitly; local hosting of unused municipal courses (D12) | `done` | `b1158d8` / `23e288c`, `7819114` | HomeClubTests, LocalHostingTests (Southport Brook, Wren Dunes, Fjordby Helsinki), CoursePageTests | L12 (`7819114`); G1 pending | -- |
-| G1.e | Seeded season with and without the baseline: starts affected, scoring change for local golfers, timings; home clubs over a season | `open: not started` | `docs/FAMILIARITY_AND_AGGRESSION.md` "To run after the CPU hold" | -- | -- | Closes with the same-seed on/off season (`Season.familiar_base_on = False`) on the final build |
+| G1.e | Seeded season with and without the baseline: starts affected, scoring change for local golfers, timings; home clubs over a season | `open: not started` | `docs/FAMILIARITY_AND_AGGRESSION.md` "To run after the CPU hold" | -- | -- | **O4**: the same-seed on/off season (`Season.familiar_base_on = False`) on the final build |
 | G2.a | Show the 0-100 Aggression trait as a style, not an ability grade | `done` | `b1158d8` / `63ad358` | `test_aggression_visible` (ProfileTests) | L03, L12, L18; G1 pending | -- |
 | G2.b | Trait stable; reach constraints kept and take the conditions' distance factor; no second risk score | `done` | `b1158d8` / `63ad358`, `f50d8da`; wind wired into the go-for-it decision in `1a0cb2f` | ReachTests, StabilityTests; `test_weather_geography_merge` (WindReachesTheDecision, PlayHolePassesTheWind) | L18; U5; G1 pending | -- |
 | G3.a | Seasonal climate by place and week; wind direction per hole; bundled offline | `done` | `1a0cb2f` / `96dff24`, `1cbf7a4` | `test_weather` (ClimateTests, WindDirectionTests) | L11, L18; G1 pending | -- |
@@ -230,8 +247,8 @@ U8; reviewer R6.
 | G3.c | Skill, caddie and familiarity mitigation without immunity | `done` | `1a0cb2f` / `96dff24` | MitigationTests | L11, L18; G1 pending | -- |
 | G3.d | Match-play sites and knockout days | `done` | `1a0cb2f` / `ed5ebaf` | `test_weather`; UnitRoundConditions (match-play case, `d2a79ce`) | L11; U8; G1 pending | -- |
 | G3.e | Conditions recorded and shown; no rainouts, cancellations or delays; older saves keep the classic draws | `done` | `1a0cb2f`; `d2a79ce` ("wet"/"dry", never "rain") | RecordTests, ControlTests; UnitRoundConditions | U6, U8; G1 pending | -- |
-| G3.f | Scope of temperature and firmness effects | `open: design decision pending` | -- | -- | `docs/BACKLOG.md`: "temperature/firmness open for the owner" | Closes with the owner's decision (in scope or not) |
-| G3.g | Season-scale runs with seasonal weather | `open: not started` | -- | -- | `docs/BACKLOG.md`: "season-scale runs pending" | Closes with G2 (first look) and a season-scale comparison against the classic model |
+| G3.f | Scope of temperature and firmness effects | `excluded from this pass by decision` | -- | -- | `docs/BACKLOG.md`: "temperature/firmness open for the owner" | Excluded from this pass (reviewer); not a missing feature |
+| G3.g | Season-scale runs with seasonal weather | `open: not started` | -- | -- | `docs/BACKLOG.md`: "season-scale runs pending" | **O3**: season-scale results from the final-build full-population runs (G2 first) |
 
 ### 2.5 B1/B2: Biggest Upsets (recording only; no rules version)
 
@@ -248,8 +265,8 @@ Evidence: L02, L13, L17 (`d70a725`; that run's one failure was in test_observer_
 | B1.e | Editions without an estimate show "not recorded"; no hindsight proxy | `done` | `tools/observer_upsets.py` (`3291666`) | NoHindsightTests, PageTests | L13; G1 pending | -- |
 | B1.f | Recording changes no outcome | `done with known limitation` | `483c0b1` | HeavyEquivalenceTests (GOLF_HEAVY_TESTS=1; `GOLF_HEAVY_WEEKS` defaults to 8) | L02 (`3291666`, 35 OK); G1 pending | Shown over 8 weeks of one world; see B1.h |
 | B1.g | Each upset row links to its edition's story | `done` | `fe04ab5` (merge change) | `test_upsets_stories_merge` (UpsetRowsLinkToStories) | U7, U8; L17; G1 pending | -- |
-| B1.h | Whole-season equivalence and cost measurement | `open: not started` | -- | -- | `docs/BACKLOG.md`: "pending the CPU release" | Closes with a whole-season same-seed on/off comparison (`upset_estimates`) with timings |
-| B2.a | Audited examples as regression and presentation cases, in no forced order | `open: not started` | -- | No test in `tests/test_upsets.py` names an audited example | -- | Closes with fixtures of the audited cases, or a decision that pre-estimate history stays "not recorded" |
+| B1.h | Whole-season equivalence and cost measurement | `open: not started` | -- | -- | `docs/BACKLOG.md`: "pending the CPU release" | **O3**: a whole-season same-seed on/off comparison (`upset_estimates`) with timings |
+| B2.a | Audited examples as regression and presentation cases, in no forced order | `open: not started` | -- | No test in `tests/test_upsets.py` names an audited example | -- | **O9**: fixtures of the audited cases, or a decision that pre-estimate history stays "not recorded" |
 
 ### 2.6 T1-T3: tournament stories (observer only; NARRATIVE_VERSION 3)
 
@@ -266,7 +283,7 @@ Merged at `fe04ab5` (package `d851d91`, `623d193`, `159cffa`, `4f9a294`, `aafe36
 | T2.b | Nothing invented; qualified career bests (same format and sample); pending comparisons rechecked; old cached stories rebuilt | `done` | `fe04ab5` / `696a72a`, `2306549` | StoryDefectTests | L15; R5 (independent 47 OK); G1 pending | -- |
 | T2.c | A rolled-back history redraws | `done` | `fe04ab5` / `4f9a294` | `test_stories` non-simulation tests | 31 non-simulation story tests (ledger section 3.5); G1 pending | -- |
 | T3.a | Prose kept out of simulation loops; per-season index for long histories; cache in `observer_cache/stories.sqlite` | `done` | `fe04ab5` / `159cffa` | StoryArchiveIndexTests, StoryIsolationTests | L15; G1 pending | -- |
-| T3.b | Measure throughput, latency, memory, and save and index growth on a long history | `open: not started` | -- | -- | `docs/BACKLOG.md`: "World-level test and timing on a long history pending the CPU hold". The world-level test has since run (StoryWorldTests in L15); the timing has not | Closes with a timed story-index and open run on a long history (for example a copy of run A's archive) |
+| T3.b | Measure throughput, latency, memory, and save and index growth on a long history | `open: not started` | -- | -- | `docs/BACKLOG.md`: "World-level test and timing on a long history pending the CPU hold". The world-level test has since run (StoryWorldTests in L15); the timing has not | **O3**: a timed story-index build and story opens on a long history (for example a copy of run A's archive) |
 
 ### 2.7 C2: death after retirement (rules 2026-11-07; decision D6)
 
@@ -291,7 +308,7 @@ Evidence: L01, L10 (50 OK), L19, U2.
 |---|---|---|---|---|---|---|
 | D5.a | A working amateur can return when finances and results support it, never guaranteed; no hard age cut-off, a smooth decline with age; avoid lifestyle flipping (D5, D5a) | `done with known limitation` | `a90ea85` / `0c5cdd7` | `test_amateur_return` (Golfer, Conditions, WorkStart) | L01, L10, L19; G1 pending | Thresholds are provisional (D5a) |
 | D5.b | The season budget includes committed coach and caddie costs | `done` | `a90ea85` / `5c15e32` | `test_amateur_return` regression (a 23-year-old with $8,000, 8 trips $4,000, a $12,500 coach: no return) | L10; G1 pending | -- |
-| D5.c | Validate return and re-block rates on a full population (D5a) | `open: not started` | -- | -- | Only a 5 % world over three seasons, 3, 2 and 1 returns (`docs/AMATEUR_WORK_PATHWAY_PROPOSAL.md`) | Closes with return and re-block counts by age from G2 and a longer fresh run of the final build |
+| D5.c | Validate return and re-block rates on a full population (D5a) | `open: not started` | -- | -- | Only a 5 % world over three seasons, 3, 2 and 1 returns (`docs/AMATEUR_WORK_PATHWAY_PROPOSAL.md`) | **O3**: return and re-block counts by age from the final-build full-population runs |
 
 ### 2.9 F1.c, F1.h and F2
 
@@ -303,7 +320,7 @@ Evidence: L01, L10 (50 OK), L19, U2.
 
 ### 2.10 E1.f: decision evidence
 
-Merged at `23701cf` (`9e0b042` plus the format /2 extension made in the merge). The documentation fix is `72ab740`.
+Merged at `23701cf` (`9e0b042` plus the format /2 extension made in the merge). The documentation fix is `72ab740`; the robustness fix found by G1 is `376c7a9` (E1.f.8).
 Evidence:
 - L20 (`d70a725`, 5 OK);
 - L21 (outcomes identical to the parent build `16c83e8`, 1 OK);
@@ -320,8 +337,9 @@ Review: `72ab740` is "From review of d70a725". The ledger records no acceptance 
 | E1.f.3 | Amateur-return evaluations (format /2) | `done` | `23701cf` | AmateurReturn | M `5664853`; L22; G1 pending | -- |
 | E1.f.4 | Mortality: evaluations by age band and every death's risk and draw (format /2); a survivor's draw is reproducible from the rule | `done` | `23701cf` | Mortality | L22; G1 pending | -- |
 | E1.f.5 | Recording changes no outcome (on and off; against the parent build) | `done with known limitation` | `23701cf` | `test_decision_evidence_world.DecisionEvidenceWorld` (test_outcomes_are_identical_with_recording_on_and_off, test_outcomes_are_identical_to_the_parent_build) | L20, L21 at `d70a725`: pre-final, before rules 2026-11-10 and 2026-11-11 were merged; G4 pending | Final-head proof is G4 |
-| E1.f.6 | Full-world size and time of the richer evidence (07:24 decision: keep it, measure it) | `open: not started` | -- | test_growth_is_small (small world only) | Estimate only, 11-13 % of a mature season file, from scale 0.10 measurements (`docs/DECISION_EVIDENCE.md`); G2 pending | Closes with G2's per-season season-file size with and without the key, season time and save size, written into `docs/DECISION_EVIDENCE.md` |
-| E1.f.7 | Remaining recording gaps: the weekly entry choice and per-event values and trip costs; the planner's per-week values; the coach/caddie career draw; the backers' review terms and draws | `open: design decision pending` | `docs/DECISION_EVIDENCE.md` "Not recorded (remaining gaps)" | -- | -- | Closes when the gaps are recorded (a format /3) or the reviewer accepts them as out of scope, in writing |
+| E1.f.6 | Full-world size and time of the richer evidence (07:24 decision: keep it, measure it) | `open: not started` | -- | test_growth_is_small (small world only) | Estimate only, 11-13 % of a mature season file, from scale 0.10 measurements (`docs/DECISION_EVIDENCE.md`); G2 pending | **O3**: G2's per-season season-file size with and without the key, season time and save size, written into `docs/DECISION_EVIDENCE.md` |
+| E1.f.8 | An evaluation without a named model records nothing and decides exactly as with recording off (a stood-in model had crashed the winter) | `done` | `376c7a9` (rc1, after `0a05310`) | `test_decision_evidence.WinterDecisions.test_models_stood_in_for_record_nothing_and_change_nothing`; `test_amateur_residence` | X10: found by G1 on `0a05310` (3 errors); M `376c7a9` (24 OK); the final suite rerun will be on a later head | -- |
+| E1.f.7 | Remaining recording gaps: the weekly entry choice and per-event values and trip costs; the planner's per-week values; the coach/caddie career draw; the backers' review terms and draws | `open: design decision pending` | `docs/DECISION_EVIDENCE.md` "Not recorded (remaining gaps)" | -- | -- | **O8**: record the gaps (a format /3), or the reviewer accepts them as out of scope, in writing |
 
 ### 2.11 Observer gaps
 
@@ -348,8 +366,8 @@ and `5073485`. `d39d613` is the review of `697183c` and `e759903`. No review is 
 | DR2 | Denominators: no start and financial exclusion apart; golfer-season denominators | `done` | `5073485`, `5ad7a50` | ExclusionByGroup | U11; R3; L22; G1 pending | -- |
 | DR3 | Conversions: pathway conversions shown (B 224, C 247); B-vs-C caveat | `done` | `5ad7a50` | `test_diagnostic_report` | U11; R3 | -- |
 | DR4 | Provenance: section in the report; A's segment 2 corrected to 2034-2054 (21 seasons); final provenance | `done` | `6aa5f9c`, `5ad7a50`; `0a05310` | `test_diagnostic_report` | X4; R3 | -- |
-| DR5 | Age in force: the pathway table grouped by the age recorded per run (pinned runs stay 21); both run modes record it | `done` | `e759903`, `d39d613` | PathwayAgeInForce; `test_long_run_safeguards.WorldRulesRecorded` | X7, X9; M `e759903`, M `d39d613`; G1 pending | -- |
-| DR6 | Memory: only the development diagnostics of each season file kept | `done` | `c2a1391` | SeasonFilesTrimmed | X8; M `c2a1391` (13 OK); the A-D report completed | -- |
+| DR5 | Age in force: the pathway table grouped by the age recorded per run (pinned runs stay 21); both run modes record it | `done` | `e759903`, `d39d613` | PathwayAgeInForce; `test_long_run_safeguards.WorldRulesRecorded` | X7, X9; M `e759903`, M `d39d613`; G1 pending | `d39d613` independently accepted (R9) |
+| DR6 | Memory: only the development diagnostics of each season file kept | `done with known limitation` | `c2a1391` | SeasonFilesTrimmed | X8; M `c2a1391` (13 OK); the A-D report completed; independently accepted (R9) | Memory is reduced, not constant: each year's development section is retained |
 | DR7 | "Overall at 19" from the exact season; season files read through the manifest; seeded and procedural apart | `done` | `43bf2c4`, `a11f29a`, `15374c9` | AtNineteen | L22; G1 pending | -- |
 
 ### 2.13 Review-document deliverables
@@ -365,26 +383,28 @@ and `5073485`. `d39d613` is the review of `697183c` and `e759903`. No review is 
 
 | Id | Requirement | Status | Merge / package (rules) | Tests | Evidence | Review | Remaining |
 |---|---|---|---|---|---|---|---|
-| DL1 | Work pathway minimum age 18 in new worlds; older saves keep 21; every other safeguard unchanged; no grants or guaranteed starts | `done with known limitation` | `f9bd765` / `c848952`; rules 2026-11-10; rule text `e759903` | `test_work_pathway.Age18Tests` (the reviewer's boundary cases), Counting, Deciding | M `5664853` (56 OK); M `e759903` (29 OK); in no serialized queue group (merged after `d70a725`); G1 pending | None recorded for `c848952` | Unit-tested only |
-| DL1.m | Measured outcomes of the pathway from 18: under-21 floor seasons and zero starts, time to a first start, job, return and turn-pro outcomes by age against 21+ | `open: not started` | -- | -- | Pinned runs predate it: 37 of 37 under-21 zero-start seasons began at the credit floor (RD2) | -- | Closes with paired fresh full-population runs (rule on and off, same seed) per the remedy document's section 6 |
-| DL2 | College amateurs at the members' class in their home region's ordinary open amateur events; rotation by open-amateur starts; everything else unchanged; older saves keep the old order | `done with known limitation` | `5664853` / `459322c`; rules 2026-11-11 | `test_college_open_access` (OrdinaryOpenTests, ClassAndRotationTests, FieldFillingTests, SavedWorldTests, RulesTests); `test_access` | M `5664853` (56 OK); in no serialized queue group; G1 pending | None recorded for `459322c` | Unit-tested with small fixtures only |
-| DL2.m | Paired fresh full-population runs (on and off, same seed): college and open-amateur starts by region, field fill, members' starts lost | `open: not started` | -- | -- | `docs/BACKLOG.md`: "pending" | -- | Closes with those paired runs on the final build |
-| DL3 | Keep the richer decision evidence despite the estimated growth; measure the full-world impact | `done` | `23701cf` (kept on rc1) | -- | -- | -- | The measurement is E1.f.6 (open) |
+| DL1 | Work pathway minimum age 18 in new worlds; older saves keep 21; every other safeguard unchanged; no grants or guaranteed starts | `done` | `f9bd765` / `c848952`; rules 2026-11-10; rule text `e759903` | `test_work_pathway.Age18Tests` (the reviewer's boundary cases), Counting, Deciding | M `5664853` (56 OK); M `e759903` (29 OK); in no serialized queue group (merged after `d70a725`); G1 pending | R8: independently tested, including a real monthly in-season transition (age 18, rank 301; unchanged cutoff; no cash grant) | Full-population outcomes: DL1.m (O2) |
+| DL1.m | Measured outcomes of the pathway from 18: under-21 floor seasons and zero starts, time to a first start, job, return and turn-pro outcomes by age against 21+ | `open: not started` | -- | -- | Pinned runs predate it: 37 of 37 under-21 zero-start seasons began at the credit floor (RD2) | -- | **O2**: paired fresh full-population runs (rule on and off, same seed) per the remedy document's section 6 |
+| DL2 | College amateurs at the members' class in their home region's ordinary open amateur events; rotation by open-amateur starts; everything else unchanged; older saves keep the old order | `done` | `5664853` / `459322c`; rules 2026-11-11 | `test_college_open_access` (OrdinaryOpenTests, ClassAndRotationTests, FieldFillingTests, SavedWorldTests, RulesTests); `test_access` | M `5664853` (56 OK); R7: an actual 5 % world, weeks 17-18, 145 open-amateur starts by 112 golfers; G1 pending | R7: independently accepted (10 tests, the 5 % world, exact counter/result match, nonzero save/reopen priority equality, next-year counter reset) | Full-population effect: DL2.m (O2) |
+| DL2.m | Paired fresh full-population runs (on and off, same seed): college and open-amateur starts by region, field fill, members' starts lost | `open: not started` | -- | -- | `docs/BACKLOG.md`: "pending" | -- | **O2**: those paired runs on the final build (a measurement) |
+| DL3 | Keep the richer decision evidence despite the estimated growth; measure the full-world impact | `done` | `23701cf` (kept on rc1) | -- | -- | -- | The measurement is E1.f.6 (O3) |
 
 ### 2.15 Live partnership history
 
 | Id | Requirement | Status | Commits | Tests | Evidence | Review | Remaining |
 |---|---|---|---|---|---|---|---|
-| LP1 | This season's partnerships shown at once on coach and caddie pages and in golfer team history: merged with the archive by stint id, live end-state overriding, marked "this season", dated, with initiator and reasons | `done with known limitation` | `697183c` (after `9cac183`); `d39d613` (footer with nothing archived) | `test_observer_profiles` (LivePartnerships; ProfilesAndStatsTests.test_coach_clients_are_current_assignments) | X6; M `697183c`; M `d39d613` (25 OK); G1 pending | `9cac183` judged insufficient; `697183c` reviewed, findings fixed in `d39d613`; no acceptance of `d39d613` recorded | Time worked together and result counts appear only once the season is archived (`697183c` message) |
+| LP1 | This season's partnerships shown at once on coach and caddie pages and in golfer team history: merged with the archive by stint id, live end-state overriding, marked "this season", dated, with initiator and reasons | `done with known limitation` | `697183c` (after `9cac183`); `d39d613` (footer with nothing archived) | `test_observer_profiles` (LivePartnerships; ProfilesAndStatsTests.test_coach_clients_are_current_assignments) | X6; M `697183c`; M `d39d613` (25 OK); G1 pending | `9cac183` judged insufficient; `697183c` reviewed, findings fixed in `d39d613`; `d39d613` independently accepted (R9) | Time worked together and result counts appear only once the season is archived (`697183c` message) |
 
 ### 2.16 Calibration questions raised by the pinned runs (C1)
 
+Three rows. Each consolidates the audit and roadmap rows that ask the same question (sections 3 and 4 point
+here).
+
 | Id | Requirement | Status | Evidence | Remaining |
 |---|---|---|---|---|
-| CQ1 | The 89-at-18 outlier. Run A: Rupert Vaughan (England, arrived 2046), 89.1 at 18, 92.0 at 19, potential 97.1, peak 96.7 at 30, 128 wins, 30 majors, still active. Investigate the extreme tail and first-year gains before any cap (C1.c) | `open: design decision pending` | A-D report, "Peaks of completed procedural careers"; under diagnosis; no diagnosis document on rc1 | Closes with the diagnosis from his creation and development records (E1.c, E1.d), then a decision: an accepted rare tail, or a change to creation or development in a new rules version |
-| CQ2 | Population growth flag (a diagnostic flag, not a stop). The plan requires the report to say whether it is legitimate growth or a defect | `open: design decision pending` | A 6,656 to 13,253 (39 of 45 seasons flagged; +98 % in 2066-2070, with arrivals and exits about level from the 2060s); B 6,449 to 10,619 (6 of 10 seasons); C to 10,638 (7); D to 10,446 (7); accounting reconciles every season. The report lists the flags and does not classify them | Closes with a diagnosis of arrivals against exits by cohort, and a decision on the intended steady-state size |
-| CQ3 | Tolerance bands before any tuning (C1.f) | `open: design decision pending` | Seeds, lengths and time approved (D4, D9); no bands | Closes with owner-approved bands for the measures in section 4's open rows |
-| CQ4 | Superstar scheduling and its interactions; no forced 20 starts, 98 % or retirement age (C1.e, N17.08) | `open: not started` | No analysis | Closes with an analysis of the top players' starts by season in run A, then a fresh run of the final build |
+| CQ1 | The 89-at-18 outlier. Run A: Rupert Vaughan (England, arrived 2046), 89.1 at 18 (season end), 92.0 at 19, potential 97.1, peak 96.7 at 30, 128 wins, 30 majors, still active. Investigate the extreme tail and first-year gains before any cap (C1.c) | `open: design decision pending` | Diagnosis published: `docs/review/VAUGHAN_OUTLIER_DIAGNOSIS.md` (`b613b3b`, `origin/build/v16-report`, not on rc1). A rare organic tail the rules produce: created Overall 85.31, potential 97.01; no generation or development bug found (R10) | **O6**: the decision. The independent calibration review recommends (a) retaining rare organic potential for the next test, rather than flattening talent, and (b) investigating individualized maturation separately (learning rate relative to the drawn peak age) |
+| CQ2 | Assess initialization to steady state: the seeded world starts below the population's equilibrium. A calibration assessment, not a defect or a runaway | `open: not started` | Run A plateaus near 13.1k active for its final ~17 seasons (13,253 at the end), with arrivals and exits about level; it starts at 6,656. B, C and D (10 seasons) are still rising (to 10,619, 10,638, 10,446). Accounting reconciles every season. The ">20 % from start" flag (A 39 of 45 seasons) measures distance from the seeded start, not growth at equilibrium | **O7**: assess how far below equilibrium the seeded world starts, and how long it takes to settle, as part of calibration (whether the seeded size, or the first seasons' arrivals, should change) |
+| CQ3 | Calibration assessment against tolerance bands. First the owner sets bands (C1.f). Then the run evidence is assessed against them: peaks and win counts, decline timing and rate by part of the game, starting distributions and the influence of potential and coaches, prodigy and slow-burn careers, late and age-26 entrants, injury frequency, stamina and recovery, superstar scheduling and starts (C1.e), and amateur financial pressure (F1.i) | `open: design decision pending` | Seeds, lengths and time approved (D4, D9); no bands. The A-D report has the tables (peaks, development and aging by part of the game, B against C); nothing has been assessed | **O5**: owner-approved bands, then one assessment per measure from run A and a fresh final-build run; any change only by decision |
 
 ### 2.17 Constraints
 
@@ -408,10 +428,10 @@ section 2 point there.
 | F1.c | Cash, equipment, restricted coverage and prize eligibility distinguished | `done` | section 2.9 | | D10 |
 | F1.d | Eligibility, amounts, payment timing, renewal, discontinuation | `done` | `138ce06` | `test_amateur_support` | L10. Week-1 budget, in-season upgrades, renewal one band down, ends on turning pro |
 | F1.e | A once-only advance is not counted twice | `done` | `138ce06` | `test_amateur_support` | No advance by design: costs drawn as incurred against one season cap |
-| F1.f | Credible response to persistent exclusion of adult non-college amateurs | `done with known limitation` | sections 2.1 (N2) and 2.14 (DL1) | | Effect of the age-18 change unmeasured (DL1.m) |
-| F1.g | Return from work to full-time amateur golf | `done with known limitation` | section 2.8 | | Validation open (D5.c) |
+| F1.f | Credible response to persistent exclusion of adult non-college amateurs | `done with known limitation` | sections 2.1 (N2) and 2.14 (DL1) | | Effect of the age-18 change unmeasured (DL1.m, O2) |
+| F1.g | Return from work to full-time amateur golf | `done with known limitation` | section 2.8 | | Validation open (D5.c, O3) |
 | F1.h | Report affordability and zero-start spells by region, age, status, standing | `done` | section 2.9 | | |
-| F1.i | Keep financial pressure below the supported elite | `open: design decision pending` | A-D report, "Amateur support: run B (with) against run C (without)" | -- | Pinned B and C tables exist; no assessment against the requirement is recorded. Closes with the reviewer's assessment (and CQ3 bands) |
+| F1.i | Keep financial pressure below the supported elite | see O5 (open) | A-D report, "Amateur support: run B (with) against run C (without)" | -- | Pinned B and C tables exist; not assessed (CQ3) |
 | F1.j | Test cash identities, renewals, duplicate processing, family and backer interactions | `done with known limitation` | `138ce06` | `test_amateur_support`, `test_finance_integration` | L10, L16. No backer-specific interaction test found |
 | F1.k | Sponsor values proposed and approved | `done` | `docs/AMATEUR_SPONSORSHIP_PROPOSAL.md`; D10 | -- | D10: the caps are the chosen initial test calibration |
 | F2.a | Every earned major place funded; money never the sole rejection | `done` | `45151e1` | `test_major_funding` (Guarantee, AllMajors) | L14 |
@@ -446,7 +466,7 @@ section 2 point there.
 | E3.d | Profiles, summaries and My World agree on episodes | `done` | section 2.1 (N5.a) | | |
 | E3.e | Missed events linked to injury only by a recorded reason | `done` | `tools/observer.py` | `test_living_views` | L16 |
 | E3.f | No fabricated past medical detail | `done` | `tools/observer.py` | `test_living_views` | L16 |
-| E3.g | Body-part damage or injury-rate tuning | `open: design decision pending` | -- | -- | The roadmap calls it a separate decision; it is not in the decision log. Closes with the owner's decision |
+| E3.g | Body-part damage or injury-rate tuning | `excluded from this pass by decision` | -- | -- | Excluded from this pass (reviewer). Assessing injury frequency stays in O5 (N19.01) |
 | P1.a | Prestige on profiles; sortable directories including retired and deceased people | `done` | `32bc43d`; `17909f4` (alive filter) | `test_living_views`, `test_mortality_world` | L05, L16 |
 | P1.b | Staff reputation under the Prestige label | `done` | `32bc43d` | `test_living_views` | L16 |
 | P1.c | Each role's value, never combined | `done with known limitation` | `32bc43d` | `test_living_views` | L16. An implemented choice; no owner decision in the decision log |
@@ -469,11 +489,11 @@ section 2 point there.
 | B1, B2 | Biggest Upsets | see section 2.5 | | | |
 | T1-T3 | Tournament stories | see section 2.6 | | | |
 | C1.a | Procedural entrants for principal conclusions, including retired and censored careers | `done with known limitation` | `473690a`, `15374c9` | `test_diagnostic_report` | The A-D report separates seeded and procedural careers and counts still-active (censored) golfers; pinned build only |
-| C1.b | Initial attributes, ceilings, coach exposure, prodigies, slow-burn, late wins and entry ages examined separately | `open: not started` | E1 records in run A | -- | Closes with that analysis from run A's creation and development records |
-| C1.c | Extreme starting tail and first-year gains before any cap | `open: design decision pending` | section 2.16 (CQ1) | | |
-| C1.d | Peak duration, decline by part of the game, competitiveness across cohorts | `open: design decision pending` | A-D report (peaks; aging by part of the game) | -- | The tables exist; competitiveness across cohorts is not reported and nothing is assessed. Closes with CQ3 bands and an assessment |
-| C1.e | Superstar scheduling | `open: not started` | section 2.16 (CQ4) | | |
-| C1.f | Tolerance bands before tuning | `open: design decision pending` | section 2.16 (CQ3) | | |
+| C1.b | Initial attributes, ceilings, coach exposure, prodigies, slow-burn, late wins and entry ages examined separately | see O5 (open) | E1 records in run A | -- | CQ3 |
+| C1.c | Extreme starting tail and first-year gains before any cap | see O6 (open) | section 2.16 (CQ1) | | |
+| C1.d | Peak duration, decline by part of the game, competitiveness across cohorts | see O5 (open) | A-D report (peaks; aging by part of the game) | -- | CQ3; competitiveness across cohorts is not yet reported |
+| C1.e | Superstar scheduling | see O5 (open) | section 2.16 (CQ3) | | |
+| C1.f | Tolerance bands before tuning | see O5 (open) | section 2.16 (CQ3) | | |
 | C2.a-f | Death after retirement | see section 2.7 | | | |
 | CAL | v2 for new worlds, v1 history browse-only, nothing deleted | `done` | `dd0bb27` | `test_observer_app`, `test_calendar_v2` | L06 |
 
@@ -503,12 +523,12 @@ follow-up has its own row.
 | N05.01 | Tournament Prestige column | `done` | `7ac03c4` |
 | N05.02 | Sortable event Prestige | `done` | `7ac03c4`, `1cc69a7` |
 | N05.03 | Sustained strong fields affect prestige | `done` | EventWindow (P2.a) |
-| N05.04 | Better prestige enables better host venues | `done` | Venue moves (P2.d); thresholds open (P2.g) |
+| N05.04 | Better prestige enables better host venues | `done` | Venue moves (P2.d); thresholds open (P2.f, O4) |
 | N05.05 | Five-year rolling factor history | `done` | Rules 2026-11-05 (P2.a) |
-| N05.06 | No big jumps | `done` | Annual limit (P2.a); constants open (P2.g) |
+| N05.06 | No big jumps | `done` | Annual limit (P2.a); constants open (P2.f, O4) |
 | N06.01 | Nation Prestige | `done` | P2.c |
 | N06.02 | Sortable nation Prestige | `done` | P2.e, `1cc69a7` |
-| N06.03 | Success beyond expectation in prestigious events | `done with known limitation` | P2.c; the expectation model is a proposal (P2.g) |
+| N06.03 | Success beyond expectation in prestigious events | `done with known limitation` | P2.c; the expectation model is a proposal (P2.f, O4) |
 | N06.04 | Increased future golfer quantity | `done` | D7: a share of a fixed cohort, not more golfers (P2.c) |
 | N06.05 | No arbitrary direct quality boosts | `done` | TalentUnchanged (P2.c) |
 | N06.06 | Five-year rolling average | `done` | `golfsim/participation.py` (`NATION_YEARS = 5`) |
@@ -519,16 +539,16 @@ follow-up has its own row.
 | N08.02 | Destination lists match the count's scope | `done` | N5.c |
 | N09.01 | Verify the amateur major win and qualification | `done` | Audit answered |
 | N09.02 | Research the real Masters, last 50 years | `done` | Audit answered |
-| N09.03 | Explain the college player's attributes without suppressing the story | `open: not started` | C1. Closes with the creation and development analysis (C1.b) |
-| N10.01 | Late non-college entry distribution | `open: not started` | E1 creation records exist; no distribution reported. Closes with an entry-age table from run A |
+| N09.03 | Explain the college player's attributes without suppressing the story | see O5 (open) | C1.b |
+| N10.01 | Late non-college entry distribution | see O5 (open) | E1 creation records exist; no distribution reported yet |
 | N10.02 | Entry age and pathway of the audited case | `done` | Audit answered |
 | N10.03 | Repeated runner-up case | `done` | Audit answered |
-| N10.04 | Age-26 entrants plausible and intentional | `open: design decision pending` | Intentional but uncalibrated; closes with N10.01 and a decision |
-| N11.01 | Starting attribute distributions | `open: not started` | C1.b |
-| N11.02 | Potential influence | `open: not started` | C1.b |
-| N11.03 | Coach influence | `open: not started` | C1.b |
-| N11.04 | Fast prodigy trajectory | `open: design decision pending` | CQ1 |
-| N11.05 | Slow-burn later greatness | `open: not started` | C1.b |
+| N10.04 | Age-26 entrants plausible and intentional | see O5 (open) | Intentional but uncalibrated |
+| N11.01 | Starting attribute distributions | see O5 (open) | C1.b |
+| N11.02 | Potential influence | see O5 (open) | C1.b |
+| N11.03 | Coach influence | see O5 (open) | C1.b |
+| N11.04 | Fast prodigy trajectory | see O6 (open) | CQ1; individualized maturation to be investigated |
+| N11.05 | Slow-burn later greatness | see O5 (open) | C1.b |
 | N11.06 | Exclude the initialization cohort | `done with known limitation` | `15374c9` (seeded and procedural apart); the filter itself has no dedicated unit test |
 | N11.07 | All procedural entrants, not survivors | `done with known limitation` | Retirement coverage counts every cohort member, including the still active; the peaks table is completed careers only |
 | N12.01 | Active/retired on Grand Slam | `done` | `test_myworld` |
@@ -546,23 +566,23 @@ follow-up has its own row.
 | N16.02 | Last chart year is the retirement year | `done` | `test_living_views` |
 | N17.01 | Complete development record | `done` | E1.c-E1.e (new worlds) |
 | N17.02 | Age-18 starting Overall | `done` | Audit answered; recorded in new worlds |
-| N17.03 | Peak plausibility | `open: design decision pending` | A-D peaks table; CQ1, CQ3 |
-| N17.04 | 94 at age 41 | `open: design decision pending` | A-D aging tables; CQ3 |
-| N17.05 | Decline still slow at 52 | `open: design decision pending` | A-D aging by part of the game (50-54, 55+); CQ3 |
-| N17.06 | Win count plausibility | `open: design decision pending` | CQ1 (128 wins, 30 majors); CQ3 |
+| N17.03 | Peak plausibility | see O5 (open) | A-D peaks table; CQ3 |
+| N17.04 | 94 at age 41 | see O5 (open) | A-D aging tables; CQ3 |
+| N17.05 | Decline still slow at 52 | see O5 (open) | A-D aging by part of the game (50-54, 55+); CQ3 |
+| N17.06 | Win count plausibility | see O5 (open) | CQ3; Vaughan's 128 wins and 30 majors in O6 |
 | N17.07 | No huge change from one outlier | `done` | A constraint, respected: no calibration change was made in `473690a..0a05310` |
-| N17.08 | Annual starts fewer than 20 | `open: not started` | CQ4 |
+| N17.08 | Annual starts fewer than 20 | see O5 (open) | CQ3 (scheduling) |
 | N17.09 | Scope-correct comparison | `done` | Audit answered |
 | N18.01 | Explain the 55.8 % turn-pro decision | `done` | Audit answered; terms and draw now recorded (E1.f.2) |
 | N18.02 | Assess about 98 %, not an automatic constant | `done` | Audit answered; not adopted |
 | N18.03 | Research top amateurs declining professional careers | `done` | Audit answered |
-| N19.01 | Injury frequency believable | `open: design decision pending` | Any tuning is E3.g; CQ3 |
-| N19.02 | Stamina functioning as intended | `open: not started` | Closes with an analysis from E1.f.1 fatigue columns on a fresh world |
-| N19.03 | Recovery functioning as intended | `open: not started` | As N19.02 (the `rest_keep` term is now recorded) |
+| N19.01 | Injury frequency believable | see O5 (open) | CQ3; injury-rate tuning itself is excluded from this pass (E3.g) |
+| N19.02 | Stamina functioning as intended | see O5 (open) | CQ3; E1.f.1 fatigue columns on a fresh world |
+| N19.03 | Recovery functioning as intended | see O5 (open) | CQ3; the `rest_keep` term is now recorded |
 | N19.04 | Declining starts and their causes | `done` | Audit answered; weekly reasons recorded (`test_access_ledger`) |
 | N20.01 | Age-55 physical attributes | `done` | Audit answered |
-| N20.02 | Decline timing | `open: design decision pending` | A-D aging tables; CQ3 |
-| N20.03 | Decline rate | `open: design decision pending` | A-D aging tables; CQ3 |
+| N20.02 | Decline timing | see O5 (open) | A-D aging tables; CQ3 |
+| N20.03 | Decline rate | see O5 (open) | A-D aging tables; CQ3 |
 | N21.01 | Locate the GOAT route | `done` | Audit answered |
 | N21.02 | Make the entry discoverable | `done` | `26df0bf`; mobile menu deferred by owner |
 | N22.01 | Death stage | `done` | C2.a |
@@ -595,11 +615,12 @@ follow-up has its own row.
 | `23701cf` | `build/v16-schedule-evidence` (`9e0b042`) | -- (recording only) | L20-L22 | Doc finding `72ab740` |
 | `d70a725` | `build/v16-report` (`8fcf2a5`) | -- | U11, L16-L22 | R3 |
 | `72ab740` | rc1 commit (docs) | -- | -- | From review of `d70a725` |
-| `f9bd765` | `build/v16-pathway18` (`c848952`) | 2026-11-10 | M `5664853`, M `e759903` | None recorded |
-| `5664853` | `build/v16-college-access` (`459322c`) | 2026-11-11 | M `5664853` | None recorded |
-| `9cac183`, `697183c`, `d39d613` | rc1 commits | -- | X6, X9 | `697183c` reviewed (findings fixed in `d39d613`) |
-| `e759903`, `c2a1391` | rc1 commits | -- | X7, X8 | -- |
+| `f9bd765` | `build/v16-pathway18` (`c848952`) | 2026-11-10 | M `5664853`, M `e759903` | R8 |
+| `5664853` | `build/v16-college-access` (`459322c`) | 2026-11-11 | M `5664853`; R7's 5 % world | R7 |
+| `9cac183`, `697183c`, `d39d613` | rc1 commits | -- | X6, X9 | `697183c` reviewed (findings fixed in `d39d613`); `d39d613` accepted (R9) |
+| `e759903`, `c2a1391` | rc1 commits | -- | X7, X8 | `c2a1391` accepted (R9) |
 | `0a05310` | rc1 commit (review docs) | -- | -- | -- |
+| `376c7a9` | rc1 commit after `0a05310` (decision-evidence fix, E1.f.8) | -- (recording only) | X10; M `376c7a9` | -- |
 
 ## 6. Pinned-run evidence (A-D, `473690a`) and final-feature-world evidence
 
@@ -627,60 +648,70 @@ What they do not support: any statement about the final feature world.
 - **Pre-final, small worlds and unit tests only:** every package's serialized queue run (L01-L15) and the grouped
   runs on the rc1 commit `d70a725` (L16-L22). L17 failed once; the failure was fixed by `697183c` (X6).
 - **Merged after `d70a725`, quick tests only:** the commits `72ab740`, `f9bd765` (pathway 18), `5664853` (college
-  access), `9cac183`, `e759903`, `697183c`, `d39d613`, `c2a1391` and `0a05310`. Their evidence is in the M and X
-  rows.
-- **On `0a05310`:** G1 full suite running; G2 full-population smoke, G3 wide-screen navigation and G4 E1.f
-  equivalence pending.
+  access), `9cac183`, `e759903`, `697183c`, `d39d613`, `c2a1391`, `0a05310` and `376c7a9`. Their evidence is in the
+  M and X rows and the independent reviews R7-R9. R7's actual 5 % world exercised college access in weeks 17-18.
+  R8's test made a real monthly in-season pathway transition at age 18.
+- **On `0a05310`:** G1 full suite running; it found X10, fixed by `376c7a9`, so the final rerun will be on a later
+  head. G2 full-population smoke, G3 wide-screen navigation and G4 E1.f equivalence pending.
 - **No full-population or multi-season run of the final feature world exists yet.** G2 is the first, at 2 seasons.
 
 ## 7. Open items and what closes them
 
-| # | Item | Status | What closes it |
-|---|---|---|---|
-| 1 | Final-head gates G1-G4 on `0a05310` | pending | G1 full suite passes; G2 smoke completes (reconciles; times and sizes reported); G3 navigation at 1920 and 1366 px passes; G4 equivalence on the exact head passes |
-| 2 | CQ1: the 89-at-18 outlier (Rupert Vaughan, run A) | `open: design decision pending` | Diagnosis from his creation and development records, then a decision: an accepted tail, or a creation/development change in a new rules version |
-| 3 | CQ2: population growth flag (A +98 %; B, C, D flagged 6-7 of 10 seasons) | `open: design decision pending` | Arrivals against exits by cohort explained; a decision on the intended steady state (legitimate growth or a defect) |
-| 4 | CQ3 / C1.f: tolerance bands | `open: design decision pending` | Owner-approved bands for peaks, decline, wins, injuries and scheduling |
-| 5 | CQ4 / C1.e / N17.08: superstar scheduling | `open: not started` | Starts by season for the top players in run A, then on a fresh final-build run |
-| 6 | C1.b, C1.d, N09.03, N10.01, N10.04, N11.01-N11.05, N17.03-N17.06, N19.01-N19.03, N20.02-N20.03, F1.i: calibration assessments | open (see rows) | The analyses from run A's records against the CQ3 bands, then a decision per measure |
-| 7 | DL2.m: paired fresh on/off runs for college open-amateur access | `open: not started` | Same-seed full-population runs, rule on and off: college and open-amateur starts by region, field fill, members' starts lost |
-| 8 | DL1.m: measured outcomes of the pathway from 18 | `open: not started` | Paired fresh runs: under-21 floor seasons, time to first start, job, return and turn-pro outcomes against 21+ |
-| 9 | E1.f.6: full-world decision-evidence size and time | `open: not started` | G2 measurements (size with and without the key, season time, save size, 13-plan / 3-row bounds) written into `docs/DECISION_EVIDENCE.md` |
-| 10 | E1.f.7: remaining recording gaps (entry choice and event values, staff-role draw, backers' review) | `open: design decision pending` | Record them (format /3), or a written reviewer decision that they are out of scope |
-| 11 | E1.f.5: equivalence on the final head | `done with known limitation` | G4 |
-| 12 | N4.c: determinism of the final feature world | `open: not started` | A determinism replay on a fresh `0a05310` full-population world |
-| 13 | D5.c: return and re-block rates | `open: not started` | Counts by age on a fresh full-population run of the final build |
-| 14 | S3.g / S3.h: recruitment measurement and constants | `open: not started` / `open: design decision pending` | Both seeds' before/after measurements; then confirmation of the constants |
-| 15 | P2.f / P2.g: prestige measurement and constants | `open: not started` / `open: design decision pending` | Two-seed measurement; then a decision on the expectation blend, bounds, step and venue-move thresholds |
-| 16 | G1.e: familiarity baseline on/off season | `open: not started` | Same-seed season with `familiar_base_on` false |
-| 17 | G3.f: temperature and firmness scope | `open: design decision pending` | Owner decision |
-| 18 | G3.g: season-scale weather runs | `open: not started` | A season-scale comparison against the classic model |
-| 19 | B1.h: Biggest Upsets whole-season equivalence and cost | `open: not started` | Whole-season on/off comparison with timings |
-| 20 | B2.a: audited upset examples as regression cases | `open: not started` | Fixtures of the audited cases, or a recorded decision that pre-estimate history stays "not recorded" |
-| 21 | T3.b: story timing on a long history | `open: not started` | Timed story-index build and story opens on a long archive |
-| 22 | E3.g: injury body-part damage or rate tuning | `open: design decision pending` | Owner decision |
+The open rows of sections 2-4 come down to these items: one gate (O1) and eight distinct open questions (O2-O9).
+Each open row names its item. Two further rows are excluded from this pass by decision.
+
+| Item | Question | Status | Rows it covers | What closes it |
+|---|---|---|---|---|
+| O1 | Final-head gates | pending | G1-G4 on the candidate; E1.f.5 (the equivalence proof is pre-final) | G1 full suite passes on the final head (the run on `0a05310` found X10; the rerun will be on a later head, from `376c7a9` on); G2 smoke completes (reconciles; times and sizes reported); G3 navigation at 1920 and 1366 px passes; G4 E1.f equivalence on the exact head passes |
+| O2 | Full-population effect of the two 07:24 rule changes (a measurement; both rules are implemented and independently accepted) | `open: not started` | DL1.m (pathway from 18), DL2.m (college open-amateur access) | Paired fresh full-population runs of the final build, rule on and off, same seed. They report under-21 floor seasons, time to a first start, job, return and turn-pro outcomes by age; and college and open-amateur starts by region, field fill and members' starts lost |
+| O3 | Full-population and long-history measurements of the final build | `open: not started` | N4.c (determinism replay), E1.f.6 (decision-evidence size and time), D5.c (return and re-block rates), G3.g (season-scale weather), B1.h (upsets whole-season equivalence and cost), T3.b (story timing on a long history) | G2 first; then one fresh multi-season run of the final build, with a determinism replay of one season, per-season sizes and times with and without the evidence and the upset estimates, return and re-block counts by age, and timed story indexing on its archive |
+| O4 | Package measurements, then the constants they inform | `open: not started` | S3.g (recruitment: both seeds' before/after, then the scouting and loyalty constants), P2.f (prestige: two-seed measurement, then the expectation blend, bounds, step and venue-move thresholds), G1.e (familiarity baseline on and off) | The three measurements on the final build; then the owner's or reviewer's confirmation of the constants |
+| O5 | Calibration assessment against tolerance bands | `open: design decision pending` | CQ3; C1.b, C1.d, C1.e, C1.f, F1.i; N09.03, N10.01, N10.04, N11.01-N11.03, N11.05, N17.03-N17.06, N17.08, N19.01-N19.03, N20.02, N20.03 | Owner-approved bands, then one assessment per measure from run A (pinned) and a fresh final-build run. Measures: peaks and wins; decline timing and rate; starting distributions and the influence of potential and coaches; prodigy, slow-burn and late or age-26 entrants; injury frequency, stamina and recovery; scheduling and starts; amateur financial pressure. Any change only by decision, in a new rules version |
+| O6 | The 89-at-18 outlier | `open: design decision pending` | CQ1; C1.c, N11.04 | Diagnosis published (`b613b3b`, not on rc1): a rare organic tail the rules produce (created 85.31, potential 97.01). The independent calibration review recommends retaining rare organic potential for the next test and investigating individualized maturation separately (learning rate relative to the drawn peak age), not flattening talent. Closes with the owner's decision on that recommendation |
+| O7 | Initialization to steady state: the seeded world starts below the population's equilibrium (a calibration assessment, not a defect) | `open: not started` | CQ2 | Run A plateaus near 13.1k active for its final ~17 seasons (from 6,656 at the start). Assess how far below equilibrium the seeded world starts and how long it takes to settle, then decide whether the seeded size or the early arrivals should change |
+| O8 | E1.f remaining recording gaps | `open: design decision pending` | E1.f.7 | Record the entry choice and per-event values, the staff-role draw and the backers' review (format /3), or the reviewer accepts them as out of scope, in writing |
+| O9 | Audited upset examples as regression cases | `open: not started` | B2.a | Fixtures of the audited cases, or a recorded decision that pre-estimate history stays "not recorded" |
+
+**Excluded from this pass by decision (reviewer), not open:**
+- weather temperature and firmness effects (G3.f);
+- injury body-part damage and injury-rate tuning (E3.g). Assessing injury frequency stays in O5.
 
 ## 8. Counts by status
 
 What is counted:
-- every row in sections 2-4 that has one of the four statuses, once;
-- not the 16 section-3 rows that point to a section-2 row, though they repeat its status: 9 `done`, 4
-  `done with known limitation`, 2 `open: design decision pending`, 1 `open: not started`;
+- every row in sections 2-4 that has one of the five statuses, once;
+- not the 13 section-3 rows that point to a section-2 row and repeat its status (9 `done`, 4
+  `done with known limitation`);
+- not the 24 rows in sections 3 and 4 that only restate a consolidated open item ("see O5 (open)" or "see O6
+  (open)"): 6 in section 3 and 18 in section 4;
 - not the evidence, merge and open-items tables (sections 1, 5 and 7).
-
-The audit register (section 4) is counted in full, although several of its rows restate a section-2 item; for
-example, N22 restates C2.
 
 | Status | Section 2 (overnight scope) | Section 3 (expanded roadmap) | Section 4 (N01-N23) | All |
 |---|---|---|---|---|
-| `done` | 71 | 37 | 64 | 172 |
-| `done with known limitation` | 14 | 9 | 6 | 29 |
-| `open: design decision pending` | 7 | 3 | 9 | 19 |
-| `open: not started` | 13 | 1 | 9 | 23 |
-| **Rows** | **105** | **50** | **88** | **243** |
+| `done` | 73 | 37 | 64 | 174 |
+| `done with known limitation` | 13 | 9 | 6 | 28 |
+| `open: design decision pending` | 3 | 0 | 0 | 3 |
+| `open: not started` | 13 | 0 | 0 | 13 |
+| `excluded from this pass by decision` | 1 | 1 | 0 | 2 |
+| **Rows** | **103** | **47** | **70** | **220** |
 
-In section 2, 20 rows are open (7 `open: design decision pending`, 13 `open: not started`): N4.c, S3.g,
-S3.h, P2.f, P2.g, G1.e, G3.f, G3.g, B1.h, B2.a, T3.b, D5.c, E1.f.6, E1.f.7, DL1.m, DL2.m, CQ1, CQ2, CQ3 and CQ4.
+The 16 open rows (all in section 2) come down to eight distinct open questions, O2-O9, plus the gate O1
+(section 7):
+
+| Open rows | Item |
+|---|---|
+| DL1.m, DL2.m | O2 |
+| N4.c, E1.f.6, D5.c, G3.g, B1.h, T3.b | O3 |
+| S3.g, P2.f, G1.e | O4 |
+| CQ3 | O5 |
+| CQ1 | O6 |
+| CQ2 | O7 |
+| E1.f.7 | O8 |
+| B2.a | O9 |
+
+By status, the eight items are:
+- `open: not started` (measurements and an assessment): O2, O3, O4, O7, O9;
+- `open: design decision pending`: O5, O6, O8.
 
 ## 9. Documents out of step with rc1 (no change made here)
 
@@ -702,4 +733,5 @@ S3.h, P2.f, P2.g, G1.e, G3.f, G3.g, B1.h, B2.a, T3.b, D5.c, E1.f.6, E1.f.7, DL1.
 - **The "not run" sections of the package documents** (`docs/WORLD_PRESTIGE_PACKAGE.md` section 6,
   `docs/RECRUITMENT_PACKAGE.md`, `docs/FAMILIARITY_AND_AGGRESSION.md`) predate the serialized queue. Their tests have
   since run (L09-L18), but their measurements still have not (P2.f, S3.g, G1.e).
-- **`docs/review/U21_AND_COLLEGE_REMEDY_OPTIONS.md`** is on `origin/build/v16-report` only (RD3).
+- **`docs/review/U21_AND_COLLEGE_REMEDY_OPTIONS.md`** (RD3) and **`docs/review/VAUGHAN_OUTLIER_DIAGNOSIS.md`**
+  (`b613b3b`, CQ1) are on `origin/build/v16-report` only.
