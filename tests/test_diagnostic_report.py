@@ -142,5 +142,29 @@ class ExclusionByGroup(unittest.TestCase):
         self.assertIn('not a paired-person causal estimate', text)
         self.assertIn('golfer-seasons, not unique people', text)
 
+class PathwayAgeInForce(unittest.TestCase):
+    """The pathway table's groups use the minimum age in force in each run's world: 18 where the run recorded it
+    (rules 2026-11-10), 21 for a run that did not (the pinned historical runs, made before then)."""
+
+    @staticmethod
+    def fake(name, min_age=None):
+        from types import SimpleNamespace as NS
+        rows = {1: (19, 'full_time', False, 400, 0, 9, None, 0, False, None, 'r'),
+                2: (22, 'full_time', False, 410, 3, 0, None, 0, False, None, 'r')}
+        d = {} if min_age is None else {'work_pathway_min_age': min_age}
+        return NS(name=name, years=[2030], d=d, amateurs=lambda y: rows)
+
+    def test_new_world_reads_its_rule(self):
+        out = '\n'.join(DR.pathway([self.fake('N', 18)]))
+        self.assertIn('eligible (18+, outside the top 300', out)
+        self.assertNotIn('under 21', out)
+        self.assertNotIn('under 18', out)                               # a 19-year-old is eligible there
+
+    def test_pinned_run_stays_21(self):
+        out = '\n'.join(DR.pathway([self.fake('B')]))
+        self.assertIn('under 21', out)
+        self.assertIn('eligible (21+, outside the top 300', out)
+
+
 if __name__ == '__main__':
     unittest.main()

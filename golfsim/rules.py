@@ -329,8 +329,10 @@ RULES = {
         'salary, living costs and schedule of every working amateur). A week counts when there was an eligible '
         'event and not one was affordable; an injury, a week with no suitable event and a week with nothing they '
         'were eligible for neither count nor reset; any week they could pay for an event starts the count again. '
-        'Nobody is given money and no cost is waived; the way back to full-time golf is turning professional, as '
-        'for every working amateur.',
+        'Nobody is given money and no cost is waived. The ways back to full-time golf are those of every working '
+        'amateur: the winter decision to turn professional, and, from rules 2026-11-06, the earned return to '
+        'full-time amateur golf when finances and results support it (Returning from work to full-time amateur '
+        'golf).',
         '2026-11-10'),
     'mortality': (
         'Death after retirement',

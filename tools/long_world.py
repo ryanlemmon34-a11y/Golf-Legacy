@@ -351,6 +351,8 @@ def run_world_session(seed, years, workers, out, resume=False, scale=1.0, amateu
         s.close()
     w = observer.World(d)
     check_support(getattr(w.session.season, 'amateur_support_on', True), amateur_support, f'seed {seed} (its world)')
+    # the work pathway's minimum age in force in this world (rules 2026-11-10: 18; earlier worlds 21), for the report
+    data['work_pathway_min_age'] = getattr(w.session.season, 'work_pathway_min_age', 21)
     first = data['first']
     if pending_path.exists():                       # a season captured but not yet merged when the run stopped
         with open(pending_path, 'rb') as f:

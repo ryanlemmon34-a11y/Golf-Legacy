@@ -285,6 +285,12 @@ AGE_BANDS = ((0, 20, 'under 21'), (21, 22, '21-22'), (23, 25, '23-25'), (26, 29,
 STANDING = ((1, 50, 'amateur top 50'), (51, 150, '51-150'), (151, 300, '151-300'), (301, 10 ** 6, 'ranked beyond 300'))
 
 
+def pathway_min_age(r):
+    """The work pathway's minimum age in force in a run's world, as tools/long_world.py recorded it (rules
+    2026-11-10: 18 in new worlds); a run that did not record it was made before then, when it was 21."""
+    return r.d.get('work_pathway_min_age', 21)
+
+
 def age_band(age):
     return next(label for lo, hi, label in AGE_BANDS if lo <= age <= hi)
 
@@ -459,6 +465,7 @@ def pathway(runs):
     rows = []
     for r in runs:
         groups = defaultdict(lambda: [0, 0, 0, 0])            # seasons, zero starts, blocked 8+, both
+        lo = pathway_min_age(r)
         took = []
         for y in r.years:
             for gid, v in r.amateurs(y).items():
@@ -467,9 +474,9 @@ def pathway(runs):
                 if v[1] != 'full_time' or v[2]:
                     continue
                 age, rank, band, family = v[0], v[3], v[6], v[8]
-                key = ('under 21' if age < 21 else 'ranked in the top 300' if rank is not None and rank <= 300
-                       else 'holds support' if band else 'family money left' if family else 'eligible (21+, outside '
-                       'the top 300, no support, no family money)')
+                key = (f'under {lo}' if age < lo else 'ranked in the top 300' if rank is not None and rank <= 300
+                       else 'holds support' if band else 'family money left' if family else f'eligible ({lo}+, '
+                       'outside the top 300, no support, no family money)')
                 gr = groups[key]
                 gr[0] += 1
                 gr[1] += v[4] == 0
