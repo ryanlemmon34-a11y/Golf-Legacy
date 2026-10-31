@@ -93,8 +93,13 @@ it too makes earlier worlds "another engine"; start the next long run on it so i
   multi-season advance saves and publishes each season as it ends, and the pages move on to it, so stopping
   or closing the window never loses a finished season. One operation at a time.
 - **Explore**: Overview, Calendar (this season, played / scheduled / not held), Rankings (world, amateur),
-  Golfers / Coaches / Caddies directories (filters: name, nation, tour, status; sorting), Courses, Nations,
+  Golfers / Coaches / Caddies directories (filters: name, nation, tour, status; golfers also playing now, world
+  ranking now and major champions; sorting), Courses, Nations,
   Tours, Tournaments (filters: tour, kind), Seasons and season recaps, the Record Book (formerly Records & frivolities), Moments.
+  On Nations and on a nation's page (v16) every count (people, active golfers, world top 100 now, major
+  champions in the archived seasons) links to the list of exactly the people it counts: the list has that many
+  rows, because the count is made with the list's own filter. Counts are by nationality, as of the date in the
+  header.
   Every person, edition, tournament, course, nation and tour links to its page; the browser's Back button
   keeps your filters.
 - **Stats** and **Prize money** (Basketball GM style): a season (the current one so far, or any archived one) or
