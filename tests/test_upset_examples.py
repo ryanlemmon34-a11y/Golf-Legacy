@@ -17,6 +17,12 @@ says "not recorded"; the story names the missing estimate among what is not in t
 "not estimated" record shows its recorded reason (or says no reason was recorded); and nothing is worked out
 afterwards (the model's functions are made to fail while all of this is rendered).
 
+Two further cases are kept apart from pre-estimate history (UnusableEstimateTests): an edition that WAS estimated
+but whose record names no winner matching the result, and a record of a model version this build does not support.
+Neither is ranked; each has its own reason (tools/upset_status.py), worded the same in the coverage line, the
+estimate panel and the story. StoreRebuildTests: a statistics store of the previous schema (6) is detected as stale
+and rebuilt, and the rebuilt rows equal the old ones except for those corrections.
+
 Quick unit tests (no world, nothing simulated; well under a second):
     python -m unittest tests.test_upset_examples -v
 """
@@ -38,6 +44,7 @@ sys.path.insert(0, str(ROOT / 'tools'))
 sys.path.insert(0, str(ROOT / 'tests'))
 from golfsim import upsets as UP                                      # noqa: E402
 import test_upsets as TU                                              # noqa: E402  (the Upsets page fixture)
+import upset_status as US                                             # noqa: E402
 
 HARPER = 200                                                          # Barnaby Harper
 # The audited examples. 'facts' are the documents' words; 'synthetic' names what the fixture had to make up.
@@ -158,10 +165,28 @@ class ExampleDataTests(unittest.TestCase):
         self.assertEqual((j['playoff'], j['margin']), (2, 0))         # the result, kept apart, as recorded
 
 
+UNUSABLE = ('2084:WINNER_NOT_IN', '2084:OTHER_WINNER', '2084:OLD_MODEL')
+
+
+def unusable_editions():
+    """Estimated editions whose record cannot be ranked (the result's winner is golfer 5 in each): the estimate names
+    no winner (the winner was not in its field), names another winner (3), or comes from an unsupported model."""
+    facts = lambda g: {'status': 'pro', 'age': 30, 'wr': g, 'ar': None}
+    pre = UP.estimate(TU.FIELD, 4)
+    a = estimated_edition(UNUSABLE[0], 23)
+    a['upset'] = UP.record(pre, 999, facts)                       # winner None
+    b = estimated_edition(UNUSABLE[1], 24)
+    b['upset'] = UP.record(pre, 3, facts)                         # another winner
+    c = estimated_edition(UNUSABLE[2], 25)
+    c['upset'] = dict(c['upset'], model='upset-model-0')          # the winner matches; the model is not supported
+    return [a, b, c]
+
+
 class _Store:
     """A statistics store with the examples, the generic legacy edition, and one synthetic season with recorded
-    estimates (one estimated stroke-play edition, one match play edition, one not-estimated record without a
-    reason)."""
+    estimates: one estimated stroke-play edition, one match play edition, one not-estimated record without a
+    reason, two estimated editions whose record names no winner matching the result, and one of an unsupported
+    model version."""
 
     def __init__(self):
         import observer_stats as ST
@@ -174,7 +199,7 @@ class _Store:
         noreason['upset'] = {'model': UP.VERSION, 'estimated': False}
         by_year[FIRST_ESTIMATED] = [estimated_edition(),
                                     estimated_edition('2084:MATCH_EVENT', 21, match_play=True, kind='amateur'),
-                                    noreason]
+                                    noreason] + unusable_editions()
         self.editions = {e['id']: e for evs in by_year.values() for e in evs}
         for y, evs in sorted(by_year.items()):
             self.store.put(y, str(y), {}, {}, {}, {}, upsets=ST.upset_rows(evs, y))
@@ -221,7 +246,7 @@ class BiggestUpsetsPageTests(unittest.TestCase):
     def test_coverage_counts_them_as_not_recorded(self):
         html = self.page()
         self.assertIn('1 winners with a recorded estimate (seasons 2084–2084); 8 not recorded (played before '
-                      'estimates were kept)', html)
+                      'estimates were kept); 5 with a record but no ranked chance — ', html)
         major = self.page(scope='major')
         self.assertIn('0 winners with a recorded estimate; 5 not recorded (played before estimates were kept).', major)
         self.assertIn('No winner with a recorded estimate matches', major)
@@ -234,8 +259,8 @@ class BiggestUpsetsPageTests(unittest.TestCase):
 
     def test_not_estimated_shows_the_recorded_reason(self):
         html = self.page(**{'from': FIRST_ESTIMATED})
-        self.assertIn('; 2 not estimated: match play (model 1 covers stroke play only) (1), no reason recorded (1).',
-                      html)
+        self.assertIn('not estimated: match play (model 1 covers stroke play only) (1), not estimated: no reason '
+                      'recorded (1)', html)
         self.assertNotIn('not estimated (match play)', html)          # the reason is never assumed
 
     def test_the_same_list_with_the_examples_present_or_not(self):
@@ -265,16 +290,16 @@ class EventPanelTests(unittest.TestCase):
     def test_each_example_says_not_recorded(self):
         for c in CASES:
             p = self.panel(c['eid'])
-            self.assertEqual(p, '<p class="muted">Pre-event estimate: not recorded (this edition was played before '
-                                'estimates were kept; none is worked out afterwards).</p>', c['eid'])
+            self.assertEqual(p, '<p class="muted">Pre-event estimate — not recorded: played before estimates were '
+                                'kept, and none is worked out afterwards.</p>', c['eid'])
             self.assertEqual(numbers_claimed(p), [])
             for word in (UP.VERSION, 'favourite', 'Top ', 'Overall', 'by the model'):
                 self.assertNotIn(word, p)
 
     def test_not_estimated_panel_gives_the_recorded_reason(self):
-        self.assertIn('not estimated (match play (model 1 covers stroke play only))', self.panel('2084:MATCH_EVENT'))
+        self.assertIn('not estimated: match play (model 1 covers stroke play only)', self.panel('2084:MATCH_EVENT'))
         p = self.panel('2084:NO_REASON')
-        self.assertIn('not estimated (no reason recorded)', p)
+        self.assertIn('not estimated: no reason recorded', p)
         self.assertNotIn('None', p)
 
     def test_an_estimated_edition_still_shows_its_estimate(self):
@@ -367,8 +392,8 @@ class EventPageTests(unittest.TestCase):
             final = O.event(self.w, {}, '2034:TOUR_MASTERS')[1]
             story = O.event(self.w, {'view': ['story']}, '2034:TOUR_MASTERS')[1]
             upsets = O.PAGES['/upsets'](self.w, {})[1]
-        self.assertIn('Pre-event estimate: not recorded (this edition was played before estimates were kept; none is '
-                      'worked out afterwards).', final)
+        self.assertIn('Pre-event estimate — not recorded: played before estimates were kept, and none is worked out '
+                      'afterwards.', final)
         self.assertNotIn(UP.VERSION, final)
         self.assertIn('Chris Jefferson', story)
         self.assertIn('Not in the record, so not in the story', story)
@@ -379,6 +404,170 @@ class EventPageTests(unittest.TestCase):
         self.assertIn('0 winners with a recorded estimate; 1 not recorded (played before estimates were kept).', upsets)
         self.assertIn('No winner with a recorded estimate matches', upsets)
         self.assertNotIn('Chris Jefferson', upsets)
+
+
+class UnusableEstimateTests(unittest.TestCase):
+    """An edition that was estimated but whose record names no winner matching the result, and a record of an
+    unsupported model: never ranked, never counted as pre-estimate history, one reason everywhere."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.fx = _Store()
+        cls.w = cls.fx.w
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.fx.close()
+
+    def test_supported_models_include_the_recording_model(self):
+        self.assertIn(UP.VERSION, US.SUPPORTED)
+
+    def test_rows_carry_the_model_and_the_reason_but_no_chance(self):
+        import observer_upsets as OU
+        rows = {r['event_id']: r for r in OU.rows_for(self.w)[0]}
+        for eid, model, why in ((UNUSABLE[0], UP.VERSION, US.WINNER_MISSING),
+                                (UNUSABLE[1], UP.VERSION, US.WINNER_MISSING),
+                                (UNUSABLE[2], 'upset-model-0', US.unsupported('upset-model-0'))):
+            r = rows[eid]
+            self.assertEqual(r['model'], model, eid)              # recorded: not pre-estimate history
+            self.assertIsNone(r['p'], eid)                        # never ranked
+            self.assertEqual(r['detail']['unavailable'], why, eid)
+            self.assertIsNone(r['status'])
+        self.assertEqual(US.unsupported('upset-model-0'),
+                         'unsupported model upset-model-0 (this build reads upset-model-1 only)')
+        self.assertNotIn('unavailable', rows['2084:RECORDED_EVENT']['detail'])
+
+    def test_not_ranked_and_not_counted_as_not_recorded(self):
+        import observer as O
+        import observer_upsets as OU
+        with no_model_calls():
+            html = OU.page(self.w, {})[1]
+        body = html.split('<tbody>', 1)[1].split('</tbody>', 1)[0]
+        for eid in UNUSABLE:
+            self.assertNotIn(quote(eid), body, eid)
+        self.assertIn('8 not recorded (played before estimates were kept)', html)   # the examples only
+        self.assertIn(O.esc(US.WINNER_MISSING) + ' (2)', html)
+        self.assertIn(O.esc(US.unsupported('upset-model-0')) + ' (1)', html)
+
+    def test_one_reason_in_the_coverage_line_the_panel_and_the_story(self):
+        import observer as O
+        import observer_stories as S
+        import observer_upsets as OU
+        import test_stories as TS
+        with no_model_calls():
+            cov = OU.page(self.w, {})[1].split('Ranked by')[0]
+            src = TS.FakeSource()
+            for eid in UNUSABLE + ('2084:MATCH_EVENT', '2084:NO_REASON'):
+                e = self.fx.editions[eid]
+                winner = next(g for g, p, _ in e['finish'][0] if p == 1)
+                kind, why = US.status(e['upset'], winner)
+                self.assertNotEqual(kind, 'ok', eid)
+                self.assertIn(O.esc(why), cov, eid)
+                panel = OU.event_panel(self.w, e)
+                self.assertIn(f'— {O.esc(why)}.', panel, eid)
+                src.eds[eid] = dict(e, year=2084, finish=[[list(x) for x in e['finish'][0]]], team={})
+                rec = S.assemble(src, eid)
+                self.assertNotIn('upset', rec['facts'], eid)
+                self.assertIn(f'a pre-event win estimate ({why}), so no upset is claimed', rec['missing'], eid)
+                if kind == 'unsupported':
+                    self.assertEqual(numbers_claimed(panel), [])      # nothing of an unsupported model is shown
+                if kind == 'winner_missing':
+                    self.assertIn('Top ', panel)                      # the estimate stands; the winner's chance
+                    self.assertNotIn('Winner: ', panel)               # is not in it
+
+
+def _schema6_upset_rows(events, year):
+    """observer_stats.upset_rows as it was under statistics schema 6 (1c28d09), verbatim, for the rebuild check."""
+    out = []
+    for e in events:
+        if e.get('kind') == 'qualifying' or e.get('tier') == 7 or len(e.get('finish') or ()) != 1:
+            continue
+        site = e['finish'][0]
+        win = next(((g, t) for g, p, t in site if p == 1), None)
+        if win is None:
+            continue
+        up = e.get('upset') or {}
+        est = bool(up.get('estimated')) and up.get('winner') == win[0]
+        facts = (up.get('winner_facts') or {}) if est else {}
+        margin = back = None
+        if not e.get('match_play') and win[1] is not None:
+            rest = [t for g, p, t in site if t is not None and g != win[0]]
+            margin = (min(rest) - win[1]) if rest else None
+            scores = (e.get('scores') or [{}])[0]
+            r = e.get('rounds') or 0
+            if r >= 2 and scores:
+                before = {g: sum(v[:r - 1]) for g, v in scores.items() if len(v) >= r - 1}
+                mine = before.get(str(win[0]), before.get(win[0]))
+                if mine is not None:
+                    back = mine - min(before.values())
+        detail = {k: up[k] for k in ('why', 'rank', 'overall_rank', 'overall', 'favourite', 'favourite_p',
+                                     'favourite_overall', 'favourite_facts', 'top', 'winner_facts') if k in up}
+        out.append((year, e['week'], e['id'], e['series'], e.get('name'), e.get('tour') or '', e.get('tier'),
+                    int(e.get('kind') == 'major' or e.get('category') == 'major'), win[0],
+                    up.get('model') if up and (est or not up.get('estimated')) else None,
+                    up.get('p') if est else None, facts.get('status'), facts.get('age'), len(site), margin,
+                    e.get('playoff') or 0, back, e.get('rounds'), int(bool(e.get('match_play'))),
+                    json.dumps(detail, separators=(',', ':')) if up else None))
+    return out
+
+
+class StoreRebuildTests(unittest.TestCase):
+    """The statistics store is derived: a store written under the previous schema is detected as stale and rebuilt
+    from the same season data (the season data itself is never changed)."""
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp())
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_old_schema_store_is_rebuilt_with_only_the_corrections(self):
+        import copy
+        import observer_stats as ST
+        import observer_upsets as OU
+        self.assertEqual(ST.SCHEMA, 7)
+        evs = [estimated_edition(), estimated_edition('2084:MATCH_EVENT', 21, match_play=True, kind='amateur'),
+               edition(LEGACY)] + unusable_editions()
+        before = copy.deepcopy(evs)
+        path = self.tmp / 's.sqlite'
+        prev = ST.StatsStore(path)                                  # a schema-6 store, as the previous build left it
+        prev.put(2084, 'src', {}, {}, {}, {}, upsets=_schema6_upset_rows(evs, 2084))
+        prev.db.execute("UPDATE meta SET value = '6' WHERE key = 'schema'")
+        prev.db.commit()
+        old_rows = {r[2]: r for r in prev.db.execute('SELECT * FROM upsets')}
+        prev.close()
+        model, p, status, age, detail = (OU.COLUMNS.index(k) for k in ('model', 'p', 'status', 'age', 'detail'))
+        self.assertEqual(old_rows[UNUSABLE[2]][p], old_rows['2084:RECORDED_EVENT'][p])   # schema 6 ranked it
+        self.assertIsNone(old_rows[UNUSABLE[0]][model])             # ... and called these "not recorded"
+        new = ST.StatsStore(path)                                   # reopened by this build: stale, so emptied
+        try:
+            self.assertEqual(new.db.execute("SELECT value FROM meta WHERE key = 'schema'").fetchone()[0], '7')
+            self.assertEqual(new.db.execute('SELECT COUNT(*) FROM years').fetchone()[0], 0)    # every season rebuilt
+            self.assertEqual(new.db.execute('SELECT COUNT(*) FROM upsets').fetchone()[0], 0)
+            new.put(2084, 'src', {}, {}, {}, {}, upsets=ST.upset_rows(evs, 2084))
+            new_rows = {r[2]: r for r in new.db.execute('SELECT * FROM upsets')}
+        finally:
+            new.close()
+        self.assertEqual(evs, before)                               # the season data is read, never changed
+        self.assertEqual(set(new_rows), set(old_rows))
+        for eid, o in old_rows.items():
+            n = new_rows[eid]
+            fixed = (model, p, detail) + ((status, age) if eid == UNUSABLE[2] else ())   # an unsupported record's
+            same = [i for i in range(len(o)) if i not in fixed]                           # facts are not used
+            self.assertEqual([o[i] for i in same], [n[i] for i in same], eid)
+            od, nd = json.loads(o[detail] or 'null'), json.loads(n[detail] or 'null')
+            if od is None:                                          # pre-estimate history: unchanged
+                self.assertIsNone(nd, eid)
+                self.assertEqual((o[model], o[p]), (n[model], n[p]), eid)
+                continue
+            self.assertEqual({k: v for k, v in nd.items() if k != 'unavailable'}, od, eid)   # only the reason added
+        self.assertEqual(old_rows['2084:RECORDED_EVENT'], new_rows['2084:RECORDED_EVENT'])
+        self.assertEqual(old_rows['2084:MATCH_EVENT'][:detail], new_rows['2084:MATCH_EVENT'][:detail])
+        for eid in UNUSABLE:
+            self.assertIsNone(new_rows[eid][p], eid)
+            self.assertIsNotNone(new_rows[eid][model], eid)
+            self.assertIn('unavailable', json.loads(new_rows[eid][detail]), eid)
+        self.assertEqual(ST.upset_rows(evs, 2084), ST.upset_rows(copy.deepcopy(before), 2084))   # the same again
 
 
 if __name__ == '__main__':

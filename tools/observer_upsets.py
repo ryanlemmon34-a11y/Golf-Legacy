@@ -16,9 +16,9 @@ from golfsim import scopes as SC
 from golfsim import upsets as UP
 
 import observer_stories as STORY                                    # the edition's story page (story_href)
+import upset_status as US                                           # why an estimate is not shown (one wording)
 
 PATH = '/upsets'
-NO_REASON = 'no reason recorded'
 PAGE = 50
 LEVELS = (('0', 'Major'), ('1', 'Premier'), ('2', 'Challenger'), ('3', 'Regional'), ('4', 'Mini tour'),
           ('5', 'College'), ('6', 'Amateur'), ('8', 'Club professional'))
@@ -190,8 +190,7 @@ def explanation(w, r):
     """Why this is classified as an upset, in one line, from the recorded estimate."""
     d = r['detail']
     if r['p'] is None:
-        return '<span class="muted">' + ('not estimated: ' + _o().esc(d.get('why')) if d.get('why') else
-                                         'not recorded (played before estimates were kept)') + '</span>'
+        return '<span class="muted">' + _o().esc(d.get('unavailable') or US.NOT_RECORDED) + '</span>'
     O = _o()
     fav = d.get('favourite')
     favtxt = ('they were the favourite' if fav == r['winner'] else
@@ -201,16 +200,17 @@ def explanation(w, r):
             f'Overall; the model put them {ordinal(d.get("rank"))} of {r["field"]} at {UP.odds_text(r["p"])}; {favtxt}.')
 
 
-def not_estimated_text(rows):
-    """'; N not estimated: <reason> (n), ...' for the chosen editions whose record says not estimated, with the reason
-    recorded with each (never assumed: an edition without one says so), or '' when there is none."""
+def unavailable_text(rows):
+    """'; N with a record but no ranked chance -- <reason> (n), ...' for the chosen editions whose estimate record
+    cannot be ranked (not estimated, an unsupported model, no winner's chance), each with its reason as the panel and
+    the story word it (tools/upset_status.py), or '' when there is none."""
     if not rows:
         return ''
     why = {}
     for r in rows:
-        k = (r.get('detail') or {}).get('why') or NO_REASON
+        k = r['detail']['unavailable']
         why[k] = why.get(k, 0) + 1
-    return (f'; {len(rows):,} not estimated: '
+    return (f'; {len(rows):,} with a record but no ranked chance — '
             + ', '.join(f'{k} ({n:,})' for k, n in sorted(why.items(), key=lambda x: (-x[1], x[0]))))
 
 
@@ -234,8 +234,8 @@ def page(w, q):
     scope = O.one(q, 'scope', '') or ''
     chosen = select(w, rows, q)
     ranked = sorted((r for r in chosen if r['p'] is not None), key=rank_key)
-    unrecorded = [r for r in chosen if r['p'] is None and not r['model']]
-    not_estimated = [r for r in chosen if r['p'] is None and r['model']]
+    unavailable = [r for r in chosen if r['p'] is None and r['detail'].get('unavailable')]
+    unrecorded = [r for r in chosen if r['p'] is None and not r['detail'].get('unavailable')]
     first = first_wins(rows)
     tours = sorted(((k, t.get('name', k)) for k, t in w.tours().items()), key=lambda x: x[1])
     nations = sorted({(w.person(r['winner']) or {}).get('country') or '' for r in rows} - {''})
@@ -265,7 +265,7 @@ def page(w, q):
     cov = (f'{len(ranked):,} winners with a recorded estimate'
            + (f' (seasons {rec_years[0]}–{rec_years[-1]})' if rec_years else '')
            + f'; {len(unrecorded):,} not recorded (played before estimates were kept)'
-           + not_estimated_text(not_estimated) + '.')
+           + unavailable_text(unavailable) + '.')
     chunk, pager = O.paged(ranked, q, PATH, size=PAGE)
     start = (max(1, min(_int(O.one(q, 'page')) or 1, (len(ranked) + PAGE - 1) // PAGE or 1)) - 1) * PAGE
     ranks = competition_ranks(ranked)                     # over the whole list, not only this page
@@ -300,16 +300,16 @@ def event_panel(w, full):
     if not full or 'id' not in full or full.get('kind') == 'qualifying' or len(full.get('finish') or ()) != 1:
         return ''
     up = full.get('upset')
-    if not up:
-        return ('<p class="muted">Pre-event estimate: not recorded (this edition was played before estimates were '
-                'kept; none is worked out afterwards).</p>')
-    if not up.get('estimated'):
-        return f'<p class="muted">Pre-event estimate: not estimated ({O.esc(up.get("why") or NO_REASON)}).</p>'
+    winner = next((g for g, p, _ in full['finish'][0] if p == 1), None)
+    kind, why = US.status(up, winner)
+    if kind not in ('ok', 'winner_missing'):                   # nothing of the estimate is shown, only why
+        return f'<p class="muted">Pre-event estimate — {O.esc(why)}.</p>'
     top = ', '.join(f'{w.person_link(g)} {UP.odds_text(p)}' for g, p in up.get('top') or [])
-    line = ''
-    if up.get('winner') is not None:
+    if kind == 'ok':
         r = {'winner': up['winner'], 'p': up['p'], 'field': up['field'], 'detail': up}
         line = f'Winner: {w.person_link(up["winner"])}, {UP.odds_text(up["p"])} before the event. ' + explanation(w, r)
+    else:                                                       # the estimate stands; the winner's chance is not in it
+        line = f'Winner\'s chance — {O.esc(why)}.'
     return (f'<h3>Pre-event estimate</h3><p>{line}</p><p class="muted">Top {len(up.get("top") or [])} by the model: '
             f'{top}. Model {O.esc(up.get("model"))}, worked out from the field before the first shot; see '
             f'<a href="{PATH}">Biggest Upsets</a>.</p>')

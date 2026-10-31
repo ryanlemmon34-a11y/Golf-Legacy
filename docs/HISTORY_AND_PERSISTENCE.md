@@ -228,8 +228,8 @@ about 450 bytes per edition for the rest -- about 0.8 KB for a 30-player field, 
 (about half that gzipped). A season grows by roughly 11 bytes x its estimated starts + 450 bytes x its estimated
 editions: for example 900 editions with 80,000 starts would add about 1.3 MB uncompressed, about 0.6 MB in the
 gzipped season file (an illustration; the measured share of a real season file is pending the long runs). Match play is marked not estimated.
-Editions played before it have none and are shown as not recorded (never reconstructed): the roadmap's audited examples (B2) are kept as such fixtures in tests/test_upset_examples.py. The statistics store
-(schema 6) keeps one `upsets` row per won edition for the observer's Biggest Upsets page, with the margin, playoff
+Editions played before it have none and are shown as not recorded (never reconstructed): the roadmap's audited examples (B2) are kept as such fixtures in tests/test_upset_examples.py. A chance is ranked only when the record is of a supported model (`upset-model-1`) and names the result's winner; otherwise the edition is unranked with its own reason (not estimated, with the recorded reason; unsupported model; estimate recorded but the winner's chance not in it), worded once in `tools/upset_status.py` for the page, the edition panel and the story. The statistics store
+(schema 7; an older store is detected and rebuilt from the season files, which are never changed) keeps one `upsets` row per won edition for the observer's Biggest Upsets page, with the margin, playoff
 and strokes behind before the final round kept apart from the estimate.
 
 ### Queries (`archive.Archive`)

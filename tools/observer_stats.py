@@ -27,8 +27,10 @@ Definitions (shown on the pages):
 - **Records kept here** (per season, bounded): the longest drives and the best event driving averages
   (top RECORD_KEEP per season and tour), every stroke-play winning margin and every match-play result.
 - **Upsets** (roadmap B1/B2): one row per won, single-site, non-qualifying edition: its recorded pre-event estimate
-  (golfsim/upsets.py; NULL model when the edition was played before estimates were kept: never reconstructed) and,
-  apart from it, the result's drama (winning margin, playoff, strokes behind before the final round).
+  (golfsim/upsets.py; NULL model when the edition was played before estimates were kept: never reconstructed; a
+  chance only when the record is of a supported model and names the result's winner, otherwise the reason in the
+  detail's `unavailable`, tools/upset_status.py) and, apart from it, the result's drama (winning margin, playoff,
+  strokes behind before the final round).
 
 The store is a small SQLite file next to the world (observer_cache/), built one season at a time from the
 season files (in the background), and rebuilt for a season whose published file changes (a rollback).
@@ -48,8 +50,9 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from golfsim import golfstats as GS                                      # noqa: E402
+import upset_status as US                                                # noqa: E402  (tools/)
 
-SCHEMA = 6
+SCHEMA = 7                                     # 7: an unusable estimate's reason (`unavailable`)
 COLUMNS = ('starts', 'wins', 'runner_ups', 'top2', 'top5', 'top10', 'cut_events', 'cuts_made', 'qualifiers')
 GOLF = ('golf_starts',) + GS.FIELDS            # summed golf statistics counters (and the starts carrying them)
 ALL = COLUMNS + GOLF
@@ -261,7 +264,8 @@ def upset_rows(events, year):
         if win is None:
             continue
         up = e.get('upset') or {}
-        est = bool(up.get('estimated')) and up.get('winner') == win[0]
+        kind, why = US.status(up, win[0])
+        est = kind == 'ok'
         facts = (up.get('winner_facts') or {}) if est else {}
         margin = back = None
         if not e.get('match_play') and win[1] is not None:
@@ -276,9 +280,11 @@ def upset_rows(events, year):
                     back = mine - min(before.values())
         detail = {k: up[k] for k in ('why', 'rank', 'overall_rank', 'overall', 'favourite', 'favourite_p',
                                      'favourite_overall', 'favourite_facts', 'top', 'winner_facts') if k in up}
+        if up and not est:
+            detail['unavailable'] = why                    # the reason, worded as the page, panel and story word it
         out.append((year, e['week'], e['id'], e['series'], e.get('name'), e.get('tour') or '', e.get('tier'),
                     int(e.get('kind') == 'major' or e.get('category') == 'major'), win[0],
-                    up.get('model') if up and (est or not up.get('estimated')) else None,
+                    up.get('model') if up else None,
                     up.get('p') if est else None, facts.get('status'), facts.get('age'), len(site), margin,
                     e.get('playoff') or 0, back, e.get('rounds'), int(bool(e.get('match_play'))),
                     json.dumps(detail, separators=(',', ':')) if up else None))

@@ -71,8 +71,9 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 from golfsim import golfstats as GS                                     # noqa: E402  (definitions only)
+import upset_status as US                                               # noqa: E402  (tools/: one wording)
 
-FACT_VERSION = 3
+FACT_VERSION = 4
 NARRATIVE_VERSION = 3
 
 # pattern thresholds (strokes, or a probability), documented on the story page
@@ -448,22 +449,15 @@ def json_safe(x):
 # 'favourite', 'favourite_p', 'favourite_overall', 'favourite_facts', 'winner', 'p', 'rank', 'overall_rank',
 # 'overall', 'winner_facts'} with facts {'status', 'age', 'wr', 'ar'} as at the event; or {'model', 'estimated':
 # False, 'why'}. Worked out before the first shot; the story reads it and never works one out afterwards.
-UPSET_MODELS = ('upset-model-1',)
+UPSET_MODELS = US.SUPPORTED
 
 
 def upset_fact(rec, winner, site):
-    """(the upset fact, None) from an edition's recorded estimate, or (None, what is missing and why)."""
-    if not rec:
-        return None, ('a pre-event win estimate (not recorded: played before estimates were kept, and none is worked '
-                      'out afterwards), so no upset is claimed')
-    if not rec.get('estimated'):
-        return None, f'a pre-event win estimate (not estimated: {rec.get("why") or "no reason recorded"})'
-    if rec.get('model') not in UPSET_MODELS:
-        return None, f'a pre-event win estimate this build can read (model {rec.get("model")})'
-    if site != rec.get('site', 0):
-        return None, 'a pre-event win estimate for this site (the estimate covers the first site only)'
-    if rec.get('winner') is None or rec['winner'] != winner or rec.get('p') is None:
-        return None, 'the winner\'s pre-event chance (the estimate names no winner matching the result)'
+    """(the upset fact, None) from an edition's recorded estimate, or (None, what is missing and why): the reason
+    is worded as the Biggest Upsets page and the edition's estimate panel word it (tools/upset_status.py)."""
+    kind, why = US.status(rec, winner, site)
+    if kind != 'ok':
+        return None, f'a pre-event win estimate ({why}), so no upset is claimed'
     return {'model': rec['model'], 'field': rec.get('field'), 'rounds': rec.get('rounds'),
             'winner_p': rec['p'], 'winner_rank': rec.get('rank'), 'overall_rank': rec.get('overall_rank'),
             'overall': rec.get('overall'), 'winner_facts': rec.get('winner_facts') or {},
