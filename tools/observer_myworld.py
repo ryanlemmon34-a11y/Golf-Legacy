@@ -8,6 +8,11 @@ worded, since you last marked it read (or over a window you choose):
   season-end changes of tour or status (from the archived seasons; the current season's status against the last
   archived one), recorded moments (course records and the like), and a change of world-ranking band (No. 1, top
   10, top 50, top 100) between the start of the window and now;
+
+  Winter changes -- a change of tour or status, a retirement, a retirement into coaching or caddying, a partnership
+  ended at a season's end -- are dated when decided, at the end of the season before (its week 52), so they are
+  inside the read marker set in the next season's week 1. A consequence: the "this season" window (from the new
+  season's week 0) does not include last winter's changes; a window reaching back to last season's end does.
 * a followed golfer's injuries (when, where, what and the weeks announced) and returns (their first appearance
   once they could enter again, and their first main event back when that appearance was a qualifying stage), as
   the profile's Injuries section works them out;
@@ -330,7 +335,10 @@ def _staff_role(w, pid, start, add):
 
 
 def _status_changes(w, pid, start, add):
-    """Season-end changes of tour or status (archived seasons), and the current season's against the last one."""
+    """Season-end changes of tour or status (archived seasons), and the current season's against the last one. Each is
+    dated when it was decided: the end of the season before (week 53, the digest's week 52, as retirements and
+    partnerships ended at a season's end), so marking the digest read in week 1 -- when "now" is last season's week
+    52 -- covers it."""
     O = _o()
     rows = w.a.index.seasons(pid) if (w.a and w.a.index is not None) else []
     tours = w.tours()
@@ -347,8 +355,8 @@ def _status_changes(w, pid, start, add):
         if (s := say(a, b)) == 'retired':              # (decided in the winter after a's season: dated then)
             if _after(start, *_dated((a['year'], 53))):
                 add(*_dated((a['year'], 53)), 'status', f'{w.person_link(pid)}: retired after the {a["year"]} season')
-        elif s and _after(start, b['year'], 1):
-            add(b['year'], 1, 'status', f'{w.person_link(pid)}: {O.esc(s)} (season {b["year"]})')
+        elif s and _after(start, *_dated((b['year'] - 1, 53))):    # (decided in the winter before b's season)
+            add(*_dated((b['year'] - 1, 53)), 'status', f'{w.person_link(pid)}: {O.esc(s)} (season {b["year"]})')
     if not rows:
         return
     live = w.live.people.get(pid) if w.live else None
@@ -359,9 +367,10 @@ def _status_changes(w, pid, start, add):
         if _after(start, *when):                       # season (its end: week 52), however often it is read
             add(*when, 'status', f'{w.person_link(pid)}: retired after the {last["year"]} season')
         return
-    if live and w.live.cursor['year'] > last['year'] and _after(start, w.live.cursor['year'], 1):
-        if s := say(last, live):
-            add(w.live.cursor['year'], 1, 'status', f'{w.person_link(pid)}: {O.esc(s)} (season {w.live.cursor["year"]})')
+    cy = w.live.cursor['year'] if live else None
+    if live and cy > last['year'] and _after(start, *_dated((cy - 1, 53))):
+        if s := say(last, live):                       # (the same date as once that season is archived)
+            add(*_dated((cy - 1, 53)), 'status', f'{w.person_link(pid)}: {O.esc(s)} (season {w.live.cursor["year"]})')
 
 
 def _ranking_week(w, y, wk):
@@ -552,7 +561,9 @@ def page(w, q):
         'together again) and ended, with who ended them and why; followed tournaments’, tours’ and courses’ '
         'editions; a nation’s wins in majors and Premier events; a golfer\'s first major won with a coach or caddie '
         '(that coach or caddie on their team as the event recorded it); a retirement into coaching or caddying '
-        '(the recorded career decision). '
+        '(the recorded career decision). Winter changes (tour or status, retirements, staff roles, partnerships '
+        'ended at a season\'s end) are dated at the end of the season before, so “this season” does not include '
+        'last winter\'s; choose a window reaching back to last season\'s end (the last 13 or 52 weeks) to see them. '
         'Kept with this world in the shortlist file; never read by the simulation.</p>')
 
 

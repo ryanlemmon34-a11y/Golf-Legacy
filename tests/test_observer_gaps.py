@@ -225,7 +225,7 @@ class UnitTeamNews(unittest.TestCase):
 class UnitWinterBoundary(unittest.TestCase):
     """The review's case: a retirement into coaching decided in the winter after 2031, the world at 2032 week 1. The
     digest's "now" is 2031 week 52, and "Mark all as read" stores it: every item shown then must be read by it --
-    the retirement, the staff role and a major won in week 52 -- and none returned again."""
+    the retirement, the staff role, a major won in week 52, a change of tour or status -- and none returned again."""
 
     def world(self):
         w = FakeWorld([win(5, 2031, 52, '2031:MAJ_A', coach=10)], [stint(1, 'coach', 10, 5, (2031, 1))],
@@ -256,6 +256,22 @@ class UnitWinterBoundary(unittest.TestCase):
         w.live.cursor = {'year': 2032, 'week': 9}                       # (and not later either)
         self.assertEqual(self.items(w, MW.now(w)), [])
         self.assertEqual(len(self.items(w, (2031, 51))), 3)             # the same items, the same dates
+
+    def test_tour_and_status_changes_read_the_same_way(self):
+        w = self.world()
+        rows = [{'year': 2030, 'lifestyle': 'full_time', 'status': 'pro', 'tour': 'T'},     # archived seasons: a
+                {'year': 2031, 'lifestyle': 'full_time', 'status': 'pro', 'tour': 'U'}]     # change of tour
+        w.a.index = NS(seasons=lambda pid: rows)
+        w.live.people = {5: {'lifestyle': 'full_time', 'status': 'club_pro', 'tour': ''}}  # and of status, now
+        w.tours = lambda: {'T': {'name': 'Tour'}, 'U': {'name': 'Upper'}}
+        seen = MW.now(w)
+        shown = collect(MW._status_changes, w, 5, (2029, 0))
+        self.assertEqual([(x[0], x[1], x[3]) for x in sorted(shown)],
+                         [(2030, 52, 'P5: Tour → Upper (season 2031)'),
+                          (2031, 52, 'P5: pro → club_pro (season 2032)')])    # each dated the winter it was decided
+        self.assertTrue(all((x[0], x[1]) <= seen for x in shown))       # never after "now" at week 1
+        self.assertEqual(collect(MW._status_changes, w, 5, seen), [])   # marked read: not returned
+        self.assertEqual([x[:2] for x in collect(MW._status_changes, w, 5, (2031, 51))], [(2031, 52)])
 
 
 class UnitRoundConditions(unittest.TestCase):
