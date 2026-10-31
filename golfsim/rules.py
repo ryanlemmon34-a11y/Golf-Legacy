@@ -47,7 +47,8 @@ VERSIONS = (
                    'they were born or live (the country, where the state or province is unknown) as if they had played '
                    'a few rounds there, unless they have played more; it is a floor, never added to experience, and '
                    'counted once. Each course records its state or province, and each season the starts where the '
-                   'baseline applied.'),
+                   'baseline applied. Aggression, an existing personality trait, is shown on profiles (unchanged in '
+                   'play).'),
 )
 EARLIER = ('Seasons archived before rules versions were recorded were played under earlier rules. The '
            'differences that matter for reading old results: a winner without a Premier card held no '
@@ -288,6 +289,18 @@ RULES = {
         'match). No other home advantage exists. People whose places were never recorded get no baseline. The '
         'rounds a golfer has actually played are recorded unchanged. A caddie\'s familiarity is rounds caddied '
         'there only.',
+        '2026-11-08'),
+    'aggression': (
+        'Aggression (playing style)',
+        'A personality trait from 0 (cautious) to 100 (attacking), set when a golfer enters the world and never '
+        'changed afterwards: not by age, injury, results or anything else. It is a style, not an ability: higher '
+        'is not better. Shown as cautious (below 35), balanced (35-65) or attacking (above 65). It tilts four '
+        'choices: the club off the tee (an attacking golfer leans to driver), aiming at the flag or the safe part '
+        'of the green, going for a par 5 in two, and attempting the recovery shot from the trees rather than '
+        'punching out. It tilts only choices that are possible: a shot out of reach (beyond the longest club from '
+        'that lie, which follows Power, so age, injury and season fatigue shorten it) is always a lay-up, however '
+        'aggressive the golfer, so an aging attacking golfer still attacks, at what they can still reach. Course '
+        'Management sets how well each choice is judged; there is no other risk score.',
         '2026-11-08'),
     'injuries': (
         'Injuries',

@@ -625,6 +625,31 @@ def residence_section(w, pid, p, geo):
               'other moves are their own choice, at most one each winter.</p>')
 
 
+def aggression_style(value):
+    """The words for an Aggression value (rules 'aggression'): cautious below 35, balanced 35-65, attacking above."""
+    return 'cautious' if value < 35 else 'attacking' if value > 65 else 'balanced'
+
+
+AGGRESSION_NOTE = ('A playing style, not an ability: higher is not better. Attacking golfers lean to driver, aim at more '
+                   'flags, go for more par 5s in two and try more recovery shots from the trees; cautious golfers take '
+                   'the safer option more often. Only what is within reach is attempted: distance (Power, which age, '
+                   'injury and fatigue reduce) decides what can be reached from each lie, and Course Management how well '
+                   'the choice is judged. The trait itself does not change with age.')
+
+
+def aggression_section(w, pid, p):
+    """The golfer's Aggression (0-100) with what it means (rules 2026-11-08): the snapshot's, else the history's."""
+    O = _o()
+    lp = w.live.people.get(pid) if w.live else None
+    v = lp.get('aggression') if lp else None
+    if v is None:
+        v = ((p or {}).get('golfer') or {}).get('aggression')
+    if v is None:
+        return ''
+    return (f'<h2>Playing style</h2><p>Aggression <b>{O.esc(v)}</b> / 100 · {O.esc(aggression_style(v))}</p>'
+            f'<p class="muted">{O.esc(AGGRESSION_NOTE)} <a href="/rules#aggression">rule</a></p>')
+
+
 def familiar_courses(w, pid, p):
     """(rows [(course, rounds)], as of) of a golfer's ten most familiar courses: the snapshot's, else the history's
     as it ended; ([], None) where neither recorded them (histories written before rules 2026-11-08)."""

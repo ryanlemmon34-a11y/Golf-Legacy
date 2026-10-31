@@ -1446,7 +1446,8 @@ def ST_person_seasons(db, pid):
 def _playing(w, q, pid, p):
     rows = OD.results(w, pid)
     active = (p.get('golfer') or {}).get('lifestyle') not in (None, 'retired')
-    out = [OH.status_section(w, pid, p), _ratings(w, pid, p), ratings_history(w, q, pid, p), injuries_section(w, pid, rows),
+    out = [OH.status_section(w, pid, p), _ratings(w, pid, p), OH.aggression_section(w, pid, p),
+           ratings_history(w, q, pid, p), injuries_section(w, pid, rows),
            _honors(w, pid, rows, active),
            OH.grand_slam_line(w, pid), _season_history(w, q, pid, p, rows),
            OG.golf_section(w, pid, one(q, 'scope'))]

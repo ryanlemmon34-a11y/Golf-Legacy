@@ -98,8 +98,8 @@ Status is what was built and tested, not what was proposed. Report: `docs/V17_PA
 | S1 Staff careers and partnerships | Mostly built (stints both sides, reasons, recorded fit and rapport, abilities); My World team news **not yet** | this pass |
 | S2 Scouting recognises upside | Existing observation-only scouting kept; richer assessment planned (design in `docs/COACHES_AND_CADDIES.md`) | -- |
 | S3 Two-way recruitment, motivations | Planned (design note) | -- |
-| G1 Geography, familiarity, course use | Planned (residence history exists) | -- |
-| G2 Visible Aggression | Planned | -- |
+| G1 Geography, familiarity, course use | Built, unit-tested (rules 2026-11-08): course state/province, regional familiarity baseline, top 10 familiar courses on profiles, unused venues explained; hosting policy for unused courses awaits the owner; seeded comparison runs pending | `docs/FAMILIARITY_AND_AGGRESSION.md`, `docs/COURSE_LIBRARY.md` |
+| G2 Visible Aggression | Built, unit-tested: shown on profiles, stable, reach/aggression interaction tested; no second risk score | `docs/FAMILIARITY_AND_AGGRESSION.md` |
 | G3 Seasonal weather | Planned | -- |
 | Record Book; nation count links | Record Book built; nation counts linked to their exact population **not yet** | -- |
 | B1/B2 Biggest Upsets | Planned | -- |

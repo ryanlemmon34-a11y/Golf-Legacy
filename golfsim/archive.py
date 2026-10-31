@@ -318,7 +318,9 @@ class ArchiveWriter:
                                        'prestige': round(season.player_prestige(g.id), 1),
                                        # the ten courses played most as this history ends: [course, rounds]
                                        # (from rules 2026-11-08)
-                                       'familiar': [[k, round(r, 1)] for k, r in FAM.top_courses(g.familiarity)]}}
+                                       'familiar': [[k, round(r, 1)] for k, r in FAM.top_courses(g.familiarity)],
+                                       # the Aggression personality trait (0-100), shown from rules 2026-11-08
+                                       'aggression': round(g.personality['aggression'])}}
         for c in st.coaches.values():
             p = people.setdefault(c.id, {'name': c.name, 'country': c.country, 'born': c.born, 'hometown': None})
             p['coach'] = {'speciality': c.speciality, 'youth': c.youth, 'reputation': c.reputation, 'clients': c.clients,

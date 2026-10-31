@@ -93,6 +93,7 @@ def capture(session):
         people[g.id]['prestige'] = round(s.player_prestige(g.id), 1)   # public standing now (not ability)
         # the ten courses they have played most (course, competitive rounds), most first (rules 2026-11-08)
         people[g.id]['familiar'] = [(k, round(r, 1)) for k, r in FAM.top_courses(g.familiarity)]
+        people[g.id]['aggression'] = round(g.personality['aggression'])   # a style, not a grade (rules 2026-11-08)
     for kind, table in (('coach', st.coaches), ('caddie', st.caddies)):
         for c in table.values():
             p = people.setdefault(c.id, {'name': c.name, 'country': c.country, 'born': c.born, 'roles': []})

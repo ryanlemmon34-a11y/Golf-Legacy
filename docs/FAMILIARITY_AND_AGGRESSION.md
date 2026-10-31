@@ -54,6 +54,31 @@ their birthplace and residence give, naming identical places once. The live view
 archived histories carry the top ten as the history ends (`people.json` `golfer.familiar`, from rules
 2026-11-08; older histories say "not recorded").
 
+## Aggression (roadmap G2)
+
+Aggression is the existing 0-100 personality trait, now **shown** on the playing tab ("Playing style":
+the value, cautious below 35, balanced 35-65, attacking above 65, and what it means; live view
+`aggression`, archived `people.json` `golfer.aggression`). Its effect on play is **unchanged**.
+
+- **A style, not a grade.** Higher is not better. It tilts four choices in the engine: driver off the tee
+  (`_tee_plan`), aiming at the flag or the safe part of the green (`_attack_pin`), going for a par 5 in two
+  (`_go_or_lay_up`) and attempting the recovery from the trees rather than punching out.
+- **Stable.** Set when the golfer enters the world (`population._personality`), never written again:
+  aging (`development.age_year`), injuries (`serious_injury`), results and careers change attributes,
+  never personality. An aging attacking golfer stays attacking.
+- **Reach is physical.** `_reach` is the longest full shot from that lie (3-wood from the fairway, less from
+  rough or a fairway bunker) and follows distance: Power (which declines after the prime and with long
+  injuries) and season fatigue. A shot beyond reach is always a lay-up, however aggressive; Aggression only
+  weighs choices that are possible, and Course Management sets how well they are judged. So the older
+  attacker still goes for the par 5s they can reach and lays up at those they no longer can. The decision was
+  moved into `_go_or_lay_up` / `_reach` without changing it (288 rounds identical to the previous engine,
+  same seeds) so the interaction can be tested directly.
+- **No second risk score.** None was needed: what a golfer can sensibly attempt already follows from their
+  physical state and course management.
+
+Tests: `tests/test_aggression_visible.py` (reach and aggression, no decline with age or injury, no code that
+writes a trait, no risk score, profile text and rule text).
+
 ## To run after the CPU hold
 
 - Full test suite; observer/archive integration tests.

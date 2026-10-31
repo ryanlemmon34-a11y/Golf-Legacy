@@ -130,8 +130,10 @@ about 4.5 strokes per round from the weakest member to the best — the same spr
 | | Course Management | Quality of strategic choices: club off the tee, attack/centre-of-green, go/lay up, punch out |
 | | Focus | Mental-error rate, rising with fatigue and pressure |
 
-Hidden personality (0–100): Big-Stage Temperament (modifies pressure), Aggression (biases decisions
-toward risk), Adaptability, Coachability, Work Ethic (the last three are for the career/training system).
+Personality (0–100): Big-Stage Temperament (modifies pressure), Aggression (biases decisions
+toward risk; shown on profiles since rules 2026-11-08, never changed after creation, and only among shots
+within reach), Adaptability, Coachability, Work Ethic (the last three are for the career/training system).
+The others stay hidden.
 
 The **overall rating** is a weighted average of the attributes. The weights are *measured*, not guessed:
 each is that attribute's measured stroke value (75% normal rounds, 25% Sunday-in-contention), from

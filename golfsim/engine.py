@@ -327,6 +327,32 @@ def _attack_pin(pl, hole, mean_ft, rng):
     return value > 0
 
 
+def _reach(pl, lie):
+    """The longest full shot this golfer can hit from this lie today (yards): a 3-wood from the fairway, less
+    from rough or a fairway bunker. It follows their distance (Power, age, season fatigue), not Aggression."""
+    reach = pl.reach_fw * (0.88 if lie == 'rough' else 0.78 if lie == 'fairway_bunker' else 1.0)
+    if lie == 'fairway_bunker':
+        reach = min(reach, 210 * pl.drive / TOUR_DRIVE)
+    return reach
+
+
+def _go_or_lay_up(pl, hole, par, strokes, lie, dist, de, rng):
+    """(lay up?, reach) for a full shot from `dist` yards. Out of reach is always a lay-up, however aggressive
+    the golfer; a par 5's second shot within reach (over 200 yards) is weighed: going for the green against
+    laying up to a wedge, with Aggression tilting the choice and Course Management's noise blurring it."""
+    reach = _reach(pl, lie)
+    lay_up = dist > reach
+    if not lay_up and par == 5 and strokes == 2 and dist > 200:
+        # Go for the green in two, or lay up to a wedge? Weigh it up.
+        m = pl.approach_mult(de)
+        water_risk = 0.45 if hole.green_water else 0.0
+        ev_go = baseline('fairway', dist) + 0.35 * (m - 1) + water_risk * min(1, m * dist / 450)
+        ev_lay = 1 + baseline('fairway', 95) + 0.25 * (pl.m_wedge - 1)
+        ev_go -= 0.15 * pl.aggr
+        lay_up = ev_go + rng.gauss(0, pl.noise) > ev_lay
+    return lay_up, reach
+
+
 # ---------------------------------------------------------------------------
 # The hole
 # ---------------------------------------------------------------------------
@@ -583,18 +609,7 @@ def play_hole(pl, hole, hidx, rng, st, pressure=0.0, state=None, pin=None):
             lie = 'trees'
             before = baseline('trees', dist)
         de = dist * (TOUR_DRIVE / pl.drive) ** 0.5
-        reach = pl.reach_fw * (0.88 if lie == 'rough' else 0.78 if lie == 'fairway_bunker' else 1.0)
-        if lie == 'fairway_bunker':
-            reach = min(reach, 210 * pl.drive / TOUR_DRIVE)
-        lay_up = dist > reach
-        if not lay_up and par == 5 and strokes == 2 and dist > 200:
-            # Go for the green in two, or lay up to a wedge? Weigh it up.
-            m = pl.approach_mult(de)
-            water_risk = 0.45 if hole.green_water else 0.0
-            ev_go = baseline('fairway', dist) + 0.35 * (m - 1) + water_risk * min(1, m * dist / 450)
-            ev_lay = 1 + baseline('fairway', 95) + 0.25 * (pl.m_wedge - 1)
-            ev_go -= 0.15 * pl.aggr
-            lay_up = ev_go + rng.gauss(0, pl.noise) > ev_lay
+        lay_up, reach = _go_or_lay_up(pl, hole, par, strokes, lie, dist, de, rng)
         if lay_up:
             prev_lie = lie
             if dist - reach <= 70 and par == 4:
