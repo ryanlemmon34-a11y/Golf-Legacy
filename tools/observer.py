@@ -156,6 +156,7 @@ class World:
         self.live = None
         self.a, self._stats, self.behind, self._stamp = None, None, None, None
         self._builder, self._stats_db = None, None
+        self._indexer, self._indexed_for = None, None      # a side index for a history browsed read-only
         self.interrupted = J.interrupted_job(p) if self.session is not None else None
         if self.interrupted is not None:
             J.log(p, f'found an advance that did not finish: {json.dumps(self.interrupted)}')
@@ -225,12 +226,45 @@ class World:
             finally:
                 self.session_lock.release()
         else:
+            if self.a is not None and self.a.index is None and self._indexer is not None and self._indexer.finished():
+                self._stamp = None                      # the side index is ready: reopen the history with it
+                self._indexer = None
             self._swap_history(published_stamp(self.archive_dir))
+
+    def _open_archive(self, stamp):
+        """This snapshot's history. Read-only without a usable index of its own (an export, an unsupported save):
+        the side index built for it outside its folder, else such an index is started in the background (once per
+        snapshot) and the pages read the season files meanwhile. Owned worlds keep their own (Session)."""
+        a = Archive(self.archive_dir)
+        if a.index is not None or self.session is not None:
+            return a
+        import observer_stats as ST
+        side = ST.index_path(self)
+        if side.exists():
+            b = Archive(self.archive_dir, index_path=side)
+            if b.index is not None:
+                a.close()
+                return b
+            b.close()
+        if self._indexed_for != stamp:                  # (one attempt per snapshot: a failure is not retried in a loop)
+            self._indexed_for = stamp
+            self._indexer = ST.IndexBuilder(self.archive_dir, side)
+            self._indexer.start()
+        return a
+
+    def index_note(self):
+        """A line for the page while a side index is being built, else ''."""
+        b = self._indexer
+        if b is None or not b.running():
+            return ''
+        p = b.progress()
+        return ('Building this history\'s index' + (f' ({p[0]} of {p[1]} seasons)' if p else '') + ': pages read the '
+                'season files until it is ready, which is slower for long histories.')
 
     def _swap_history(self, stamp):
         if stamp == self._stamp:
             return
-        new = Archive(self.archive_dir) if stamp[1] else None   # nothing archived before the first season ends
+        new = self._open_archive(stamp) if stamp[1] else None   # nothing archived before the first season ends
         try:
             if self._stats is not None and new is not None:
                 self._stats.extend(new)
@@ -282,6 +316,8 @@ class World:
             self._save_history_cache()                   # seasons read since: next time from the cache
         if self._builder is not None:
             self._builder.stop()
+        if self._indexer is not None:
+            self._indexer.stop()
         if self._stats_db is not None:
             self._stats_db.close()
             self._stats_db = None
@@ -616,6 +652,8 @@ def my_world_link(w):
 def history_note(w):
     """Which committed generation the page was drawn from (every part of a page comes from this one)."""
     behind = f'<p class="muted">{esc(w.behind)}</p>' if getattr(w, 'behind', None) else ''
+    if w is not None and hasattr(w, 'index_note') and w.index_note():
+        behind += f'<p class="muted">{esc(w.index_note())}</p>'
     live = (f'Showing the world as committed at {date_text(w.live.cursor)} (generation {w.live.generation}). '
             if getattr(w, 'live', None) else '')
     if not getattr(w, 'a', None):

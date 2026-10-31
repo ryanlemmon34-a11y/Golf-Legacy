@@ -405,6 +405,57 @@ class Builder:
             self.wait(10)
 
 
+class IndexBuilder:
+    """Builds the side index of a history browsed read-only (archive.build_index_at) in a separate process, with
+    its progress in a small file beside it; pages read the season files until it is ready."""
+
+    def __init__(self, archive_dir, out):
+        self.archive_dir, self.out = Path(archive_dir), Path(out)
+        self.proc = None
+
+    def start(self):
+        import subprocess
+        self.out.parent.mkdir(parents=True, exist_ok=True)
+        with open(self.out.with_suffix('.log'), 'w') as err:
+            self.proc = subprocess.Popen([sys.executable, str(Path(__file__).resolve()), 'index', str(self.archive_dir),
+                                          str(self.out)], stdout=subprocess.DEVNULL, stderr=err)
+
+    def running(self):
+        return self.proc is not None and self.proc.poll() is None
+
+    def finished(self):
+        return self.proc is not None and self.proc.poll() == 0
+
+    def progress(self):
+        """(seasons done, seasons) so far, or None."""
+        try:
+            done, total = self.out.with_suffix('.progress').read_text().split()
+            return int(done), int(total)
+        except (OSError, ValueError):
+            return None
+
+    def wait(self, timeout=None):
+        if self.proc is not None:
+            self.proc.wait(timeout)
+
+    def stop(self):
+        if self.running():
+            self.proc.terminate()
+            self.wait(10)
+
+
+def index_path(world):
+    """The side index of a history browsed read-only: beside its statistics store, never in its folder."""
+    p = cache_path(world)
+    return p.with_name(p.name.replace('.stats.sqlite', '.index.sqlite'))
+
+
+def build_index(archive_dir, out):
+    from golfsim.archive import build_index_at
+    prog = Path(out).with_suffix('.progress')
+    build_index_at(archive_dir, out, report=lambda done, total: prog.write_text(f'{done} {total}'))
+
+
 def cache_path(world):
     """observer_cache/stats.sqlite inside a world folder this observer owns; a temporary folder for
     archives browsed read-only (never written into)."""
@@ -554,5 +605,7 @@ def staff_seasons(db, pid, kind):
 if __name__ == '__main__':
     if len(sys.argv) == 4 and sys.argv[1] == 'build':
         build(sys.argv[2], sys.argv[3])
+    elif len(sys.argv) == 4 and sys.argv[1] == 'index':
+        build_index(sys.argv[2], sys.argv[3])
     else:
-        raise SystemExit('usage: observer_stats.py build ARCHIVE_DIR STORE_PATH')
+        raise SystemExit('usage: observer_stats.py build|index ARCHIVE_DIR OUT_PATH')

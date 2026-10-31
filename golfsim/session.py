@@ -340,12 +340,18 @@ class Session:
         if has_history and (not (a / MANIFEST).exists() or published != (self.generation if h is None else h)):
             _publish_archive(self.dir, self.generation)
         m = read_manifest(a)
-        if m is not None and (a / 'index.sqlite').exists():
+        if m is not None:
             from types import SimpleNamespace
             from .archive_index import ArchiveIndex
             with ArchiveIndex(a / 'index.sqlite') as idx:
                 if set(idx.years()) - set(m['years']):  # rows of no published season (never visible: bounded)
                     idx.drop_years_after(m['years'][-1] if m['years'] else -1)
+                # a missing or stale index (deleted, copied without it, or rows from other season files) is
+                # rebuilt from the published season files, season by season: derived data only, by the owner
+                sources = idx.sources()
+                for y in m['years']:
+                    if sources.get(y) != m['files']['years'][y]:
+                        idx.index_year(y, _read(a / m['files']['years'][y]), source=m['files']['years'][y])
                 # indexes from before the weekly No. 1 table: filled once, by the archive's owner, under its lock
                 if m['years'] and not idx.derived_complete(m['years']):
                     idx.backfill_derived(SimpleNamespace(years=m['years'],

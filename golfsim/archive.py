@@ -38,6 +38,7 @@ from __future__ import annotations
 import gzip
 import hashlib
 import json
+import os
 import sqlite3
 import time
 from collections import Counter, OrderedDict, defaultdict
@@ -370,6 +371,30 @@ def _staff_earnings(season, kind, pid):
     return round(person.earnings) if person is not None else None
 
 
+def build_index_at(directory, out, report=None):
+    """A complete index of the published history in `directory`, written to `out` (a side file: nothing in the
+    archive's folder is written), for a history browsed read-only that has no usable index of its own -- an
+    export, or a save this build does not continue. Built under a temporary name and moved into place when
+    whole; each season's rows record the file they came from, so Archive(directory, index_path=out) checks them
+    against the manifest exactly as it checks the archive's own index. report(done, total) after each season."""
+    from .archive_index import ArchiveIndex
+    d, out = Path(directory), Path(out)
+    m = read_manifest(d)
+    files = m['files']['years'] if m is not None else legacy_files(d)['years']
+    out.parent.mkdir(parents=True, exist_ok=True)
+    tmp = out.with_name(out.name + '.part')
+    for p in (tmp, tmp.with_name(tmp.name + '-wal'), tmp.with_name(tmp.name + '-shm')):
+        if p.exists():
+            p.unlink()
+    with ArchiveIndex(tmp) as idx:
+        for i, (y, f) in enumerate(sorted(files.items())):
+            idx.index_year(y, _read(d / f), source=f)
+            if report:
+                report(i + 1, len(files))
+    os.replace(tmp, out)
+    return out
+
+
 def index_season(directory, year, chunk, source=None):
     """Index one season (idempotent: the season's rows are replaced), exactly as it reads back from disk.
     `source`: the season file the rows come from (recorded with them: readers check it)."""
@@ -461,8 +486,9 @@ class Archive:
 
     OPEN_ATTEMPTS = 10
 
-    def __init__(self, directory):
+    def __init__(self, directory, index_path=None):
         self.dir = Path(directory)
+        self.index_path = Path(index_path) if index_path else self.dir / 'index.sqlite'   # (a side index: below)
         self.index = None
         self.manifest = None
         if (self.dir / MANIFEST).exists():
@@ -541,10 +567,10 @@ class Archive:
         files answer). With a manifest: every season's rows must come from the file the manifest names
         (recorded with them when indexed); rows of later seasons are outside the snapshot's bound. Without
         one: the index must hold exactly these seasons."""
-        if not (self.dir / 'index.sqlite').exists() or not self.years:
+        if not self.index_path.exists() or not self.years:
             return None
         from .archive_index import ArchiveIndex
-        idx = ArchiveIndex(self.dir / 'index.sqlite', reader=True)
+        idx = ArchiveIndex(self.index_path, reader=True)
         try:
             idx.snapshot()
             if self.manifest is not None:

@@ -527,8 +527,9 @@ class App:
                        '<p><label>What happened<textarea name="note" required></textarea></label></p>'
                        '<p><label>Steps to reproduce<textarea name="steps"></textarea></label></p>'
                        '<p><label>What you expected<textarea name="expected"></textarea></label></p>'
-                       '<p><label><input type="checkbox" name="index" value="yes"> include the history index '
-                       f'({idx_mb}; optional: rebuilt from the season files when missing)</label><br>'
+                       '<p><label><input type="checkbox" name="index" value="yes" checked> include the history index '
+                       f'({idx_mb}; included by default so the history browses at full speed; without it the '
+                       'observer rebuilds one beside a read-only copy)</label><br>'
                        '<label><input type="checkbox" name="previous" value="yes">'
                        ' include the last known good checkpoint (optional)</label></p>'
                        '<button class="primary">Write the package</button></form>')
