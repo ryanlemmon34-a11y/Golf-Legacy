@@ -61,5 +61,32 @@ class Safeguards(unittest.TestCase):
         self.assertNotIn(2031, data['flags'])
 
 
+class ResumedSupportSetting(unittest.TestCase):
+    """A resumed run keeps its world's amateur-support setting: a mismatched flag is refused, never relabelled."""
+
+    def test_a_mismatch_is_refused(self):
+        for saved, asked in ((False, True), (True, False)):
+            with self.assertRaises(SystemExit):
+                LW.check_support(saved, asked, 'seed 2027')
+        LW.check_support(False, False, 'seed 2027')
+        LW.check_support(True, True, 'seed 2027')
+
+    def test_the_command_line_refuses_a_support_off_folder_resumed_with_defaults(self):
+        import json
+        out = Path(tempfile.mkdtemp())
+        (out / 'manifest.json').write_text(json.dumps({'amateur_support': False, 'seeds': {'2027': {}}}))
+        argv = ['long_world.py', '--session', '--resume', '--seeds', '2027', '--out', str(out)]
+        with mock.patch.object(sys, 'argv', argv), mock.patch.object(LW, 'git_state', return_value=('x', False)), \
+                mock.patch('golfsim.savegame.engine_id', return_value='e'), \
+                mock.patch.object(LW, 'run_world_session') as run:
+            json_man = json.loads((out / 'manifest.json').read_text())
+            json_man['engine'] = 'e'
+            (out / 'manifest.json').write_text(json.dumps(json_man))
+            with self.assertRaisesRegex(SystemExit, 'amateur support off'):
+                LW.main()
+            run.assert_not_called()
+        self.assertFalse(json.loads((out / 'manifest.json').read_text())['amateur_support'])   # left as it was
+
+
 if __name__ == '__main__':
     unittest.main()
