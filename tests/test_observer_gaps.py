@@ -339,14 +339,17 @@ class UnitWinterDeathAndDeparture(unittest.TestCase):
 
 
 class UnitRoundConditions(unittest.TestCase):
-    """Each round's wind, rain and pin difficulty as recorded; "not recorded" when absent, never estimated."""
+    """Each round's wind, wet or dry, and pin difficulty as recorded (the weather's own word, never "rain", which
+    could read as a rain-out: weather never cancels, shortens or delays a round); "not recorded" when absent, never
+    estimated."""
 
     full = {'conditions': [[[12.3, 0, 0.45], [20.1, 1, 0.45], [7.0, 0, 0.5]], None]}
 
     def test_each_round_as_recorded(self):
         h = OH.conditions_line(self.full, 0)
         self.assertIn('R1 wind 12.3 mph, dry, pin difficulty 0.45', h)
-        self.assertIn('R2 wind 20.1 mph, rain, pin difficulty 0.45', h)
+        self.assertIn('R2 wind 20.1 mph, wet, pin difficulty 0.45', h)
+        self.assertNotIn('rain', h)
         self.assertIn('R3 wind 7.0 mph, dry, pin difficulty 0.5', h)
         self.assertNotIn('not recorded', h)
         self.assertEqual(OH.round_conditions(self.full, 0)[1], (20.1, True, 0.45))
@@ -360,6 +363,22 @@ class UnitRoundConditions(unittest.TestCase):
         for full, site in ((self.full, 1), (self.full, 5), (None, 0), ({'scores': [{}]}, 0), ({'conditions': []}, 0)):
             self.assertIsNone(OH.round_conditions(full, site))
             self.assertIn('Round conditions: not recorded', OH.conditions_line(full, site))
+
+    def test_the_one_line_keeps_direction_gusts_and_knockout_days(self):
+        """Seasonal weather's five-value rows (wind, wet, pins, bearing, gustiness) at a match-play site: two stroke-play
+        rounds, then knockout days, each with its wind's direction and gusts, in the weather's words."""
+        full = {'match_play': True, 'scores': [{'1': [70, 71]}],
+                'conditions': [[[12.0, 0, 0.4, 270.0, 0.2], [18.5, 1, 0.5, 90.0, 0.0], [9.0, 0, 0.45, 180.0, 0.35],
+                                [6.0, 1, 0.5, None, None]]]}
+        h = OH.conditions_line(full, 0)
+        self.assertIn('R1 wind 12.0 mph from the W, gusts ±20%, dry, pin difficulty 0.4', h)
+        self.assertIn('R2 wind 18.5 mph from the E, wet, pin difficulty 0.5', h)          # no gusts recorded: none said
+        self.assertIn('Knockout day 1: wind 9.0 mph from the S, gusts ±35%, dry, pin difficulty 0.45', h)
+        self.assertIn('Knockout day 2: wind 6.0 mph, wet, pin difficulty 0.5', h)        # no direction recorded
+        self.assertNotIn('rain', h)
+        self.assertIn('Weather never cancels, shortens or delays a round', h)
+        self.assertEqual(h.count('Round conditions:'), 1)                                # one consolidated line
+        self.assertNotIn('Knockout day 3', h)
 
 
 class WorldGaps(unittest.TestCase):
@@ -525,7 +544,7 @@ class WorldGaps(unittest.TestCase):
     # ---- 4. Round conditions on the edition's pages ----------------------------------------------------------
     def expect(self, conds, upto=None):
         # (seasonal weather, rules 2026-11-09, also records the wind's direction and gusts: OH.round_wind)
-        return [f'R{i} wind {row[0]} mph{OH.round_wind(row)}, {"rain" if row[1] else "dry"}, pin difficulty {row[2]}'
+        return [f'R{i} wind {row[0]} mph{OH.round_wind(row)}, {"wet" if row[1] else "dry"}, pin difficulty {row[2]}'
                 for i, row in enumerate(conds[:upto] if upto else conds, 1)]
 
     def check_edition(self, eid, conds):

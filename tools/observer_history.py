@@ -1033,12 +1033,12 @@ def round_wind(row):
 
 
 def conditions_line(full, site, through=None, label='Round conditions'):
-    """HTML: each round's recorded wind (with its direction and gusts where seasonal weather recorded them), rain
-    and pin difficulty at a site (rounds 1..`through` when given), or "not recorded". A match-play site's knockout
+    """HTML: each round's recorded wind (with its direction and gusts where seasonal weather recorded them), wet or
+    dry, and pin difficulty at a site (rounds 1..`through` when given), or "not recorded". A match-play site's knockout
     days follow its stroke-play rounds. Never estimated: a missing round is not filled in from another."""
     c = site_conditions(full or {}, site)
     if not c:
-        return (f'<p class="muted">{label}: not recorded (wind, rain and pin positions are kept from rules 2026-10-30, '
+        return (f'<p class="muted">{label}: not recorded (wind, wet or dry, and pin positions are kept from rules 2026-10-30, '
                 'for stroke-play rounds).</p>')
     rows = c[:through] if through else c
     stroke = len(c)
@@ -1048,7 +1048,7 @@ def conditions_line(full, site, through=None, label='Round conditions'):
         stroke = max((len(v) for v in by.values()), default=2)
     name = lambda i: f'R{i}' if i <= stroke else f'Knockout day {i - stroke}:'
     return (f'<p class="muted">{label}: ' + ' · '.join(
-        f'{name(i)} wind {row[0]} mph{_o().esc(round_wind(row))}, {"rain" if row[1] else "dry"}, pin difficulty '
+        f'{name(i)} wind {row[0]} mph{_o().esc(round_wind(row))}, {"wet" if row[1] else "dry"}, pin difficulty '
         f'{row[2]}' for i, row in enumerate(rows, 1))
         + ' (pin difficulty: 0 centre pins to 1 tucked tournament pins). Weather never cancels, shortens or delays a '
           'round.</p>')
