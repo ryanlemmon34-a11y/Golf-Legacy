@@ -154,6 +154,7 @@ def capture(session):
         injuries=dict(s.injury_episodes(year)) if hasattr(s, 'injury_episodes') else {},   # this season's, by golfer
         injured_now=sorted(getattr(s, 'injured', {})),
         qual=_qual(s, year, session.cursor),
+        prestige=s.prestige_view() if hasattr(s, 'prestige_view') else None,   # events, courses, nations now
         **_status(s, year),
         captured=time.time())
     view.capture_seconds = round(time.perf_counter() - t0, 2)

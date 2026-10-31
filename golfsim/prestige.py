@@ -1,13 +1,25 @@
 """Prestige: of events and of players, plus the ranking-point and prize-money scales built on them.
 
-Event prestige (0-100), from a rolling average of the last 4 editions of every factor:
+Event prestige (0-100), from a recency-weighted average over the last five calendar years of every factor
+(rules 2026-11-05; it had been the plain average of the last four editions):
     tour        the series' standing: majors 100, Premier flagship 93, a mini-tour event ~24...  35%
     field       how good last year's field was: its best 30 players by world ranking (amateur
                 ranking for amateur events)                                                         30%
     purse       prize money, on a log scale ($10k = 0, $25M = 100)                                   20%
     course      the venue: an elite course 100, a championship course's Championship tees 80,
                 a standard course's Forward tees 32, a municipal course 25                          15%
-    so an event's reputation moves slowly: one strong or weak year shifts it by a quarter.
+    so an event's reputation moves slowly: this year's edition carries a quarter of the weight (weights
+    1.0, 0.9, 0.8, 0.7, 0.6 for this year and the four before), a calendar year without an edition (not
+    held: nobody entered) is left out and the other years' weights renormalised, and an event's prestige
+    moves at most EVENT_MAX_MOVE points in a calendar year either way. The field factor is the field as it
+    was ranked the week it played (world or amateur ranking then): never what its players later became.
+    Warm-up: a new world assumes each event's four years before the first season were played at its
+    expected starting factors, so the first real edition carries a quarter of the weight (as before) and
+    the assumed years leave the window one a year; from the fifth season the window is all real editions.
+
+Course prestige (0-100) is a separate value from a course's physical class and layout (those stay the
+`course` factor above): the prestige of the events it hosted, lagged one season (see `course_prestige`).
+Event prestige never reads it, so a strong field cannot raise its own venue's prestige and feed back.
 
 Player prestige (0-100) comes from fame over the last 52 weeks (a one-year rolling window): every
 finish earns fame in proportion to the event's prestige (cubed: a major is worth far more than a
@@ -21,7 +33,17 @@ from __future__ import annotations
 import math
 
 WEIGHTS = {'tour': 0.35, 'field': 0.30, 'purse': 0.20, 'course': 0.15}
-WINDOW = 4                            # editions in the rolling average
+
+# ---- PROPOSED calibration (rules 2026-11-05): five-year prestige of events and courses --------------------------
+# Starting values to measure, not proven ones (docs/WORLD_PRESTIGE_PACKAGE.md).
+EVENT_YEARS = 5                       # calendar years in an event's window (this year and the four before)
+YEAR_WEIGHTS = (1.0, 0.9, 0.8, 0.7, 0.6)   # by age in years; the newest edition keeps the old model's quarter
+WARMUP_YEARS = 4                      # years before the first season assumed played at the expected factors
+EVENT_MAX_MOVE = 6.0                  # most an event's prestige moves in one calendar year, either way
+COURSE_YEARS = 5                      # completed seasons a course's prestige reads (never the current one)
+COURSE_FADE = 0.9                     # hosted nothing in those seasons: its prestige x 0.9 a season
+COURSE_MAX_MOVE = 10.0                # most a course's prestige moves from one season to the next
+WINDOW = EVENT_YEARS                  # (the old name, kept for tools that read it)
 
 COURSE_QUALITY = {('elite', 'Championship'): 100, ('championship', 'Championship'): 80,
                   ('standard', 'Championship'): 62, ('championship', 'Club'): 55, ('standard', 'Club'): 45,
@@ -69,16 +91,72 @@ def initial_factors(series, course_quality):
     return factors(series, field, course_quality)
 
 
-def prestige_from(history):
-    """Event prestige from the rolling average of the last WINDOW editions' factors."""
-    rows = history[-WINDOW:]
-    n = len(rows)
-    tour, field, purse, course = (sum(r[i] for r in rows) / n for i in range(4))
+def combine(f):
+    """Prestige of one set of (tour, field, purse, course) factors."""
+    tour, field, purse, course = f
     return WEIGHTS['tour'] * tour + WEIGHTS['field'] * field + WEIGHTS['purse'] * purse + WEIGHTS['course'] * course
+
+
+def prestige_from(rows):
+    """Prestige of the plain average of some editions' factors (one edition: its own prestige)."""
+    n = len(rows)
+    return combine(tuple(sum(r[i] for r in rows) / n for i in range(4)))
 
 
 def initial_prestige(series, course_quality):
     return prestige_from([initial_factors(series, course_quality)])
+
+
+def seeded_years(f0, first_year):
+    """An event's assumed history as the world begins ({year: [factors of that year's editions]}): the
+    WARMUP_YEARS years before the first season, each at the expected starting factors f0."""
+    return {first_year - k: [tuple(f0)] for k in range(1, WARMUP_YEARS + 1)}
+
+
+def window_factors(by_year, year):
+    """The recency-weighted mean factors over the calendar years year-4 .. year (YEAR_WEIGHTS by age). A year
+    with no edition is left out and the other years' weights renormalised; several editions in one year count
+    as their mean. None when no year of the window had an edition."""
+    num, den = [0.0, 0.0, 0.0, 0.0], 0.0
+    for age, w in enumerate(YEAR_WEIGHTS):
+        rows = by_year.get(year - age)
+        if not rows:
+            continue
+        for i in range(4):
+            num[i] += w * sum(r[i] for r in rows) / len(rows)
+        den += w
+    return None if den == 0 else tuple(x / den for x in num)
+
+
+def event_prestige_after(by_year, year, start):
+    """An event's prestige after its edition in `year`: the five-year window's prestige, moved at most
+    EVENT_MAX_MOVE from `start` (its prestige as that calendar year began). No edition in the window: `start`."""
+    f = window_factors(by_year, year)
+    if f is None:
+        return start
+    return max(start - EVENT_MAX_MOVE, min(start + EVENT_MAX_MOVE, combine(f)))
+
+
+def course_prestige(hosted, year, before):
+    """A course's prestige for season `year`, read from the completed seasons year-COURSE_YEARS .. year-1 only
+    (a lag: what it hosts this season counts from the next). hosted: {season: the highest prestige, as played,
+    of an event it hosted that season}. The recency-weighted mean (YEAR_WEIGHTS by age, the latest completed
+    season first) over the seasons in which it hosted anything, moved at most COURSE_MAX_MOVE from `before`;
+    with no hosting in the window, `before` x COURSE_FADE. `before` None (never rated): the window's value as
+    it is, or None when it has hosted nothing."""
+    num = den = 0.0
+    for age, w in enumerate(YEAR_WEIGHTS[:COURSE_YEARS]):
+        v = hosted.get(year - 1 - age)
+        if v is None:
+            continue
+        num += w * v
+        den += w
+    if den == 0:
+        return None if before is None else before * COURSE_FADE
+    raw = num / den
+    if before is None:
+        return raw
+    return max(before - COURSE_MAX_MOVE, min(before + COURSE_MAX_MOVE, raw))
 
 
 # ---- what results are worth --------------------------------------------------------------------

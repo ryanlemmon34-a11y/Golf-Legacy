@@ -36,6 +36,7 @@ from . import development as D
 from . import golfstats as GS
 from . import finance as FIN
 from . import staff as ST
+from . import participation as PT
 from . import prestige as PR
 from . import qualification as Q
 from . import residence as RES
@@ -166,6 +167,26 @@ def allocate_places(total, weights, key, caps=None):
 
 
 ARRIVAL_LOGS = ('Arrived on the scene', 'Turned professional at ')   # history lines written on arrival
+
+
+def _migrate_event_years(state):
+    """Saves from before rules 2026-11-05 kept each event's factors as a list (the four assumed starting
+    editions, then one per edition played): the played editions take their years from the prestige history,
+    the assumed ones the years before the world began; the five-year window reads them from now on."""
+    out = {}
+    first = state.get('first_year') or 0
+    hist = state.get('prestige_history', {})
+    for sid, rows in state.get('event_factors', {}).items():
+        years = [y for y, _, _ in hist.get(sid, [])]
+        n = min(len(years), max(0, len(rows) - PR.WARMUP_YEARS))
+        by = {}
+        for k, f in enumerate(reversed(rows[:len(rows) - n][-PR.WARMUP_YEARS:]), 1):
+            by.setdefault(first - k, []).append(tuple(f))
+        for y, f in zip(years[len(years) - n:], rows[len(rows) - n:]):
+            by.setdefault(y, []).append(tuple(f))
+        last = max(by, default=first)
+        out[sid] = {y: v for y, v in by.items() if y > last - PR.EVENT_YEARS}
+    return out
 
 
 def _migrate_prior_rounds(state):
@@ -336,7 +357,14 @@ class Season:
         self.fame = {}                                       # gid -> fame over the last 52 weeks
         self.fame_log = defaultdict(list)                    # gid -> [(abs_week, fame points)]
         self.legacy = defaultdict(float)
-        self.event_factors = {}                              # series_id -> [(tour, field, purse, course)]
+        # five-year prestige (rules 2026-11-05): each event's factors by calendar year (the window: prestige.py),
+        # its prestige as each calendar year began (the annual movement limit), what each course hosted by season
+        # and its prestige (lagged: completed seasons only), and national prestige with the cohort shares
+        self.event_years = {}                                # series_id -> {year: [(tour, field, purse, course)]}
+        self.event_year_start = {}                           # series_id -> (year, prestige as that year began)
+        self.course_hosted = {}                              # course_id -> {season: best prestige hosted}
+        self.course_prestige = {}                            # course_id -> prestige this season
+        self.participation = PT.Participation(world.nations, self.first_year)
         self.fatigue = defaultdict(float)                    # gid -> season fatigue, 0 (fresh) .. 1 (exhausted)
         self.injured = {}                                    # gid -> (first abs week they can enter again, injury, weeks)
         self.injuries = defaultdict(list)                    # year -> [(week, gid, injury, weeks out, event_id)]
@@ -497,9 +525,21 @@ class Season:
         self.ctx.standings[('PREMIER', self.first_year - 1)] = [g.id for g in prem]
         self.update_fame(self.first_year - 1, 52)
         for ed in self.cal.editions(self.first_year):
+            sid = ed.series.series_id
             f0 = PR.initial_factors(ed.series, self.course_quality(ed, 0))
-            self.event_factors[ed.series.series_id] = [f0] * PR.WINDOW   # no history yet: expected values
-            self.event_prestige[ed.series.series_id] = PR.prestige_from(self.event_factors[ed.series.series_id])
+            self.event_years[sid] = PR.seeded_years(f0, self.first_year)   # warm-up: assumed years at expected values
+            self.event_prestige[sid] = PR.prestige_from([f0])
+        # courses: the seasons before the world began are assumed to have hosted what the first season's plan
+        # gives them, at the events' starting prestige (the same warm-up as the events')
+        best = {}
+        for eid, vs in self.lib.venues(self.first_year).items():
+            p = self.event_prestige.get(eid.split(':', 1)[1])
+            for v in vs:
+                if p is not None and p > best.get(v.course_id, -1.0):
+                    best[v.course_id] = p
+        for cid, p in best.items():
+            self.course_hosted[cid] = {self.first_year - k: p for k in range(1, PR.WARMUP_YEARS + 1)}
+            self.course_prestige[cid] = PR.course_prestige(self.course_hosted[cid], self.first_year, None)
         tours = defaultdict(list)
         for s in self.cal.series:
             if s.category == 'regular' or s.tier == 1:
@@ -1897,6 +1937,14 @@ class Season:
             places.legacy = {g.id for g in state['world'].golfers} | set(state['staff'].coaches) \
                 | set(state['staff'].caddies)
             state['places'], state['move_log'], state['move_blocked'] = places, {}, {}
+        if 'event_years' not in state:                      # saves from before rules 2026-11-05 (four editions)
+            state['event_years'] = _migrate_event_years(state)
+            state['event_year_start'] = {}
+        state.pop('event_factors', None)
+        state.setdefault('course_hosted', {})                # courses: rated from the first season-end after loading
+        state.setdefault('course_prestige', {})
+        if 'participation' not in state:                     # nations: shares from the starting profiles, multipliers 1,
+            state['participation'] = PT.Participation(state['world'].nations, state['first_year'])   # evidence from now
         now = state.get('year') or state.get('first_year')
         for rec in (r for tiers in state['prize_record'].values() for r in tiers.values()):
             if len(rec) == 2:                                # evidence from before it was dated: as of now
@@ -2083,13 +2131,25 @@ class Season:
                             'premier' if s.tier == 1 else None
                         if kind:
                             self.legacy[gid] += PR.LEGACY[kind]
+            if s.kind != 'qualifying':                       # national prestige: the site's fame against what each
+                gs = [self.g[gid] for gid, _, _ in finish]   # nation's starters were expected to take (participation)
+                self.participation.note_site(year, [(g_.country, g_.overall, PR.fame_points(p, pos))
+                                                    for g_, (_, pos, _) in zip(gs, finish)])
         # field strength and the event's prestige for next year
         ranks = [self.am_pos.get(gid) if amateur_event else self.wr_pos.get(gid) for gid in all_ids]
         res.field_strength = PR.field_strength(ranks, amateur=amateur_event)
         quality = S.mean(PR.COURSE_QUALITY[(self.lib.sites[v.course_id]['cls'], v.layout)] for v in venue_list)
-        if s.kind not in ('qualifying',):
-            self.event_factors[sid].append(PR.factors(s, res.field_strength, quality))
-            self.event_prestige[sid] = PR.prestige_from(self.event_factors[sid])
+        if s.kind not in ('qualifying',):                    # the five calendar years' window (prestige.py)
+            by_year = self.event_years.setdefault(sid, {})
+            by_year.setdefault(year, []).append(PR.factors(s, res.field_strength, quality))
+            for y in [y for y in by_year if y <= year - PR.EVENT_YEARS]:
+                del by_year[y]
+            if self.event_year_start.get(sid, (None,))[0] != year:
+                self.event_year_start[sid] = (year, p)       # (p: its prestige as the calendar year began)
+            self.event_prestige[sid] = PR.event_prestige_after(by_year, year, self.event_year_start[sid][1])
+        for v in venue_list:                                 # what each course hosted (its prestige: next season)
+            hosted = self.course_hosted.setdefault(v.course_id, {})
+            hosted[year] = max(hosted.get(year, 0.0), p)
         self.prestige_history[sid].append((year, p, res.field_strength))
         self.results[ed.event_id] = res
         self.stats[year]['events'] += 1
@@ -2294,6 +2354,7 @@ class Season:
             row['demoted'] = new_tier > row['tier'] and row['tier'] <= 4
         for gid, frm, to, why in self.card_log[year]:
             self.log(gid, year, 53, f'{TOUR_BY_KEY[frm].name if frm in TOUR_BY_KEY else "—"} → {TOUR_BY_KEY[to].name} ({why})')
+        self.close_prestige(year)                            # before the next season's entrants are drawn
         if self.development:
             from . import careers
             self.note_peaks(year, 52)                        # the season's ratings, before retirements and aging
@@ -2327,6 +2388,25 @@ class Season:
         self._active = None
         if self.development:                                 # after aging (it can raise the mental game) and arrivals
             self.note_peaks(year + 1, 0, [g for g in self.world.golfers if g.lifestyle != 'retired'])
+
+    def close_prestige(self, year):
+        """The season's end (rules 2026-11-05): each course's prestige for the next season, read from completed
+        seasons only (prestige.course_prestige), and national prestige with the multipliers and cohort shares
+        of the next season's entrants (participation.py). No random draw."""
+        for cid, hosted in self.course_hosted.items():
+            v = PR.course_prestige(hosted, year + 1, self.course_prestige.get(cid))
+            if v is not None:
+                self.course_prestige[cid] = v
+            for y in [y for y in hosted if y <= year - PR.COURSE_YEARS]:
+                del hosted[y]
+        self.participation.close_season(year)
+
+    def prestige_view(self):
+        """Plain data of every prestige now: events (as they stand: after this season's editions so far),
+        courses (this season's), nations (as last settled) with the cohort shares."""
+        return {'events': {sid: round(v, 2) for sid, v in self.event_prestige.items()},
+                'courses': {cid: round(v, 2) for cid, v in self.course_prestige.items()},
+                'nations': self.participation.view()}
 
     def record_college(self, year, snap):
         """The college eligibility ledger (rules 'college-eligibility'): each season a golfer spent enrolled,

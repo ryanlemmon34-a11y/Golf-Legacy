@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import re
 
-RULES_VERSION = '2026-11-03'
+RULES_VERSION = '2026-11-05'
 RANKING_RULE = 'world-ranking-1'     # the world ranking's formula (unchanged since the world began; named now)
 VERSIONS = (
     ('2026-10-30', 'Winners\' exemptions count whatever a golfer\'s membership (a non-member champion earns a '
@@ -43,6 +43,12 @@ VERSIONS = (
                    '(it had been one edition more). The work pathway: a full-time adult amateur outside the top 300, '
                    'without support or family money, who cannot afford any eligible event for eight counted weeks '
                    'takes a job at the next monthly plan and keeps playing as a working amateur.'),
+    ('2026-11-05', 'Five-year prestige: event prestige reads the last five calendar years, recency-weighted, with '
+                   'a limit on how far it moves in a year (it had been the last four editions); courses have a '
+                   'prestige of their own from the events they hosted in completed seasons; nations have a '
+                   'prestige from success beyond pre-event expectation, which sets their share of each year\'s new '
+                   'juniors and new professionals. The number of new golfers is unchanged by it: only how the '
+                   'fixed number is shared between nations.'),
 )
 EARLIER = ('Seasons archived before rules versions were recorded were played under earlier rules. The '
            'differences that matter for reading old results: a winner without a Premier card held no '
@@ -271,6 +277,45 @@ RULES = {
         'Nobody is given money and no cost is waived; the way back to full-time golf is turning professional, as '
         'for every working amateur.',
         '2026-11-03'),
+    'event-prestige': (
+        'Event prestige (five calendar years)',
+        'An event\'s prestige (0-100) is 35% its tour\'s standing, 30% its field (the best 30 entrants by world '
+        'ranking -- amateur ranking for amateur events -- as ranked the week it was played), 20% its purse (log '
+        'scale) and 15% its course\'s physical class and layout. Each factor is averaged over this calendar year '
+        'and the four before, weighted 1.0, 0.9, 0.8, 0.7 and 0.6 by age; a year without an edition is left out '
+        'and the others reweighted. It is updated after each edition and moves at most 6 points in a calendar '
+        'year either way. A new world assumes the four years before its first season were played at each '
+        'event\'s expected starting factors; one assumed year leaves the window each season. Qualifying stages '
+        'keep their starting prestige. Before rules 2026-11-05: the plain average of the last four editions, '
+        'with no yearly limit.',
+        '2026-11-05'),
+    'course-prestige': (
+        'Course prestige',
+        'A course\'s prestige is separate from its physical class and layout (which alone count in event '
+        'prestige, so a venue\'s prestige never feeds back into its events). At each season\'s end it is set '
+        'for the next season from the five completed seasons before it: for each season in which the course '
+        'hosted an event, the highest prestige (as played) of the events it hosted, averaged with weights 1.0, '
+        '0.9, 0.8, 0.7 and 0.6 by age; it moves at most 10 points from one season to the next, and a course '
+        'that hosted nothing in those five seasons loses 10% of its prestige a season. A new world assumes the '
+        'four seasons before it hosted what its first season\'s schedule gives it. Courses that have hosted '
+        'nothing have none. Venues are still chosen by the course plan, not by prestige.',
+        '2026-11-05'),
+    'nation-shares': (
+        'National prestige and shares of new golfers',
+        'The number of new juniors (18) and new professionals (21-26) each year is what the existing rule '
+        'creates from the nations as the world began, with the same random draws: prestige never adds or removes '
+        'a golfer. That number is split between nations by share (largest remainders; ties by the larger quota, '
+        'then the name), and each nation draws candidates from its own unchanged talent distribution until '
+        'exactly its number has passed the pathway\'s usual filter; nobody\'s nationality ever changes. A '
+        'nation\'s share is its starting share (its expected share under the existing rule) times its '
+        'participation multiplier, normalised to 100%. The multiplier follows national prestige: in every event '
+        'except qualifying stages each starter earns the fame points of their finish, and is expected, before '
+        'the event, to take half of an equal share of the fame the event hands out plus half by current Overall '
+        '(softmax, 4 points per e-fold). Over the last five completed seasons (weights 1.0 to 0.6 by age), '
+        'R = (actual + 150) / (expected + 150), prestige = 50 + 25 x log2 R within 0-100, and the multiplier '
+        'moves toward 4 ^ ((prestige - 50) / 50) -- between 0.25 and 4 -- by at most 10% a year. Set at each '
+        'season\'s end for the next season\'s entrants.',
+        '2026-11-05'),
     'injuries': (
         'Injuries',
         'A golfer can be hurt playing an event; the chance rises with tiredness, age and the rounds played and falls '

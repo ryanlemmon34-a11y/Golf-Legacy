@@ -281,25 +281,292 @@ def generate_world(year=2027, seed=2027, nation_profiles=None, scale=1.0):
 JUNIOR_SHARE = 1 / 31.25          # share of a nation's candidates who are 18 in any one year (see _age)
 
 
-def junior_class(year, seed, profiles, start_id, taken, in_use=None):
-    """This year's 18-year-olds from every nation (amateurs: college or amateur golf). Names: see
-    names.make_name (`taken`: every name used so far; `in_use`: those of people active now)."""
-    rows = []
+# ---- the yearly entrant cohorts and each nation's share of them (rules 2026-11-05, owner decision D7) -------------
+# Two pathways bring new golfers into the world each year: the junior class (18-year-old amateurs) and the new
+# professionals from outside the tracked amateur game (21-26). The EXISTING rule for each: every nation draws
+# a fixed number of candidates (from its pool) around a mean potential set by its development, and keeps those
+# who pass the pathway's filter. Since rules 2026-11-05 that rule fixes only the year's TOTAL, and nations
+# share it:
+#   1. total      what the existing rule creates that year from the BASELINE nation profiles (fixed when the
+#                 world began), with the existing per-nation random streams: today's year-to-year variation,
+#                 never anything to do with prestige;
+#   2. shares     each nation's expected share of the golfers the existing rule creates (expected_shares:
+#                 candidates x the chance one passes the filter), times its participation multiplier from
+#                 national prestige (participation.py), normalised to 100 %;
+#   3. allocation the total split by those shares, largest remainders first (ties: larger quota, then name);
+#   4. generation each nation draws candidates from its own existing distribution (the same mean from its
+#                 development, the same filter) until exactly its allocation has passed: first the existing
+#                 rule's own draws, then further draws continuing the same stream (seed, pathway, year,
+#                 nation), so a share changes how many golfers come from a nation -- never their talent, and
+#                 never the total.
+# Nothing here reads or changes a nation's pool or development beyond the existing rule's own use of them.
+
+PATHWAYS = ('juniors', 'new_pros')
+MAX_DRAWS_PER_PASS = 400          # safety: a nation stops after this many draws per golfer it still owes
+                                  # (far beyond any real need: the rarest pass rate is ~1 in 40)
+
+
+def _cand_n(kind, prof):
+    """Candidates a nation draws a year under the existing rule."""
+    scale = NEW_PRO_SCALE if kind == 'new_pros' else 1.0
+    return max(0, round(prof.pool * CANDIDATES_PER_POOL * JUNIOR_SHARE * scale))
+
+
+def _mu(prof):
+    return BASE_POTENTIAL + DEV_EFFECT * (prof.development - 60)
+
+
+def _junior_draw(crng, country, mu):
+    """One junior candidate, exactly as the existing rule draws it: the kept row, or None."""
+    pot = crng.gauss(mu, POTENTIAL_SD)
+    peak = crng.gauss(27.0, 2.0)
+    aging = math.exp(crng.gauss(0, 0.3))
+    cur = pot - age_deficit(18, peak, aging) + crng.gauss(0, CAREER_LUCK_SD)
+    if cur < KEEP_OVERALL:
+        return None
+    cur = min(cur, 99.0)
+    pot = max(min(pot, 99.0), cur)
+    if _keep_young(cur, 18, crng.random(), crng.gauss(0, SCOUTING_SD)):
+        return (country, 18, pot, peak, cur, 'amateur', aging)
+    return None
+
+
+def _new_pro_draw(crng, country, mu, prof):
+    """One new-professional candidate, exactly as the existing rule draws it: the kept row, or None."""
+    pot = crng.gauss(mu, POTENTIAL_SD)
+    peak = crng.gauss(27.0, 2.0)
+    aging = math.exp(crng.gauss(0, 0.3))
+    luck = crng.gauss(0, CAREER_LUCK_SD)
+    age = crng.choice(NEW_PRO_AGES)
+    cur18 = pot - age_deficit(18, peak, aging) + luck
+    tracked = cur18 >= KEEP_OVERALL and _keep_young(cur18, 18, crng.random(), crng.gauss(0, SCOUTING_SD))
+    cur = pot - age_deficit(age, peak, aging) + luck
+    if tracked or cur < KEEP_OVERALL:
+        return None
+    cur = min(cur, 99.0)
+    pot = max(min(pot, 99.0), cur)
+    if _status(max(age, 23), cur, prof, crng.random(), crng) != 'pro':
+        return None
+    if crng.random() < _keep_probability('pro', age, cur):
+        return (country, age, pot, peak, cur, 'pro', aging)
+    return None
+
+
+class _Stream:
+    """A nation's candidates for one pathway and year, in draw order: the existing rule's random stream
+    (`{seed}:juniors:{year}:{country}` or `{seed}:new-pros:{year}:{country}`), which simply continues past the
+    existing rule's last draw when more are needed. Draw d is fixed by (seed, pathway, year, nation, d)."""
+
+    def __init__(self, kind, year, seed, country, prof):
+        tag = 'juniors' if kind == 'juniors' else 'new-pros'
+        self.rng = random.Random(f'{seed}:{tag}:{year}:{country}')
+        self.kind, self.country, self.prof, self.mu = kind, country, prof, _mu(prof)
+        self.draws = 0
+
+    def draw(self):
+        self.draws += 1
+        if self.kind == 'juniors':
+            return _junior_draw(self.rng, self.country, self.mu)
+        return _new_pro_draw(self.rng, self.country, self.mu, self.prof)
+
+    def passers(self, n):
+        """The kept rows among the next n draws."""
+        return [r for r in (self.draw() for _ in range(n)) if r is not None]
+
+
+def existing_rule(kind, year, seed, profiles):
+    """The existing rule, nation by nation: {country: (kept rows, its stream after the rule's draws)}."""
+    out = {}
     for country, prof in profiles.items():
-        n = max(0, round(prof.pool * CANDIDATES_PER_POOL * JUNIOR_SHARE))
-        mu = BASE_POTENTIAL + DEV_EFFECT * (prof.development - 60)
-        crng = random.Random(f'{seed}:juniors:{year}:{country}')
-        for _ in range(n):
-            pot = crng.gauss(mu, POTENTIAL_SD)
-            peak = crng.gauss(27.0, 2.0)
-            aging = math.exp(crng.gauss(0, 0.3))
-            cur = pot - age_deficit(18, peak, aging) + crng.gauss(0, CAREER_LUCK_SD)
-            if cur < KEEP_OVERALL:
-                continue
-            cur = min(cur, 99.0)
-            pot = max(min(pot, 99.0), cur)
-            if _keep_young(cur, 18, crng.random(), crng.gauss(0, SCOUTING_SD)):
-                rows.append((country, 18, pot, peak, cur, 'amateur', aging))
+        st = _Stream(kind, year, seed, country, prof)
+        out[country] = (st.passers(_cand_n(kind, prof)), st)
+    return out
+
+
+def allocate(total, shares):
+    """Split `total` places by `shares` ({country: share}, summing to 1): each nation's whole quota, then one
+    more place to the largest remainders until the total is reached; ties by the larger quota, then the
+    nation's name (reproducible)."""
+    shares = normalised(shares)
+    quota = {c: total * s for c, s in shares.items()}
+    out = {c: int(math.floor(q)) for c, q in quota.items()}
+    left = total - sum(out.values())                     # (0 <= left < number of nations: the quotas sum to total)
+    order = sorted(quota, key=lambda c: (-(quota[c] - out[c]), -quota[c], c))
+    for c in order[:max(0, left)]:
+        out[c] += 1
+    return out
+
+
+def normalised(weights):
+    tot = sum(weights.values())
+    return {c: (w / tot if tot > 0 else 0.0) for c, w in weights.items()}
+
+
+def entrant_rows(kind, year, seed, profiles, baseline=None, shares=None, report=None):
+    """This year's entrant rows for a pathway under the cohort-share rule (see the block comment above).
+    profiles: the nations now (each nation's own distribution); baseline: the profiles the world began with
+    (the total; default `profiles`); shares: {country: share} (default: the expected shares of the existing
+    rule, expected_shares). `report` (a dict) receives 'total', 'existing' (the existing rule's count per
+    nation), 'allocated' and 'draws'."""
+    baseline = baseline or profiles
+    if set(baseline) != set(profiles):
+        raise ValueError('the baseline and current nation profiles must name the same nations')
+    base = existing_rule(kind, year, seed, baseline)
+    total = sum(len(rows) for rows, _ in base.values())
+    shares = shares if shares is not None else expected_shares(kind, baseline)
+    if set(shares) != set(profiles):
+        raise ValueError('a share is needed for every nation')
+    alloc = allocate(total, shares)
+    rows = []
+    draws = {}
+    for country, prof in profiles.items():
+        k = alloc.get(country, 0)
+        if country in base and _same_distribution(baseline[country], prof):
+            got, st = base[country]
+            got = list(got)
+        else:                                            # a nation whose profile changed: its own stream anew
+            st = _Stream(kind, year, seed, country, prof)
+            got = []
+        if len(got) < k:
+            limit = st.draws + MAX_DRAWS_PER_PASS * (k - len(got)) + 1000
+            while len(got) < k:
+                if st.draws >= limit:
+                    raise RuntimeError(f'{country}: {k} {kind} not reached in {st.draws} draws')
+                r = st.draw()
+                if r is not None:
+                    got.append(r)
+        rows.extend(got[:k])
+        draws[country] = st.draws
+    if report is not None:
+        report.update(total=total, existing={c: len(r) for c, (r, _) in base.items()}, allocated=alloc, draws=draws)
+    return rows
+
+
+def _same_distribution(a, b):
+    return a.pool == b.pool and a.development == b.development
+
+
+# ---- expected shares of the existing rule (numerical integration; no random draws) --------------------------------
+# A candidate passes or not depending only on X = potential + career luck (normal: mean from development, sd
+# sqrt(POTENTIAL_SD^2 + CAREER_LUCK_SD^2)), the peak age, the aging rate, the age (new professionals) and the
+# filters' own scouting noise and coin flips. So the chance of passing is the integral of
+# normal(X; mu, sd) x g(X), where g -- the chance of passing given X -- is the same for every nation and is
+# tabulated once per process. Expected count = candidates x chance; a nation's share = its expected count / all.
+_X_LO, _X_HI, _X_STEP = 22.0, 152.0, 0.2
+_TABLES = {}
+
+
+def _normal_nodes(mean, sd, half=6.0, step=0.25):
+    """Simpson nodes and weights (summing to 1) for a normal variable, over mean +- half sd."""
+    n = int(round(2 * half / step))
+    n += n % 2
+    xs = [-half + i * 2 * half / n for i in range(n + 1)]
+    ws = [(1 if i in (0, n) else 4 if i % 2 else 2) * math.exp(-x * x / 2) for i, x in enumerate(xs)]
+    tot = sum(ws)
+    return [(mean + sd * x, w / tot) for x, w in zip(xs, ws)]
+
+
+def _young_keep_table():
+    """K(c): the chance _keep_young keeps a golfer whose overall at 18 is c (scouting noise integrated), on a
+    grid from KEEP_OVERALL up (linear interpolation; 1.0 beyond the grid, where every golfer is kept)."""
+    d = age_deficit(18, 27.0)
+    noise = _normal_nodes(0.0, SCOUTING_SD)
+    step, lo, hi = 0.05, KEEP_OVERALL, _X_HI + 1
+    vals = []
+    c = lo
+    while c <= hi + 1e-9:
+        k = 0.0
+        for e, w in noise:
+            proj = c + d + e
+            k += w * _keep_probability('pro' if proj >= PRO_LINE + 3 else 'amateur', 27, proj)
+        vals.append(k)
+        c += step
+    return lo, step, vals
+
+
+def _interp(table, c):
+    lo, step, vals = table
+    x = (c - lo) / step
+    i = int(x)
+    if i >= len(vals) - 1:
+        return 1.0
+    f = x - i
+    return vals[i] * (1 - f) + vals[i + 1] * f
+
+
+def _pass_given_x():
+    """{pathway: [g(X) on the X grid]} (computed once per process)."""
+    if 'g' in _TABLES:
+        return _TABLES['g']
+    K = _young_keep_table()
+    peaks = _normal_nodes(27.0, 2.0)
+    agings = [(math.exp(z), w) for z, w in _normal_nodes(0.0, 0.3, half=3.0, step=1.0)]   # (peaks below 19 only:
+                                                                                        # under 1 in 30,000)
+    xs = []
+    x = _X_LO
+    while x <= _X_HI + 1e-9:
+        xs.append(x)
+        x += _X_STEP
+    gj, gp = [], []
+    for X in xs:
+        j = p = 0.0
+        for peak, wp in peaks:
+            # junior: overall at 18 (no decline at 18 for any peak in the integration range)
+            c = X - age_deficit(18, peak)
+            if c >= KEEP_OVERALL:
+                j += wp * _interp(K, min(c, 99.0))
+            # new professional: aging matters only where an age 21-26 is past the peak + 7 (very early peaks)
+            for aging, wa in (agings if peak < NEW_PRO_AGES[-1] - 7 else ((1.0, 1.0),)):
+                c18 = X - age_deficit(18, peak, aging)
+                tracked = _interp(K, c18) if c18 >= KEEP_OVERALL else 0.0
+                if tracked >= 1.0:
+                    continue
+                s = 0.0
+                for age in NEW_PRO_AGES:
+                    ca = X - age_deficit(age, peak, aging)
+                    if ca < KEEP_OVERALL:
+                        continue
+                    ca = min(ca, 99.0)
+                    p_pro = 1 / (1 + math.exp(-(ca - PRO_LINE) / 3.0))      # _status, ages 23-50
+                    s += p_pro * _keep_probability('pro', age, ca)
+                p += wp * wa * (1 - tracked) * s / len(NEW_PRO_AGES)
+        gj.append(j)
+        gp.append(p)
+    _TABLES['g'] = {'juniors': gj, 'new_pros': gp, 'x': xs}
+    return _TABLES['g']
+
+
+def pass_chance(kind, development):
+    """The chance one candidate of a nation with this development passes the pathway's filter (existing rule)."""
+    key = (kind, float(development))
+    if key in _TABLES:
+        return _TABLES[key]
+    t = _pass_given_x()
+    mu = BASE_POTENTIAL + DEV_EFFECT * (development - 60)
+    sd = math.hypot(POTENTIAL_SD, CAREER_LUCK_SD)
+    xs, g = t['x'], t[kind]
+    dens = [math.exp(-((x - mu) / sd) ** 2 / 2) / (sd * math.sqrt(2 * math.pi)) for x in xs]
+    tot = sum((dens[i] * g[i] + dens[i + 1] * g[i + 1]) / 2 * _X_STEP for i in range(len(xs) - 1))
+    tail = g[-1] * 0.5 * math.erfc((xs[-1] - mu) / (sd * math.sqrt(2)))    # beyond the grid: g is flat there
+    _TABLES[key] = tot + tail
+    return tot + tail
+
+
+def expected_counts(kind, profiles):
+    """{country: expected golfers a year} under the existing rule: candidates x the chance one passes."""
+    return {c: _cand_n(kind, p) * pass_chance(kind, p.development) for c, p in profiles.items()}
+
+
+def expected_shares(kind, profiles):
+    """{country: expected share of the pathway's golfers} under the existing rule (sums to 1)."""
+    return normalised(expected_counts(kind, profiles))
+
+
+def junior_class(year, seed, profiles, start_id, taken, in_use=None, baseline=None, shares=None, report=None):
+    """This year's 18-year-olds from every nation (amateurs: college or amateur golf), by the cohort-share
+    rule (entrant_rows: the total from the baseline profiles, split by `shares`). Names: see
+    names.make_name (`taken`: every name used so far; `in_use`: those of people active now)."""
+    rows = entrant_rows('juniors', year, seed, profiles, baseline, shares, report)
     rows.sort(key=lambda r: -r[4])
     golfers = [_make_golfer(start_id + i, row, year, f'{seed}:j{year}', profiles, taken, in_use)
                for i, row in enumerate(rows)]
@@ -314,7 +581,7 @@ NEW_PRO_SCALE = 5.5               # aspiring professionals a year, in birth coho
 NEW_PRO_AGES = (21, 22, 23, 24, 25, 26)
 
 
-def new_professionals(year, seed, profiles, start_id, taken, in_use=None):
+def new_professionals(year, seed, profiles, start_id, taken, in_use=None, baseline=None, shares=None, report=None):
     """This year's new professionals from outside the tracked amateur game.
 
     The junior class follows one route into professional golf in detail (college and national amateur
@@ -326,29 +593,10 @@ def new_professionals(year, seed, profiles, start_id, taken, in_use=None):
     professionals (ability for their age, the professional status rule and the same keep rule for
     the many weaker professionals): NEW_PRO_SCALE birth cohorts' worth of candidates aged 21-26. Golfers
     the junior class would have kept are left out (they are already in the world). Nothing here
-    depends on how many golfers the tours hold now: it is a steady flow, not a top-up."""
-    rows = []
-    for country, prof in profiles.items():
-        n = max(0, round(prof.pool * CANDIDATES_PER_POOL * JUNIOR_SHARE * NEW_PRO_SCALE))
-        mu = BASE_POTENTIAL + DEV_EFFECT * (prof.development - 60)
-        crng = random.Random(f'{seed}:new-pros:{year}:{country}')
-        for _ in range(n):
-            pot = crng.gauss(mu, POTENTIAL_SD)
-            peak = crng.gauss(27.0, 2.0)
-            aging = math.exp(crng.gauss(0, 0.3))
-            luck = crng.gauss(0, CAREER_LUCK_SD)
-            age = crng.choice(NEW_PRO_AGES)
-            cur18 = pot - age_deficit(18, peak, aging) + luck
-            tracked = cur18 >= KEEP_OVERALL and _keep_young(cur18, 18, crng.random(), crng.gauss(0, SCOUTING_SD))
-            cur = pot - age_deficit(age, peak, aging) + luck
-            if tracked or cur < KEEP_OVERALL:
-                continue
-            cur = min(cur, 99.0)
-            pot = max(min(pot, 99.0), cur)
-            if _status(max(age, 23), cur, prof, crng.random(), crng) != 'pro':
-                continue
-            if crng.random() < _keep_probability('pro', age, cur):
-                rows.append((country, age, pot, peak, cur, 'pro', aging))
+    depends on how many golfers the tours hold now: it is a steady flow, not a top-up.
+    Since rules 2026-11-05 that flow's yearly total is split between nations by the cohort-share rule
+    (entrant_rows), like the junior class."""
+    rows = entrant_rows('new_pros', year, seed, profiles, baseline, shares, report)
     rows.sort(key=lambda r: -r[4])
     golfers = [_make_golfer(start_id + i, row, year, f'{seed}:p{year}', profiles, taken, in_use)
                for i, row in enumerate(rows)]

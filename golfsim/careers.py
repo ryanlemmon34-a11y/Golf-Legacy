@@ -472,13 +472,22 @@ def names_in_use(season):
             | {p.name for p in list(st.coaches.values()) + list(st.caddies.values()) if p.status == 'active'})
 
 
+def _cohort_args(season, kind):
+    """The cohort-share rule's inputs for a pathway (population.entrant_rows, participation.py): the total from
+    the nation profiles the world began with, split by each nation's share now (the report is filled in)."""
+    pt = season.participation
+    return {'baseline': pt.baseline, 'shares': pt.shares(kind), 'report': {}}
+
+
 def add_new_professionals(season, year):
     """This year's new professionals from outside the tracked amateur game (population.new_professionals):
     they start on their home mini tour, with savings and perhaps backers like any new professional."""
     from .population import new_professionals
     start = season.world.next_id
     taken = {g.name for g in season.world.golfers} | season.staff.taken
-    arrivals = new_professionals(year, season.seed, season.world.nations, start, taken, names_in_use(season))
+    args = _cohort_args(season, 'new_pros')
+    arrivals = new_professionals(year, season.seed, season.world.nations, start, taken, names_in_use(season), **args)
+    season.participation.record(year, 'new_pros', args['report'])
     season.world.next_id = start + len(arrivals)
     rng = random.Random(f'{season.seed}:new-pros:{year}')
     for g in arrivals:
@@ -506,7 +515,9 @@ def add_juniors(season, year):
     from .population import junior_class
     start = season.world.next_id                     # ids come from the world's single person registry
     taken = {g.name for g in season.world.golfers} | season.staff.taken
-    juniors = junior_class(year, season.seed, season.world.nations, start, taken, names_in_use(season))
+    args = _cohort_args(season, 'juniors')
+    juniors = junior_class(year, season.seed, season.world.nations, start, taken, names_in_use(season), **args)
+    season.participation.record(year, 'juniors', args['report'])
     season.world.next_id = start + len(juniors)
     rng = random.Random(f'{season.seed}:juniors:{year}')
     for g in juniors:
