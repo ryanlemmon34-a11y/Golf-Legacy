@@ -73,7 +73,7 @@ if str(ROOT) not in sys.path:
 from golfsim import golfstats as GS                                     # noqa: E402  (definitions only)
 
 FACT_VERSION = 3
-NARRATIVE_VERSION = 2
+NARRATIVE_VERSION = 3
 
 # pattern thresholds (strokes, or a probability), documented on the story page
 UPSET_P = 0.03                 # recorded pre-event win estimate below 3 %
