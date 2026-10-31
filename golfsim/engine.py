@@ -72,9 +72,10 @@ class Conditions:
     wind_from: float = None          # None: classic model (no direction)
 
 
-# per-hole wind terms in the classic model, or for a hole the seasonal model has no direction for:
-# (dispersion direction factor, distance factor, tailwind firmness, distance-error, lateral-error, distance spread)
-_NO_DIRECTION = (1.0, 1.0, 0.0, 1.0, 1.0, 1.0)
+# per-hole wind terms in the classic model, or in calm air: (dispersion direction factor, headwind distance
+# loss, its share Ball-Flight Control can win back, tailwind firmness, distance-error, lateral-error, distance
+# spread). The distance factor is 1 - loss + back * ball-flight (exactly 1.0 here).
+_NO_DIRECTION = (1.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0)
 
 
 def pin_sheet(course, cond, rng):
@@ -240,8 +241,11 @@ class Player:
         self.hw = None
         if seasonal:
             self.wind_skill = (1 - 0.20 * (self.mgmt - 0.75)) * (1 - 0.10 * self.fam)
-            if cond.wind_mph > 0:
-                self.hw = _hole_wind(course, cond, self.bfc)
+            if cond.wind_mph > 0:                          # shared by everyone in the round: built once
+                cache = cond.__dict__.get('_hw')
+                if cache is None or cache[0] is not course:
+                    cache = cond._hw = (course, _hole_wind(course, cond))
+                self.hw = cache[1]
         self.reach_fw = self.drive * 0.90       # 3-wood from a fairway
         self.plans = {}
 
@@ -289,9 +293,10 @@ class Player:
         return max(0.25, rng.gammavariate(2.0, mean / 2.0))
 
 
-def _hole_wind(course, cond, bfc):
-    """Per-hole wind terms for one golfer and round (seasonal model): {hole number: (dispersion direction factor,
-    distance factor, tailwind firmness, distance-error factor, lateral-error factor, distance-spread factor)}.
+def _hole_wind(course, cond):
+    """Per-hole wind terms for a round (seasonal model), the same for every golfer: {hole number: (dispersion
+    direction factor, headwind distance loss, the part of it Ball-Flight Control wins back per unit of control,
+    tailwind firmness, distance-error factor, lateral-error factor, distance-spread factor)}.
 
     along +1 = straight into the face, -1 = straight behind; cross = share across the line. The dispersion
     factor averages ~1.0 over all directions (crosswind 1.0, headwind 0.85, tailwind 0.30), so a round's
@@ -307,7 +312,8 @@ def _hole_wind(course, cond, bfc):
         e = w * h.wind_exposure                       # exposed mph
         ew = e / 20.0
         out[h.number] = (cross + 0.85 * head + 0.30 * tail,
-                         1 - e * (0.0075 * head * (1 - 0.35 * bfc) - 0.0045 * tail),
+                         e * (0.0075 * head - 0.0045 * tail),
+                         e * 0.0075 * 0.35 * head,
                          0.25 * tail * ew,
                          1 + 0.25 * ew * (abs(along) - 0.637),
                          1 + 0.25 * ew * (cross - 0.637),
@@ -339,7 +345,8 @@ def _tee_plan(pl, hole, rng):
         return pl.plans[key]
     clubs = (('driver', 1.0, 1.0), ('3-wood', 0.92, 0.87), ('iron', 0.80, 0.72))
     best, best_v = None, 1e9
-    dirf, dfac = (pl.hw[hole.number] if pl.hw else _NO_DIRECTION)[:2]
+    dirf, loss, back = (pl.hw[hole.number] if pl.hw else _NO_DIRECTION)[:3]
+    dfac = 1 - loss + back * pl.bfc
     wind_f = 1 + pl.wind * hole.wind_exposure * (0.55 - 0.40 * pl.bfc) * pl.wind_skill * dirf
     for name, df, sf in clubs:
         carry = pl.drive * df * pl.roll * dfac
@@ -426,7 +433,8 @@ def play_hole(pl, hole, hidx, rng, st, pressure=0.0, state=None, pin=None):
     state.press = pl.pressure_effect(pressure)
     fat = (hidx / 17.0) * pl.fatigue_round + pl.fatigue_week
     state.fat = fat
-    dirf, dfac, tail_firm, ax, ay, dsdf = pl.hw[hole.number] if pl.hw else _NO_DIRECTION
+    dirf, loss, back, tail_firm, ax, ay, dsdf = pl.hw[hole.number] if pl.hw else _NO_DIRECTION
+    dfac = 1 - loss + back * pl.bfc                     # distance factor (1.0 exactly with no direction)
     wind_f = 1 + pl.wind * hole.wind_exposure * (0.55 - 0.40 * pl.bfc) * (1 - 0.10 * pl.c_yard) * pl.wind_skill * dirf
     disp = pl.day_disp * wind_f * (1 + 0.15 * state.press) * (1 + 0.09 * state.tilt) * (1 + 0.08 * fat)
     err_p = (pl.mishit * (1 + 0.9 * state.press) * (1 + 0.6 * state.tilt) * (1 + 0.7 * fat)

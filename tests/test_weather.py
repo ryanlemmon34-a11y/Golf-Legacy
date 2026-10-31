@@ -163,10 +163,12 @@ class WindDirectionTests(unittest.TestCase):
         h, t, c = terms(b), terms(b + 180), terms(b + 90)
         self.assertGreater(c[0], h[0])                                     # spread: cross > head > tail
         self.assertGreater(h[0], t[0])
-        self.assertGreater(t[2], 0.0)                                      # a tailwind takes the spin off
-        self.assertEqual(h[2], 0.0)
-        self.assertGreater(h[3], c[3])                                     # head: more long/short error
-        self.assertGreater(c[4], h[4])                                     # cross: more left/right error
+        self.assertGreater(t[3], 0.0)                                      # a tailwind takes the spin off
+        self.assertEqual(h[3], 0.0)
+        self.assertGreater(h[4], c[4])                                     # head: more long/short error
+        self.assertGreater(c[5], h[5])                                     # cross: more left/right error
+        self.assertGreater(h[1], 0.0)                                      # headwind distance loss...
+        self.assertLess(h[2], h[1])                                        # ...only partly won back by control
 
     def test_opposing_holes_under_one_wind(self):
         b = WX.hole_bearings(MID)
@@ -175,11 +177,12 @@ class WindDirectionTests(unittest.TestCase):
                  key=lambda n: abs(((b[n] - b[n1]) + 180) % 360 - 180))   # the hole most nearly opposite
         cond = Conditions(wind_mph=20.0, wind_from=b[n1])
         hw = Player(golfer(), MID, cond, None, random.Random(1)).hw
-        self.assertLess(hw[n1][1], 1.0)                                    # hole n1 into the wind
-        self.assertGreater(hw[n2][1], 1.0)                                 # the opposite hole downwind
+        dfac = lambda t: 1 - t[1] + t[2] * 0.75
+        self.assertLess(dfac(hw[n1]), 1.0)                                 # hole n1 into the wind
+        self.assertGreater(dfac(hw[n2]), 1.0)                              # the opposite hole downwind
         flip = Player(golfer(), MID, Conditions(wind_mph=20.0, wind_from=b[n1] + 180), None, random.Random(1)).hw
-        self.assertGreater(flip[n1][1], 1.0)
-        self.assertLess(flip[n2][1], 1.0)
+        self.assertGreater(dfac(flip[n1]), 1.0)
+        self.assertLess(dfac(flip[n2]), 1.0)
 
     def test_direction_averages_to_the_speed_only_spread(self):
         import math
