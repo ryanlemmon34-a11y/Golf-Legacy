@@ -279,6 +279,152 @@ class Baseline(unittest.TestCase):
             self.assertEqual(rep['allocated'], P.allocate(rep['total'], pt.base_share[kind]))
 
 
+def pre_fix_entrant_rows(kind, year, seed, profiles, shares):
+    """entrant_rows as it stood at d187a56 (draws capped at 400 per golfer owed + 1000, then RuntimeError): the
+    outcomes the fix must keep wherever that cap was never reached."""
+    base = P.existing_rule(kind, year, seed, profiles)
+    alloc = P.allocate(sum(len(r) for r, _ in base.values()), shares)
+    rows = []
+    for country, prof in profiles.items():
+        k = alloc.get(country, 0)
+        got, st = base[country]
+        got = list(got)
+        if len(got) < k:
+            limit = st.draws + 400 * (k - len(got)) + 1000
+            while len(got) < k:
+                if st.draws >= limit:
+                    raise RuntimeError(f'{country}: {k} {kind} not reached in {st.draws} draws')
+                r = st.draw()
+                if r is not None:
+                    got.append(r)
+        rows.extend(got[:k])
+    return rows
+
+
+# nations whose new professionals pass the filter rarely (about 1 in 300 to 1 in 650: low development)
+RARE = [c for c in PROFILES if P.pass_chance('new_pros', PROFILES[c].development) < 1 / 300]
+
+
+def extreme(kind, favoured, up=4.0, down=0.25):
+    """Expected shares with `favoured` nations at the top multiplier and the rest at the bottom (normalised):
+    the largest share a small nation can reach (16 x its start)."""
+    base = P.expected_shares(kind, PROFILES)
+    return P.normalised({c: s * (up if c in favoured else down) for c, s in base.items()})
+
+
+class DrawCap(unittest.TestCase):
+    """A nation owing golfers keeps drawing from its own stream until its quota has passed: no cap, no shortfall, no
+    reassigned places (population.py, block comment step 5). Before the fix the draws stopped at 400 per golfer
+    owed + 1000 and raised RuntimeError."""
+
+    @staticmethod
+    def own_passers(kind, year, seed, country, n):
+        """The first n golfers who pass in the nation's own stream: its talent distribution conditional on the
+        nation, exactly as the existing rule draws it (no other nation's draws, no re-weighting)."""
+        st = P._Stream(kind, year, seed, country, PROFILES[country])
+        out = []
+        while len(out) < n:
+            r = st.draw()
+            if r is not None:
+                out.append(r)
+        return out
+
+    def check(self, kind, year, seed, shares, fixed_total=None):
+        rep = {}
+        rows = P.entrant_rows(kind, year, seed, PROFILES, shares=shares, report=rep)
+        self.assertEqual(len(rows), rep['total'], (kind, year, seed))               # ACTUAL total = the fixed cohort
+        if fixed_total is not None:
+            self.assertEqual(len(rows), fixed_total)
+        self.assertEqual(sum(rep['allocated'].values()), rep['total'])
+        self.assertEqual(Counter(r[0] for r in rows), {c: n for c, n in rep['allocated'].items() if n})
+        for c in RARE:                       # the nations the old cap failed: their own stream's passers, in order
+            mine = [r for r in rows if r[0] == c]
+            self.assertEqual(mine, self.own_passers(kind, year, seed, c, len(mine)), (kind, year, seed, c))
+        return rows, rep
+
+    def test_czechia_2029_seed_99_is_filled_from_its_own_stream(self):
+        """The serialized queue's crash (tests.test_living_views, seed 99, end of 2028): Czechia's one new professional
+        of 2029 was not reached in 1590 draws (its first passer is draw 2161) and the season stopped."""
+        rows, rep = self.check('new_pros', 2029, 99, None)
+        self.assertEqual(rep['existing']['Czechia'], 0)
+        self.assertEqual(rep['allocated']['Czechia'], 1)
+        self.assertGreater(rep['draws']['Czechia'], 1590)
+        st = P._Stream('new_pros', 2029, 99, 'Czechia', PROFILES['Czechia'])
+        first = next(r for r in iter(st.draw, 'never') if r is not None)          # the stream's own next passer
+        self.assertEqual([r for r in rows if r[0] == 'Czechia'], [first])
+        self.assertEqual(rep['draws']['Czechia'], st.draws)
+
+    def test_no_crash_and_quotas_hold_over_many_years_seeds_and_small_nations(self):
+        """No RuntimeError; the actual number created is the fixed cohort (the pre-2026-11-05 rule's own count, computed
+        independently by old_new_pros / old_juniors); every nation gets exactly its quota; and the rare nations'
+        golfers are their own stream's passers (the conditional talent distribution, by construction)."""
+        self.assertGreaterEqual(len(RARE), 15)
+        for seed in (99, 7, 2027):
+            for year in (2029, 2034, 2041, 2050):
+                fixed = len(old_new_pros(year, seed, PROFILES))
+                self.check('new_pros', year, seed, None, fixed)
+                self.check('new_pros', year, seed, extreme('new_pros', RARE), fixed)   # rare nations at 16 x their start
+            year = 2029 + seed % 5
+            self.check('juniors', year, seed, extreme('juniors', RARE), len(old_juniors(year, seed, PROFILES)))
+
+    def test_conditional_talent_is_unchanged_past_the_old_cap(self):
+        """Statistical companion to the by-construction check: golfers reached only past the old cap (the fix's
+        path) have the same Overall distribution as the same nations' golfers within it."""
+        early, late = [], []
+        for seed in range(1, 41):
+            for c in ('Turkey', 'Vietnam', 'Poland'):
+                st = P._Stream('new_pros', 2031, seed, c, PROFILES[c])
+                cap = P._cand_n('new_pros', PROFILES[c]) + 400 + 1000
+                for _ in range(6000):
+                    r = st.draw()
+                    if r is not None:
+                        (early if st.draws <= cap else late).append(r[4])
+        self.assertGreater(min(len(early), len(late)), 60)
+        se = math.hypot(S.stdev(early) / math.sqrt(len(early)), S.stdev(late) / math.sqrt(len(late)))
+        self.assertLess(abs(S.mean(early) - S.mean(late)), 4 * se)
+
+    def test_outcomes_are_unchanged_wherever_the_old_cap_was_enough(self):
+        compared = 0
+        for seed, year in ((2027, 2030), (99, 2028), (7, 2033)):
+            for kind in P.PATHWAYS:
+                for shares in (P.expected_shares(kind, PROFILES), extreme(kind, RARE, 2.0, 0.8)):
+                    try:
+                        old = pre_fix_entrant_rows(kind, year, seed, PROFILES, shares)
+                    except RuntimeError:
+                        continue
+                    self.assertEqual(P.entrant_rows(kind, year, seed, PROFILES, shares=shares), old, (kind, year, seed))
+                    compared += 1
+        self.assertGreaterEqual(compared, 8)
+
+    def test_the_extreme_tail_terminates_with_the_exact_quota(self):
+        """Development 0 (the bottom of the scale: a new professional passes about 1 in 100,000, a junior 1 in 9,300):
+        the stream still reaches the exact quota, each golfer from that nation's own stream, and the total holds."""
+        from dataclasses import replace
+        self.assertGreater(P.pass_chance('new_pros', 0), 1 / 120000)
+        self.assertGreater(P.pass_chance('juniors', 0), 1 / 12000)
+        now = dict(PROFILES)
+        now['Turkey'] = replace(PROFILES['Turkey'], development=0)
+        for kind, want in (('juniors', 4), ('new_pros', 2)):
+            base = P.expected_shares(kind, PROFILES)
+            rep = {}
+            total = len(OLD[kind](2031, 5, PROFILES))
+            shares = P.normalised({c: (want / total if c == 'Turkey' else s) for c, s in base.items()})
+            rows = P.entrant_rows(kind, 2031, 5, now, baseline=PROFILES, shares=shares, report=rep)
+            self.assertEqual(len(rows), total)
+            k = rep['allocated']['Turkey']
+            self.assertGreaterEqual(k, 1)
+            mine = [r for r in rows if r[0] == 'Turkey']
+            self.assertEqual(len(mine), k)
+            st = P._Stream(kind, 2031, 5, 'Turkey', now['Turkey'])               # its own (development 0) stream
+            own = []
+            while len(own) < k:
+                r = st.draw()
+                if r is not None:
+                    own.append(r)
+            self.assertEqual(mine, own)
+            self.assertEqual(rep['draws']['Turkey'], st.draws)
+
+
 class InTheWorld(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

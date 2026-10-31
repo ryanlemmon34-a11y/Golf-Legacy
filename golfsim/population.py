@@ -299,11 +299,20 @@ JUNIOR_SHARE = 1 / 31.25          # share of a nation's candidates who are 18 in
 #                 rule's own draws, then further draws continuing the same stream (seed, pathway, year,
 #                 nation), so a share changes how many golfers come from a nation -- never their talent, and
 #                 never the total.
+#   5. no cap     a nation's stream continues until its allocation has passed, however long that takes: the
+#                 quota is always met exactly, from the nation's own conditional distribution, and the actual
+#                 number created is always the fixed total. It terminates: draws are independent and each
+#                 passes with probability p > 0 (pass_chance; rising with development, about 1 in 100,400
+#                 for new professionals and 1 in 9,300 for juniors even at development 0), so the draws a
+#                 nation needs for m more golfers are negative binomial: finite with probability 1, m/p on
+#                 average, and more than N draws only with probability below m(1-p)^(N/m). The rarest real
+#                 nation is Turkey's new professionals, 1 in 658 (Czechia 1 in 316). Until 2026-11 the draws stopped at
+#                 400 per golfer owed + 1000 and raised RuntimeError, which a rare but valid tail reached
+#                 (Czechia, seed 99, new professionals 2029: its first passer is draw 2161; the cap was 1590).
+#                 Lifting the cap changes nothing a cap-respecting run produced: the same stream, the same draws.
 # Nothing here reads or changes a nation's pool or development beyond the existing rule's own use of them.
 
 PATHWAYS = ('juniors', 'new_pros')
-MAX_DRAWS_PER_PASS = 400          # safety: a nation stops after this many draws per golfer it still owes
-                                  # (far beyond any real need: the rarest pass rate is ~1 in 40)
 
 
 def _cand_n(kind, prof):
@@ -406,8 +415,9 @@ def entrant_rows(kind, year, seed, profiles, baseline=None, shares=None, report=
     """This year's entrant rows for a pathway under the cohort-share rule (see the block comment above).
     profiles: the nations now (each nation's own distribution); baseline: the profiles the world began with
     (the total; default `profiles`); shares: {country: share} (default: the expected shares of the existing
-    rule, expected_shares). `report` (a dict) receives 'total', 'existing' (the existing rule's count per
-    nation), 'allocated' and 'draws'."""
+    rule, expected_shares). Every nation gets exactly its allocation and the rows number exactly the total.
+    `report` (a dict) receives 'total', 'existing' (the existing rule's count per nation), 'allocated' and
+    'draws'."""
     baseline = baseline or profiles
     if set(baseline) != set(profiles):
         raise ValueError('the baseline and current nation profiles must name the same nations')
@@ -427,14 +437,10 @@ def entrant_rows(kind, year, seed, profiles, baseline=None, shares=None, report=
         else:                                            # a nation whose profile changed: its own stream anew
             st = _Stream(kind, year, seed, country, prof)
             got = []
-        if len(got) < k:
-            limit = st.draws + MAX_DRAWS_PER_PASS * (k - len(got)) + 1000
-            while len(got) < k:
-                if st.draws >= limit:
-                    raise RuntimeError(f'{country}: {k} {kind} not reached in {st.draws} draws')
-                r = st.draw()
-                if r is not None:
-                    got.append(r)
+        while len(got) < k:                              # step 5: no cap (terminates: see the block comment)
+            r = st.draw()
+            if r is not None:
+                got.append(r)
         rows.extend(got[:k])
         draws[country] = st.draws
     if report is not None:

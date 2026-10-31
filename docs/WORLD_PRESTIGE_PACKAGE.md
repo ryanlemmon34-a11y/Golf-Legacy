@@ -89,6 +89,23 @@ rule.
 | Current shares | starting share x participation multiplier, normalised to 100 % |
 | Allocation | the total split by current shares, largest remainders first; ties by the larger quota, then the nation's name |
 | Generation | each nation draws from its own existing distribution (same mean from its development, same filter) until exactly its allocation has passed: first the existing rule's own draws, then further draws continuing the same stream. Draw d is fixed by (seed, pathway, year, nation, d) |
+| No cap | a nation's stream continues until exactly its allocation has passed, however many draws that takes: no cap, no shortfall, no place passed to another nation, no filter changed. It always ends: each draw passes independently with the nation's chance p > 0 (`pass_chance`: about 1 in 100,400 for new professionals and 1 in 9,300 for juniors even at development 0; Turkey's new professionals, 1 in 658, are the rarest real case), so the draws for m more golfers are negative binomial -- finite with probability 1, m/p on average, more than N only with probability below m(1-p)^(N/m) |
+
+Draw-cap fix (serialized-queue crash in `tests.test_living_views.RatingsOverTime`, seed 99, end of 2028): until
+this fix the further draws stopped at 400 per golfer owed + 1000 and raised `RuntimeError`, on the assumption
+that the rarest pass rate was about 1 in 40. New professionals from low-development nations pass about 1 in 316
+(Czechia, development 50) to 1 in 658 (Turkey, 42). Czechia, allocated 1 new professional for 2029 (seed 99,
+even at the starting shares) with none among its 190 existing draws, has its first passer at draw 2161, past
+the cap of 1590, so the season stopped. Reproduce: `entrant_rows('new_pros', 2029, 99, nations())` at d187a56. On
+24 seed/year/share cases of the new tests the old cap failed 10 times. Without the cap:
+
+* every nation receives exactly its allocation and the actual number created each year is exactly the fixed
+  cohort total (checked against the pre-2026-11-05 rule's own count);
+* every golfer comes from their own nation's stream, in draw order: the talent distribution conditional on the
+  nation is unchanged (nothing substituted from other nations' draws, nothing re-weighted; checked by
+  construction, plus a statistical check that golfers found past the old cap match those within it);
+* worlds in which the old cap was never reached are unchanged golfer for golfer (compared with the pre-fix code
+  in `tests.test_nation_shares.DrawCap`); only years that used to crash differ, and they now continue.
 
 So a share changes how many golfers come from a nation, never their talent and never the total; with every
 nation allocated exactly what the existing rule gave it, the golfers are the existing rule's own (tested).
