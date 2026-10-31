@@ -31,6 +31,7 @@ from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass, field, replace
 
 from . import access as ACC
+from . import amateur_support as AS
 from . import development as D
 from . import golfstats as GS
 from . import finance as FIN
@@ -395,6 +396,11 @@ class Season:
         self.dev_acc = defaultdict(dict)                     # year -> gid -> development evidence (D.ACC_LEN numbers)
         self.creations = defaultdict(dict)                   # year -> gid -> how a golfer started (hidden facts too)
         self.injury_lasting = defaultdict(dict)              # year -> 'week:gid' -> lasting losses of that injury
+        self.week = 0                                        # the week being played (0 between seasons)
+        self.am_support = {}                                 # gid -> this season's amateur support (amateur_support)
+        self.am_support_log = defaultdict(list)              # year -> [each payment it made]
+        self.am_support_seasons = {}                         # year -> gid -> the season's contract as it ended
+        self.am_support_held = {}                            # year -> gid -> band held at the season's end (renewal)
         for g in world.golfers:                              # the world starts mid-history: assume the season
             if g.lifestyle != 'retired':                     # before it was a typical one for their lifestyle
                 self.prior_rounds[g.id] = (self.first_year, D.EXPERIENCE_ROUNDS * (1.0 if g.lifestyle == 'full_time' else 0.5))
@@ -836,6 +842,7 @@ class Season:
         self.finish_year(year)
 
     def run_week(self, year, week, eds):
+        self.week = week
         rng = random.Random(_seed(self.seed, year, week, 'entries'))
         venues = self.lib.venues(year)
         busy = defaultdict(set)                              # gid -> days committed this week
@@ -892,6 +899,7 @@ class Season:
         self.update_rankings(year, week)
         if self.cal.spec.amateur_award and week == self.cal.spec.amateur_award[0]:
             self.award_amateur(year, week)
+        AS.upgrade(self, year, week)                         # a new A or B achievement: more from next week
         self.update_fame(year, week)
         self.snapshot_standings(year, week)
         self.update_fatigue(year, week)
@@ -1355,10 +1363,13 @@ class Season:
             if not cities or g.id in money:
                 return
             committed = FIN.RESERVE_WEEKS * self.committed_weekly(g)
+            support = AS.left(self, g) if self.am_support else 0.0
+            trip = min(self.trip_cost(g, ed.series, c) for c in cities)
             money[g.id] = {'funds': round(self.funds(g, year)), 'set_aside': round(committed + self._reserved.get(g.id, 0.0)),
-                           'spendable': round(self.spendable(g, year)),
-                           'trip': round(min(self.trip_cost(g, ed.series, c) for c in cities)),
-                           'paid_by': FIN.event_payer(g, ed.series) or 'golfer'}
+                           'spendable': round(self.spendable(g, year)), 'support': round(support),
+                           'trip': round(trip),
+                           'paid_by': FIN.event_payer(g, ed.series) or (
+                               AS.PAYER if support >= trip else f'golfer and {AS.PAYER}' if support > 0 else 'golfer')}
 
         def ok(gid):
             if not can_play(gid):
@@ -1845,6 +1856,11 @@ class Season:
         state.setdefault('dev_acc', defaultdict(dict))       # development evidence before it was kept: not recorded
         state.setdefault('creations', defaultdict(dict))
         state.setdefault('injury_lasting', defaultdict(dict))   # lasting injury losses before they were kept
+        state.setdefault('week', 0)
+        state.setdefault('am_support', {})                   # saves from before amateur support: none held
+        state.setdefault('am_support_log', defaultdict(list))
+        state.setdefault('am_support_seasons', {})
+        state.setdefault('am_support_held', {})
         state.setdefault('earned', {})                      # rebuilt from results when first needed
         state.setdefault('college', {})                     # college seasons before the ledger: not recorded
         state.setdefault('wr_seed', {})
@@ -1998,7 +2014,7 @@ class Season:
                                                          'amount': round(cost, 2), 'covers': 'travel and entry',
                                                          'source': 'organizer: an earned major place'})
                     elif cost:
-                        self.spend(g_, year, 'events', cost)
+                        self.spend(g_, year, 'events', cost, ed.event_id)
                 k = self.staff.caddie(gid)
                 if k is not None and gid not in self._caddie_paid:   # a weekly retainer: once a week,
                     self._caddie_paid.add(gid)                        # however many events they play
@@ -2214,7 +2230,7 @@ class Season:
                   self.staff_receipts, self.injuries, self.card_log, self.career_counts, self.transitions,
                   self.assignments, self.staff_year, self.unheld, self.rights, self.earned, self.card_reasons, self.snapshots,
                   self.major_rights, self.travel_grants, self.dev_acc, self.creations, self.injury_lasting,
-                  self.rank_top,
+                  self.rank_top, self.am_support_log, self.am_support_seasons, self.am_support_held,
                   self.juniors_added, self.new_pros_added, self.stats, self.moments):
             for y in [y for y in d if isinstance(y, int) and old(y)]:
                 del d[y]
@@ -2273,6 +2289,7 @@ class Season:
                 if gid in self.g:                            # golfer retiring now skips the winter's aging)
                     acc[D.OV_PRE] = self.g[gid].overall
             self.career_counts[year] = careers.decide(self, year, snap)
+            AS.close_season(self, year)                      # (after turning professional and retiring)
             rng = random.Random(_seed(self.seed, year, 'aging'))
             from .golfer import overall_rating
             for g in self.world.golfers:
@@ -2285,6 +2302,10 @@ class Season:
             self.new_pros_added[year + 1] = careers.add_new_professionals(self, year + 1)
             for g in self.world.golfers:
                 self.fatigue[g.id] = g.fatigue = 0.0         # the off-season rests everyone
+        if year not in self.am_support_seasons:
+            AS.close_season(self, year)
+        self.am_support = {}                                 # (unused support lapses: nothing is drawn in winter)
+        self.week = 0
         ST.end_of_season(self, year, snap)                   # coaches' and caddies' year
         self._active = None                                  # retirements and arrivals: rebuilt when next needed
         if self.development:
@@ -2314,6 +2335,7 @@ class Season:
                           if g.status == 'pro' and g.lifestyle != 'retired'}
         self.rank_start[year] = dict(self.wr_pos)
         self.am_start[year] = dict(self.am_pos)
+        AS.open_season(self, year)                           # amateur support: the season's budgets open
         for g in self.world.golfers:                         # backers put up this season's money
             self.start_backing(g, year)
         self.cash_start[year] = {g.id: g.cash for g in self.world.golfers}
@@ -2675,10 +2697,18 @@ class Season:
         setattr(led, field, getattr(led, field) + amount)
         g.cash += amount
 
-    def spend(self, g, year, field, amount):
+    def spend(self, g, year, field, amount, what=None):
+        """A cost: recorded in the ledger and taken from cash in the same step. An amateur's support pays a golf
+        cost first (amateur_support.cover): the cost stays in its line and the support is a matching income line
+        (am_support), so cash moves only by the part the golfer paid."""
         led = self.ledger(year, g.id)
         setattr(led, field, getattr(led, field) + amount)
         g.cash -= amount
+        if self.am_support:
+            paid = AS.cover(self, g, year, field, amount, what)
+            if paid:
+                led.am_support += paid
+                g.cash += paid
 
     def pay_staff(self, g, year, field, person, amount):
         """A payment from a golfer to their coach or caddie: out of the golfer's ledger and into the
@@ -2691,7 +2721,7 @@ class Season:
     def funds(self, g, year):
         """What a golfer could draw on right now: savings, backers, and a limited line of credit."""
         last = self.ledgers.get(year - 1, {}).get(g.id)
-        earned = last.income - last.support - last.backer_support if last else 0.0   # earnings, not handouts
+        earned = (last.income - last.support - last.backer_support - last.am_support) if last else 0.0   # earnings, not handouts
         return g.cash + g.backing + g.backer_funds + FIN.credit_limit(earned)
 
     # The money definitions every decision shares (hiring, the monthly plan, entries, settlement and
@@ -2710,8 +2740,10 @@ class Season:
 
     def spendable(self, g, year):
         """Funds left for golf after setting aside the next few weeks of committed costs and the cost of
-        the entries already accepted this week."""
-        return self.funds(g, year) - FIN.RESERVE_WEEKS * self.committed_weekly(g) - self._reserved.get(g.id, 0.0)
+        the entries already accepted this week, plus what an amateur's support can still pay (restricted to golf
+        costs, and every use of this is a golf decision: entries, the monthly plan, hiring)."""
+        return (self.funds(g, year) - FIN.RESERVE_WEEKS * self.committed_weekly(g) - self._reserved.get(g.id, 0.0)
+                + (AS.left(self, g) if self.am_support else 0.0))    # an amateur's support pays golf costs only
 
     def reserve(self, g, series, city):
         """An accepted entry books its cost against the week's budget at once (paid when played); a major trip

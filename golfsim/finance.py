@@ -211,21 +211,22 @@ def money_unit(available):
 class Ledger:
     """One golfer's money for one year."""
     __slots__ = ('prize', 'sponsors', 'salary', 'work', 'support', 'backer_support', 'events', 'caddie',
-                 'caddie_share', 'coaching', 'coach_share', 'living', 'backer_share', 'moving')
+                 'caddie_share', 'coaching', 'coach_share', 'living', 'backer_share', 'moving', 'am_support')
 
     def __init__(self):
         self.prize = self.sponsors = self.salary = self.work = self.support = self.backer_support = 0.0
         self.events = self.caddie = self.caddie_share = self.coaching = self.coach_share = self.living = 0.0
-        self.backer_share = self.moving = 0.0
+        self.backer_share = self.moving = self.am_support = 0.0
 
     def __setstate__(self, state):                    # ledgers saved before backer shares (or backers'
-        self.backer_share = self.backer_support = self.moving = 0.0   # draws, or moves) existed
+        self.backer_share = self.backer_support = self.moving = self.am_support = 0.0   # draws, moves, support)
         for k, v in (state[1] if isinstance(state, tuple) else state).items():
             setattr(self, k, v)
 
     @property
     def income(self):
-        return self.prize + self.sponsors + self.salary + self.work + self.support + self.backer_support
+        return (self.prize + self.sponsors + self.salary + self.work + self.support + self.backer_support
+                + self.am_support)                     # (amateur support: in kind, it paid golf costs booked below)
 
     @property
     def costs(self):

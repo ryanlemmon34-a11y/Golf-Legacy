@@ -100,6 +100,8 @@ def capture(session):
                                youth=c.youth, clients=c.clients)
             elif getattr(c, 'skills', None):
                 p[kind]['skills'] = {k: round(v, 1) for k, v in c.skills.items()}
+    am_support = {gid: {'band': c['band'], 'cap': c['cap'], 'drawn': round(c['drawn'], 2), 'basis': list(c['basis'])}
+                  for gid, c in getattr(s, 'am_support', {}).items()}
     editions, by_person = {}, defaultdict(list)
     for r in s.results.values():
         if r.year in archived:
@@ -145,7 +147,7 @@ def capture(session):
         rank_top={w_: list(rows) for w_, rows in getattr(s, 'rank_top', {}).get(year, {}).items()},
         wr_seed=dict(getattr(s, 'wr_seed', {})),          # (seeded points: the world's first two seasons only)
         editions=editions, by_person=dict(by_person), schedule=schedule, series=series,
-        coach_of=dict(st.coach_of), caddie_of=dict(st.caddie_of),
+        coach_of=dict(st.coach_of), caddie_of=dict(st.caddie_of), am_support=am_support,
         birth=dict(pl.birth), home=dict(pl.home), first=dict(pl.first),
         moves={k: list(v) for k, v in pl.moves.items()}, courses=courses, tours=tours, records=records,
         prize={gid: led.prize for gid, led in s.ledgers.get(year, {}).items()},

@@ -35,7 +35,9 @@ VERSIONS = (
                    'decided on.'),
     ('2026-11-02', 'An injury announced as n weeks keeps the golfer out of exactly n weeks of entries (it had kept '
                    'them out one week longer). The world\'s first Tour Masters invitations are covered by the '
-                   'major-trip guarantee, as earned places and called-up alternates are.'),
+                   'major-trip guarantee, as earned places and called-up alternates are. Amateur support: amateurs '
+                   'who show success have their golf costs (events, a caddie, a coach) paid in kind up to a season '
+                   'cap by band. Coaches\' teaching and scouting and every golfer\'s Prestige are recorded.'),
 )
 EARLIER = ('Seasons archived before rules versions were recorded were played under earlier rules. The '
            'differences that matter for reading old results: a winner without a Premier card held no '
@@ -235,6 +237,20 @@ RULES = {
         'not a validated real-world baseline. Season, career and tour figures add up the counts and the '
         'opportunities (never averages of averages); seasons before this version show "not recorded".',
         '2026-10-30'),
+    'amateur-support': (
+        'Amateur support',
+        'Amateurs who show success have their golf costs paid in kind -- event travel and entry, a caddie\'s weekly '
+        'fee and a coach\'s fee -- up to a season cap: Band A $25,000 (amateur ranking 1-10; last season\'s USA '
+        'Amateur or Britannia Amateur champion or annual amateur award; a top-25 finish in a major as an amateur), '
+        'Band B $12,000 (ranking 11-50; an earned major place this season; a continental amateur title or the USA '
+        'Mid-Amateur), Band C $5,000 (ranking 51-150; or among the 150 amateurs with the most ranking points won in '
+        'the last 26 weeks). Never cash, living costs or moving; unused support lapses at the season\'s end. The '
+        'budget opens in week 1; a new Band A or B achievement raises it from the next week, and it is never cut '
+        'during a season. Each winter the band is what the facts give but at most one band below the one held '
+        '(A, B, C, none). It ends on turning professional or retiring. A school or club pays its own events first, '
+        'then the support, then the golfer; the organizer pays a major trip only when the two cannot. Starting '
+        'values to test, not proven amounts.',
+        '2026-11-02'),
     'injuries': (
         'Injuries',
         'A golfer can be hurt playing an event; the chance rises with tiredness, age and the rounds played and falls '

@@ -94,14 +94,31 @@ def rights_section(w, year, major):
               'before this was kept.</p>')
 
 
+def support_line(w, pid, lv):
+    """This season's amateur support (the live world), else the last archived season's; '' if none."""
+    O = _o()
+    c = (getattr(lv, 'am_support', None) or {}).get(pid) if lv is not None else None
+    if c is not None:
+        return (f'Band {O.esc(c["band"])}: up to {O.money(c["cap"])} this season for golf costs (events, a caddie, a '
+                f'coach), {O.money(c["drawn"])} used so far · {O.esc("; ".join(c["basis"]))} '
+                '<a href="/rules#amateur-support">rule</a>')
+    import observer_data as OD
+    for y, r in reversed(OD.career_rows(w, pid) if w.a is not None and pid in w.a.people else []):
+        if r.get('am_support_band'):
+            return (f'{y}: Band {O.esc(r["am_support_band"])}, {O.money(r.get("am_support") or 0)} of golf costs paid '
+                    '<a href="/rules#amateur-support">rule</a>')
+    return ''
+
+
 def _place_money(O, r):
     m = r.get('money')
     if not m:
         return NOT_RECORDED
     payer = {'golfer': 'the golfer', 'organizer': 'the organizer (travel and entry)', 'school': 'their school',
              'club': 'their club'}.get(m.get('paid_by'), m.get('paid_by') or '—')
+    support = f' (amateur support {O.money(m["support"])} of it)' if m.get('support') else ''
     return (f'could draw {O.money(m["funds"])} · set aside {O.money(m["set_aside"])} · '
-            f'to spend {O.money(m["spendable"])} · trip {O.money(m["trip"])} · paid by {O.esc(payer)}')
+            f'to spend {O.money(m["spendable"])}{support} · trip {O.money(m["trip"])} · paid by {O.esc(payer)}')
 
 
 def rules_versions(w):
@@ -260,6 +277,9 @@ def status_section(w, pid, p):
     import observer_data as OD
     rows.append(('Status', O.esc(OD.playing_status(gs)[1])))     # (retired, with the status last held)
     rows.append(('Lifestyle', O.esc(LIFESTYLE.get(gs.get('lifestyle'), gs.get('lifestyle') or '—'))))
+    sup = support_line(w, pid, lv)
+    if sup:
+        rows.append(('Amateur support', sup))
     pres = O.golfer_prestige(w, pid, p)
     when = 'now' if lv is not None and lv.people[pid].get('prestige') is not None else 'as the published history ends'
     rows.append(('Prestige', (f'{pres} <span class="muted">of 100, {when}: public standing from the last 52 weeks\' '

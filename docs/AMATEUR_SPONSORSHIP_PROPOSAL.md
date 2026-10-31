@@ -1,7 +1,11 @@
 # Amateur sponsorship: proposed starting settings (for approval)
 
-Status: **proposal, not implemented.** Nothing here changes the simulation until the owner approves it. The
-guaranteed major-trip funding (every earned major place) is separate and does not wait for this decision.
+Status: **implemented as an initial calibration** (rules 2026-11-02, `golfsim/amateur_support.py`), on the owner's
+instruction of 31 October 2026: the three bands are starting values to test, not proven amounts; coaching fees are
+covered alongside entry, travel and caddie costs within the same cap; the ~150 recipients is an estimate, not a
+maximum (title, scouting and renewal routes add recipients). Measured effects are in the pass report. The
+work/part-time pathway for persistently cash-blocked adult amateurs is a separate proposal
+(`docs/AMATEUR_WORK_PATHWAY_PROPOSAL.md`), not implemented. The proposal as approved follows.
 
 ## Evidence it is sized from (the reference world "Test 1 10.30", seasons 2074-2083)
 

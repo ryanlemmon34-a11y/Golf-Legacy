@@ -208,7 +208,10 @@ class ArchiveWriter:
             if led is not None:
                 careers[gid].update({'net': round(led.net), 'income': round(led.income), 'costs': round(led.costs),
                                      'support': round(led.support), 'backer_support': round(led.backer_support),
-                                     'moving': round(led.moving)})
+                                     'moving': round(led.moving), 'am_support': round(led.am_support)})
+            con = getattr(season, 'am_support_seasons', {}).get(year, {}).get(gid)
+            if con is not None:                        # the season's amateur support (rules 2026-11-02)
+                careers[gid]['am_support_band'] = con['band']
             else:
                 careers[gid]['net'] = careers[gid]['net_at_decision']
             g = season.g.get(gid)
@@ -263,6 +266,9 @@ class ArchiveWriter:
         chunk['next_major_rights'] = js(rights.get(year + 1, {}))
         chunk['travel_grants'] = [dict(t) for t in getattr(season, 'travel_grants', {}).get(year, [])]   # major
         # trips the organizer paid (in kind: in no golfer's ledger)
+        # amateur support (rules 2026-11-02): each contract as the season ended -- band, cap, what it drew and on
+        # what (events, caddie, coaching), its basis and upgrades, how it ended
+        chunk['amateur_support'] = {str(g): c for g, c in getattr(season, 'am_support_seasons', {}).get(year, {}).items()}
         # development evidence -- diagnostics only (hidden facts included; never shown to the player): how each
         # golfer arriving this season started, and what each source moved this season (development.SOURCES)
         from . import development as D
