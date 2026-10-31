@@ -85,16 +85,29 @@ class Run:
 
 
 # ---- sections -----------------------------------------------------------------------------------------
+def ended(r):
+    """What the saved state records about how far a run got -- never an inference about segments. A safeguard stop
+    stays in the state whatever happened after it (a resume, or nothing), and a stop on the last requested season
+    looks the same as one followed by a resume; which segments ran, and whether a run is still going, is only what
+    the Provenance section (when given) records."""
+    stop, asked, done = r.d.get('stopped'), r.man.get('years_requested'), len(r.years)
+    got = f'{done} of {asked} requested seasons recorded' if asked else f'{done} seasons recorded'
+    return got + (f'; a guard stop is recorded in the saved state ({stop})' if stop else '')
+
+
 def overview(runs):
     out = ['## The runs', '']
     rows = []
     for r in runs:
         m = r.man
-        stop = r.d.get('stopped')
         rows.append([r.name, r.seed, f'`{str(m.get("commit"))[:10]}`', 'on' if r.d.get('amateur_support', True) else 'off',
                      f'{len(r.years)} ({r.years[0]}-{r.years[-1]})' if r.years else '0',
-                     f'{r.d.get("minutes", 0):.0f} min', stop or 'completed'])
-    out += table(['Run', 'Seed', 'Commit', 'Amateur support', 'Seasons', 'Run time', 'Ended'], rows)
+                     f'{sum(p["skip"] for p in r.d["perf"].values()) / 60:.0f} min', ended(r)])
+    out += table(['Run', 'Seed', 'Commit', 'Amateur support', 'Seasons', 'Season time (sum)', 'Recorded state'], rows)
+    out += ['', 'Season time is the sum of the recorded season skips, whichever segment played them (a resumed run\'s '
+            'wall clock covers its last segment only). The recorded state says how many seasons are recorded and '
+            'whether a guard stop is kept in the saved state; it does not say whether the run was resumed or is still '
+            'running -- the Provenance section, when included, records each segment.']
     m = runs[0].man.get('machine') or {}
     out += ['', f'Machine: {json.dumps(m)}', '']
     return out
@@ -113,11 +126,18 @@ def performance(runs):
             continue
         ys = sorted(p)
         sk = [p[y]['skip'] for y in ys]
-        rows.append([r.name, f(sk[0], 0), f(med(sk), 0), f(max(sk), 0), f(sk[-1], 0),
+        slow = f(max(sk), 0) + (' (above the guard)' if max(sk) > LW.SEASON_LIMIT else '')
+        rows.append([r.name, f(sk[0], 0), f(med(sk), 0), slow, f(sk[-1], 0),
                      f(med([p[y]['simulate'] for y in ys]), 0), f(med([p[y]['save'] + p[y]['publish'] for y in ys]), 1),
                      f(p[ys[-1]]['archive_mb'], 0), f(p[ys[-1]]['checkpoint_mb'], 0)])
     out += table(['Run', 'First season s', 'Median s', 'Slowest s', 'Last s', 'Median simulate s', 'Median save+publish s',
                   'Archive MB at end', 'Checkpoint MB'], rows)
+    over = [f'{r.name} {y} ({r.d["perf"][y]["skip"]:.0f} s)' for r in runs for y in sorted(r.d['perf'])
+            if r.d['perf'][y]['skip'] > LW.SEASON_LIMIT]
+    if over:
+        out += ['', f'Seasons above the {LW.SEASON_LIMIT:.0f} s guard: {", ".join(over)}. The guard stops a run after '
+                'such a season; which segment it was, and what the machine was doing, is recorded under Provenance, when '
+                'given.']
     return out + ['']
 
 
@@ -275,40 +295,79 @@ def standing_band(rank):
     return next(label for lo, hi, label in STANDING if lo <= rank <= hi)
 
 
+def share(n, d):
+    """'n / d (x%)': a count with its denominator, '—' when there is none."""
+    return f'{n:,} / {d:,} ({n / d:.1%})' if d else '—'
+
+
 def breakdowns(b, c):
-    """F1.h: the support comparison and zero-start seasons by age and by amateur standing at the season's end, both
-    arms, from each season's recorded amateur rows (read only)."""
+    """F1.h: the support comparison, starts and financial exclusion by age and by amateur standing at the season's
+    end, both arms, from each season's recorded amateur rows (read only). Every rate shows its denominator."""
     out = [f'### By age and by amateur standing (runs {b.name} and {c.name})', '',
-           'Every amateur season of every recorded season, grouped by age and by the amateur ranking at the season\'s '
-           'end; support columns are run ' + b.name + '\'s (run ' + c.name + ' has none by design).', '']
+           'Every amateur golfer-season of every recorded season (golfer-seasons, not unique people), grouped by age '
+           'and by the amateur ranking at the season\'s end. Starting no event is not the same as being priced out, so '
+           'the two are counted apart:', '',
+           '- **No start**: no event entered all season (any reason), of all amateur golfer-seasons (including those '
+           'who took work by the pathway during the season).',
+           '- **Cash-blocked** (financial exclusion): at least one week counted as "could not afford any event" -- '
+           'eligible for an event that week and not one of them affordable from spendable funds, support included. '
+           'Counted only for full-time amateurs outside college (the work pathway\'s ledger), so its denominator is '
+           '**tracked**: golfer-seasons that ended full-time and outside college. A golfer who took work by the '
+           'pathway during the season ended it part-time, so is not tracked; those conversions are counted in their '
+           'own column (and in total below).',
+           '- **Count 8+**: the cash-blocked count reached 8 during the season (injury and calendar gaps pause it, an '
+           'affordable week resets it; it can carry weeks over from the winter before).',
+           '- **No start, cash-blocked** / **no start, never cash-blocked**: tracked seasons with no start, split by '
+           'whether any week was counted as unaffordable.',
+           f'- Support columns are run {b.name}\'s (run {c.name} has none by design).', '',
+           f'Reading {b.name} against {c.name}: the same seed and rules with support the only intended difference, but '
+           f'support can change a golfer\'s results, amateur rank and status, so a group (by year-end rank especially) '
+           f'need not hold comparable golfers in the two runs. The differences are supportive evidence about support, '
+           f'not a paired-person causal estimate.', '']
+    cap = {'A': 25000, 'B': 12000, 'C': 5000}
     for title, key in (('Age', lambda v: age_band(v[0])), ('Amateur standing', lambda v: standing_band(v[3]))):
-        agg = {run.name: defaultdict(list) for run in (b, c)}
-        sup = defaultdict(lambda: [0, 0, 0])                    # group -> supported seasons, drawn, cap exhausted
-        cap = {'A': 25000, 'B': 12000, 'C': 5000}
+        agg = {run.name: defaultdict(lambda: [0] * 9) for run in (b, c)}
         for run in (b, c):
             for y in run.years:
                 for v in run.amateurs(y).values():
-                    k = key(v)
-                    agg[run.name][k].append(v[4])
+                    a = agg[run.name][key(v)]
+                    tracked = v[1] == 'full_time' and not v[2]
+                    a[0] += 1                                   # amateur-seasons
+                    a[1] += v[4] == 0                           # no start
+                    a[2] += tracked
+                    a[3] += tracked and v[5] >= 1               # cash-blocked at least one week
+                    a[4] += tracked and v[5] >= 8
+                    a[5] += tracked and v[4] == 0 and v[5] >= 1
+                    a[6] += tracked and v[4] == 0 and v[5] == 0
                     if run is b and v[6]:
-                        sup[k][0] += 1
-                        sup[k][1] += v[7]
-                        sup[k][2] += v[7] >= 0.98 * cap[v[6]]
+                        a[7] += 1
+                    a[8] += v[9] is not None                    # took work by the pathway (not tracked)
+        drawn = defaultdict(lambda: [0, 0])                     # group -> drawn, cap used up (run b)
+        for y in b.years:
+            for v in b.amateurs(y).values():
+                if v[6]:
+                    drawn[key(v)][0] += v[7]
+                    drawn[key(v)][1] += v[7] >= 0.98 * cap[v[6]]
         order = [label for *_, label in (AGE_BANDS if title == 'Age' else STANDING)] + (['unranked'] if title != 'Age' else [])
         rows = []
         for k in order:
-            xb, xc = agg[b.name].get(k, []), agg[c.name].get(k, [])
-            if not xb and not xc:
-                continue
-            s_ = sup[k]
-            rows.append([k, len(xb), f(S.mean(xb) if xb else None), f'{sum(1 for e in xb if e == 0) / len(xb):.1%}' if xb else '—',
-                         f'{s_[0] / len(xb):.0%}' if xb else '—', f'${s_[1] / s_[0]:,.0f}' if s_[0] else '—',
-                         f'{s_[2] / s_[0]:.0%}' if s_[0] else '—',
-                         len(xc), f(S.mean(xc) if xc else None), f'{sum(1 for e in xc if e == 0) / len(xc):.1%}' if xc else '—'])
+            for run in (b, c):
+                a = agg[run.name].get(k)
+                if not a or not a[0]:
+                    continue
+                sup = run is b
+                rows.append([k, run.name, f'{a[0]:,}', share(a[1], a[0]), f'{a[2]:,}', f'{a[8]:,}', share(a[3], a[2]),
+                             share(a[4], a[2]), share(a[5], a[2]), share(a[6], a[2]),
+                             share(a[7], a[0]) if sup else '—',
+                             f'${drawn[k][0] / a[7]:,.0f}' if sup and a[7] else '—',
+                             share(drawn[k][1], a[7]) if sup else '—'])
         out += [f'**{title}**', '']
-        out += table([title, f'{b.name} amateur-seasons', f'{b.name} events', f'{b.name} no start', f'{b.name} supported',
-                      f'{b.name} mean drawn', f'{b.name} cap used up', f'{c.name} amateur-seasons', f'{c.name} events',
-                      f'{c.name} no start'], rows) + ['']
+        out += table([title, 'Run', 'Amateur golfer-seasons', 'No start', 'Tracked (season-end full-time, not college)',
+                      'Took work by the pathway (not tracked)', 'Cash-blocked 1+ week', 'Count 8+', 'No start, cash-blocked', 'No start, never cash-blocked',
+                      'Supported', 'Mean drawn', 'Cap used up (of supported)'], rows) + ['']
+    conv = {run.name: sum(v[9] is not None for y in run.years for v in run.amateurs(y).values()) for run in (b, c)}
+    out += [f'Pathway conversions excluded from the tracked denominators: {b.name} {conv[b.name]:,}, '
+            f'{c.name} {conv[c.name]:,} golfer-seasons.', '']
     return out
 
 
@@ -428,6 +487,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--run', action='append', required=True, help='NAME=<folder>:<seed>')
     ap.add_argument('--out', required=True)
+    ap.add_argument('--provenance', help='a Markdown file of the runs\' segments (start, end, how each ended), '
+                    'included verbatim')
     a = ap.parse_args()
     runs = []
     for spec in a.run:
@@ -441,6 +502,9 @@ def main():
     if 'B' in by and 'C' in by:
         out += support(by['B'], by['C'])
     out += pathway(runs)
+    if a.provenance:
+        text = Path(a.provenance).read_text().strip().splitlines()
+        out += ['## Provenance', ''] + [('#' + x if x.startswith('# ') else x) for x in text] + ['']
     Path(a.out).write_text('\n'.join(out) + '\n')
     print('wrote', a.out)
 
