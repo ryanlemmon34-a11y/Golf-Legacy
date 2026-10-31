@@ -15,7 +15,7 @@ continued; no multi-hour run was started.
 | 4. Long histories | `17c673b` | No | A world's index validated and missing or stale seasons rebuilt on opening; a side index outside the folder for read-only histories; exports include the index by default |
 | 5. Coaches and Prestige | `32bc43d` | No (shown identical) | Coach teaching and scouting shown and recorded each season; Prestige for every golfer (profile, season rows, sortable directory) and for coaches and caddies (their reputation, by role); recruitment design note |
 | 6. Amateur support | `138ce06` | **Yes** | Bands A/B/C ($25k/$12k/$5k) as an initial calibration, in kind for events, caddie and coaching; observable eligibility; week-1 budget, in-season A/B upgrades, one-band renewal decline; ends on turning pro or retiring; payment order school/club, support, golfer, organizer; every payment recorded; measured over three seasons |
-| 7. Reconciliation and validation | this commit | No | Roadmap status (`docs/BACKLOG.md`), long-run plan for approval (`docs/LONG_RUN_PLAN.md`), this report |
+| 7. Reconciliation and validation | `9f8525b`, `6a9e065`, `e615b2e`, this commit | No (`e615b2e`: archive fix) | Roadmap status (`docs/BACKLOG.md`), long-run plan for approval (`docs/LONG_RUN_PLAN.md`), this report |
 
 ## Amateur support, measured (initial calibration)
 
@@ -50,7 +50,24 @@ Built once, in the background, separately from page loads: the side index 246 s 
 Grand Slam under 0.01 s. The index is about 1.6 times the size of the season files; exports that include it are
 larger accordingly.
 
-*Validation: the full suite is running on `27e92b4`; results are added when it finishes.*
+## Validation (staged)
+
+1. **Focused tests per package**, each run before its commit: injury timing 3, major funding 11, living views 15,
+   qualification windows 10, observer app 12, history access 4, amateur support 12, plus the modules each package
+   touched (season, finance, development evidence, access ledger, realism, zero-start regions, comparisons, GOAT
+   peaks, history index and consistency, observer history, peak Overall, cohorts, My World). Outcome identity for
+   package 5: identical digests in every outcome part over 16 weeks across a season end (153 events).
+2. **Full suite on `27e92b4`** (54 modules): 50 passed, 4 failed. Two were tests tied to the old behaviour (the major
+   places' money identity now includes amateur support; a test world no longer holding a retired professional),
+   fixed in `9f8525b` and `6a9e065`. Two (`test_session`, `test_residence`) found a real defect introduced by
+   `138ce06`: a misplaced line split an if/else in the archive, so a season row's settled net lost a winter move's
+   cost for golfers without support. Bisected across this pass's commits (only `138ce06` failed) and fixed in
+   `e615b2e` (archive only).
+3. **Full suite on `e615b2e`** (the last commit with code; later commits change documents only): **54 modules,
+   573 tests, all passed, 1 skipped by design** (`test_observer_profiles`, as before); 18 minutes on 4 CPUs.
+
+**Not tested**: browsers other than Chromium, and no wide-screen re-measure this pass (the new Prestige, coach
+and support rows are table and list rows on pages measured last pass); small screens (deferred); the long runs.
 
 ## Remaining defects and gaps (not claimed as done)
 
