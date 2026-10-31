@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import sys
 import unittest
+from unittest import mock
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -164,6 +165,25 @@ class PathwayAgeInForce(unittest.TestCase):
         out = '\n'.join(DR.pathway([self.fake('B')]))
         self.assertIn('under 21', out)
         self.assertIn('eligible (21+, outside the top 300', out)
+
+
+class SeasonFilesTrimmed(unittest.TestCase):
+    """A long run's season files are not all kept decoded (45 mature seasons exceeded 12 GB): Run.season keeps only
+    the development diagnostics the report uses, read once per season."""
+
+    def test_only_the_development_diagnostics_are_kept(self):
+        import golfsim.archive as A
+        from types import SimpleNamespace as NS
+        reads = []
+        big = {'events': ['x' * 1000] * 100, 'diagnostics': {'development': {'7': [1, 2]}, 'access': {'big': 1}}}
+        r = NS(dir=Path('/nowhere'), seed=1, _seasons={})
+        with mock.patch.object(A, 'read_manifest', lambda a: {'files': {'years': {'2030': 'years/2030.g1.json.gz'}}}), \
+                mock.patch.object(A, '_read', lambda p: reads.append(p) or big):
+            got = DR.Run.season(r, 2030)
+            again = DR.Run.season(r, 2030)
+        self.assertEqual(got, {'diagnostics': {'development': {'7': [1, 2]}}})
+        self.assertIs(got, again)
+        self.assertEqual(len(reads), 1)                                 # read once
 
 
 if __name__ == '__main__':

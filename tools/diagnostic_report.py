@@ -62,13 +62,17 @@ class Run:
         self._seasons = {}
 
     def season(self, y):
-        """The archived season file (development diagnostics), read once."""
+        """The parts of an archived season file the report uses (its development diagnostics), read once. Only those
+        parts are kept: a long run's season files decoded together would not fit in memory (45 mature seasons
+        exceeded 12 GB), so each file is read, trimmed and released in turn."""
         if y not in self._seasons:
             from golfsim.archive import _read, read_manifest
             a = self.dir / f'world_{self.seed}' / 'archive'
             man = read_manifest(a) or {}
             f = man.get('files', {}).get('years', {}).get(str(y)) or man.get('files', {}).get('years', {}).get(y)
-            self._seasons[y] = _read(a / f) if f else {}
+            data = _read(a / f) if f else {}
+            self._seasons[y] = {'diagnostics': {'development': (data.get('diagnostics') or {}).get('development', {})}}
+            del data
         return self._seasons[y]
 
     def amateurs(self, y):
