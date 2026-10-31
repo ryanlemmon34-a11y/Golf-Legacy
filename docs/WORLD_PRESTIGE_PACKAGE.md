@@ -117,7 +117,77 @@ also with real draws).
 
 ### Starting shares (actual values)
 
-STARTING_TABLE
+From the starting nation profiles (`nations.py`), by `Participation(nations(), 2027).starting_table()` (numerical
+integration, no random draws; the same for every seed). Expected golfers a year under the existing rule: juniors
+298.7, new professionals 428.5. For comparison, the existing rule's realised totals for seed 2027, 2028-2037:
+juniors 269, 302, 295, 303, 297, 295, 310, 286, 271, 297 (mean 292.5); new professionals 458, 462, 399, 450, 443,
+422, 464, 438, 441, 439 (mean 441.6). (Those means are within about one and two standard errors of the
+expected totals respectively; the longer check is `Baseline.test_expected_shares_match_the_existing_rule`,
+not yet run -- see section 6.)
+
+| Nation | Pool | Dev | Juniors share | Juniors expected/yr | New pros share | New pros expected/yr |
+|---|---|---|---|---|---|---|
+| USA | 100 | 63.5 | 33.59% | 100.4 | 33.85% | 145.1 |
+| Japan | 40 | 56.5 | 8.17% | 24.4 | 8.01% | 34.3 |
+| England | 22 | 64 | 7.65% | 22.9 | 7.71% | 33.1 |
+| Australia | 16 | 63 | 5.19% | 15.5 | 5.23% | 22.4 |
+| South Korea | 18 | 60.5 | 4.90% | 14.6 | 4.90% | 21.0 |
+| South Africa | 10 | 66 | 3.98% | 11.9 | 4.02% | 17.2 |
+| Canada | 13 | 60 | 3.41% | 10.2 | 3.41% | 14.6 |
+| Sweden | 7 | 64.5 | 2.52% | 7.5 | 2.54% | 10.9 |
+| Scotland | 8 | 62.5 | 2.50% | 7.5 | 2.52% | 10.8 |
+| France | 9 | 60.5 | 2.45% | 7.3 | 2.45% | 10.5 |
+| Spain | 7 | 63 | 2.28% | 6.8 | 2.29% | 9.8 |
+| China | 10 | 56 | 1.97% | 5.9 | 1.93% | 8.3 |
+| Germany | 9 | 56.5 | 1.84% | 5.5 | 1.80% | 7.7 |
+| Denmark | 4 | 67 | 1.70% | 5.1 | 1.72% | 7.4 |
+| Ireland | 6 | 60.5 | 1.64% | 4.9 | 1.63% | 7.0 |
+| Thailand | 5 | 61 | 1.41% | 4.2 | 1.41% | 6.1 |
+| India | 6 | 55 | 1.10% | 3.3 | 1.07% | 4.6 |
+| Norway | 2.5 | 66 | 1.00% | 3.0 | 1.01% | 4.3 |
+| Argentina | 3 | 63 | 0.97% | 2.9 | 0.98% | 4.2 |
+| Italy | 3.5 | 60 | 0.92% | 2.8 | 0.92% | 3.9 |
+| Mexico | 3.5 | 60 | 0.92% | 2.8 | 0.92% | 3.9 |
+| New Zealand | 3 | 62 | 0.90% | 2.7 | 0.91% | 3.9 |
+| Northern Ireland | 2.5 | 64 | 0.87% | 2.6 | 0.88% | 3.8 |
+| Netherlands | 3.5 | 58 | 0.80% | 2.4 | 0.79% | 3.4 |
+| Belgium | 2 | 64 | 0.70% | 2.1 | 0.70% | 3.0 |
+| Finland | 2 | 63 | 0.65% | 2.0 | 0.65% | 2.8 |
+| Taiwan | 3 | 56.5 | 0.61% | 1.8 | 0.60% | 2.6 |
+| Wales | 2.5 | 58 | 0.57% | 1.7 | 0.56% | 2.4 |
+| Austria | 2 | 61 | 0.57% | 1.7 | 0.57% | 2.4 |
+| Colombia | 1.8 | 60.5 | 0.49% | 1.5 | 0.49% | 2.1 |
+| Philippines | 2.2 | 56 | 0.43% | 1.3 | 0.42% | 1.8 |
+| Chile | 1.5 | 61 | 0.42% | 1.3 | 0.42% | 1.8 |
+| Switzerland | 2 | 54 | 0.34% | 1.0 | 0.33% | 1.4 |
+| Malaysia | 2 | 53 | 0.32% | 0.9 | 0.30% | 1.3 |
+| Zimbabwe | 1 | 61 | 0.28% | 0.8 | 0.28% | 1.2 |
+| Portugal | 1.5 | 52 | 0.22% | 0.7 | 0.21% | 0.9 |
+| Brazil | 1.5 | 50 | 0.19% | 0.6 | 0.18% | 0.8 |
+| Kenya | 1.2 | 52 | 0.18% | 0.5 | 0.17% | 0.7 |
+| Indonesia | 1.5 | 49 | 0.17% | 0.5 | 0.16% | 0.7 |
+| Czechia | 1.2 | 50 | 0.15% | 0.5 | 0.14% | 0.6 |
+| Singapore | 1 | 52 | 0.15% | 0.4 | 0.14% | 0.6 |
+| Vietnam | 1.2 | 46 | 0.11% | 0.3 | 0.10% | 0.4 |
+| United Arab Emirates | 0.8 | 50 | 0.10% | 0.3 | 0.09% | 0.4 |
+| Morocco | 0.8 | 48 | 0.09% | 0.3 | 0.08% | 0.3 |
+| Poland | 0.8 | 46 | 0.07% | 0.2 | 0.07% | 0.3 |
+| Peru | 0.6 | 48 | 0.06% | 0.2 | 0.06% | 0.3 |
+| Namibia | 0.4 | 52 | 0.06% | 0.2 | 0.06% | 0.2 |
+| Nigeria | 0.6 | 45 | 0.05% | 0.1 | 0.04% | 0.2 |
+| Egypt | 0.6 | 44 | 0.05% | 0.1 | 0.04% | 0.2 |
+| Fiji | 0.3 | 52 | 0.05% | 0.1 | 0.04% | 0.2 |
+| Zambia | 0.4 | 48 | 0.04% | 0.1 | 0.04% | 0.2 |
+| Saudi Arabia | 0.5 | 46 | 0.04% | 0.1 | 0.04% | 0.2 |
+| Turkey | 0.6 | 42 | 0.04% | 0.1 | 0.03% | 0.1 |
+| Mauritius | 0.3 | 48 | 0.03% | 0.1 | 0.03% | 0.1 |
+| Qatar | 0.3 | 45 | 0.03% | 0.1 | 0.02% | 0.1 |
+| Bahrain | 0.2 | 44 | 0.02% | 0.0 | 0.01% | 0.1 |
+| Oman | 0.2 | 44 | 0.02% | 0.0 | 0.01% | 0.1 |
+
+Read with the bounds: a nation with 0.05 % of the juniors (about one junior every seven years) at the
+maximum multiplier 4 has about 0.2 %, about one every two years; the USA at 0.25 would fall from 33.6 % to about
+11 % if the rest of the world stayed at 1.
 
 ## 4. Saves, rules, archive, observer
 
@@ -139,14 +209,54 @@ STARTING_TABLE
 
 ## 5. Measurement (small scale)
 
-MEASUREMENTS
+**Not run yet.** A machine-wide CPU hold stopped all simulations and measurements while this package was
+written. The script is ready (it reports, per season on two seeds at `scale=0.05`: cohort totals, event prestige
+moves and how many hit the 6-point limit, majors' prestige, mean course prestige, the top shares and the
+biggest multiplier movers, plus a calibration table of actual against expected fame by Overall band for the
+expectation model). No results are claimed here until it has run.
 
-## 6. Open questions
+## 6. What has and has not been run (state of this commit)
+
+Written under a CPU hold: only tiny unit tests were allowed, at `nice -n 19`.
+
+**Run, passing (13 tests, under a second each):**
+
+```
+python -m unittest tests.test_world_prestige.EventWindow tests.test_world_prestige.CourseLag \
+  tests.test_nation_shares.SmoothingAndBounds \
+  tests.test_nation_shares.TotalsAndAllocation.test_allocation_sums_and_is_reproducible \
+  tests.test_nation_shares.TotalsAndAllocation.test_shares_sum_to_one \
+  tests.test_nation_shares.TotalsAndAllocation.test_a_rising_nation_gains_exactly_what_the_others_lose \
+  tests.test_nation_shares.TalentUnchanged.test_the_draw_code_never_reads_prestige_or_shares -v
+```
+
+These include the owner's D7 acceptance example
+(`test_a_rising_nation_gains_exactly_what_the_others_lose`): a nation holding 1 of 100 places has its multiplier
+doubled, gets 2, the total stays 100 and the others lose exactly 1 between them, none gaining; then the same
+with real junior draws for one year (the total is unchanged and the other nations lose exactly the nation's
+gain). Also run: the starting-share table above (numerical integration) and ten years of the existing rule's
+realised totals.
+
+**Not run yet** (they need cohort draws or season simulation; to run once the hold is lifted):
+
+* Light (seconds, cohort draws only, no season): the rest of `tests.test_nation_shares` --
+  `TotalsAndAllocation.test_the_total_is_the_existing_rules_whatever_the_shares`,
+  `TotalsAndAllocation.test_existing_rule_draws_are_reused_exactly`, `TalentUnchanged` (two cohort tests),
+  `Baseline` (15 years of juniors and 4 of new professionals against the expected shares).
+* Medium: `tests.test_nation_shares.InTheWorld` (builds a 0.05-scale Season and pickles it: deterministic
+  resume, nationality unchanged).
+* Heavy (a simulated season or more): `tests.test_world_prestige.InASession` (one season and three weeks,
+  archive record and every observer view), and the existing modules touched: `tests.test_season`,
+  `tests.test_population`, `tests.test_development`, `tests.test_amateur_residence`,
+  `tests.test_history_consistency`, `tests.test_observer_history`, `tests.test_living_views`.
+* The two-seed measurement (section 5).
+
+## 7. Open questions
 
 1. Expectation model: half field presence, half ability (`EXPECT_SKILL`, `EXPECT_TAU`). Pure ability-based
    expectation would leave shares near baseline (success beyond a rating-based expectation is mostly noise);
    pure field presence would turn development differences into a steady drift of shares toward high-
-   development nations. The half/half blend is a proposal; the calibration table in section 5 shows how well
+   development nations. The half/half blend is a proposal; the calibration table in section 5 (once run) will show how well
    the ability half fits.
 2. The bounds 0.25-4 and the 10 % step: the owner's call on how far and how fast.
 3. The venue-selection link (section 2) is proposed, not built.

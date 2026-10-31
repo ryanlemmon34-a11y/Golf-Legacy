@@ -202,7 +202,8 @@ class SmoothingAndBounds(unittest.TestCase):
             pt.success[y][c] = [3000.0, 300.0]
             pt.close_season(y)
             hist = pt.history[y + 1]
-            self.assertAlmostEqual(sum(hist['shares']['juniors'].values()), 1.0, places=5)
+            self.assertAlmostEqual(sum(hist['shares']['juniors'].values()), 1.0, places=4)   # (recorded rounded)
+            self.assertAlmostEqual(sum(pt.shares('juniors').values()), 1.0, places=12)
         self.assertEqual(pt.multiplier[c], PT.MULT_MAX)
         self.assertGreater(pt.shares('juniors')[c] / start, 3.5)
 
