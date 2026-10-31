@@ -1,0 +1,556 @@
+{
+ "archive": "runs/A/world_360013/archive",
+ "mirror": "armsan/story_mirror/60e05d28ff57/archive",
+ "build": "arms/build_c0d1ea5",
+ "archive_generation": 45,
+ "seasons": [
+  2027,
+  2071,
+  45
+ ],
+ "started": "2026-10-31 11:03:14",
+ "archive_build": "473690a1541c046e5462085db2ae044454a6c451",
+ "side_index": {
+  "built": true,
+  "seconds": 218.07391089200064,
+  "bytes": 1054089216,
+  "child_peak_mb": 402.48828125
+ },
+ "world_open_s": 6.04,
+ "world_open_rss_mb": 502,
+ "latest_first": {
+  "event": "2071:BRITANNIA_OPEN",
+  "first_s": 3.079,
+  "pending": true,
+  "indexer_s": 102.0,
+  "indexer_done": true,
+  "reopened_s": 0.076,
+  "reopened_pending": false,
+  "children_peak_mb": 758,
+  "rss_mb": 716
+ },
+ "background_story_index_wait_s": 0.0,
+ "background_story_index_done": true,
+ "children_peak_mb": 758,
+ "passes": {
+  "1 cold, as first opened": {
+   "rows": [
+    {
+     "event": "2027:TOUR_MASTERS",
+     "seconds": 1.973,
+     "pending": false,
+     "rss_mb": 684
+    },
+    {
+     "event": "2029:PREMIER_TOUR_CHAMPIONSHIP",
+     "seconds": 5.052,
+     "pending": false,
+     "rss_mb": 1170
+    },
+    {
+     "event": "2032:USA_OPEN",
+     "seconds": 7.263,
+     "pending": false,
+     "rss_mb": 1518
+    },
+    {
+     "event": "2034:BRITANNIA_OPEN",
+     "seconds": 6.209,
+     "pending": false,
+     "rss_mb": 1574
+    },
+    {
+     "event": "2036:TOUR_MASTERS",
+     "seconds": 4.035,
+     "pending": false,
+     "rss_mb": 1746
+    },
+    {
+     "event": "2039:PREMIER_TOUR_CHAMPIONSHIP",
+     "seconds": 8.525,
+     "pending": false,
+     "rss_mb": 1783
+    },
+    {
+     "event": "2041:USA_OPEN",
+     "seconds": 5.752,
+     "pending": false,
+     "rss_mb": 1909
+    },
+    {
+     "event": "2043:BRITANNIA_OPEN",
+     "seconds": 6.292,
+     "pending": false,
+     "rss_mb": 1941
+    },
+    {
+     "event": "2046:TOUR_MASTERS",
+     "seconds": 9.3,
+     "pending": false,
+     "rss_mb": 2059
+    },
+    {
+     "event": "2048:PREMIER_TOUR_CHAMPIONSHIP",
+     "seconds": 6.751,
+     "pending": false,
+     "rss_mb": 2087
+    },
+    {
+     "event": "2050:USA_OPEN",
+     "seconds": 5.177,
+     "pending": false,
+     "rss_mb": 2141
+    },
+    {
+     "event": "2052:BRITANNIA_OPEN",
+     "seconds": 7.621,
+     "pending": false,
+     "rss_mb": 2182
+    },
+    {
+     "event": "2055:TOUR_MASTERS",
+     "seconds": 10.983,
+     "pending": false,
+     "rss_mb": 2196
+    },
+    {
+     "event": "2057:PREMIER_TOUR_CHAMPIONSHIP",
+     "seconds": 7.98,
+     "pending": false,
+     "rss_mb": 2234
+    },
+    {
+     "event": "2059:USA_OPEN",
+     "seconds": 8.101,
+     "pending": false,
+     "rss_mb": 2263
+    },
+    {
+     "event": "2062:BRITANNIA_OPEN",
+     "seconds": 10.036,
+     "pending": false,
+     "rss_mb": 2319
+    },
+    {
+     "event": "2064:TOUR_MASTERS",
+     "seconds": 4.914,
+     "pending": false,
+     "rss_mb": 2345
+    },
+    {
+     "event": "2066:PREMIER_TOUR_CHAMPIONSHIP",
+     "seconds": 8.22,
+     "pending": false,
+     "rss_mb": 2392
+    },
+    {
+     "event": "2069:USA_OPEN",
+     "seconds": 11.85,
+     "pending": false,
+     "rss_mb": 2428
+    },
+    {
+     "event": "2071:BRITANNIA_OPEN",
+     "seconds": 7.681,
+     "pending": false,
+     "rss_mb": 2472
+    }
+   ],
+   "peak_mb": 2646,
+   "total_s": 143.72
+  },
+  "2 cold facts, story index complete": {
+   "rows": [
+    {
+     "event": "2027:TOUR_MASTERS",
+     "seconds": 0.082,
+     "pending": false,
+     "rss_mb": 2322
+    },
+    {
+     "event": "2029:PREMIER_TOUR_CHAMPIONSHIP",
+     "seconds": 0.089,
+     "pending": false,
+     "rss_mb": 2322
+    },
+    {
+     "event": "2032:USA_OPEN",
+     "seconds": 0.074,
+     "pending": false,
+     "rss_mb": 2322
+    },
+    {
+     "event": "2034:BRITANNIA_OPEN",
+     "seconds": 0.082,
+     "pending": false,
+     "rss_mb": 2322
+    },
+    {
+     "event": "2036:TOUR_MASTERS",
+     "seconds": 0.072,
+     "pending": false,
+     "rss_mb": 2322
+    },
+    {
+     "event": "2039:PREMIER_TOUR_CHAMPIONSHIP",
+     "seconds": 0.077,
+     "pending": false,
+     "rss_mb": 2322
+    },
+    {
+     "event": "2041:USA_OPEN",
+     "seconds": 0.182,
+     "pending": false,
+     "rss_mb": 2322
+    },
+    {
+     "event": "2043:BRITANNIA_OPEN",
+     "seconds": 0.128,
+     "pending": false,
+     "rss_mb": 2322
+    },
+    {
+     "event": "2046:TOUR_MASTERS",
+     "seconds": 0.078,
+     "pending": false,
+     "rss_mb": 2322
+    },
+    {
+     "event": "2048:PREMIER_TOUR_CHAMPIONSHIP",
+     "seconds": 0.109,
+     "pending": false,
+     "rss_mb": 2322
+    },
+    {
+     "event": "2050:USA_OPEN",
+     "seconds": 0.092,
+     "pending": false,
+     "rss_mb": 2322
+    },
+    {
+     "event": "2052:BRITANNIA_OPEN",
+     "seconds": 0.124,
+     "pending": false,
+     "rss_mb": 2322
+    },
+    {
+     "event": "2055:TOUR_MASTERS",
+     "seconds": 0.109,
+     "pending": false,
+     "rss_mb": 2322
+    },
+    {
+     "event": "2057:PREMIER_TOUR_CHAMPIONSHIP",
+     "seconds": 0.137,
+     "pending": false,
+     "rss_mb": 2322
+    },
+    {
+     "event": "2059:USA_OPEN",
+     "seconds": 0.126,
+     "pending": false,
+     "rss_mb": 2322
+    },
+    {
+     "event": "2062:BRITANNIA_OPEN",
+     "seconds": 0.096,
+     "pending": false,
+     "rss_mb": 2322
+    },
+    {
+     "event": "2064:TOUR_MASTERS",
+     "seconds": 0.125,
+     "pending": false,
+     "rss_mb": 2322
+    },
+    {
+     "event": "2066:PREMIER_TOUR_CHAMPIONSHIP",
+     "seconds": 0.118,
+     "pending": false,
+     "rss_mb": 2322
+    },
+    {
+     "event": "2069:USA_OPEN",
+     "seconds": 0.273,
+     "pending": false,
+     "rss_mb": 2322
+    },
+    {
+     "event": "2071:BRITANNIA_OPEN",
+     "seconds": 0.094,
+     "pending": false,
+     "rss_mb": 2322
+    }
+   ],
+   "peak_mb": 2646,
+   "total_s": 2.27
+  },
+  "3 warm (disk)": {
+   "rows": [
+    {
+     "event": "2027:TOUR_MASTERS",
+     "seconds": 0.001,
+     "pending": false,
+     "rss_mb": 2322
+    },
+    {
+     "event": "2029:PREMIER_TOUR_CHAMPIONSHIP",
+     "seconds": 0.001,
+     "pending": false,
+     "rss_mb": 2322
+    },
+    {
+     "event": "2032:USA_OPEN",
+     "seconds": 0.001,
+     "pending": false,
+     "rss_mb": 2322
+    },
+    {
+     "event": "2034:BRITANNIA_OPEN",
+     "seconds": 0.001,
+     "pending": false,
+     "rss_mb": 2322
+    },
+    {
+     "event": "2036:TOUR_MASTERS",
+     "seconds": 0.001,
+     "pending": false,
+     "rss_mb": 2322
+    },
+    {
+     "event": "2039:PREMIER_TOUR_CHAMPIONSHIP",
+     "seconds": 0.001,
+     "pending": false,
+     "rss_mb": 2322
+    },
+    {
+     "event": "2041:USA_OPEN",
+     "seconds": 0.001,
+     "pending": false,
+     "rss_mb": 2322
+    },
+    {
+     "event": "2043:BRITANNIA_OPEN",
+     "seconds": 0.001,
+     "pending": false,
+     "rss_mb": 2322
+    },
+    {
+     "event": "2046:TOUR_MASTERS",
+     "seconds": 0.001,
+     "pending": false,
+     "rss_mb": 2322
+    },
+    {
+     "event": "2048:PREMIER_TOUR_CHAMPIONSHIP",
+     "seconds": 0.001,
+     "pending": false,
+     "rss_mb": 2322
+    },
+    {
+     "event": "2050:USA_OPEN",
+     "seconds": 0.001,
+     "pending": false,
+     "rss_mb": 2322
+    },
+    {
+     "event": "2052:BRITANNIA_OPEN",
+     "seconds": 0.001,
+     "pending": false,
+     "rss_mb": 2322
+    },
+    {
+     "event": "2055:TOUR_MASTERS",
+     "seconds": 0.001,
+     "pending": false,
+     "rss_mb": 2322
+    },
+    {
+     "event": "2057:PREMIER_TOUR_CHAMPIONSHIP",
+     "seconds": 0.001,
+     "pending": false,
+     "rss_mb": 2322
+    },
+    {
+     "event": "2059:USA_OPEN",
+     "seconds": 0.001,
+     "pending": false,
+     "rss_mb": 2322
+    },
+    {
+     "event": "2062:BRITANNIA_OPEN",
+     "seconds": 0.001,
+     "pending": false,
+     "rss_mb": 2322
+    },
+    {
+     "event": "2064:TOUR_MASTERS",
+     "seconds": 0.001,
+     "pending": false,
+     "rss_mb": 2322
+    },
+    {
+     "event": "2066:PREMIER_TOUR_CHAMPIONSHIP",
+     "seconds": 0.001,
+     "pending": false,
+     "rss_mb": 2322
+    },
+    {
+     "event": "2069:USA_OPEN",
+     "seconds": 0.002,
+     "pending": false,
+     "rss_mb": 2322
+    },
+    {
+     "event": "2071:BRITANNIA_OPEN",
+     "seconds": 0.001,
+     "pending": false,
+     "rss_mb": 2322
+    }
+   ],
+   "peak_mb": 2646,
+   "total_s": 0.02
+  },
+  "4 warm (memory)": {
+   "rows": [
+    {
+     "event": "2027:TOUR_MASTERS",
+     "seconds": 0.0,
+     "pending": false,
+     "rss_mb": 2322
+    },
+    {
+     "event": "2029:PREMIER_TOUR_CHAMPIONSHIP",
+     "seconds": 0.0,
+     "pending": false,
+     "rss_mb": 2322
+    },
+    {
+     "event": "2032:USA_OPEN",
+     "seconds": 0.0,
+     "pending": false,
+     "rss_mb": 2322
+    },
+    {
+     "event": "2034:BRITANNIA_OPEN",
+     "seconds": 0.0,
+     "pending": false,
+     "rss_mb": 2322
+    },
+    {
+     "event": "2036:TOUR_MASTERS",
+     "seconds": 0.0,
+     "pending": false,
+     "rss_mb": 2322
+    },
+    {
+     "event": "2039:PREMIER_TOUR_CHAMPIONSHIP",
+     "seconds": 0.0,
+     "pending": false,
+     "rss_mb": 2322
+    },
+    {
+     "event": "2041:USA_OPEN",
+     "seconds": 0.0,
+     "pending": false,
+     "rss_mb": 2322
+    },
+    {
+     "event": "2043:BRITANNIA_OPEN",
+     "seconds": 0.0,
+     "pending": false,
+     "rss_mb": 2322
+    },
+    {
+     "event": "2046:TOUR_MASTERS",
+     "seconds": 0.0,
+     "pending": false,
+     "rss_mb": 2322
+    },
+    {
+     "event": "2048:PREMIER_TOUR_CHAMPIONSHIP",
+     "seconds": 0.0,
+     "pending": false,
+     "rss_mb": 2322
+    },
+    {
+     "event": "2050:USA_OPEN",
+     "seconds": 0.0,
+     "pending": false,
+     "rss_mb": 2322
+    },
+    {
+     "event": "2052:BRITANNIA_OPEN",
+     "seconds": 0.0,
+     "pending": false,
+     "rss_mb": 2322
+    },
+    {
+     "event": "2055:TOUR_MASTERS",
+     "seconds": 0.0,
+     "pending": false,
+     "rss_mb": 2322
+    },
+    {
+     "event": "2057:PREMIER_TOUR_CHAMPIONSHIP",
+     "seconds": 0.0,
+     "pending": false,
+     "rss_mb": 2322
+    },
+    {
+     "event": "2059:USA_OPEN",
+     "seconds": 0.0,
+     "pending": false,
+     "rss_mb": 2322
+    },
+    {
+     "event": "2062:BRITANNIA_OPEN",
+     "seconds": 0.0,
+     "pending": false,
+     "rss_mb": 2322
+    },
+    {
+     "event": "2064:TOUR_MASTERS",
+     "seconds": 0.0,
+     "pending": false,
+     "rss_mb": 2322
+    },
+    {
+     "event": "2066:PREMIER_TOUR_CHAMPIONSHIP",
+     "seconds": 0.0,
+     "pending": false,
+     "rss_mb": 2322
+    },
+    {
+     "event": "2069:USA_OPEN",
+     "seconds": 0.0,
+     "pending": false,
+     "rss_mb": 2322
+    },
+    {
+     "event": "2071:BRITANNIA_OPEN",
+     "seconds": 0.0,
+     "pending": false,
+     "rss_mb": 2322
+    }
+   ],
+   "peak_mb": 2646,
+   "total_s": 0.0
+  }
+ },
+ "missing": {
+  "a pre-event win estimate (not recorded: played before estimates were kept, and none is worked out afterwards), so no upset is claimed": 20,
+  "results before the world began in 2027 (counts are of the retained history)": 5
+ },
+ "patterns": {
+  "comeback": 10,
+  "close_finish": 5,
+  "playoff": 3,
+  "wire_to_wire": 3,
+  "runaway": 2
+ },
+ "story_cache_bytes": 115834880,
+ "peak_mb": 2646,
+ "finished": "2026-10-31 11:11:10",
+ "summary_md": "Archive: `runs/A/world_360013/archive` (seasons 2027\u20132071, 45 seasons, archive build 473690a); story code: the candidate build `arms/build_c0d1ea5`. Read through a mirror of its MANIFEST and links to the files it names (`armsan/story_mirror/60e05d28ff57/archive`); its own index.sqlite was never opened. Measured 2026-10-31 11:03:14\u20132026-10-31 11:11:10 UTC with `nice -n 19` while two simulations ran on the same 4-CPU machine (times include that contention).\n\n- One-off side index of the read-only history (golfsim.archive.build_index_at, as the observer builds for a history it does not own): built in 218 s, 1.05 GB, child peak 402 MB.\n- Opening the history read-only (observer.World): 6.04 s, RSS 502 MB.\n- After pass 1 a background story indexer was not running (none was needed); largest child process peak so far 758 MB.\n- Latest edition opened first in an empty story cache (2071:BRITANNIA_OPEN): 3.079 s, facts waiting for the story index (not kept); the background story indexer then took 102.0 s (finished: True; largest child peak 758 MB); reopened afterwards: 0.076 s.\n- Passes 1\u20134 below open the sample oldest first, so each cold story found at most two seasons unindexed and indexed them inline (INLINE_SEASONS = 2); the observer keeps up to 4 decoded seasons in memory (archive.Archive.CACHE_SEASONS), which is what the process RSS climbs to.\n\n| pass | editions | min s | median s | max s | total s | facts pending (not cached) | process peak RSS MB |\n|---|---|---|---|---|---|---|---|\n| 1 cold, as first opened | 20 | 1.973 | 7.442 | 11.850 | 143.7 | 0 | 2646 |\n| 2 cold facts, story index complete | 20 | 0.072 | 0.103 | 0.273 | 2.3 | 0 | 2646 |\n| 3 warm (disk) | 20 | 0.001 | 0.001 | 0.002 | 0.0 | 0 | 2646 |\n| 4 warm (memory) | 20 | 0.000 | 0.000 | 0.000 | 0.0 | 0 | 2646 |\n\nPer edition (seconds: pass 1 / 2 / 3 / 4):\n\n| edition | pass 1 | pass 2 | pass 3 | pass 4 | RSS after pass 1 (MB) |\n|---|---|---|---|---|---|\n| 2027:TOUR_MASTERS | 1.973 | 0.082 | 0.001 | 0.000 | 684 |\n| 2029:PREMIER_TOUR_CHAMPIONSHIP | 5.052 | 0.089 | 0.001 | 0.000 | 1170 |\n| 2032:USA_OPEN | 7.263 | 0.074 | 0.001 | 0.000 | 1518 |\n| 2034:BRITANNIA_OPEN | 6.209 | 0.082 | 0.001 | 0.000 | 1574 |\n| 2036:TOUR_MASTERS | 4.035 | 0.072 | 0.001 | 0.000 | 1746 |\n| 2039:PREMIER_TOUR_CHAMPIONSHIP | 8.525 | 0.077 | 0.001 | 0.000 | 1783 |\n| 2041:USA_OPEN | 5.752 | 0.182 | 0.001 | 0.000 | 1909 |\n| 2043:BRITANNIA_OPEN | 6.292 | 0.128 | 0.001 | 0.000 | 1941 |\n| 2046:TOUR_MASTERS | 9.300 | 0.078 | 0.001 | 0.000 | 2059 |\n| 2048:PREMIER_TOUR_CHAMPIONSHIP | 6.751 | 0.109 | 0.001 | 0.000 | 2087 |\n| 2050:USA_OPEN | 5.177 | 0.092 | 0.001 | 0.000 | 2141 |\n| 2052:BRITANNIA_OPEN | 7.621 | 0.124 | 0.001 | 0.000 | 2182 |\n| 2055:TOUR_MASTERS | 10.983 | 0.109 | 0.001 | 0.000 | 2196 |\n| 2057:PREMIER_TOUR_CHAMPIONSHIP | 7.980 | 0.137 | 0.001 | 0.000 | 2234 |\n| 2059:USA_OPEN | 8.101 | 0.126 | 0.001 | 0.000 | 2263 |\n| 2062:BRITANNIA_OPEN | 10.036 | 0.096 | 0.001 | 0.000 | 2319 |\n| 2064:TOUR_MASTERS | 4.914 | 0.125 | 0.001 | 0.000 | 2345 |\n| 2066:PREMIER_TOUR_CHAMPIONSHIP | 8.220 | 0.118 | 0.001 | 0.000 | 2392 |\n| 2069:USA_OPEN | 11.850 | 0.273 | 0.002 | 0.000 | 2428 |\n| 2071:BRITANNIA_OPEN | 7.681 | 0.094 | 0.001 | 0.000 | 2472 |\n\nStory cache on disk after the sample: 115.8 MB. Patterns of the sampled stories: comeback 10, close_finish 5, playoff 3, wire_to_wire 3, runaway 2.\n\nFacts the sampled stories list as not recorded (`missing`, pass 2; editions of the 45-season archive built by 473690a, which predates some facts the candidate records):\n\n- a pre-event win estimate (not recorded: played before estimates were kept, and none is worked out afterwards), so no upset is claimed: 20 of 20 editions\n- results before the world began in 2027 (counts are of the retained history): 5 of 20 editions"
+}
