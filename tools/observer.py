@@ -1708,7 +1708,7 @@ def refusals_section(w, pid):
         return ''
     rows.sort(key=lambda r: (r[3], r[4], r[1], r[2]))
     archived = set(w.a.years) if w.a is not None else set()
-    asked = {'golfer': 'the player', 'coach': 'the coach'}
+    asked = {'golfer': 'the player', 'coach': 'the coach', 'caddie': 'the caddie'}
     said_no = {'golfer': 'the player', 'coach': 'the coach', 'caddie': 'the caddie'}
     return (f'<h2>Approaches turned down ({len(rows)})</h2>' + table(
         ['When', 'Kind', 'Player', 'Coach or caddie', 'Who asked, and why', 'Who said no, and why'],

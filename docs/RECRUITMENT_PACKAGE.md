@@ -46,6 +46,19 @@ are treated as settled.
    snapshot, `tools/observer_live.py`, carries this season's refusals and each stint's acceptance reason and
    declined approaches, as it already carried this season's stints).
 
+6. **Staff who make the first move** (added after review, same rules version). *Coaches of established
+   players* (reputation 55+, room in their book) court established golfers of any age near them -- separate
+   from youth scouting -- looking at the 30 most accomplished within reach (achievement at least 4) and offering
+   a fee to the one they rate highest, one offer a winter (`established_approaches`). *Caddies without a bag*
+   look at the 30 golfers wanting a caddie in their region with the best results and offer to carry the bag of
+   the one they would most readily accept (at least 85%), one offer a winter (`caddie_approaches`). The golfer's
+   answer respects the existing affordability rules (`coach_budget`, `caddie_budget`), loyalty to a current
+   partner and shared history (`golfer_answers(..., 'fee')`, `golfer_takes_caddie`). Stints record the true
+   initiator (`started_by` 'coach' or 'caddie'); refusals record who asked. One offer per pair per winter
+   across every path (`offered`); a golfer whose partnership began in this market is not courted again until the
+   next; an existing partnership ends only after the golfer accepts another. Each path has its own seeded random
+   stream, so replay is deterministic.
+
 ## The constants (proposed)
 
 | Constant | Value | Why |
@@ -63,7 +76,20 @@ are treated as settled.
 | `LOYALTY_RAPPORT`, `LOYALTY_FIT`, `LOYALTY_RESULTS` | 4.0, 1.0, 1.5 | A full season together (rapport ~0.7) already outweighs a 20-point gain; good rapport, fit and results push a switch below 10% (tested). |
 | `CADDIE_SAYS_YES`, `CADDIE_PAY`, `CADDIE_FIT`, `CADDIE_STABLE`, `CADDIE_WAITING` | 2.5, 0.6, 1.0, 0.5, 0.5 | A top caddie (85) turns down most low-earning Challenger bags but relents after a few refusals; ordinary caddies almost always accept. |
 
+| `ESTABLISHED_REP`, `ESTABLISHED_BAR` | 55, 4.0 | Only coaches with some standing court stars; a candidate needs Prestige ~40 or Prestige ~25 with a top-100 ranking. |
+| `ESTABLISHED_LOOK`, `ESTABLISHED_OFFERS` | 30, 1 | Bounded search and one fee offer a winter per coach. |
+| `GOLFER_FEE_YES`, `GOLFER_COACHABLE` | 0.5, 1.0 | A golfer without a coach accepts a paid approach ~62% before terms, more if coachable or the coach is well known. |
+| `CADDIE_LOOK`, `CADDIE_OFFERS`, `CADDIE_APPROACH_MIN` | 30, 1, 0.85 | Bounded search; one offer a winter per free caddie, only to a golfer they would readily accept. |
+| `GOLFER_CADDIE_YES`, `GOLFER_CADDIE_REP` | 1.5, 0.5 | ~82% before terms; less when the caddie is less known than the golfer's own results. |
+
 ## Measured before/after (proposed values)
+
+**The tables below were measured BEFORE item 6 (staff who make the first move) was added and have NOT been
+re-run since** (CPU hold). One tiny check of the extended market, not a measurement: the first winter of seed
+2027 at scale 0.1 (unscaled coaches) gave 300 caddie partnerships, 277 of them started by the caddie (in a
+world's first winter every caddie is free, so caddies move first almost everywhere; later winters have few free
+caddies), 58 fee partnerships started by coaches of established players (golfers aged 24-47) beside 200 hired by
+golfers, and 30 caddie offers and 47 coach offers turned down by golfers.
 
 Small worlds, `workers=1`, `generate_world(seed, scale=0.15)`, three seasons (2027-2029), measured with the same
 script (`tools/staff_market_measure.py`, table by `tools/staff_market_compare.py`) on both builds (before = commit a11f29a, after = this branch). Because the generated starting coaches are
@@ -193,7 +219,12 @@ Run (on this branch's code, final proposed constants; HEAD after the review fix 
 - After the review fix (refusals shown without any partnership, and live): the same 9 plus
   `tests.test_recruitment.ObserverRefusalTests` (3 fixture tests, no world) -- 12 tests, OK, with `nice -n 19`.
 
+- After item 6 (staff who make the first move): `tests.test_recruitment` Assessment, Motivation, TwoWay,
+  Loyalty, Hidden (all three), ObserverRefusal and Initiative tests -- 19 tests, OK, with `nice -n 19` (tiny
+  worlds, the market only).
+
 NOT yet run (blocked by the CPU hold):
+- Any measurement with item 6 (both seeds' after arms need re-running).
 - Measurement, seed 3031, after arm:
   `python tools/staff_market_measure.py . 3031 0.15 3 after_3031.json` (before: the same script with ROOT a
   checkout of a11f29a), then `python tools/staff_market_compare.py before_3031.json after_3031.json`. The script

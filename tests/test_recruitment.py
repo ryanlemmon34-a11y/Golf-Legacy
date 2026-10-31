@@ -18,6 +18,7 @@ import unittest
 from collections import Counter
 from pathlib import Path
 from types import SimpleNamespace
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -234,6 +235,158 @@ class LoyaltyTests(unittest.TestCase):
         self.assertEqual(rel.refusals[0][9], kept.id)                      # the partnership the golfer kept
 
 
+def mature_star(s, exclude=(), age=31, rank=15, fame=400.0):
+    """A professional made into an established star anyone can see: aged 31, ranked 15th in the world, with
+    Prestige from fame, money to pay a coach, and no coach of their own."""
+    g = next(g for g in sorted(s.world.golfers, key=lambda x: x.id) if g.status == 'pro' and g.lifestyle == 'full_time'
+             and g.id not in s.staff.coach_of and g.id not in exclude)
+    g.born = 2027 - age
+    s.wr_pos[g.id], s.fame[g.id] = rank, fame
+    g.cash, g.personality['coachability'] = 5_000_000.0, 80.0
+    return g
+
+
+class InitiativeTests(unittest.TestCase):
+    """Staff who make the first move beyond youth scouting: coaches of established players courting established
+    golfers for a fee, and caddies offering to carry a bag (rules 2026-11-04)."""
+
+    def setUp(self):
+        self.s = fresh(50)
+        self.s.start_year(2027)
+        self.st = self.s.staff
+        self.rng = random.Random(9)
+
+    def coach(self, g, rep, youth=False):
+        return self.st.new_coach(self.rng, self.s.home_country(g), 2027, 50, 70, 70, 'putting', youth, rep, 'test')
+
+    def test_an_established_coach_approaches_a_mature_established_golfer(self):
+        s, st = self.s, self.st
+        g = mature_star(s)
+        c = self.coach(g, 99.0)
+        p, _, _ = ST.golfer_answers(s, st, g, c, 2027, 'fee')
+        self.assertGreater(p, 0.8)                                         # affordable, no coach: weak loyalty
+        offered = set()
+        made = ST.established_approaches(s, 2027, offered, Counter(st.coach_of.values()))
+        self.assertIn(('coach', c.id, g.id), offered)
+        self.assertEqual(made[c.id], 1)
+        self.assertTrue(all(n <= ST.ESTABLISHED_OFFERS for n in made.values()))
+        x = st.rel.current('coach', g.id)
+        self.assertIs(st.coach(g.id), c)
+        self.assertEqual((x.started_by, x.arrangement, x.terms), ('coach', 'fee', c.fee))
+        self.assertIn('(a coach of established players)', x.reason_start)
+        self.assertTrue(x.reason_accept)
+        self.assertGreater(g.age(2027), ST.SCOUT_AGE)                      # not youth scouting
+        dev = self.coach(g, 99.0, youth=True)                              # a development coach does not court them
+        self.assertNotIn(dev.id, ST.established_approaches(s, 2027, set(), Counter(st.coach_of.values())))
+
+    def test_the_golfers_answer_follows_money_and_loyalty(self):
+        s, st = self.s, self.st
+        g = mature_star(s)
+        cur = self.coach(g, 60.0)
+        st.assign_coach(s, g, cur, 'fee', (2024, 1), 'golfer', 'test', 'test')
+        before = st.rel.current('coach', g.id)
+        offer = self.coach(g, 99.0)
+        # strong loyalty: years of work, a good fit, progress together -> a recorded no, the partnership kept
+        st.rel.add_work('coach', g.id, 80.0, 2026)
+        st.rel.pair('coach', cur.id, g.id).fit = 1.0
+        before.seasons += [(2025, 0.6, 1.0), (2026, 0.6, 1.0)]
+        self.assertLess(ST.golfer_answers(s, st, g, offer, 2027, 'fee')[0], 0.1)
+        self.assertFalse(ST.approach(s, offer, g, 'established results', (2027, 1), _Stub(0.3), arrangement='fee'))
+        self.assertIs(st.rel.current('coach', g.id), before)
+        self.assertTrue(st.rel.refusals[-1][8].startswith(f'stayed with {cur.name}'))
+        self.assertEqual(st.rel.refusals[-1][9], before.id)
+        # unaffordable: no whatever the loyalty, with the reason, and nothing ended
+        h = mature_star(s, exclude={g.id})
+        h.cash, h.backing = -1_000_000.0, 0.0
+        self.assertEqual(ST.golfer_answers(s, st, h, offer, 2027, 'fee')[0], 0.0)
+        self.assertFalse(ST.approach(s, offer, h, 'established results', (2027, 1), _Stub(0.0), arrangement='fee'))
+        self.assertTrue(st.rel.refusals[-1][8].startswith('could not afford the fee'))
+        self.assertIsNone(st.coach(h.id))
+        # weak loyalty and affordable: yes; only then does the old partnership end, with the reason
+        k = mature_star(s, exclude={g.id, h.id})
+        st.assign_coach(s, k, cur, 'fee', (2027, 1), 'golfer', 'test', 'test')
+        old = st.rel.current('coach', k.id)
+        self.assertTrue(ST.approach(s, offer, k, 'established results', (2027, 1), _Stub(0.0), arrangement='fee'))
+        self.assertEqual(old.reason_end, f'left for an approach from {offer.name}')
+        self.assertEqual((st.rel.current('coach', k.id).started_by, st.deal[k.id]), ('coach', 'fee'))
+
+    def test_a_caddie_makes_offers_accepted_and_refused(self):
+        s, st = self.s, self.st
+        bagged = sorted(st.caddie_of, key=lambda gid: (-s.player_prestige(gid), gid))
+        g, g2, g3 = (s.g[gid] for gid in bagged[:3])
+        for x in (g, g2):
+            x.cash = 5_000_000.0
+        k = copy.deepcopy(next(iter(st.caddies.values())))
+        k.id, k.reputation, k.name = st.new_id(), 99.0, 'Test Caddie'
+        k.familiarity = {}
+        st.caddies[k.id] = k
+        # weak loyalty (a stint begun this winter) and affordable: accepted, started by the caddie
+        old = st.rel.current('caddie', g.id)
+        self.assertTrue(ST.caddie_offer(s, k, g, 'a bag with good earnings', (2027, 1), _Stub(0.0)))
+        new = st.rel.current('caddie', g.id)
+        self.assertEqual((new.staff, new.started_by, new.reason_start), (k.id, 'caddie', 'a bag with good earnings'))
+        self.assertTrue(new.reason_accept)
+        self.assertEqual(old.reason_end, f'left for an approach from {k.name}')
+        self.assertNotIn(old.staff, st.caddie_of.values())                # the old caddie is free again
+        self.assertEqual(len(set(st.caddie_of.values())), len(st.caddie_of))
+        # strong loyalty: refused with the reason, recorded on the partnership kept
+        k2 = copy.deepcopy(k)
+        k2.id, k2.name = st.new_id(), 'Second Caddie'
+        st.caddies[k2.id] = k2
+        cur = st.rel.current('caddie', g2.id)
+        st.rel.add_work('caddie', g2.id, 200.0, 2026)
+        st.rel.pair('caddie', cur.staff, g2.id).fit = 1.5
+        cur.seasons += [(2025, 0.6, 1.0), (2026, 0.6, 1.0)]
+        self.assertFalse(ST.caddie_offer(s, k2, g2, 'a bag with good earnings', (2027, 1), _Stub(0.3)))
+        self.assertIs(st.rel.current('caddie', g2.id), cur)
+        r = st.rel.refusals[-1]
+        self.assertEqual((r[0], r[1], r[2], r[5], r[6]), ('caddie', k2.id, g2.id, 'caddie', 'golfer'))
+        self.assertTrue(r[8].startswith('stayed with'))
+        self.assertEqual(cur.declined[-1][2], k2.id)
+        # unaffordable under the hiring rule (caddie_budget: means plus half the prize money they expect to keep;
+        # set to nothing here): refused, nothing ended
+        held = st.rel.current('caddie', g3.id)
+        with mock.patch.object(ST, 'caddie_budget', return_value=0.0):
+            self.assertFalse(ST.caddie_offer(s, k2, g3, 'a secure Premier bag', (2027, 1), _Stub(0.0)))
+        self.assertTrue(st.rel.refusals[-1][8].startswith('could not afford their fee'))
+        self.assertIs(st.rel.current('caddie', g3.id), held)
+
+    def test_the_market_records_true_initiators_bounded_and_ends_nothing_without_a_yes(self):
+        s, st = small(), small().staff
+        coach_started = [x for x in st.rel.stints if x.kind == 'coach' and x.started_by == 'coach' and x.arrangement == 'fee']
+        caddie_started = [x for x in st.rel.stints if x.kind == 'caddie' and x.started_by == 'caddie']
+        self.assertTrue(coach_started and caddie_started)
+        self.assertTrue(any(s.g[x.golfer].age(2027) > ST.SCOUT_AGE for x in coach_started))
+        self.assertTrue(all(x.reason_start and x.reason_accept for x in coach_started + caddie_started))
+        self.assertTrue(any(r[5] == 'caddie' and r[6] == 'golfer' and r[8] for r in st.rel.refusals))
+        # bounded: offers per coach (fee approaches) and per caddie, and one offer per pair
+        fee_offers = Counter(x.staff for x in coach_started)
+        fee_offers.update(r[1] for r in st.rel.refusals if r[0] == 'coach' and r[5] == 'coach' and '$' in r[7])
+        self.assertTrue(all(n <= ST.ESTABLISHED_OFFERS for n in fee_offers.values()))
+        cad_offers = Counter(x.staff for x in caddie_started)
+        cad_offers.update(r[1] for r in st.rel.refusals if r[5] == 'caddie')
+        self.assertTrue(all(n <= ST.CADDIE_OFFERS for n in cad_offers.values()))
+        pairs = Counter((r[0], r[1], r[2]) for r in st.rel.refusals)
+        self.assertTrue(all(n == 1 for n in pairs.values()))
+        # no partnership ended for an approach without the new one beginning that very week
+        for x in st.rel.stints:
+            if x.end and x.reason_end.startswith('left for an approach from'):
+                nxt = st.rel.current(x.kind, x.golfer)
+                people = st.coaches if x.kind == 'coach' else st.caddies
+                self.assertEqual(nxt.start, x.end)
+                self.assertEqual(x.reason_end, f'left for an approach from {people[nxt.staff].name}')
+        load = Counter(st.coach_of.values())
+        self.assertTrue(all(n <= st.coaches[cid].capacity for cid, n in load.items()))
+        self.assertEqual(len(set(st.caddie_of.values())), len(st.caddie_of))
+
+    def test_the_same_world_makes_the_same_offers(self):
+        def market():
+            s = fresh(51)
+            s.start_year(2027)
+            return json.dumps(s.staff.rel.export()), s.staff.coach_of, s.staff.caddie_of
+        self.assertEqual(market(), market())
+
+
 class WorldTests(unittest.TestCase):
     """Two runs of the same small world: one season and the next winter's market."""
 
@@ -276,7 +429,8 @@ class WorldTests(unittest.TestCase):
 
 class HiddenTests(unittest.TestCase):
     NEW = ('firming', 'scouting_estimate', 'motivation', 'recent_rise', 'earned_majors', 'achievement', 'coach_rates',
-           'loyalty', 'last_prize', 'golfer_answers', 'coach_takes', 'results_level', 'caddie_answers', 'approach')
+           'loyalty', 'last_prize', 'golfer_answers', 'coach_takes', 'results_level', 'caddie_answers', 'approach',
+           'started_now', 'established_approaches', 'golfer_takes_caddie', 'caddie_offer', 'caddie_approaches')
 
     def test_new_decision_code_never_reads_potential_or_ceilings(self):
         """Every name, attribute and string the new decisions use (docstrings aside), and every function they

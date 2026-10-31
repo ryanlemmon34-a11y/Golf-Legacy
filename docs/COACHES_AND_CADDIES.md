@@ -46,6 +46,13 @@ level, so they pick better things to work on.
    a college team coaches them or when last season's prize money makes a share costly; a player who already
    has a coach weighs the newcomer's extra reputation against the partnership's **loyalty** (below). The coach
    works for free in return for **5% of future prize money**.
+   **Courting established players** (from rules 2026-11-04). Separately, coaches of established players with
+   reputation 55+ and room in their book court established golfers of any age near them (their country; from
+   reputation 60 their region): each looks at the 30 most accomplished candidates (Prestige and a world or
+   amateur ranking; never potential) and offers a **fee** to the one they rate highest (achievement, a known fit,
+   earned major places), one offer a winter. The golfer accepts only if the fee fits 10% of their means (the
+   hiring rule); without a coach, more readily from a better-known coach and the more coachable they are; with
+   one, against the partnership's loyalty.
 2. **Hiring.** Golfers who want a coach (coachability, and almost every tour professional) hire the
    best-looking coach they can afford: the fee must fit 10% of their **means** (spendable funds plus 80% of
    last year's earned income — money they have, not winnings they hope for). They see reputation, not teaching skill, and look for a speciality matching
@@ -68,8 +75,13 @@ of their own. Caddies gain a little skill with experience — in proportion to t
 season (none for an idle year), growing towards 95 and never pulling a higher skill down — until about 50 and stop caddying smoothly
 with age (around 60).
 
-Full-time professionals on the Premier and Challenger tours hire a caddie each season: the best-known
-players first, each offering the bag to a caddie they worked well with before, then to the best-looking
+Full-time professionals on the Premier and Challenger tours have a caddie each season. **Caddies make the
+first move** (from rules 2026-11-04): each caddie without a bag looks at the 30 golfers wanting a caddie in
+their region with the best results and offers to carry the bag of the one they would most readily accept (at
+least 85% ready, by the same earnings, fit and stability terms below), one offer a winter; the golfer accepts
+only if the caddie's fees fit their caddie budget, without a caddie more readily the better known the caddie
+against their own results, with one against the partnership's loyalty. Then the golfers still without a caddie
+hire: the best-known players first, each offering the bag to a caddie they worked well with before, then to the best-looking
 caddies they can afford (a weekly fee of $800 + $25 per reputation point, plus 8% of prize money). **A
 caddie may say no** (from rules 2026-11-04): they weigh expected earnings (the golfer's last season's prize
 money or Prestige, on the scale their own reputation follows), compatibility (the pair's fit and time
@@ -140,7 +152,9 @@ recorded**: why each partnership was proposed (`reason_start`) and why the other
 and why) in `Relations.refusals`, and on the partnership a golfer kept when they said no out of loyalty
 (`declined`); all archived in `relations.json.gz` and shown on both profiles (how each partnership began, and
 the approaches turned down, also for someone no partnership ever began with, and this season's before it is
-archived). The weights are proposed starting values awaiting approval
+archived). Each stint records who made the first move (`started_by`: the golfer, the coach or the caddie). One
+offer per pair per winter, whoever makes it; a golfer whose partnership began in this market is not courted again
+until the next; an existing partnership ends only once the golfer has accepted another. The weights are proposed starting values awaiting approval
 (`docs/RECRUITMENT_PACKAGE.md`).
 
 **Fit is recorded and shown.** Each pairing's fit is drawn once (normal, clipped to −2..+2) and saved with the

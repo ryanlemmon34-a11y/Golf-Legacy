@@ -128,9 +128,9 @@ class Relations:
         return s
 
     def refuse(self, kind, staff, golfer, when, asked_by, refused_by, reason_asked, reason):
-        """An approach turned down: [kind, staff, golfer, year, week, who asked ('golfer', 'coach'), who said no
-        ('golfer', 'coach', 'caddie'), why they asked, why the answer was no, the stint the golfer kept (-1 if
-        none)]. A golfer who said no while in a partnership of that kind records it on that stint too."""
+        """An approach turned down: [kind, staff, golfer, year, week, who asked ('golfer', 'coach', 'caddie'), who
+        said no ('golfer', 'coach', 'caddie'), why they asked, why the answer was no, the stint the golfer kept (-1
+        if none)]. A golfer who said no while in a partnership of that kind records it on that stint too."""
         kept = self.current(kind, golfer) if refused_by == 'golfer' else None
         if kept is not None and kept.staff:
             kept.declined.append((when[0], when[1], staff, reason))
