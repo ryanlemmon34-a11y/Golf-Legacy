@@ -1836,9 +1836,12 @@ def courses_page(w, q):
     f = filters('/courses', q, [('q', 'Name contains', None),
                                 ('country', 'Country', [('', 'any')] + [(c, c) for c in sorted({c.get('country') for c in cs.values()})])])
     chunk, pager = paged(rows, q, '/courses')
-    return 'Courses', f + table(['Course', 'City', 'Country', 'Class', 'Layouts', 'Editions hosted'], [
-        [course_link(w, cid), esc(c.get('city')), nation_link(c.get('country')), esc(c.get('class')),
-         esc(', '.join(c.get('layouts', {}))), str(hosted.get(cid, 0))] for cid, c in chunk], numeric=(5,)) + pager
+    from golfsim.course_library import course_place
+    sub = lambda c: (c['subdivision'] if 'subdivision' in c else course_place(c)[1]) or 'unknown'
+    return 'Courses', f + table(['Course', 'City', 'State / province', 'Country', 'Class', 'Layouts', 'Editions hosted'], [
+        [course_link(w, cid), esc(c.get('city')), esc(sub(c)), nation_link(c.get('country')), esc(c.get('class')),
+         esc(', '.join(c.get('layouts', {}))), str(hosted.get(cid, 0)) if hosted.get(cid) else
+         '0 <span class="muted">(local club)</span>'] for cid, c in chunk], numeric=(6,)) + pager
 
 
 def course(w, q, cid):
@@ -1848,6 +1851,8 @@ def course(w, q, cid):
         return cid, '<p class="muted">No such course.</p>'
     out = [f'<p>{esc(c.get("city"))}, {nation_link(c.get("country"))} · {esc(c.get("class"))} · architect '
            f'{esc(c.get("architect"))} · opened {esc(c.get("opened"))}{shortlist_button(w, "course", cid)}</p>']
+    eds = sorted(w.course_editions(cid), key=lambda e: (e['year'], e['event']), reverse=True)
+    out.append(OH.course_place_section(w, cid, c, len(eds)))
     out.append('<h2>Layouts</h2>' + table(['Layout', 'Par', 'Yards'], [
         [esc(k), esc(l.get('par')), f'{l.get("yards") or 0:,}'] for k, l in c.get('layouts', {}).items()], numeric=(1, 2)))
     recs = {lid: r for lid, r in w.records_table().items() if lid.split(':')[0] == cid}
@@ -1865,7 +1870,6 @@ def course(w, q, cid):
                            f'{event_link(w, m["event_id"])}' for h, m in sorted(totals.items(), key=lambda x: int(x[0])))
                        + '</p>')
     out.append(OH.course_use(w, cid))
-    eds = sorted(w.course_editions(cid), key=lambda e: (e['year'], e['event']), reverse=True)
     chunk, pager = paged(eds, q, f'/course/{quote(cid)}')
     out.append('<h2>Editions hosted</h2>' + (table(['Edition', 'Layout', 'Winner'], [
         [event_link(w, e['event']), esc(e['layout']), w.person_link(e['winner'])]

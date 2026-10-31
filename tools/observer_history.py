@@ -687,6 +687,27 @@ def series_summary(w, sid):
               f'tournament. * {O.AGE_NOTE}</p>')
 
 
+_ORIGIN = {'calendar': 'built because an event needed a course here when the library was sized',
+           'club': 'added as an extra club where golf is busiest',
+           'hand-built': 'one of the hand-built reference courses'}
+
+
+def course_place_section(w, cid, c, hosted):
+    """A course's state / province (normalised from its city; 'unknown' when the geography lacks it) and its
+    role: an event venue, or a local club no event has chosen, with the venue policy's reason
+    (course_library.venue_role)."""
+    O = _o()
+    from golfsim.course_library import course_place, venue_role
+    sub = c['subdivision'] if 'subdivision' in c else course_place(c)[1]
+    role, why = venue_role(w.courses(), cid, hosted)
+    origin = _ORIGIN.get(c.get('origin'))
+    out = [f'<p>State / province: {O.esc(sub) if sub else "<span class=\'muted\'>unknown</span>"} · '
+           f'role: <b>{O.esc(role)}</b>' + (f' · {O.esc(origin)}' if origin else '') + '</p>']
+    if why:
+        out.append(f'<p class="muted">No event has been played here yet. {O.esc(why)}</p>')
+    return ''.join(out)
+
+
 def course_use(w, cid):
     """A course's tournament mix and total starts (2090 audit: an elite venue's use should be visible)."""
     O = _o()

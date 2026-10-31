@@ -46,6 +46,7 @@ from pathlib import Path
 
 from .calendar import TOUR_BY_KEY
 from .history import Relations
+from .course_library import course_place
 
 FORMAT = 'golf-legacy-archive/1'
 
@@ -151,6 +152,9 @@ class ArchiveWriter:
                  'series': {s.series_id: {'name': s.name, 'tour': s.tour, 'tier': s.tier, 'kind': s.kind,
                                           'category': s.category} for s in cal.series},
                  'courses': {cid: {'name': site['name'], 'city': site['city'], 'country': site['country'],
+                                   # state / province or equivalent (None = unknown) and how the course came to
+                                   # be built (rules 2026-11-08)
+                                   'subdivision': course_place(site)[1], 'origin': site.get('origin'),
                                    'class': site['cls'], 'architect': site.get('architect'), 'opened': site.get('opened'),
                                    'layouts': {k: {'par': c.par, 'yards': c.yards} for k, c in site['layouts'].items()}}
                              for cid, site in lib.sites.items()}}

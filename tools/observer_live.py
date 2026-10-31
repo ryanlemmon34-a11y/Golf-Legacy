@@ -130,7 +130,9 @@ def capture(session):
     pl = s.places
     meta = _generation_meta(session)
     from golfsim.calendar import TOUR_BY_KEY
+    from golfsim.course_library import course_place
     courses = {cid: {'name': site['name'], 'city': site['city'], 'country': site['country'], 'class': site['cls'],
+                     'subdivision': course_place(site)[1], 'origin': site.get('origin'),
                      'architect': site.get('architect'), 'opened': site.get('opened'),
                      'layouts': {k: {'par': c.par, 'yards': c.yards} for k, c in site['layouts'].items()}}
                for cid, site in s.lib.sites.items()}
