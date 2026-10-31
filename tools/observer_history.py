@@ -13,6 +13,7 @@ from collections import Counter, defaultdict
 from urllib.parse import quote, urlencode
 
 from golfsim import rules as R
+from golfsim import weather as WX
 
 MAJOR_SERIES = ('TOUR_MASTERS', 'PREMIER_TOUR_CHAMPIONSHIP', 'USA_OPEN', 'BRITANNIA_OPEN')
 LEVELS = {0: 'Majors', 1: 'Premier Tour', 2: 'Challenger tour', 3: 'Regional tour', 4: 'Mini tour', 5: 'College golf',
@@ -854,8 +855,7 @@ def rounds_view(w, q, e):
                                              f'<a href="{base}?{urlencode({"view": "rounds", "site": i, "round": k})}">{i + 1}</a>')
                                             for i in range(len(full['sites']))) + '</p>')
     if cond and k - 1 < len(cond):
-        wind, rain, pins = cond[k - 1]
-        out.append(f'<p class="muted">Round {k}: wind {wind} mph{", rain" if rain else ""}, pin difficulty {pins}.</p>')
+        out.append(f'<p class="muted">Round {k}: {O.esc(WX.describe(cond[k - 1]))}.</p>')
     has_holes = bool(full.get('holes'))
     rows = []
     for t, g, rs in board:
@@ -886,24 +886,44 @@ def rounds_view(w, q, e):
     return ''.join(out)
 
 
+def site_conditions(full, site):
+    """A site's recorded conditions, one row per round (see weather.archived), or None when not recorded."""
+    conds = full.get('conditions') or []
+    return conds[site] if site < len(conds) and conds[site] else None
+
+
+def conditions_lines(full, site, through=None):
+    """HTML: each round's recorded conditions (through round `through` only, in a replay), or ''."""
+    O = _o()
+    cond = site_conditions(full, site)
+    if not cond:
+        return ''
+    rows = cond[:through] if through else cond
+    return ('<p class="muted">Conditions: ' + ' · '.join(f'R{i}: {O.esc(WX.describe(c))}' for i, c in enumerate(rows, 1))
+            + '. Weather never cancels, shortens or delays a round.</p>')
+
+
 def scorecard(w, full, gid, base, through=None, n=None):
-    """A major's hole-by-hole card, through round `through` of the replay (no later round is shown)."""
+    """A major's hole-by-hole card, through round `through` of the replay (no later round is shown), with each
+    round's recorded conditions."""
     O = _o()
     site = next((i for i, s in enumerate(full.get('holes') or []) if str(gid) in s), None)
     if site is None:
         return '<p class="muted">No scorecard recorded for this golfer here.</p>'
     holes = full['holes'][site][str(gid)][:through]
     pars = (full.get('pars') or [None])[site] if full.get('pars') else None
-    head = ['Round'] + [str(i) for i in range(1, 19)] + ['Total']
+    cond = site_conditions(full, site)
+    head = ['Round'] + [str(i) for i in range(1, 19)] + ['Total'] + (['Conditions'] if cond else [])
     rows = []
     if pars:
-        rows.append(['Par'] + [str(p) for p in pars] + [str(sum(pars))])
+        rows.append(['Par'] + [str(p) for p in pars] + [str(sum(pars))] + ([''] if cond else []))
     for r, hs in enumerate(holes, 1):
         cells = []
         for i, s in enumerate(hs):
             cls = '' if not pars else ('up' if s < pars[i] else 'down' if s > pars[i] else '')
             cells.append(f'<span class="{cls}">{s}</span>' if cls else str(s))
-        rows.append([f'R{r}'] + cells + [str(sum(hs))])
+        rows.append([f'R{r}'] + cells + [str(sum(hs))]
+                    + ([O.esc(WX.describe(cond[r - 1]) if r - 1 < len(cond) else 'not recorded')] if cond else []))
     back = f'{base}?{urlencode({"view": "rounds", "round": through, "site": site})}' if through else f'{base}?view=rounds'
     shown = (f'<p class="muted">Through round {through} of the replay.</p>'
              if through and n and through < n else '')

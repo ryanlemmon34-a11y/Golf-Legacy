@@ -44,6 +44,7 @@ from . import schedule as SCH
 from . import work_pathway as WP
 from .course_library import default_library, library_version
 from .engine import Conditions
+from . import weather as WX
 from .golfer import Caddie
 from .geography import CITY_BY_NAME, COUNTRIES
 from .population import CHALLENGER_BY_COUNTRY, CHALLENGER_BY_REGION
@@ -258,12 +259,15 @@ def play_site(task):
                                     on_round=on_round, on_hole=on_hole, caddies=caddies, on_match=on_match)
         out.update(finish=[(g.id, pos, None) for g, pos in res], playoff=0, matches=matches)
         return out
-    wind = max(0.0, rng.gauss(course.typical_wind, 3.0))
     pins = 0.3 + 0.4 * task['prestige'] / 100
-    cond = {r: Conditions(wind_mph=max(0.0, wind + rng.gauss(0, 2.5)), rain=rng.random() < 0.08,
-                          pin_difficulty=pins) for r in range(1, task['rounds'] + 1)}
-    out['conditions'] = [[round(c.wind_mph, 1), int(c.rain), round(c.pin_difficulty, 2)]
-                         for _, c in sorted(cond.items())]          # each round's weather and pins (archived)
+    if task.get('weather') == WX.MODEL:
+        # seasonal climate for this course and week, from the site's own seed (never the shot stream)
+        cond = WX.draw_conditions(course, task['week'], task['rounds'], pins, task['seed'])
+    else:                                    # classic model (worlds started before seasonal weather)
+        wind = max(0.0, rng.gauss(course.typical_wind, 3.0))
+        cond = {r: Conditions(wind_mph=max(0.0, wind + rng.gauss(0, 2.5)), rain=rng.random() < 0.08,
+                              pin_difficulty=pins) for r in range(1, task['rounds'] + 1)}
+    out['conditions'] = [WX.archived(c) for _, c in sorted(cond.items())]   # each round's weather and pins
     cut_after = 2 if task['cut_top'] and task['rounds'] > 2 else None
     board, playoff = play_event(golfers, course, rng, cut_top=task['cut_top'] or len(golfers),
                                 prestige=task['prestige'] / 100, cond_by_round=cond, rounds_n=task['rounds'],
@@ -295,7 +299,8 @@ class EventResult:
     # Kept for the archive (results from saves before these were kept have none: see edition_record)
     scores: list = field(default_factory=list)       # per site: {gid: [stroke-play round scores, in order]}
     prizes: list = field(default_factory=list)       # per site: {gid: prize money paid} (paid golfers only)
-    conditions: list = field(default_factory=list)   # per site: [[wind mph, rain 0/1, pin difficulty] per round]
+    conditions: list = field(default_factory=list)   # per site: [[wind mph, rain 0/1, pin difficulty(, wind from
+                                                     # degrees: seasonal weather)] per round]
     holes: list = field(default_factory=list)        # majors, per site: {gid: [[strokes per hole] per round]}
     pars: list = field(default_factory=list)         # majors, per site: each hole's par (for the scorecards)
     golf: list = field(default_factory=list)         # per site: {gid: golfstats counters + longest drive}
@@ -318,6 +323,7 @@ class Season:
         # otherwise, so support is the one difference: docs/LONG_RUN_PLAN.md)
         self.amateur_support_on = amateur_support
         self.work_pathway_on = True                          # cash-blocked adult amateurs can take work (WP)
+        self.weather = WX.MODEL                              # seasonal climate with wind direction (weather.py)
         self.lib = library or default_library(calendar or SCH.DEFAULT)   # new worlds: the reference calendar
         self.cal = self.lib.calendar
         self.calendar_version = self.cal.version
@@ -1814,6 +1820,7 @@ class Season:
                               'caddies': [_for_course(self.staff.bag(self.g[gid], year), fk) for gid in ids],
                               'rounds': s.rounds, 'cut_top': s.cut_top,
                               'prestige': self.event_prestige[s.series_id],
+                              'week': week, 'weather': self.weather,
                               'seed': _seed(self.seed, ed.event_id, site)})
         if not tasks:
             return
@@ -1869,6 +1876,8 @@ class Season:
         state.setdefault('am_support_held', {})
         state.setdefault('amateur_support_on', True)
         state.setdefault('work_pathway_on', False)           # saves from before the pathway: never applied
+        state.setdefault('weather', 'classic')               # saves from before seasonal weather keep the classic
+                                                             # draws, so a resumed world replays as it would have
         if 'cash_blocked' not in state:
             state['cash_blocked'] = Counter()
             state['cash_blocked_max'] = defaultdict(Counter)

@@ -66,12 +66,16 @@ def play_event(field, course, rng, cut_top=65, prestige=1.0, cond_by_round=None,
     tied = [g for g in board if totals[id(g)] == best]
     playoff_holes = 0
     playoff_pins = pin_sheet(course, Conditions(), rng)
+    # a playoff is played straight after the final round, in its weather (seasonal model; the classic model
+    # played it in default conditions, kept for worlds that use it)
+    last = (cond_by_round or {}).get(rounds_n)
+    playoff_cond = last if last is not None and last.wind_from is not None else Conditions()
     while len(tied) > 1:
         idx = 17 if playoff_holes % 2 == 0 else 16
         hole = course.holes[idx]
         scores = {}
         for g in tied:
-            pl = Player(g, course, Conditions(), caddies.get(id(g)), rng, rounds_n, forms[id(g)])
+            pl = Player(g, course, playoff_cond, caddies.get(id(g)), rng, rounds_n, forms[id(g)])
             scores[id(g)] = play_hole(pl, hole, idx, rng, RoundStats(), 1.0 * prestige, HoleState(), playoff_pins[idx])
             if on_hole:
                 on_hole(g, idx, scores[id(g)], f'playoff hole {playoff_holes + 1}')
