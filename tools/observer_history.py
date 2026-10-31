@@ -601,14 +601,17 @@ def team_history(w, pid):
         coach, caddie = lv.coach_of.get(pid), lv.caddie_of.get(pid)
         out.append(f'<p>Now: coach {w.person_link(coach) if coach else "none"} · caddie '
                    f'{w.person_link(caddie) if caddie else "none"}.</p>')
-    stints = w.a.golfer_staff(pid) if w.a and pid in w.a.people else []
+    archived = w.a.golfer_staff(pid) if w.a and pid in w.a.people else []
+    # school teams stay as archived; coaching and caddying stints begun or ended this season come from the snapshot
+    # (merged by id, its record the later one), so a partnership is dated and explained from its first week
+    stints = ([x for x in archived if x.kind == 'school']
+              + O.merge_stints([x for x in archived if x.kind != 'school'], O.live_stints(w, pid, 'golfer')))
     if not stints:
-        out.append('<p class="muted">Dated stints are archived when a season ends.</p>' if not w.a else
-                   '<p class="muted">No coaches or caddies recorded.</p>')
+        out.append('<p class="muted">No coaches or caddies recorded.</p>')
         out.append(O.refusals_section(w, pid))             # approaches turned down, even with no partnership
         return ''.join(out)
     rows = OD.results(w, pid)
-    through = w.a.years[-1]
+    through = w.a.years[-1] if w.a and w.a.years else None
     for kind, title in (('coach', 'Coaches'), ('caddie', 'Caddies'), ('school', 'School teams')):
         ss = [s for s in stints if s.kind == kind]
         if not ss:
@@ -627,12 +630,15 @@ def team_history(w, pid):
                 began += O.esc(f'; turned down {len(s.declined)} approach{"es" if len(s.declined) > 1 else ""} '
                                'while together')
             table_rows.append([w.person_link(s.staff) if s.staff else O.esc(s.arrangement), O.esc(s.arrangement),
-                               O.when(s.start), O.when(s.end) if s.end else 'still together', *pair,
+                               O.when(s.start) + O._this_season(s, through), O.when(s.end) if s.end else 'still together',
+                               *pair,
                                str(len(during)), str(wins), began, O.esc(s.reason_end or '')])
-        out.append(f'<h2>{title}</h2>' + O.table(['Who', 'Arrangement', 'From', 'To', 'Fit', f'Rapport (end of {through})',
+        out.append(f'<h2>{title}</h2>' + O.table(['Who', 'Arrangement', 'From', 'To', 'Fit',
+                                                  f'Rapport (end of {through})' if through else 'Rapport',
                                                   'Starts together', 'Wins together', 'How it began', 'Why it ended'],
                                                  table_rows, numeric=(4, 5, 6, 7)))
-    out.append(f'<p class="muted">Stints as recorded at the end of {through}; starts and wins together are this golfer\'s '
+    out.append(f'<p class="muted">Stints as recorded at the end of {through}, and this season\'s as the running world '
+               'records them (marked "this season"); starts and wins together are this golfer\'s '
                'results with that person recorded on their team that week (their achievements, not the coach\'s or '
                'caddie\'s own wins). How it began: who approached whom and why, and why the other side said yes '
                '(recorded from rules 2026-11-04). ' + O.PAIR_NOTE + ' Changes since then show under “Now” and in each '

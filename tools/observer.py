@@ -1656,6 +1656,35 @@ def _results(w, q, pid):
           'rule in words, linked to the rules page, with the code recorded at the time.</p>')
 
 
+def live_stints(w, pid, side, kind=None):
+    """Coaching and caddying stints the running world's snapshot holds with this person as `side` ('staff' or
+    'golfer'): those begun or ended in the season not archived yet, read from the captured snapshot (never the
+    running Season), as stint-like records marked `live`. A stint keeps its id for good, so a caller merging these
+    with the history's stints by id reads each once, the snapshot's record being the later one (its end, if any)."""
+    from types import SimpleNamespace
+    out = []
+    for d in (getattr(w.live, 'stints', None) or ()) if w.live is not None else ():
+        if d.get(side) == pid and d.get('staff') and d.get('kind') != 'school' and (kind is None or d['kind'] == kind):
+            out.append(SimpleNamespace(**{**d, 'start': tuple(d['start']), 'end': tuple(d['end']) if d['end'] else None,
+                                          'live': True}))
+    return out
+
+
+def _this_season(st, through):
+    """' this season' tag for a stint read from the snapshot that began after the last archived season."""
+    if getattr(st, 'live', False) and (through is None or st.start[0] > through):
+        return ' <span class="tag">this season</span>'
+    return ''
+
+
+def merge_stints(archived, live):
+    """Archived and live stints by id, each once, the live record replacing the archived one (its later end-state);
+    oldest first."""
+    got = {x.id: x for x in archived}
+    got.update((x.id, x) for x in live)
+    return sorted(got.values(), key=lambda x: (x.start, x.id))
+
+
 def _staff(w, pid, role):
     out = []
     p = w.person(pid) or {}
@@ -1665,10 +1694,16 @@ def _staff(w, pid, role):
                + (f' · {esc(info.get("background"))}' if info.get('background') else '') + '</p>')
     out.append(_staff_card(info, role))
     stints = w.a.staff_clients(pid, role) if w.a and pid in w.a.people else []
+    # this season's partnerships (begun or ended since the last archived season) from the snapshot, merged by id with
+    # the history's: the snapshot's record replaces the archived one; result counts are the archived seasons'
+    counts = {c['stint'].id: c for c in stints}
+    blank = {'starts': 0, 'wins': [], 'majors': [], 'by_year': {}}
+    rows_ = [{**counts.get(x.id, blank), 'stint': x}
+             for x in merge_stints([c['stint'] for c in stints], live_stints(w, pid, 'staff', role))]
     if w.live:
         now = sorted((g for g, s in (w.live.coach_of if role == 'coach' else w.live.caddie_of).items() if s == pid),
                      key=lambda g: (w.live.wr.get(g, 10 ** 9), g))
-        since = {c['stint'].golfer: c['stint'].start for c in stints if c['stint'].end is None}
+        since = {c['stint'].golfer: c['stint'].start for c in rows_ if c['stint'].end is None}
         out.append(f'<h2>Current {"clients" if role == "coach" else "player"} ({len(now)})</h2>' + (table(
             ['Golfer', 'Tour', 'Status', 'World', 'Since'],
             [[w.person_link(g), tour_link(w, w.live.people.get(g, {}).get('tour')),
@@ -1676,30 +1711,40 @@ def _staff(w, pid, role):
               esc(w.live.wr.get(g, '—')), esc(when(since[g]) if g in since else 'this season')]
              for g in now], numeric=(3,)) if now else '<p class="muted">Nobody at the moment.</p>')
             + '<p class="muted">Current assignments as of the date in the header. '
-            + ('Dated partnerships below are the recorded history' if stints else
-               'No partnership archived yet: dated partnerships are archived when a season ends')
+            + ('Dated partnerships below are the recorded history, this season\'s included' if rows_ else
+               'No partnership recorded yet')
             + '; results show the team at each event.</p>')
-    if stints:
+    if rows_:
         unit = 'weeks' if role == 'coach' else 'rounds'
-        out.append(f'<h2>All partnerships (through {w.a.years[-1]})</h2>' + table(
+        through = w.a.years[-1] if w.a and w.a.years else None
+        live_note = any(getattr(c['stint'], 'live', False) for c in rows_)
+        out.append(f'<h2>All partnerships ({f"through {through}" if through else "this season"}'
+                   f'{"; this season as the running world records it" if live_note and through else ""})</h2>' + table(
             ['Player', 'From', 'To', 'How it began', 'Arrangement', f'Worked together ({unit})', 'Fit',
-             f'Rapport (end of {w.a.years[-1]})', 'How it ended', 'Starts together', 'Wins', 'Majors'],
-            [[w.person_link(c['stint'].golfer), when(c['stint'].start),
+             f'Rapport (end of {through})' if through else 'Rapport', 'How it ended', 'Starts together', 'Wins',
+             'Majors'],
+            [[w.person_link(c['stint'].golfer), when(c['stint'].start) + _this_season(c['stint'], through),
               when(c['stint'].end) if c['stint'].end else 'still together',
-              _began(c['stint']), _arrangement(c['stint']), f'{c["stint"].work:,.0f}', *pair_cells(w, c['stint']),
+              _began(c['stint']), _arrangement(c['stint']),
+              f'{c["stint"].work:,.0f}' if getattr(c['stint'], 'work', None) is not None else NOT_RECORDED_TEXT,
+              *pair_cells(w, c['stint']),
               _ended(c['stint']) if c['stint'].end else '<span class="muted">—</span>',
-              str(c['starts']), str(len(c['wins'])), str(len(c['majors']))] for c in stints], numeric=(5, 6, 7, 9, 10, 11))
+              str(c['starts']), str(len(c['wins'])), str(len(c['majors']))] for c in rows_],
+            numeric=(5, 6, 7, 9, 10, 11))
             + '<p class="muted">As recorded when each partnership began and ended: who started it and why, the '
               'arrangement (a coaching fee per year, a share of winnings, a tour bag), the time actually worked '
-              'together and who ended it and why. ' + PAIR_NOTE + ' Results during a partnership are the client’s '
-              'achievements, association not proof of cause. Starts together count the archived seasons.</p>')
+              'together and who ended it and why. A partnership begun or ended this season is shown as the running '
+              'world records it (marked "this season"; time worked together is kept when the season is archived). '
+              + PAIR_NOTE + ' Results during a partnership are the client’s achievements, association not proof of '
+              'cause. Starts together count the archived seasons.</p>')
+    if stints:
         out.append(_staff_seasons(w, pid, role, stints))
     out.append(refusals_section(w, pid))              # (also for someone no partnership ever began with)
     if w.a and pid in w.a.people:
         hist = (w.a.people[pid].get(role) or {}).get('history') or []
         if hist:
             out.append('<h2>Staff career</h2><ul>' + ''.join(f'<li>{esc(y)}: {esc(t)}</li>' for y, t in hist) + '</ul>')
-    else:
+    elif not rows_:
         out.append('<p class="muted">Dated partnerships are archived when the season ends; until then each result shows '
                    'the team that week.</p>')
     return ''.join(out)

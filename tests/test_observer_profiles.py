@@ -171,20 +171,25 @@ class ProfilesAndStatsTests(unittest.TestCase):
         clients = sorted(g for g, c in lv.coach_of.items() if c == coach)
         section = html.split('Current clients')[1].split('</table>')[0]
         self.assertEqual(sorted(int(x) for x in re.findall(r'/golfer/(\d+)', section)), clients)
-        archived = w.a.staff_clients(coach, 'coach') if coach in w.a.people else []
-        if archived:                                                    # dated history kept apart
-            self.assertIn('All partnerships', html)
-            self.assertIn('Season by season', html)
-        else:                                                           # (every partnership began this season)
-            self.assertNotIn('All partnerships', html)
-            self.assertIn('No partnership archived yet', html)
+        self.assertIn('All partnerships', html)                         # every current client, dated and explained
+        table = html.split('All partnerships')[1].split('</table>')[0]
+        live = {x.golfer: x for x in O.live_stints(w, coach, 'staff', 'coach') if x.end is None}
+        archived = {c['stint'].golfer: c['stint'] for c in (w.a.staff_clients(coach, 'coach') if coach in w.a.people
+                                                              else []) if c['stint'].end is None}
+        for g in clients:
+            st = live.get(g) or archived.get(g)                         # (the snapshot's record is the later one)
+            self.assertIsNotNone(st, g)
+            row = next(r for r in table.split('<tr>') if f'/golfer/{g}"' in r)
+            self.assertIn(O.when(st.start), row)                        # dated, and who began it and why
+            self.assertIn(O._began(st), row)
+            if g in live and st.start[0] > w.a.years[-1]:
+                self.assertIn('this season', row)
         busiest = max((c for c in set(lv.coach_of.values()) if c in w.a.people and w.a.staff_clients(c, 'coach')),
                       key=lambda c: (len(w.a.staff_clients(c, 'coach')), -c), default=None)
         self.assertIsNotNone(busiest)                                   # a coach with archived partnerships:
         other = self.page(w, f'/golfer/{busiest}?tab=coaching')          # their dated history and seasons
         self.assertIn('All partnerships', other)
         self.assertIn('Season by season', other)
-        self.assertIn('Dated partnerships below are the recorded history', other)
 
     def test_moments_show_their_venue(self):
         d, w = self.world('moments')
@@ -294,6 +299,85 @@ class ProfilesAndStatsTests(unittest.TestCase):
         page = app.renderer.call(app.draw, '/worlds', {})
         self.assertIn('Starting year', page)
         self.assertIn('<td>2040</td>', page)
+
+
+class LivePartnerships(unittest.TestCase):
+    """The reviewed case, kept as a fixture: a coach whose seven current clients all began this season (nothing
+    archived for them yet) shows every partnership at once -- dated, who began it and why, why the other side said
+    yes -- from the snapshot; a stint the history holds and the snapshot has since ended is shown once, ended."""
+
+    def stint(self, i, g, start=(2028, 1), end=None, by='golfer'):
+        return {'id': i, 'kind': 'coach', 'staff': 304, 'golfer': g, 'start': list(start),
+                'end': list(end) if end else None, 'arrangement': 'fee', 'started_by': by,
+                'reason_start': f'reason {i}', 'reason_end': 'moved on' if end else '', 'ended_by': 'golfer' if end else None,
+                'terms': 0.0, 'reason_accept': f'accepted {i}', 'declined': []}
+
+    def world(self, archived=(), people=()):
+        from types import SimpleNamespace as NS
+        clients = list(range(1001, 1008))
+        live = NS(coach_of={g: 304 for g in clients}, caddie_of={}, wr={}, first_year=2027,
+                  people={g: {'tour': 'T', 'status': 'pro', 'lifestyle': 'full_time'} for g in clients},
+                  stints=[self.stint(i, g, by='golfer' if i % 2 else 'coach') for i, g in enumerate(clients, 1)])
+        arch = [NS(**{**d, 'start': tuple(d['start']), 'end': tuple(d['end']) if d['end'] else None, 'work': 30.0})
+                for d in archived]
+        a = NS(years=[2027], people={p: {} for p in people}, rel=NS(pairs={}),
+               staff_clients=lambda pid, kind=None: [{'stint': x, 'starts': 3, 'wins': [], 'majors': [], 'by_year': {}}
+                                                     for x in arch],
+               golfer_staff=lambda pid: [x for x in arch if x.golfer == pid])
+        w = NS(a=a, live=live, person=lambda pid: {'coach': {'status': 'active'}},
+               person_link=lambda pid: f'<a href="/golfer/{pid}">P{pid}</a>')
+        return w, clients
+
+    def render(self, w):
+        with mock.patch.object(O, '_staff_card', lambda info, role: ''), \
+                mock.patch.object(O, 'refusals_section', lambda w_, pid: ''), \
+                mock.patch.object(O, 'tour_link', lambda w_, t: str(t)), \
+                mock.patch.object(O, '_staff_seasons', lambda *a: '<h2>Season by season</h2>'):
+            return O._staff(w, 304, 'coach')
+
+    def test_seven_new_clients_show_at_once(self):
+        w, clients = self.world()
+        html = self.render(w)
+        self.assertIn('Current clients (7)', html)
+        self.assertIn('All partnerships (through 2027; this season as the running world records it)', html)
+        table = html.split('All partnerships')[1].split('</table>')[0]
+        for i, g in enumerate(clients, 1):
+            row = next(r for r in table.split('<tr>') if f'/golfer/{g}"' in r)
+            self.assertIn(O.when((2028, 1)), row)
+            self.assertIn('this season', row)
+            self.assertIn('the player' if i % 2 else 'the coach (an approach)', row)
+            self.assertIn(f'reason {i}', row)
+            self.assertIn(f'accepted {i}', row)
+        self.assertNotIn('Dated partnerships are archived when the season ends', html)
+        self.assertNotIn('Season by season', html)                      # (no archived season of work yet)
+        self.assertIn('Dated partnerships below are the recorded history', html)
+
+    def test_live_end_state_overrides_the_archive_once(self):
+        old = self.stint(50, 999, start=(2027, 1))                      # archived as still together at 2027's end
+        w, _ = self.world(archived=[old], people={304})
+        w.live.stints.append(self.stint(50, 999, start=(2027, 1), end=(2028, 10)))   # ended this season
+        html = self.render(w)
+        table = html.split('All partnerships')[1].split('</table>')[0]
+        rows = [r for r in table.split('<tr>') if '/golfer/999"' in r]
+        self.assertEqual(len(rows), 1)                                  # one stint, by id
+        self.assertIn(O.when((2028, 10)), rows[0])                      # the snapshot's end, not "still together"
+        self.assertNotIn('still together', rows[0])
+        self.assertIn('Season by season', html)                         # archived work: seasons shown
+
+    def test_golfer_profile_shows_this_seasons_partnership(self):
+        import observer_history as OH
+        w, clients = self.world()
+        g = clients[0]
+        w.live.people[g] = {'tour': 'T', 'status': 'pro', 'lifestyle': 'full_time'}
+        with mock.patch.object(O, 'refusals_section', lambda w_, pid: ''), \
+                mock.patch.object(OD, 'results', lambda w_, pid: []):
+            html = OH.team_history(w, g)
+        self.assertIn('<h2>Coaches</h2>', html)
+        self.assertIn(O.when((2028, 1)), html)
+        self.assertIn('this season', html)
+        self.assertIn('reason 1', html)
+        self.assertIn('accepted 1', html)
+        self.assertNotIn('No coaches or caddies recorded', html)
 
 
 if __name__ == '__main__':
