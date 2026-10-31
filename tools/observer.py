@@ -371,6 +371,8 @@ class World:
             for r in ('coach', 'caddie'):
                 if r in lp:
                     p[r] = {**p.get(r, {}), **lp[r]}
+            if lp.get('died'):                           # (a death recorded since the history was published)
+                p['died'] = lp['died']
         if p is not None:
             p['roles'] = [r for r in ('golfer', 'coach', 'caddie') if r in p]
         return p
@@ -917,6 +919,7 @@ def people_filter(w, q, role):
     top = int(one(q, 'top')) if (one(q, 'top') or '').isdigit() else None   # in the world ranking's top N now
     champs = major_champions(w) if one(q, 'champion') == 'major' else None
     wr = w.live.wr if w.live else {}
+    alive = one(q, 'alive', '') or ''                   # '', 'living' or 'deceased' (rules 2026-11-07)
 
     def keep(pid, p):
         if p is None or (role and role not in p['roles']):
@@ -936,6 +939,8 @@ def people_filter(w, q, role):
             return False
         st = (p.get(role, {}).get('status') if role in ('coach', 'caddie') else gs.get('lifestyle') or gs.get('status'))
         if status and st != status:
+            return False
+        if alive and (alive == 'deceased') != bool(p.get('died')):
             return False
         return st
     return keep
@@ -978,6 +983,7 @@ def directory(w, q, role='golfer'):
                                                     ('100', 'top 100')]))
         fields.append(('champion', 'Honors', [('', 'any'), ('major', 'major champion (archived seasons)')]))
     fields.append(('status', 'Status now', [('', 'any')] + [(s, s) for s in statuses]))
+    fields.append(('alive', 'Living or deceased', [('', 'everyone'), ('living', 'living'), ('deceased', 'deceased')]))
     fields.append(('sort', 'Sort', [(k, t) for k, t in (('rank', 'world ranking'), ('name', 'name'), ('born', 'youngest first'),
                                                        ('reputation', 'Prestige'), ('clients', 'clients now'))
                                     if (role == 'golfer' and k in ('rank', 'name', 'born', 'reputation'))
@@ -985,22 +991,31 @@ def directory(w, q, role='golfer'):
     chunk, pager = paged(rows, q, path)
     if role in ('coach', 'caddie'):
         body = table(['Name', 'Nation', 'Born', 'Status', 'Prestige', 'Clients now', 'Also'], [
-            [w.person_link(pid), nation_link(p.get('country')), esc(p.get('born')), esc(st),
+            [w.person_link(pid), nation_link(p.get('country')), esc(p.get('born')), status_cell(p, st),
              esc(p.get(role, {}).get('reputation', '')), str(clients.get(pid, 0)) if w.live else '',
              esc(', '.join(r for r in p['roles'] if r != role))] for pid, p, st in chunk], numeric=(2, 4, 5))
     else:
         body = table(['Name', 'Nation', 'Born', 'Status now', 'Tour now', 'World', 'Prestige', 'Roles'], [
-            [w.person_link(pid), nation_link(p.get('country')), esc(p.get('born')), esc(st),
+            [w.person_link(pid), nation_link(p.get('country')), esc(p.get('born')), status_cell(p, st),
              tour_link(w, p.get('golfer', {}).get('tour')), esc(wr.get(pid, '')),
              esc(golfer_prestige(w, pid, p) if golfer_prestige(w, pid, p) is not None else ''), esc(', '.join(p['roles']))]
             for pid, p, st in chunk], numeric=(2, 5, 6))
     note = ('<p class="muted">Everyone in the published history and the current world. "Now" is as of the date in the '
-            'header; retired people keep their pages. ' + ('Prestige: a golfer\'s public standing (0-100), now, or at '
+            'header; retired people keep their pages, and so do people who have died (marked deceased). ' + ('Prestige: a golfer\'s public standing (0-100), now, or at '
             'their last recorded season\'s end -- the last 52 weeks\' results plus a slowly fading legacy of majors '
             'and other big wins; not a rating of ability. Blank where not recorded.' if role in (None, 'golfer') else
             'Prestige: their public reputation (0-100) in this role, not a measure of their skill.') + '</p>')
     return ROLE_TITLES[role] if not term else f'{ROLE_TITLES[role]} matching “{term}”', \
         filters(path, q, fields) + note + body + pager
+
+
+def status_cell(p, st):
+    """A directory's status, with a deceased person marked (a staff record of someone who died already says
+    'deceased')."""
+    d = OD.died(p)
+    tag = (f' <span class="tag" title="{esc(OD.death_text(d))}">deceased</span>'
+           if d is not None and st != 'deceased' else '')
+    return esc(st) + tag
 
 
 def golfer_prestige(w, pid, p=None):
@@ -1037,8 +1052,11 @@ AGE_NOTE = ('Ages are the season’s year minus the birth year: birth dates are 
             'year more than the true one (approximate).')
 
 
-def age_text(w, born, year=None):
+def age_text(w, born, year=None, died=None):
+    """An age in a season (now by default), frozen at a recorded death (`died`: {'year', 'age'})."""
     year = year or now_year(w)
+    if died and born and year and year >= died['year']:
+        return f'{died["age"]}*'
     return f'{year - born}*' if born and year else '—'
 
 
@@ -1069,10 +1087,13 @@ def golfer(w, q, pid):
     out = []
     a = w.a
     initial = a and pid in a.people and a.people[pid].get('initial')
-    out.append(f'<p class="lead">Age {age_text(w, p.get("born"))} · born {esc(p.get("born"))} · '
-               f'{nation_link(p.get("country"))} · {esc(", ".join(roles))}'
+    dead = OD.died(p)
+    out.append(f'<p class="lead">'
+               + (f'{esc(OD.death_text(dead))} · ' if dead else f'Age {age_text(w, p.get("born"))} · ')
+               + f'born {esc(p.get("born"))} · {nation_link(p.get("country"))} · {esc(", ".join(roles))}'
                + (' · <span class="tag">career began before the archive</span>' if initial else '')
                + (' · <span class="tag">retired</span>' if OD.playing_status(p.get('golfer'))[0] == 'retired' else '')
+               + (' · <span class="tag">deceased</span>' if dead else '')
                + (f' · <a href="/compare?ids={pid}">compare</a>' if 'golfer' in roles else '')
                + '</p>' + shortlist_button(w, 'person', pid))
     geo = w.geography(pid)
@@ -1453,7 +1474,7 @@ def _season_history(w, q, pid, p, rows):
         label = (f'<a href="/golfer/{pid}?tab=season&year={y}" title="This season as it was">{y}</a>'
                  + (' <span class="tag">so far</span>' if live else ''))
         tour_cell = ', '.join(tour_link(w, t) for t in tours if t) or (tour_link(w, info.get('tour')) if info.get('tour') else '—')
-        out.append([label, age_text(w, born, y), tour_cell, esc(info.get('status') or (p.get('golfer') or {}).get('status')
+        out.append([label, age_text(w, born, y, OD.died(p)), tour_cell, esc(info.get('status') or (p.get('golfer') or {}).get('status')
                                                                 if live else info.get('status') or '')]
                    + cells(y, None, a, money(prize) if prize is not None else '<span class="muted">—</span>')
                    + [esc(info.get('wr_end') or (w.live.wr.get(pid) if live and w.live else '') or '—')])

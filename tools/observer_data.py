@@ -106,6 +106,29 @@ def playing_status(golfer):
     return 'active', st
 
 
+def died(p):
+    """A person's recorded death ({'year', 'week', 'age'}: the winter after season `year`, aged `age`), or None.
+    `p`: a person as the observer reads them (World.person)."""
+    return (p or {}).get('died')
+
+
+def death_text(d):
+    """The recorded fact, nothing more: "Died in the winter after season Y, aged N"."""
+    return f'Died in the winter after season {d["year"]}, aged {d["age"]}'
+
+
+def age_at(p, year):
+    """A person's age in a season (the season's year minus the birth year), frozen at their death: never more
+    than the age recorded when they died. None when the birth year is unknown."""
+    born = (p or {}).get('born')
+    if not born or year is None:
+        return None
+    d = died(p)
+    if d is not None and year >= d['year']:
+        return d['age']
+    return year - born
+
+
 def is_qualifying(r):
     return r.get('tier') == 7
 

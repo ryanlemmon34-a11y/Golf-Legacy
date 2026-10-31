@@ -94,7 +94,9 @@ class Cohorts(unittest.TestCase):
             self.assertEqual(f['best_wr'], min((r['wr_end'] for r in got if r['wr_end']), default=None))
             live = self.w.live.people[pid]                               # where they are now: today's snapshot
             kind = f['now']
-            if live.get('lifestyle') == 'retired':
+            if live.get('died'):                                          # (rules 2026-11-07)
+                self.assertEqual(kind, 'died')
+            elif live.get('lifestyle') == 'retired':
                 self.assertEqual(kind, 'retired')
             elif live.get('status') == 'amateur':
                 self.assertEqual(kind, 'amateur')
