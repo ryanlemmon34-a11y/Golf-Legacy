@@ -34,7 +34,11 @@ Asserted per row (subTest by case_id): in the field by one of its own routes and
 'entered' with the row's routes and state and its money facts (could not pay; paid by the organizer); exactly one
 organizer travel grant covering travel and entry, nothing in the golfer's events ledger, cash moving only by what
 the books show; the caddie's week paid by the golfer. Each of the 172 conditional rows is also run with a golfer
-who has turned professional: the place lapses ('expired: turned professional') and nothing is paid. Summary checks:
+who has turned professional: the place lapses ('expired: turned professional') and nothing is paid. For one row of
+each of the 10 (status, major, state) groups, the week's admission (special_field -> major_field -> lock_rights)
+and the trip's booking (reserve) are run twice more on the same state inside that week: the field, rights (with
+their money facts), grants, bookings, ledger and cash are unchanged, and the week still ends with one grant.
+Summary checks:
 269/269 case ids; Harper 8/8 (2 recorded in 2047 + the 6 modeled 2048-2050).
 
 What it does not do: it is not a replay of Test 1 and uses no historical balance or trip cost (none is recorded;

@@ -14,7 +14,9 @@ Each row asserts: the place is used (in the field, played), the right is recorde
 and money facts (could not pay; paid by the organizer), the organizer paid the travel and entry once, in kind (one
 travel grant; nothing in the golfer's events ledger; cash moves only by what the books show), and the caddie's
 week stays the golfer's. Every conditional row is run a second time with a golfer who has turned professional:
-the place lapses ('expired: turned professional'), nobody pays anything.
+the place lapses ('expired: turned professional'), nobody pays anything. For one row of each (status, major,
+state) the week's admission and booking are also repeated twice on the same state, inside that week: no second
+place, right, grant, charge or booking.
 
 Rows are grouped by category (status, major, earned/conditional, routes): one fact recipe per category, asserted
 row by row with subTest(case_id). About 15 seconds on a tiny world (scale 0.01); no season is simulated.
@@ -99,6 +101,10 @@ class Coverage269(unittest.TestCase):
                          for st in ('amateur', 'pro', 'club_pro')}
         cls.cut = s.cal.spec.cutoffs
         cls.out, cls.lapsed = {}, {}
+        cls.repeat = {}                       # one row per (status, major, state): admission repeated on the same state
+        for r in cls.rows:
+            cls.repeat.setdefault((r['status'], r['major'], r['right_state']), r['case_id'])
+        cls.repeat_ids = set(cls.repeat.values())
         for r in sorted(cls.rows, key=lambda r: (r['year'], r['event_week'], r['case_id'])):
             cls.out[r['case_id']] = cls.run_row(r, lapse=False)
             if r['right_state'] == 'conditional':
@@ -156,7 +162,11 @@ class Coverage269(unittest.TestCase):
         cash0 = g.cash
         spend0 = s.spendable(g, y)
         s.year = y
-        s.run_week(y, wk, [ed])                                        # the major's week, through the real path
+        repeat = cls.repeat_within_the_week(r, g, ed) if not lapse and r['case_id'] in cls.repeat_ids else None
+        try:
+            s.run_week(y, wk, [ed])                                    # the major's week, through the real path
+        finally:
+            cls.stop_repeating()
         res = s.results.get(ed.event_id)                               # (an unheld week keeps an older result)
         out = dict(
             gid=g.id, event=ed.event_id, week=wk, spendable_before=spend0,
@@ -170,11 +180,53 @@ class Coverage269(unittest.TestCase):
             caddie_share=led().caddie_share if led() else 0.0,
             net=led().net if led() else 0.0, cash=g.cash - cash0,
             caddie_fee=k.weekly_fee, caddie_receipts=s.staff_receipts[y][('caddie', k.id)] - receipts,
-            cost=FIN.event_cost(g, ed.series, s.lib.venues(y)[ed.event_id][0].city, s.home_country(g)))
+            cost=FIN.event_cost(g, ed.series, s.lib.venues(y)[ed.event_id][0].city, s.home_country(g)),
+            repeat=repeat)
         s.staff.end_caddie(s, g.id, (y, wk), 'scenario over', 'golfer')   # free the bag; retire the scenario golfer
         g.lifestyle = 'retired'
         s.injured.pop(g.id, None)
         return out
+
+    @classmethod
+    def repeat_within_the_week(cls, r, g, ed):
+        """For a representative row: inside the major's own week, on the SAME state, the admission (special_field
+        -> major_field -> lock_rights) is run twice more right after the real one, and the trip's booking
+        (reserve) twice more right after the real one. Returns {stage: (state before, state after the repeats)};
+        run_week then plays and records the event once, as always."""
+        s = cls.s
+        y, sid = r['year'], r['major']
+        led = lambda: s.ledgers[y].get(g.id)
+        state = lambda: dict(cash=g.cash, events=led().events if led() else 0.0, net=led().net if led() else 0.0,
+                             caddie=led().caddie if led() else 0.0, reserved=s._reserved.get(g.id, 0.0),
+                             caddie_week=g.id in s._caddie_week, routes=dict(s.entry_routes.get((y, sid), {})),
+                             rights=copy.deepcopy(s.major_rights[y].get(sid, {})),
+                             week_grants=sorted(x for x in s._week_grants if x[1] == g.id),
+                             grants=[dict(t) for t in s.travel_grants[y]], declined=list(s.declined[y].get(g.id, [])))
+        seen = {}
+        field_of, book = s.special_field, s.reserve                   # the real methods (bound)
+
+        def special_field(ed_, *a):
+            out = field_of(ed_, *a)
+            if ed_ is ed:
+                before = state()
+                again = [field_of(ed_, *a) for _ in range(2)]
+                seen['admission'] = (before, state(), [out] + again)
+            return out
+
+        def reserve(g_, series, city):
+            book(g_, series, city)
+            if g_ is g and series is ed.series:
+                before = state()
+                for _ in range(2):
+                    book(g_, series, city)
+                seen['booking'] = (before, state())
+        s.special_field, s.reserve = special_field, reserve           # (instance attributes: run_week calls these)
+        return seen
+
+    @classmethod
+    def stop_repeating(cls):
+        for name in ('special_field', 'reserve'):
+            cls.s.__dict__.pop(name, None)
 
     # ---- the table ------------------------------------------------------------------------------------
     def each(self, which=None):
@@ -222,6 +274,30 @@ class Coverage269(unittest.TestCase):
                 self.assertAlmostEqual(o['caddie'], o['caddie_fee'], places=2)
                 # the caddie is paid by the golfer: the week's fee (and a professional's prize share, if any)
                 self.assertAlmostEqual(o['caddie_receipts'], o['caddie_fee'] + o['caddie_share'], places=2)
+
+    def test_admission_again_on_the_same_state_changes_nothing(self):
+        """Idempotence beyond one run: the same week's admission and booking repeated on the same state add no
+        second place, right, grant, charge or booking, and the week still ends with exactly one grant."""
+        self.assertEqual(len(self.repeat), 10)                         # every (status, major, state) in the manifest
+        for r, tag, o in self.each(lambda r: r['case_id'] in self.repeat_ids):
+            with self.subTest(**tag):
+                gid = o['gid']
+                self.assertEqual(sorted(o['repeat']), ['admission', 'booking'])
+                b, a, fields = o['repeat']['admission']
+                self.assertEqual(len(fields), 3)                       # the real admission and two repeats
+                for f in fields:
+                    self.assertEqual(f, fields[0])                     # the same field each time
+                    self.assertEqual(sum(ids.count(gid) for ids in f), 1)   # one place
+                self.assertEqual(a, b)                                 # routes, rights (with their money), grants,
+                self.assertEqual(a['week_grants'], [(r['major'], gid)])   # ledger, cash, bookings: all unchanged
+                self.assertEqual(list(a['rights']).count(gid), 1)
+                self.assertEqual(a['rights'][gid]['money']['paid_by'], 'organizer')
+                b, a = o['repeat']['booking']
+                self.assertEqual(a, b)                                 # no second booking or charge
+                self.assertTrue(a['caddie_week'])                      # the caddie's week booked once
+                self.assertEqual(len(o['grants']), 1)                  # and one grant when the week is played
+                self.assertEqual(o['events'], 0.0)
+                self.assertAlmostEqual(o['caddie'], o['caddie_fee'], places=2)
 
     def test_a_conditional_place_lapses_on_turning_professional(self):
         for r, tag, o in self.each(lambda r: r['right_state'] == 'conditional'):
