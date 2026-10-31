@@ -260,10 +260,10 @@ class MyWorld(unittest.TestCase):
         pid = gone[0]
         items = lambda start: [(a, b, re.sub(r'<[^>]+>', '', h)) for a, b, k, h in
                                MW.digest(self.w, [('person', pid, '', '')], start) if k == 'status']
-        once = [(y - 1, 52, f'{self.w.name(pid)}: retired after the {y - 1} season')]   # dated that winter:
-        self.assertEqual(items((y - 1, 51)), once)                      # the season's end, week 52
-        self.assertEqual(items((y - 1, 52)), [])                        # read since (at week 1, "now" is
-        self.assertEqual(items((y, 1)), [])                             # last season's week 52): not again
+        once = [(y - 1, 53, f'{self.w.name(pid)}: retired after the {y - 1} season')]   # dated that winter:
+        self.assertEqual(items((y - 1, 52)), once)                      # after the season's end, week 53
+        self.assertEqual(items((y - 1, 53)), [])                        # read since (at week 1, "now" is
+        self.assertEqual(items((y, 1)), [])                             # last season's winter): not again
         with mock.patch.object(lv, 'cursor', {**lv.cursor, 'year': y + 1, 'week': 5}):
             self.assertEqual(items((y, 30)), [])                        # a season later: still not again
             self.assertEqual(items((y - 1, 51)), once)                  # the same event, the same date

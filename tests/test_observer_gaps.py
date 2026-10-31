@@ -197,13 +197,13 @@ class UnitTeamNews(unittest.TestCase):
         got = collect(MW._staff_role, w, 5, (2030, 0))
         self.assertEqual(len(got), 1)
         y, wk, kind, html, key = got[0]
-        self.assertEqual((y, wk, kind, key), (2031, 52, 'staff role', ('staff-role', 5, 2031)))
+        self.assertEqual((y, wk, kind, key), (2031, 53, 'staff role', ('staff-role', 5, 2031)))
         self.assertIn('P5 retired from playing after the 2031 season and became a coach at 41 (they stopped '
                       'chasing a playing career)', html)
         raw = []
         MW._staff_role(w, 5, (2030, 0), lambda *a, **k: raw.append(a[3]))
         self.assertIn('href="/golfer/5?tab=coaching"', raw[0])
-        self.assertEqual(collect(MW._staff_role, w, 5, (2031, 52)), [])  # read since: not again
+        self.assertEqual(collect(MW._staff_role, w, 5, (2031, 53)), [])  # read since: not again
         nobody = FakeWorld(roles={5: ['golfer']}, transitions={2031: [t]})
         self.assertEqual(collect(MW._staff_role, nobody, 5, (2030, 0)), [])   # no staff career: nothing read
 
@@ -213,7 +213,7 @@ class UnitTeamNews(unittest.TestCase):
                       years=(2029, 2030))
         with mock.patch.object(OD, 'career_rows', lambda w_, pid: [(2029, {}), (2030, {'decisions': [t]})]):
             got = collect(MW._staff_role, w, 5, (2029, 0))
-        self.assertEqual([(x[0], x[1], x[4]) for x in got], [(2030, 52, ('staff-role', 5, 2030))])
+        self.assertEqual([(x[0], x[1], x[4]) for x in got], [(2030, 53, ('staff-role', 5, 2030))])
         self.assertIn('became a caddie at 30', got[0][3])
         self.assertNotIn('stopped chasing', got[0][3])
         plain = {'gid': 5, 'kind': 'retired', 'age': 30}
@@ -224,7 +224,7 @@ class UnitTeamNews(unittest.TestCase):
 
 class UnitWinterBoundary(unittest.TestCase):
     """The review's case: a retirement into coaching decided in the winter after 2031, the world at 2032 week 1. The
-    digest's "now" is 2031 week 52, and "Mark all as read" stores it: every item shown then must be read by it --
+    digest's "now" is the winter after 2031 (week 53), and "Mark all as read" stores it: every item shown then must be read by it --
     the retirement, the staff role, a major won in week 52, a change of tour or status -- and none returned again."""
 
     def world(self):
@@ -247,10 +247,10 @@ class UnitWinterBoundary(unittest.TestCase):
     def test_marked_read_at_week_one_reads_the_winter(self):
         w = self.world()
         seen = MW.now(w)
-        self.assertEqual(seen, (2031, 52))
+        self.assertEqual(seen, (2031, 53))
         shown = self.items(w, (2031, 40))                               # before marking read: all three, dated
         self.assertEqual(sorted((x[0], x[1], x[2]) for x in shown),    # no later than "now"
-                         [(2031, 52, 'shared major'), (2031, 52, 'staff role'), (2031, 52, 'status')])
+                         [(2031, 52, 'shared major'), (2031, 53, 'staff role'), (2031, 53, 'status')])
         self.assertIn('P5: retired after the 2031 season', [x[3] for x in shown])
         self.assertEqual(self.items(w, seen), [])                       # read: none returned again
         w.live.cursor = {'year': 2032, 'week': 9}                       # (and not later either)
@@ -267,11 +267,75 @@ class UnitWinterBoundary(unittest.TestCase):
         seen = MW.now(w)
         shown = collect(MW._status_changes, w, 5, (2029, 0))
         self.assertEqual([(x[0], x[1], x[3]) for x in sorted(shown)],
-                         [(2030, 52, 'P5: Tour → Upper (season 2031)'),
-                          (2031, 52, 'P5: pro → club_pro (season 2032)')])    # each dated the winter it was decided
+                         [(2030, 53, 'P5: Tour → Upper (season 2031)'),
+                          (2031, 53, 'P5: pro → club_pro (season 2032)')])    # each dated the winter it was decided
         self.assertTrue(all((x[0], x[1]) <= seen for x in shown))       # never after "now" at week 1
         self.assertEqual(collect(MW._status_changes, w, 5, seen), [])   # marked read: not returned
-        self.assertEqual([x[:2] for x in collect(MW._status_changes, w, 5, (2031, 51))], [(2031, 52)])
+        self.assertEqual([x[:2] for x in collect(MW._status_changes, w, 5, (2031, 51))], [(2031, 53)])
+
+
+class UnitWinterDeathAndDeparture(unittest.TestCase):
+    """A followed golfer who died in the winter after 2031, and the coaching partnership the death ended (both dated
+    (2031, 53)): "Mark all as read" at the season-end cursor clears both together, the same after the world is
+    reopened from its history alone, and a record of the next season's week 1 is never hidden by it."""
+
+    def world(self):
+        w = FakeWorld([], [stint(1, 'coach', 10, 5, (2031, 1), (2031, 53)),
+                           stint(2, 'caddie', 21, 6, (2032, 1), archived=False)],
+                      roles={5: ['golfer'], 6: ['golfer'], 10: ['coach'], 21: ['caddie']}, years=(2030, 2031))
+        died = {'year': 2031, 'week': 53, 'age': 81}
+        w.person = lambda pid: {'roles': w.roles.get(pid, ['golfer']), **({'died': died} if pid == 5 else {})}
+        w.live.cursor = {'year': 2032, 'week': 1}
+        w.a.index = None
+        w.tours = lambda: {}
+        w.editions_of = lambda sid: []
+        return w
+
+    def items(self, w, start, follow=(5, 10, 6)):
+        with mock.patch.object(OD, 'career_rows', lambda w_, pid: []), \
+                mock.patch.object(MW, '_ranking_band', lambda *a, **k: None):  # (no ranking in this world)
+            return sorted((x[0], x[1], x[2]) for x in MW.digest(w, [('person', p, '', '') for p in follow], start))
+
+    def marked(self, w):
+        saved = []
+        with mock.patch.object(O, '_shortlist_file', lambda w_: {'items': []}), \
+                mock.patch.object(O, '_write_shortlist', lambda w_, items, seen: saved.append(seen)):
+            self.assertTrue(O.mark_read(w))
+        return tuple(saved[0])
+
+    def test_cleared_together_at_the_season_end_cursor(self):
+        w = self.world()
+        w.read_only = False
+        before = self.items(w, (2031, 40), follow=(5, 10))
+        self.assertEqual(before, [(2031, 53, 'departure'), (2031, 53, 'status')])   # (one partnership, one item)
+        seen = self.marked(w)
+        self.assertEqual(seen, (2031, 53))
+        self.assertEqual(self.items(w, seen, follow=(5, 10)), [])       # the death and the departure, together
+
+    def test_and_after_reopening_from_the_history(self):
+        w = self.world()
+        w.read_only = False
+        w.live = None                                                   # reopened: the archive alone
+        self.assertEqual(MW.now(w), (2031, 53))
+        seen = self.marked(w)
+        self.assertEqual(self.items(w, seen, follow=(5, 10)), [])
+        self.assertEqual(self.items(self.world(), seen, follow=(5, 10)), [])   # and resumed: the same watermark
+
+    def test_next_seasons_week_one_is_not_hidden(self):
+        w = self.world()
+        w.read_only = False
+        seen = self.marked(w)
+        w.live.cursor = {'year': 2032, 'week': 2}                       # week 1 played: its records are new
+        self.assertEqual(MW.now(w), (2032, 1))
+        self.assertEqual(self.items(w, seen), [(2032, 1, 'partnership')])
+        self.assertEqual(self.items(w, MW.now(w)), [])
+
+    def test_the_winter_reads_the_season_end_ranking(self):
+        import observer_golf as OG
+        w = self.world()
+        snap = {'ranking_points': {'52': [[6, 9.0], [5, 4.0]]}}       # (no week-53 ranking is ever published)
+        with mock.patch.object(OG, '_rankings', lambda w_, y: snap if y == 2031 else {}):
+            self.assertEqual(MW._rank_at(w, *MW.now(w), 5), (True, 2))
 
 
 class UnitRoundConditions(unittest.TestCase):
@@ -451,7 +515,7 @@ class WorldGaps(unittest.TestCase):
         for g, (y, role) in want.items():
             mine = [x for x in got if x[3].startswith(f'<a href="/golfer/{g}">')]
             self.assertEqual(len(mine), 1, g)
-            self.assertEqual(mine[0][:2], (y, 52))
+            self.assertEqual(mine[0][:2], (y, 53))
             self.assertIn(f'after the {y} season and became a {role}', text(mine[0][3]))
             self.assertIn(f'href="/golfer/{g}?tab={"coaching" if role == "coach" else "caddying"}"', mine[0][3])
         not_staff = [('person', g, '', None) for g, p in self.w.live.people.items()

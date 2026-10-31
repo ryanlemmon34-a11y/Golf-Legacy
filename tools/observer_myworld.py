@@ -10,8 +10,8 @@ worded, since you last marked it read (or over a window you choose):
   10, top 50, top 100) between the start of the window and now;
 
   Winter changes -- a change of tour or status, a retirement, a retirement into coaching or caddying, a partnership
-  ended at a season's end -- are dated when decided, at the end of the season before (its week 52), so they are
-  inside the read marker set in the next season's week 1. A consequence: the "this season" window (from the new
+  ended at a season's end, a death -- are dated when decided, in the winter after the season before (its week 53,
+  shown as "winter"), so they are inside the read marker set in the next season's week 1. A consequence: the "this season" window (from the new
   season's week 0) does not include last winter's changes; a window reaching back to last season's end does.
 * a followed golfer's injuries (when, where, what and the weeks announced) and returns (their first appearance
   once they could enter again, and their first main event back when that appearance was a qualifying stage), as
@@ -19,12 +19,12 @@ worded, since you last marked it read (or over a window you choose):
 * a followed golfer's, coach's or caddie's partnerships (coaching and caddying stints): each one begun (a reunion
   when the same pair had worked together before) and each one ended, with who ended it and why as recorded.
   Stints come from the history's relations table and, for seasons not archived yet, the snapshot; a stint keeps its
-  id, so one available from both is one item. A stint ended at a season's end is dated that season's week 52.
+  id, so one available from both is one item. A stint ended at a season's end is dated that season's winter (week 53).
 * a followed golfer's, coach's or caddie's first major won together: the first major a golfer won with that coach or
   caddie on their team as the event recorded it (the team kept with each result, not a guess from the dates);
 * a followed golfer's retirement into a staff role: the recorded career decision "became coach" or "became caddie"
   (season files, and the snapshot for a season not archived yet), dated like the retirement: the end of the season
-  it followed (week 52, as a partnership ended at a season's end), with a link to the new career;
+  it followed (week 53, as a partnership ended at a season's end), with a link to the new career;
 * a followed tournament's or tour's editions played (with their winners); a course's editions and course records
   set there; a nation's golfers' wins in majors and Premier events; a followed edition once played.
 
@@ -52,11 +52,14 @@ def _o():
 
 
 def now(w):
-    """(year, week) of the latest week played (the snapshot's), or the history's last season end."""
+    """(year, week) of the latest week played (the snapshot's), or the history's last season end. Between seasons
+    (the cursor at the next season's week 1) it is the winter just past, (year, 53): everything decided at the
+    season's end -- retirements, deaths, the partnerships they end, changes of tour or status -- is dated then, so
+    'Mark all as read' covers it while next season's week 1 stays ahead."""
     if w.live is not None:
         c = w.live.cursor
-        return (c['year'], c['week'] - 1) if c['week'] > 1 else (c['year'] - 1, 52)
-    return (w.a.years[-1], 52) if w.a else (0, 0)
+        return (c['year'], c['week'] - 1) if c['week'] > 1 else (c['year'] - 1, 53)
+    return (w.a.years[-1], 53) if w.a else (0, 0)
 
 
 def _yw(text):
@@ -79,7 +82,7 @@ def window_start(w, q, seen):
         return (y, 0), WINDOWS[win], win
     if win.isdigit():
         n = int(win)
-        k = y * 52 + wk - n
+        k = y * 52 + min(wk, 52) - n                   # (the winter counts as its season's end)
         return (k // 52, k % 52), WINDOWS.get(win, f'the last {n} weeks'), win
     if seen:
         return tuple(seen), WINDOWS['new'], 'new'
@@ -230,8 +233,9 @@ def stints_of(w, pid):
 
 
 def _dated(t):
-    """A stint's date as a digest (year, week): week 53, a season's end (after its week 52), is week 52."""
-    return (t[0], min(t[1], 52))
+    """A recorded date as a digest (year, week); week 53 is the winter after season `year` (after its week 52),
+    shown as 'winter' and covered by the watermark between seasons (now())."""
+    return (t[0], t[1])
 
 
 def _partnerships(w, pid, start, add):
@@ -321,8 +325,7 @@ def staff_transitions(w, pid):
 
 def _staff_role(w, pid, start, add):
     """A followed golfer's retirement into coaching or caddying, as the career decision recorded it: dated when it
-    was decided, in the winter at the end of that season (season end, week 53, is the digest's week 52, as a
-    partnership ended at a season's end), so marking the digest read once that season is over covers it. Once per
+    was decided, in the winter at the end of that season (week 53, as a partnership ended at a season's end), so marking the digest read once that season is over covers it. Once per
     decision."""
     O = _o()
     for y, t in staff_transitions(w, pid):
@@ -339,9 +342,9 @@ def _staff_role(w, pid, start, add):
 
 def _status_changes(w, pid, start, add):
     """Season-end changes of tour or status (archived seasons), and the current season's against the last one. Each is
-    dated when it was decided: the end of the season before (week 53, the digest's week 52, as retirements and
-    partnerships ended at a season's end), so marking the digest read in week 1 -- when "now" is last season's week
-    52 -- covers it."""
+    dated when it was decided: the winter after the season before (week 53, as retirements and partnerships ended
+    at a season's end), so marking the digest read in week 1 -- when "now" is last season's winter, week 53 --
+    covers it."""
     O = _o()
     rows = w.a.index.seasons(pid) if (w.a and w.a.index is not None) else []
     tours = w.tours()
@@ -367,7 +370,7 @@ def _status_changes(w, pid, start, add):
     now_ = live or ((w.person(pid) or {}).get('golfer'))
     if now_ and now_.get('lifestyle') == 'retired' and last.get('lifestyle') != 'retired':
         when = _dated((last['year'], 53))              # one dated event: retired in the winter after their last
-        if _after(start, *when):                       # season (its end: week 52), however often it is read
+        if _after(start, *when):                       # season (the winter, week 53), however often it is read
             add(*when, 'status', f'{w.person_link(pid)}: retired after the {last["year"]} season')
         return
     cy = w.live.cursor['year'] if live else None
@@ -382,6 +385,7 @@ def _ranking_week(w, y, wk):
     for that week (never another week's ranking in its place)."""
     if wk <= 0:
         y, wk = y - 1, 52
+    wk = min(wk, 52)                                   # (the winter: the ranking published at the season's end)
     if w.live is not None and y == w.live.cursor['year'] and not (w.a and y in w.a.years):
         top = getattr(w.live, 'rank_top', None) or {}
         rows = top.get(wk) or top.get(str(wk))
