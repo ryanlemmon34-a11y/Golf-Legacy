@@ -1675,8 +1675,10 @@ def _staff(w, pid, role):
               esc(f'{w.live.people.get(g, {}).get("status")} / {w.live.people.get(g, {}).get("lifestyle")}'),
               esc(w.live.wr.get(g, '—')), esc(when(since[g]) if g in since else 'this season')]
              for g in now], numeric=(3,)) if now else '<p class="muted">Nobody at the moment.</p>')
-            + '<p class="muted">Current assignments as of the date in the header. Dated partnerships below are the '
-              'recorded history; results show the team at each event.</p>')
+            + '<p class="muted">Current assignments as of the date in the header. '
+            + ('Dated partnerships below are the recorded history' if stints else
+               'No partnership archived yet: dated partnerships are archived when a season ends')
+            + '; results show the team at each event.</p>')
     if stints:
         unit = 'weeks' if role == 'coach' else 'rounds'
         out.append(f'<h2>All partnerships (through {w.a.years[-1]})</h2>' + table(

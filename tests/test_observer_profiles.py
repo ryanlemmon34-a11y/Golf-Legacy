@@ -171,8 +171,20 @@ class ProfilesAndStatsTests(unittest.TestCase):
         clients = sorted(g for g, c in lv.coach_of.items() if c == coach)
         section = html.split('Current clients')[1].split('</table>')[0]
         self.assertEqual(sorted(int(x) for x in re.findall(r'/golfer/(\d+)', section)), clients)
-        self.assertIn('All partnerships', html)                         # dated history kept apart
-        self.assertIn('Season by season', html)
+        archived = w.a.staff_clients(coach, 'coach') if coach in w.a.people else []
+        if archived:                                                    # dated history kept apart
+            self.assertIn('All partnerships', html)
+            self.assertIn('Season by season', html)
+        else:                                                           # (every partnership began this season)
+            self.assertNotIn('All partnerships', html)
+            self.assertIn('No partnership archived yet', html)
+        busiest = max((c for c in set(lv.coach_of.values()) if c in w.a.people and w.a.staff_clients(c, 'coach')),
+                      key=lambda c: (len(w.a.staff_clients(c, 'coach')), -c), default=None)
+        self.assertIsNotNone(busiest)                                   # a coach with archived partnerships:
+        other = self.page(w, f'/golfer/{busiest}?tab=coaching')          # their dated history and seasons
+        self.assertIn('All partnerships', other)
+        self.assertIn('Season by season', other)
+        self.assertIn('Dated partnerships below are the recorded history', other)
 
     def test_moments_show_their_venue(self):
         d, w = self.world('moments')
