@@ -43,7 +43,9 @@ class Compare(unittest.TestCase):
         lv = cls.w.live
         ranked = sorted(lv.wr, key=lv.wr.get)
         cls.a, cls.b = ranked[0], ranked[1]
-        cls.champ = next((m[4] for m in OH.major_wins(cls.w)), cls.a)
+        # a major champion who is not the world No. 1 (who may well have won majors too): the comparison is of
+        # two different golfers, so each column's totals are checked against that golfer's own records
+        cls.champ = next((m[4] for m in OH.major_wins(cls.w) if m[4] != cls.a), cls.b)
 
     @classmethod
     def tearDownClass(cls):
@@ -59,7 +61,9 @@ class Compare(unittest.TestCase):
         return [re.sub(r'<[^>]+>', '', c).strip() for c in re.findall(r'<td>(.*?)</td>', row, re.S)]
 
     def test_totals_come_from_the_records(self):
+        self.assertNotEqual(self.a, self.champ)
         html = self.page(f'/compare?ids={self.a},{self.champ}')
+        self.assertEqual(len(self.cells(html, 'Starts')), 2)            # one column per golfer
         for i, pid in enumerate((self.a, self.champ)):
             rows = OD.career_rows(self.w, pid)
             live = self.w.live.results(pid)

@@ -42,12 +42,18 @@ class ArchiveOnlyPeaks(unittest.TestCase):
             cls.arch._builder.wait(300)
         a = cls.arch.a
         cls.first, cls.last = a.years[0], a.years[-1]
-        cls.retired = []                                                # last season played: the first one
+        # retired golfers with a recorded peak who played the first season, grouped by the last season they
+        # played; the earliest such retirement is taken (the most archived seasons after it). Which golfers
+        # retire, and when, is a draw of the simulation: this world need not have anyone who stopped right
+        # after the first season, so the cohort is chosen, not assumed.
+        by_last = {}
         for pid in a.people:
             rows = OD.career_rows(cls.arch, pid)
-            if (rows and rows[-1][0] == cls.first and any(r.get('peak') for _, r in rows)
+            if (rows and rows[0][0] == cls.first and any(r.get('peak') for _, r in rows)
                     and ((cls.arch.person(pid) or {}).get('golfer') or {}).get('lifestyle') == 'retired'):
-                cls.retired.append(pid)
+                by_last.setdefault(rows[-1][0], []).append(pid)
+        cls.gone = min(by_last, default=None)                           # the last season they played
+        cls.retired = by_last.get(cls.gone, [])
 
     @classmethod
     def tearDownClass(cls):
@@ -59,8 +65,11 @@ class ArchiveOnlyPeaks(unittest.TestCase):
         import observer_cohort as OC
         import observer_data as OD
         self.assertIsNone(self.arch.live)
-        self.assertGreaterEqual(self.last - self.first, 3)              # several seasons after they retired
+        self.assertGreaterEqual(self.last - self.first, 3)              # several archived seasons
         self.assertTrue(self.retired)
+        self.assertLess(self.gone, self.last)                           # archived seasons after they retired:
+        for pid in self.retired:                                        # none of them has a row in those
+            self.assertEqual(OD.career_rows(self.arch, pid)[-1][0], self.gone)
         vals, missing = G.careers(self.arch, '')
         fol = OC.follow(self.arch, self.retired, self.first)
         for pid in self.retired:
