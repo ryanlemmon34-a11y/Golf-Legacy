@@ -78,6 +78,22 @@ Recorded as proposed by the reviewer; nothing is changed until the reviewer conf
 | P2 | Eligible college amateurs get equal home-region access to ordinary open amateur events, with the rotation counting amateur-event starts rather than school starts; closed, national and championship qualification unchanged; no universal field expansion, no forcing of target counts | between K1 and K2 (equal class, but limited to home-region ordinary open events) | the entry class in `Season.priority` for tier-6 ordinary open events when a college player's home region is the event's region (class 12 -> the members' class 10, `season.py:880-889`); the rotation key at `season.py:892-897`, which now counts every start this season (`self.played`), would count only open-amateur starts for those events; the 1.5x expansion and calendar unchanged | "home region": the college's region or the golfer's residence (the diagnosis' North America cases are both); which series count as "ordinary open" (excluding closed, national and championship); members' starts lost in full fields (to be reported); the same rotation for members, so their key would also count open-amateur starts |
 | P3 | Keep the current richer decision evidence despite the estimated 11-13 % archive growth; measure the actual full-world impact | -- (E1, d70a725) | nothing to change; the full-population smoke on the exact candidate measures season-file size with and without the evidence key, season time, save size and the 13-plan / 3-row bounds | the measured numbers replace the estimate in DECISION_EVIDENCE.md |
 
+### Required tests if P1 or P2 is approved (from review; nothing implemented yet)
+
+Independent review confirms all nine B cases meet the pathway's documented non-age safeguards and began outside
+the top 300 (lowest rank 380). The archive's season endpoints cannot prove that any of the nine seasons would have
+been rescued: the counterfactual must be measured on fresh worlds, not claimed.
+
+P1 (pathway from 18): boundary tests that keep every other exclusion -- age 17 excluded; a ranked top-300 amateur
+excluded; held support excluded; family money left excluded; 7 counted weeks not enough (8 needed); the decision
+only at the monthly plan (month timing unchanged); no grant, no guaranteed start.
+
+P2 (college access): reciprocal low-amateur-start priority (a college player and a member each go ahead of the
+other when they have fewer open-amateur starts); equal class for a college player in their home region's ordinary
+open events; adding school (college-event) starts leaves the rotation unchanged; restricted, professional and
+out-of-region access unchanged (closed, national and championship qualification untouched); capacity fixed, no
+duplicate entries, deterministic tie-breaking. No guaranteed starts and no promise that nobody is displaced.
+
 ## 6. How a chosen option would be validated
 New dated rules version; fresh v2 worlds only; focused unit tests; then paired fresh full-population runs (option
 on/off, same seed) of 10 seasons with: under-21 floor seasons and zero-start counts, time to first start after the
