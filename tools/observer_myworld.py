@@ -22,6 +22,8 @@ from __future__ import annotations
 from collections import defaultdict
 from urllib.parse import quote
 
+import observer_stories as STORY
+
 BANDS = ((1, 'No. 1'), (10, 'the top 10'), (50, 'the top 50'), (100, 'the top 100'))
 WINDOWS = {'new': 'since last read', '4': 'the last 4 weeks', '13': 'the last 13 weeks', 'season': 'this season',
            '52': 'the last 52 weeks'}
@@ -100,10 +102,14 @@ def digest(w, items, start, until=None):
                 continue
             info = _ed_info(w, r['event'], cache)
             ev = O.event_link(w, r['event'])
+            story = ''
+            if STORY.notable({**info, 'pos': r['pos']}):  # a notable performance: its story, from their side
+                story = (f' · <a href="{O.esc(STORY.story_href(r["event"], None if r["pos"] == 1 else pid))}">'
+                         'story</a>')
             if r['pos'] == 1 and info['category'] not in ('qualifier', 'q_school'):
-                add(r['year'], r['week'], 'win', f'{link} won the {ev}', r['event'])
+                add(r['year'], r['week'], 'win', f'{link} won the {ev}{story}', r['event'])
             elif r['pos'] is not None and r['pos'] <= 10 and (major(info) or info['tier'] == 1):
-                add(r['year'], r['week'], 'top10', f'{link} finished {r["pos"]} at the {ev}', r['event'])
+                add(r['year'], r['week'], 'top10', f'{link} finished {r["pos"]} at the {ev}{story}', r['event'])
             elif r['pos'] is None and major(info):
                 add(r['year'], r['week'], 'cut', f'{link} missed the cut at the {ev}', r['event'])
         _status_changes(w, pid, start, add)

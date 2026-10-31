@@ -48,6 +48,7 @@ import observer_cohort as OC                                          # noqa: E4
 import observer_compare as OCMP                                       # noqa: E402
 import observer_goat as GOAT                                          # noqa: E402
 import observer_qual as OQ                                            # noqa: E402
+import observer_stories as STORY                                      # noqa: E402
 
 PAGE_SIZE = 100
 
@@ -1453,6 +1454,7 @@ def _playing(w, q, pid, p):
     if wins:
         out.append(f'<h2>Wins ({len(wins)})</h2>' + table(['Season', 'Event', 'Tour then'], [
             [esc(r['year']), event_link(w, r['event']), tour_link(w, r['tour'])] for r in reversed(wins)]))
+    out.append(STORY.profile_section(w, pid, rows))
     out.append(OG.ranking_section(w, pid))
     return ''.join(out)
 
@@ -1713,11 +1715,16 @@ def event(w, q, eid):
     base = f'/event/{quote(eid)}'
     out.append('<div class="tabs">' + ''.join(f'<a href="{base}?view={k}" class="{"on" if k == view else ""}">{esc(t)}</a>'
                                               for k, t in (('final', 'Final result'), ('rounds', 'Rounds & replay'),
-                                                           ('stats', 'Statistics')))
+                                                           ('stats', 'Statistics'), ('story', 'Story')))
                + '</div>')
-    if view in ('rounds', 'stats'):
-        out.append(OH.rounds_view(w, q, e) if view == 'rounds' else OG.edition_stats(w, e))
+    if view in ('rounds', 'stats', 'story'):
+        out.append(OH.rounds_view(w, q, e) if view == 'rounds' else OG.edition_stats(w, e) if view == 'stats'
+                   else STORY.story_view(w, q, e))
         return f'{eid.split(":")[0]} {e.get("name") or w.series_name(sid)}', ''.join(out)
+    if STORY.story_level(e):                          # majors and prestigious events: the story's first line
+        lead = STORY.headline(w, eid)
+        if lead:
+            out.append(f'<p class="story-lead">{lead} <a href="{esc(STORY.story_href(eid))}">Read the story</a></p>')
     prizes = {}
     if any(r.get('prize') is not None for r in rows):
         prizes = {(r['person'], r['site']): r['prize'] for r in rows if r.get('prize') is not None}

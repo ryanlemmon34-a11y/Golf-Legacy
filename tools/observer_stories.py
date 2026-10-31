@@ -705,8 +705,9 @@ def _perspective(src, pid, e, site, finish, scores, winner, par, y, wk, eid):
         best = min(range(len(rs)), key=lambda i: (rs[i], i))
         out['path'] = path
         out['best_round'] = {'round': best + 1, 'score': rs[best], 'to_par': rs[best] - par if par else None,
-                             'day_low': rs[best] == min(v[best] for v in scores.values() if len(v) > best)}
-        out['src'].append(ref(f'round {best + 1}', _round_href(eid, best + 1, site)))
+                             'day_low': rs[best] == min(v[best] for v in scores.values() if len(v) > best),
+                             'href': _round_href(eid, best + 1, site)}
+        out['rounds_src'] = [ref(f'after round {k}', _round_href(eid, k, site)) for k in range(1, len(rs) + 1)]
     rows = [r for r in (src.starts(pid) or []) if (r['year'], r['week']) < (y, wk) and r['event'] != eid]
     if is_major(e):
         prev = [r['pos'] for r in rows if is_major(r) and r['pos'] is not None]
@@ -883,32 +884,31 @@ class Writer:
             out.append(n)
         return out
 
-    def say(self, template, facts, extra_src=(), **slots):
-        src = []
-        for k in facts:
-            v = self.f.get(k)
-            items = v if isinstance(v, list) else [v]
-            for it in items:
-                for s in (it or {}).get('src', ()):
-                    if s not in src:
-                        src.append(s)
-        for s in extra_src:
-            if s not in src:
-                src.append(list(s))
-        self.out.append(Sentence(fill(template, **slots), facts, src))
+    # facts whose sentences link the round they speak of inline (their every-round sources would be noise)
+    INLINE = ('rounds',)
 
-    def say_parts(self, parts, facts, extra_src=()):
+    def _src(self, facts, extra_src):
         src = []
         for k in facts:
+            if k in self.INLINE:
+                continue
             v = self.f.get(k)
             for it in (v if isinstance(v, list) else [v]):
                 for s in (it or {}).get('src', ()):
                     if s not in src:
                         src.append(s)
-        src += [list(s) for s in extra_src if list(s) not in src]
+        for s in extra_src:
+            if list(s) not in src:
+                src.append(list(s))
+        return src
+
+    def say(self, template, facts, extra_src=(), **slots):
+        self.out.append(Sentence(fill(template, **slots), facts, self._src(facts, extra_src)))
+
+    def say_parts(self, parts, facts, extra_src=()):
         if parts and isinstance(parts[0], str):
             parts[0] = parts[0][:1].upper() + parts[0][1:]
-        self.out.append(Sentence(parts, facts, src))
+        self.out.append(Sentence(parts, facts, self._src(facts, extra_src)))
 
     def pick(self, slot, options):
         return pick(self.key, slot, options)
@@ -1177,7 +1177,7 @@ def _rounds(w, primary, tags):
         w.say(w.pick('r1', ['{W} opened with {S} to lead {A}{T}.', 'A first-round {S} put {W} in front {A}{T}.']),
               ['rounds'], W=W, S=s0, A=w.round_link(1), T=' (shared)' if path[0]['tied'] else '')
         if g and any(g):
-            w.say('The lead over the next player after each round: {G}.', ['rounds'],
+            w.say('The lead over the next player after each round: {G}.', ['rounds'], extra_src=r['src'],
                   G=', '.join('shared' if not x else strokes(x) for x in r['gap'][:n]))
         return
     # the first round's leader, unless it was the winner and the story leads elsewhere
@@ -1390,12 +1390,13 @@ def _perspective_section(w, primary, tags):
     if path:
         steps = ', '.join(place_text(x['pos'], x['tied']).replace('in the lead', '1st').replace('tied for the lead', 'T1')
                           .replace('tied for ', 'T') for x in path)
-        w.say('{P}\'s position after each round: {S}.', ['perspective'], P=P, S=steps)
+        w.say('{P}\'s position after each round: {S}.', [], extra_src=p['rounds_src'], P=P, S=steps)
         b = p.get('best_round')
         if b:
             tp = to_par_text(b['to_par'])
-            w.say('{P}\'s best round was {S}{TP} in round {K}{D}.', ['perspective'], P=P, S=b['score'],
-                  TP=f' ({tp})' if tp else '', K=b['round'], D=', the lowest of that round' if b['day_low'] else '')
+            w.say('{P}\'s best round was {S}{TP} in {K}{D}.', [], P=P, S=b['score'],
+                  TP=f' ({tp})' if tp else '', K=[f'round {b["round"]}', b['href']],
+                  D=', the lowest of that round' if b['day_low'] else '')
     if p.get('behind') is not None and p['pos'] is not None:
         w.say('{P} finished {B} behind the winner.', ['perspective'], P=P, B=strokes(p['behind']))
     if 'best_major_before' in p and p['pos'] is not None:

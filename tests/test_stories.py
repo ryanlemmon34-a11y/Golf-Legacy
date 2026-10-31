@@ -178,6 +178,7 @@ class StoryFactTests(unittest.TestCase):
         st = S.story_data(S.narrate(rec, lambda g: NAMES[g]))
         for s in st['sentences']:
             self.assertTrue(s['facts'] or s['src'], s)
+            self.assertTrue(s['src'] or any(not isinstance(p, str) for p in s['parts']), s)   # a claim, a link
             for p in s['parts']:
                 if not isinstance(p, str):
                     self.assertTrue(_resolves(src, p[1]), p)
@@ -508,6 +509,92 @@ def _resolves(src, href):
     if path == '/rankings':
         return (int(q['year'][0]), int(q['week'][0])) in src.rank
     return path in ('/grand-slam', '/moments')
+
+
+class StoryLiveViewTests(unittest.TestCase):
+    """The observer's own path (World, WorldSource, the edition page's Story tab, profiles' and My World's
+    entry points) over a hand-built snapshot of a current season: no simulation, no archive."""
+
+    def setUp(self):
+        import observer as O
+        from observer_live import LiveView
+        self.O = O
+        self.tmp = Path(tempfile.mkdtemp())
+        src = FakeSource()
+        runaway(src, '2030:TOUR_MASTERS', week=20)
+        comeback(src, '2030:PT_OPEN')
+        src.eds['2030:PT_OPEN'].update(series='PT_OPEN', tier=1, category='regular', kind='regular', name='Pine Open',
+                                       week=12, id='2030:PT_OPEN', tour='PT')
+        eds, by_person = {}, {}
+        for eid, e in src.eds.items():
+            e = {k: v for k, v in e.items() if k not in ('year', 'origin')}
+            e['team'] = {1: (11, 12)} if eid == '2030:TOUR_MASTERS' else {}
+            e['routes'] = {}
+            eds[eid] = e
+            for k, site in enumerate(e['finish']):
+                for g, pos, _ in site:
+                    by_person.setdefault(g, []).append((eid, k, pos))
+        people = {g: {'name': n, 'country': 'USA', 'born': 1995 + g, 'status': 'pro', 'lifestyle': 'full_time',
+                      'tour': 'PT', 'turned_pro': 2020, 'roles': ['golfer'], 'initial': g == 3}
+                  for g, n in NAMES.items()}
+        live = LiveView(cursor={'year': 2030, 'week': 30, 'phase': 'week'}, generation=7, year=2030, people=people,
+                        editions=eds, by_person=by_person, schedule=[], first_year=2030,
+                        series={'TOUR_MASTERS': {'name': 'Masters', 'tour': 'MAJORS', 'tier': 0, 'kind': 'major',
+                                                 'category': 'major'},
+                                'PT_OPEN': {'name': 'Pine Open', 'tour': 'PT', 'tier': 1, 'kind': 'regular',
+                                            'category': 'regular'}},
+                        courses={'AUG': {'name': 'Augusta Pines', 'layouts': {'main': {'par': 72}}}},
+                        tours={'PT': {'name': 'Premier Tour', 'tier': 1}, 'MAJORS': {'name': 'Majors', 'tier': 0}},
+                        rank_top={19: [[2, 9.0, 40], [1, 8.0, 40], [3, 7.0, 40]], 11: [[1, 9.0, 40], [5, 1.0, 40]]},
+                        moments=[{'kind': 'hole-in-one', 'person': 1, 'event': '2030:TOUR_MASTERS', 'week': 20,
+                                  'layout': 'AUG:main', 'hole': 7, 'stage': 'round 2'}],
+                        records={}, wr={}, am={}, home={}, first={}, birth={}, moves={}, rules_version='2026-11-03')
+        w = O.World.__new__(O.World)
+        w.path = w.archive_dir = self.tmp
+        w.session, w.a, w.live, w.label = None, None, live, 'test'
+        self.w = w
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_story_tab_and_facts(self):
+        O = self.O
+        title, body = O.event(self.w, {'view': ['story']}, '2030:TOUR_MASTERS')
+        self.assertIn('class="lead"', body)
+        self.assertIn('Ada Lin', body)
+        self.assertIn('hole-in-one at the 7th hole in round 2', body)
+        self.assertIn('/rankings?kind=points&amp;year=2030&amp;week=19', body)
+        self.assertIn('coached by', body)
+        facts = O.event(self.w, {'view': ['story'], 'facts': ['1']}, '2030:TOUR_MASTERS')[1]
+        self.assertIn('Recorded values', facts)
+        final = O.event(self.w, {}, '2030:TOUR_MASTERS')[1]
+        self.assertIn('Read the story', final)
+        self.assertIn('view=story', final)
+        # the current season's story is cached in memory only, keyed by the snapshot's generation
+        cache = S.cache_for(self.w)
+        self.assertTrue(any(k[0] == 'facts' and k[-1] == 'live:7' for k in cache.mem))
+
+    def test_perspective_and_comeback_on_the_page(self):
+        body = self.O.event(self.w, {'view': ['story'], 'for': ['2']}, '2030:PT_OPEN')[1]
+        self.assertIn('Bo Park', body)
+        self.assertIn('position after each round', body)
+        self.assertIn('12 strokes', body)
+
+    def test_entry_points(self):
+        import observer_data as OD
+        import observer_myworld as MW
+        rows = OD.results(self.w, 1)
+        sec = S.profile_section(self.w, 1, rows)
+        self.assertIn('view=story', sec)
+        self.assertIn('2030:TOUR_MASTERS', unquote(sec))
+        dig = MW.digest(self.w, [('person', '2', '', '')], (2030, 0))
+        self.assertTrue(any('for=2' in x[3] and 'story' in x[3] for x in dig), dig)   # 2nd at the Open: a story
+
+    def test_retained_history_on_the_page(self):
+        self.w.live.people[5]['initial'] = True                       # the winner was playing before the world began
+        body = self.O.event(self.w, {'view': ['story']}, '2030:PT_OPEN')[1]
+        self.assertIn('retained history', body)
+        self.assertIn('Not in the record', body)
 
 
 class StoryWorldTests(unittest.TestCase):
