@@ -197,13 +197,13 @@ class UnitTeamNews(unittest.TestCase):
         got = collect(MW._staff_role, w, 5, (2030, 0))
         self.assertEqual(len(got), 1)
         y, wk, kind, html, key = got[0]
-        self.assertEqual((y, wk, kind, key), (2032, 1, 'staff role', ('staff-role', 5, 2031)))
+        self.assertEqual((y, wk, kind, key), (2031, 52, 'staff role', ('staff-role', 5, 2031)))
         self.assertIn('P5 retired from playing after the 2031 season and became a coach at 41 (they stopped '
                       'chasing a playing career)', html)
         raw = []
         MW._staff_role(w, 5, (2030, 0), lambda *a, **k: raw.append(a[3]))
         self.assertIn('href="/golfer/5?tab=coaching"', raw[0])
-        self.assertEqual(collect(MW._staff_role, w, 5, (2032, 1)), [])  # read since: not again
+        self.assertEqual(collect(MW._staff_role, w, 5, (2031, 52)), [])  # read since: not again
         nobody = FakeWorld(roles={5: ['golfer']}, transitions={2031: [t]})
         self.assertEqual(collect(MW._staff_role, nobody, 5, (2030, 0)), [])   # no staff career: nothing read
 
@@ -213,13 +213,49 @@ class UnitTeamNews(unittest.TestCase):
                       years=(2029, 2030))
         with mock.patch.object(OD, 'career_rows', lambda w_, pid: [(2029, {}), (2030, {'decisions': [t]})]):
             got = collect(MW._staff_role, w, 5, (2029, 0))
-        self.assertEqual([(x[0], x[1], x[4]) for x in got], [(2031, 1, ('staff-role', 5, 2030))])
+        self.assertEqual([(x[0], x[1], x[4]) for x in got], [(2030, 52, ('staff-role', 5, 2030))])
         self.assertIn('became a caddie at 30', got[0][3])
         self.assertNotIn('stopped chasing', got[0][3])
         plain = {'gid': 5, 'kind': 'retired', 'age': 30}
         with mock.patch.object(OD, 'career_rows', lambda w_, pid: [(2030, {'decisions': [plain]})]), \
                 mock.patch.object(OH, 'decisions', lambda w_, pid, y: [plain]):
             self.assertEqual(collect(MW._staff_role, FakeWorld(roles={5: ['golfer', 'caddie']}), 5, (2029, 0)), [])
+
+
+class UnitWinterBoundary(unittest.TestCase):
+    """The review's case: a retirement into coaching decided in the winter after 2031, the world at 2032 week 1. The
+    digest's "now" is 2031 week 52, and "Mark all as read" stores it: every item shown then must be read by it --
+    the retirement, the staff role and a major won in week 52 -- and none returned again."""
+
+    def world(self):
+        w = FakeWorld([win(5, 2031, 52, '2031:MAJ_A', coach=10)], [stint(1, 'coach', 10, 5, (2031, 1))],
+                      roles={5: ['golfer', 'coach'], 10: ['coach']}, years=(2030, 2031))
+        w.live.cursor = {'year': 2032, 'week': 1}
+        w.live.people = {5: {'lifestyle': 'retired', 'status': 'pro', 'tour': ''}}
+        rows = [{'year': y, 'lifestyle': 'full_time', 'status': 'pro', 'tour': 'T'} for y in (2030, 2031)]
+        w.a.index = NS(seasons=lambda pid: rows if pid == 5 else [])
+        w.tours = lambda: {'T': {'name': 'Tour'}}
+        return w
+
+    def items(self, w, start):
+        decided = [(2030, {}), (2031, {'decisions': [{'gid': 5, 'kind': 'became coach', 'age': 40,
+                                                      'via': 'retirement'}]})]
+        with mock.patch.object(OD, 'career_rows', lambda w_, pid: decided if pid == 5 else []):
+            return (collect(MW._status_changes, w, 5, start) + collect(MW._staff_role, w, 5, start)
+                    + collect(MW._shared_majors, w, 5, start, lambda eid: eid in MAJORS))
+
+    def test_marked_read_at_week_one_reads_the_winter(self):
+        w = self.world()
+        seen = MW.now(w)
+        self.assertEqual(seen, (2031, 52))
+        shown = self.items(w, (2031, 40))                               # before marking read: all three, dated
+        self.assertEqual(sorted((x[0], x[1], x[2]) for x in shown),    # no later than "now"
+                         [(2031, 52, 'shared major'), (2031, 52, 'staff role'), (2031, 52, 'status')])
+        self.assertIn('P5: retired after the 2031 season', [x[3] for x in shown])
+        self.assertEqual(self.items(w, seen), [])                       # read: none returned again
+        w.live.cursor = {'year': 2032, 'week': 9}                       # (and not later either)
+        self.assertEqual(self.items(w, MW.now(w)), [])
+        self.assertEqual(len(self.items(w, (2031, 51))), 3)             # the same items, the same dates
 
 
 class UnitRoundConditions(unittest.TestCase):
@@ -399,7 +435,7 @@ class WorldGaps(unittest.TestCase):
         for g, (y, role) in want.items():
             mine = [x for x in got if x[3].startswith(f'<a href="/golfer/{g}">')]
             self.assertEqual(len(mine), 1, g)
-            self.assertEqual(mine[0][:2], (y + 1, 1))
+            self.assertEqual(mine[0][:2], (y, 52))
             self.assertIn(f'after the {y} season and became a {role}', text(mine[0][3]))
             self.assertIn(f'href="/golfer/{g}?tab={"coaching" if role == "coach" else "caddying"}"', mine[0][3])
         not_staff = [('person', g, '', None) for g, p in self.w.live.people.items()

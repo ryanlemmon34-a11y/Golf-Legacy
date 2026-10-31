@@ -18,8 +18,8 @@ worded, since you last marked it read (or over a window you choose):
 * a followed golfer's, coach's or caddie's first major won together: the first major a golfer won with that coach or
   caddie on their team as the event recorded it (the team kept with each result, not a guess from the dates);
 * a followed golfer's retirement into a staff role: the recorded career decision "became coach" or "became caddie"
-  (season files, and the snapshot for a season not archived yet), dated like the retirement (the next season's
-  week 1), with a link to the new career;
+  (season files, and the snapshot for a season not archived yet), dated like the retirement: the end of the season
+  it followed (week 52, as a partnership ended at a season's end), with a link to the new career;
 * a followed tournament's or tour's editions played (with their winners); a course's editions and course records
   set there; a nation's golfers' wins in majors and Premier events; a followed edition once played.
 
@@ -312,17 +312,19 @@ def staff_transitions(w, pid):
 
 
 def _staff_role(w, pid, start, add):
-    """A followed golfer's retirement into coaching or caddying, as the career decision recorded it: dated like the
-    retirement (the next season's week 1), once per decision."""
+    """A followed golfer's retirement into coaching or caddying, as the career decision recorded it: dated when it
+    was decided, in the winter at the end of that season (season end, week 53, is the digest's week 52, as a
+    partnership ended at a season's end), so marking the digest read once that season is over covers it. Once per
+    decision."""
     O = _o()
     for y, t in staff_transitions(w, pid):
         role = t['kind'].split(' ', 1)[1]
-        if role not in ('coach', 'caddie') or not _after(start, y + 1, 1):
+        if role not in ('coach', 'caddie') or not _after(start, *_dated((y, 53))):
             continue
         how = ' (they stopped chasing a playing career)' if t.get('via') == 'stopped chasing' else ''
         age = f' at {t["age"]}' if t.get('age') is not None else ''
         tab = 'coaching' if role == 'coach' else 'caddying'
-        add(y + 1, 1, 'staff role', f'{w.person_link(pid)} retired from playing after the {y} season and became a '
+        add(*_dated((y, 53)), 'staff role', f'{w.person_link(pid)} retired from playing after the {y} season and became a '
             f'{role}{age}{how}: <a href="/golfer/{pid}?tab={tab}">their {O.esc(role)} career</a>',
             key=('staff-role', pid, y))
 
@@ -342,7 +344,10 @@ def _status_changes(w, pid, start, add):
             return f'{name(a.get("tour"))} → {name(b.get("tour"))}'
         return None
     for a, b in zip(rows, rows[1:]):
-        if _after(start, b['year'], 1) and (s := say(a, b)):
+        if (s := say(a, b)) == 'retired':              # (decided in the winter after a's season: dated then)
+            if _after(start, *_dated((a['year'], 53))):
+                add(*_dated((a['year'], 53)), 'status', f'{w.person_link(pid)}: retired after the {a["year"]} season')
+        elif s and _after(start, b['year'], 1):
             add(b['year'], 1, 'status', f'{w.person_link(pid)}: {O.esc(s)} (season {b["year"]})')
     if not rows:
         return
@@ -350,9 +355,9 @@ def _status_changes(w, pid, start, add):
     last = rows[-1]                                    # (a season row: their status before that winter)
     now_ = live or ((w.person(pid) or {}).get('golfer'))
     if now_ and now_.get('lifestyle') == 'retired' and last.get('lifestyle') != 'retired':
-        y = last['year'] + 1                           # one dated event: retired in the winter after their last
-        if _after(start, y, 1):                        # season, whenever (and however often) it is read
-            add(y, 1, 'status', f'{w.person_link(pid)}: retired after the {last["year"]} season')
+        when = _dated((last['year'], 53))              # one dated event: retired in the winter after their last
+        if _after(start, *when):                       # season (its end: week 52), however often it is read
+            add(*when, 'status', f'{w.person_link(pid)}: retired after the {last["year"]} season')
         return
     if live and w.live.cursor['year'] > last['year'] and _after(start, w.live.cursor['year'], 1):
         if s := say(last, live):
