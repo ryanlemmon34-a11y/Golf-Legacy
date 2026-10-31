@@ -78,6 +78,40 @@ an upgraded index for older archives); the parent/child tour filter; migrating a
 Deferred (not in this increment): nation development and other large simulation expansions; a day-ordered
 same-week feeder engine; season-100 timing (no checkpoint exists).
 
+## Expanded roadmap: status after the pass of 31 October 2026 (branch build/v16)
+
+The owner's expanded roadmap (`Golf_Legacy_Expanded_World_Roadmap_2026-10-30`) is the full pre-playthrough scope.
+Where it and the owner's prompt of 31 October differ, the prompt wins: **old-world compatibility and resuming
+previous saves are no longer required** (fresh worlds only; unsupported saves are identified, never deleted).
+Status is what was built and tested, not what was proposed. Report: `docs/V17_PASS_REPORT.md`.
+
+| Roadmap item | Status | Where |
+|---|---|---|
+| F1 Support successful amateurs | Built as an initial calibration (bands A/B/C, in kind, coaching included); measured over three seasons; work pathway for cash-blocked adult amateurs **proposed only** | `golfsim/amateur_support.py`, `docs/AMATEUR_WORK_PATHWAY_PROPOSAL.md` |
+| F2 Earned major trip guarantee | Built and tested for all four majors, every status, inaugural Masters invitees, alternates, expired amateur places, injury; representative reconstructed scenarios (not each of the 269 cases) | `tests/test_major_funding.py` |
+| F3 Rule and observer defects | Built (U1 tenth anniversary, one status rule, one retirement event, comparisons, cohort level) | v16 |
+| E1 Evidence | Built (money behind major places, injury episodes, creation and development by source, dated aging); target-event components and retirement inputs partly (decisions are recorded) | v16 |
+| E2 Wide-screen ratings | Built (fixed-width annual bars, levels and changes, retirement year); physical/technical/mental group views not yet; coach and caddie ratings shown | v16, this pass |
+| E3 Injuries | Built (episodes, announced = actual from rules 2026-11-02, first appearance incl. qualifying, lasting losses); My World injury and return items **not yet** | this pass |
+| P1 Prestige for every individual | Built (golfers, coaches, caddies; sortable; each role its own value) | this pass |
+| P2 Five-year event, course and nation prestige | Planned | -- |
+| S1 Staff careers and partnerships | Mostly built (stints both sides, reasons, recorded fit and rapport, abilities); My World team news **not yet** | this pass |
+| S2 Scouting recognises upside | Existing observation-only scouting kept; richer assessment planned (design in `docs/COACHES_AND_CADDIES.md`) | -- |
+| S3 Two-way recruitment, motivations | Planned (design note) | -- |
+| G1 Geography, familiarity, course use | Planned (residence history exists) | -- |
+| G2 Visible Aggression | Planned | -- |
+| G3 Seasonal weather | Planned | -- |
+| Record Book; nation count links | Record Book built; nation counts linked to their exact population **not yet** | -- |
+| B1/B2 Biggest Upsets | Planned | -- |
+| T1-T3 Tournament stories, linked history | Planned | -- |
+| C1 Calibration | Waiting for the long runs (`docs/LONG_RUN_PLAN.md`, for approval) | -- |
+| C2 Death after retirement | Planned, after the identity foundations | -- |
+| Qualification windows | Documented, tested; one policy choice for the owner | `docs/QUALIFICATION_WINDOWS.md` |
+| Long histories | Index validated/rebuilt, side index for read-only histories, exports include it; benchmarked | this pass |
+| Mobile and small screens | Deferred | -- |
+| Hide Results | Stays removed | -- |
+| Career mode | Planning after the world systems are ready | -- |
+
 ## Build v16 (branch build/v16; report `docs/V16_BUILD_REPORT.md`; the prompt worked out with HAL, 30 October 2026)
 
 Delivered for review, one commit per package: the wide desktop layout (no 1,150 px cap; tables sized to their
