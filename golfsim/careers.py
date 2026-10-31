@@ -100,24 +100,29 @@ def own_way(season, g, year, row):
     the season before any winnings arrive (UPFRONT_SHARE of its costs), and then either their earnings
     *proven at that level* (PROVEN_EVENTS events or more there, counted cautiously: a new card is not yet
     an income) and sponsors cover the season, or their savings cover SELF_FUNDED_SEASONS seasons of
-    losses. None if not."""
+    losses. None if not. The costs are next season's as far as the season's end has set them (a caddie's
+    fee follows the season they carried the bag for: staff.caddie_reputations runs before these decisions).
+    Whichever way it is judged, the figures the decision used are kept with it (season._own_way_last, recorded
+    with the transition): later winter changes do not rewrite them."""
     events = season.target_events(g)
     income, costs = season.season_forecast(g, g.tour, events, row,
                                            without_backers=True, cautious=True)
     if g.cash < FIN.UPFRONT_SHARE * costs:
         return None
+
+    def judged(why):
+        season._own_way_last = {'cash': round(g.cash), 'income': round(income), 'costs': round(costs)}
+        return why
     tier = TOUR_BY_KEY[g.tour].tier if g.tour in TOUR_BY_KEY else 4
     if season.events_at_level(g.id, tier) >= FIN.PROVEN_EVENTS:
         if income >= costs:
-            return 'their winnings at this level and sponsors now cover a season'
+            return judged('their winnings at this level and sponsors now cover a season')
     else:
         income = season.sponsor_income(g)                    # unproven here: no winnings counted on
         if income >= costs:
-            return 'their sponsor contract now covers a season'
+            return judged('their sponsor contract now covers a season')
     if g.cash >= SELF_FUNDED_SEASONS * (costs - income):
-        # (the figures the decision used, kept with the decision: later winter changes do not rewrite them)
-        season._own_way_last = {'cash': round(g.cash), 'income': round(income), 'costs': round(costs)}
-        return f'their own savings now cover {g.cash / (costs - income):.0f} seasons'
+        return judged(f'their own savings now cover {g.cash / (costs - income):.0f} seasons')
     return None
 
 

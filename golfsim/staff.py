@@ -1054,12 +1054,37 @@ def p_caddie_moves_on(season_pay, reputation, rapport, fit):
     return _sig(-3.8 + 1.5 * (1 - min(1.0, season_pay / 40000)) * (reputation / 60) - 1.0 * rapport - 0.3 * fit)
 
 
+def caddie_reputations(season, year, snap):
+    """A caddie's reputation follows the season of the bag they carry (0.8 x their reputation + 0.2 x
+    20 log10(1 + the golfer's prize money / $1,000)), set as the season ends -- before anyone decides on next
+    season (Season.end_of_season calls this ahead of the career decisions): a caddie's weekly fee follows their
+    reputation (TourCaddie.weekly_fee), so next season's costs, which the winter's decisions weigh (backers
+    stepping aside because the golfer pays their own way among them, careers.own_way), carry the fee the
+    caddie will charge then. Once a season: what each caddie's reputation was during the season is held until
+    end_of_season below records it (and takes it), so a second call before then changes nothing."""
+    held = season.__dict__.get('_caddie_rep_during')
+    if held is not None and held[0] == year:
+        return held[1]
+    st = season.staff
+    during = {}
+    for gid, kid in st.caddie_of.items():
+        k = st.caddies[kid]
+        during[kid] = k.reputation
+        row = snap.get(gid, {})
+        k.reputation = round(_clip(0.8 * k.reputation + 0.2 * min(100.0, 20 * math.log10(1 + row.get('prize', 0) / 1000)), 1.0), 1)
+    season._caddie_rep_during = (year, during)
+    return during
+
+
 def end_of_season(season, year, snap):
-    """Reputations follow results; either side may end a relationship; staff gain experience, age and
-    retire; the profession recruits from outside for unmet paying demand."""
+    """Reputations follow results (a caddie's already set as the season ended, caddie_reputations); either
+    side may end a relationship; staff gain experience, age and retire; the profession recruits from outside
+    for unmet paying demand."""
     st = season.staff
     rng = random.Random(f'{season.seed}:staff-year:{year}')
     when = (year, 53)
+    during = caddie_reputations(season, year, snap)   # (a no-op when the season's end already set them)
+    season.__dict__.pop('_caddie_rep_during', None)   # (taken here: nothing of it is saved)
     from .careers import progress_signal
     # what this season showed, kept with each open stint
     for (kind, gid), sid in list(st.rel.open.items()):
@@ -1082,7 +1107,7 @@ def end_of_season(season, year, snap):
     for k in st.caddies.values():
         if k.status == 'active':
             record[('caddie', k.id)] = {'rounds': round(k.rounds_worked, 2), 'weeks': k.weeks_worked,
-                                        'reputation': k.reputation}
+                                        'reputation': during.get(k.id, k.reputation)}   # (during the season)
     for gid, cid in st.coach_of.items():
         r = record.setdefault(('coach', cid), {'students': 0, 'reputation': st.coaches[cid].reputation})
         r['students'] += 1
@@ -1105,8 +1130,6 @@ def end_of_season(season, year, snap):
     receipts = season.staff_receipts.get(year, {})
     for gid, kid in list(st.caddie_of.items()):
         k = st.caddies[kid]
-        row = snap.get(gid, {})
-        k.reputation = round(_clip(0.8 * k.reputation + 0.2 * min(100.0, 20 * math.log10(1 + row.get('prize', 0) / 1000)), 1.0), 1)
         s = st.rel.current('caddie', gid)
         tr, ev = trend(s)
         rap = st.rel.rapport('caddie', kid, gid, year)

@@ -23,6 +23,7 @@ from unittest import mock
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / 'tools'))
+from golfsim import careers as C                                      # noqa: E402
 from golfsim import staff as ST                                       # noqa: E402
 from golfsim.archive import ArchiveWriter                              # noqa: E402
 from golfsim.history import Relations                                  # noqa: E402
@@ -385,6 +386,62 @@ class InitiativeTests(unittest.TestCase):
             s.start_year(2027)
             return json.dumps(s.staff.rel.export()), s.staff.coach_of, s.staff.caddie_of
         self.assertEqual(market(), market())
+
+
+class WinterOrderTests(unittest.TestCase):
+    """The winter's decisions weigh next season's costs. A caddie's fee follows their reputation, and their
+    reputation follows the season of the bag they carry: that is set before careers decide (backers stepping
+    aside because the golfer can pay their own way, careers.own_way, among them), so a golfer is never judged
+    to be paying their own way on a caddie fee that rises later the same winter (seed 11, 2027: golfer 557's
+    sponsor contract covered the season at the old fee and fell $1,532 short at the new one)."""
+
+    def test_decisions_see_the_caddie_fee_of_next_season(self):
+        s = fresh(50)
+        s.start_year(2027)
+        st = s.staff
+        bags = dict(st.caddie_of)
+        self.assertTrue(bags)
+        reps = {kid: st.caddies[kid].reputation for kid in bags.values()}
+        fee0 = {gid: st.caddies[kid].weekly_fee for gid, kid in bags.items()}
+        for gid in bags:
+            s.ledger(2027, gid).prize = 2_000_000.0                       # a big season: their caddies' standing rises
+        seen = {}
+        decide = C.decide
+
+        def watching(season, year, snap):
+            seen.update({gid: st.caddies[kid].weekly_fee for gid, kid in st.caddie_of.items()})
+            return decide(season, year, snap)
+        with mock.patch.object(C, 'decide', watching):
+            s.finish_year(2027)
+        self.assertEqual(set(seen), set(bags))
+        kept = [gid for gid, kid in bags.items() if st.caddie_of.get(gid) == kid]
+        self.assertTrue(kept)
+        self.assertTrue(any(seen[gid] > fee0[gid] for gid in kept))       # fees rose with the season...
+        for gid in kept:
+            self.assertEqual(seen[gid], st.caddie(gid).weekly_fee)         # ...before anyone decided on the next
+        for kid, rep in reps.items():                                      # the season's record: as during it
+            self.assertEqual(s.staff_year[2027][('caddie', kid)]['reputation'], rep)
+        self.assertNotIn('_caddie_rep_during', s.__dict__)                 # (nothing of it is kept or saved)
+
+    def test_every_paying_their_own_way_decision_keeps_its_figures(self):
+        """Whichever way a golfer is judged to pay their own way (proven winnings, a sponsor contract or
+        savings), the figures the decision used are kept with it, the caddie's fee included."""
+        s = fresh(50)
+        s.start_year(2027)
+        g = s.g[sorted(s.staff.caddie_of)[0]]
+        g.cash, g.backer = 1_000_000.0, 20_000.0
+        row = s.season_snapshot(2027)[g.id]
+        with mock.patch.object(s, 'sponsor_income', return_value=5_000_000.0):
+            why = C.own_way(s, g, 2027, row)
+            income, costs = s.season_forecast(g, g.tour, s.target_events(g), row, without_backers=True, cautious=True)
+        self.assertTrue(why.endswith('cover a season') or why.endswith('covers a season'), why)   # not savings
+        seen = s.__dict__.pop('_own_way_last')
+        self.assertEqual(seen['costs'], round(costs))
+        self.assertEqual(seen['cash'], 1_000_000)
+        self.assertGreater(seen['income'], seen['costs'])
+        with mock.patch.object(s.staff, 'caddie', return_value=None):      # the caddie's fee is in those costs
+            self.assertLess(s.season_forecast(g, g.tour, s.target_events(g), row, without_backers=True,
+                                              cautious=True)[1], costs)
 
 
 class WorldTests(unittest.TestCase):

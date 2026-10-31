@@ -86,7 +86,8 @@ caddies they can afford (a weekly fee of $800 + $25 per reputation point, plus 8
 caddie may say no** (from rules 2026-11-04): they weigh expected earnings (the golfer's last season's prize
 money or Prestige, on the scale their own reputation follows), compatibility (the pair's fit and time
 together, where they worked together before) and stability (a Premier card), and grow readier to accept
-with each bag they turn down that winter. A caddie's reputation follows their employer's prize money.
+with each bag they turn down that winter. A caddie's reputation follows their employer's prize money,
+set as the season ends and before the winter's career decisions, so those decisions weigh next season's fee.
 A difficult season can cost a caddie the bag. **Everyone else carries their own bag** (or a friend
 does): skills of 40 — weaker help than any professional caddie, where before everyone silently had an
 average (50) caddie.
