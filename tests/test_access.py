@@ -178,7 +178,19 @@ class LocalGolfTests(unittest.TestCase):
                        and g.id != newcomer.id)
         s.am_pos[veteran.id] = 1
         s.played[2027][veteran.id] = list(range(1, 9))                    # eight starts already
+        s.open_am_starts[2027][veteran.id] = 8                             # (amateur events: rules 2026-11-11)
         self.assertLess(s.priority(newcomer, am_ev), s.priority(veteran, am_ev))   # the lineup rotates
+
+    def test_open_amateur_starts_are_counted_as_played(self):
+        """The rotation's count of amateur (tier 6) starts (rules 2026-11-11) is every tier-6 start played."""
+        s = SEASON
+        played = Counter()
+        for r in s.results.values():
+            if r.year == 2027 and s.cal.by_id[r.series_id].tier == 6:
+                for site in r.finish:
+                    played.update(gid for gid, _, _ in site)
+        self.assertTrue(played)
+        self.assertEqual(+s.open_am_starts[2027], played)
 
 
 class FlagshipTests(unittest.TestCase):

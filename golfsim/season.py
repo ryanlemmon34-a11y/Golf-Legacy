@@ -43,7 +43,7 @@ from . import qualification as Q
 from . import residence as RES
 from . import familiarity as FAM
 from . import home_clubs as HC
-from .calendar import TOUR_BY_KEY, _in_window
+from .calendar import LOCAL_CIRCUITS, TOUR_BY_KEY, _in_window
 from . import schedule as SCH
 from . import upsets as UP
 from . import work_pathway as WP
@@ -74,6 +74,18 @@ COLLEGE_WINDOWS = {k: TOUR_BY_KEY[k].weeks for k in ('CO_US_D1', 'CO_US_SMALL', 
 # golfers at college in the USA (wherever they are from) can play that country's amateur events
 COLLEGE_AMATEUR_SERIES = {'CO_US_D1': 'AM_NORTH_AMERICA', 'CO_US_SMALL': 'AM_NORTH_AMERICA'}
 TOUR_COUNTRIES = {k: frozenset(c for c, _ in t.countries) for k, t in TOUR_BY_KEY.items()}
+# Ordinary open amateur events (rules 2026-11-11): the regular events of a regional amateur series (tier 6,
+# category 'regular', open amateur entry) -- not its closed championship (circuit_championship), the national
+# and elite amateur championships, qualifiers, college (tier 5) or professional events. Each series' region is
+# the region(s) its circuit covers (calendar.LOCAL_CIRCUITS: the Asian series covers Asia and the Middle East).
+OPEN_AMATEUR_REGIONS = {k: regions for k, (regions, kind) in LOCAL_CIRCUITS.items() if kind == 'amateur'}
+
+
+def ordinary_open_amateur(s):
+    """Whether an event is an ordinary open amateur event (see OPEN_AMATEUR_REGIONS)."""
+    return s.tier == 6 and s.category == 'regular' and s.eligibility == 'amateur' and s.tour in OPEN_AMATEUR_REGIONS
+
+
 ELITE_AMATEUR_REGIONS = {'LATIN_AMERICA_AMATEUR': ('Latin America',), 'AFRICA_AMATEUR': ('Africa',),
                          'EUROPEAN_AMATEUR': ('Europe',), 'ASIA_PACIFIC_AMATEUR': ('Asia', 'Oceania')}
 QS_AMERICAS = ('North America', 'Latin America')
@@ -387,6 +399,9 @@ class Season:
         self.amateur_support_on = amateur_support
         self.work_pathway_on = True                          # cash-blocked adult amateurs can take work (WP)
         self.amateur_return_on = True                        # ... and working amateurs can return (amateur_return)
+        # college amateurs at home in ordinary open amateur events (rules 2026-11-11): the members' class, and
+        # the rotation there counts open amateur (tier 6) starts; worlds saved before it keep the old order
+        self.college_open_access = True
         self.amateur_work_from = {}                          # gid -> (year, week) they started working as amateurs
         self.weather = WX.MODEL                              # seasonal climate with wind direction (weather.py)
         self.lib = library or default_library(calendar or SCH.DEFAULT)   # new worlds: the reference calendar
@@ -434,6 +449,7 @@ class Season:
         self.level_earnings = defaultdict(dict)              # year -> gid -> {tier: [prize, events]} (professionals)
         self.career_prize = Counter()                        # gid -> $ prize money over the whole career
         self.played = defaultdict(_dd_list)                  # year -> gid -> [weeks]
+        self.open_am_starts = defaultdict(Counter)           # year -> gid -> amateur (tier 6) starts (rules 2026-11-11)
         self.stage_log = defaultdict(list)
         self.card_log = defaultdict(list)                    # year -> [(gid, from, to, reason)]
         self.holes_played = Counter()                        # year -> holes
@@ -839,6 +855,13 @@ class Season:
         return (g.tour == tour or g.country in countries or COLLEGE_AMATEUR_SERIES.get(g.tour) == tour
                 or self.home_country(g) in countries)
 
+    def home_college_amateur(self, g, mt, s):
+        """A college amateur (on a college tour, tier 5) whose home region -- where they live (residence.Places,
+        their college base while at college; nationality for legacy golfers never given a residence:
+        home_region) -- is a region the amateur series of `s` covers (OPEN_AMATEUR_REGIONS). Rules 2026-11-11."""
+        return (g.status == 'amateur' and mt is not None and mt.tier == 5
+                and self.home_region(g) in OPEN_AMATEUR_REGIONS[s.tour])
+
     def entry_ticket(self, g, s):
         """A golfer's place in the entry queue for this season's edition of an event (a fair draw: it
         never depends on how the population happens to be numbered)."""
@@ -847,7 +870,9 @@ class Season:
     def priority(self, g, s):
         """Lower sorts first: (class, strength, entry draw). Mini tours are open entry: their members
         get in by the draw, not by world ranking. Elsewhere ranking decides and the draw breaks ties
-        (so unranked golfers are not ordered by id)."""
+        (so unranked golfers are not ordered by id). College and amateur fields rotate by starts; in
+        ordinary open amateur events (rules 2026-11-11, `college_open_access`) college amateurs at home
+        in the series' region share the members' class and both rotate by amateur (tier 6) starts."""
         mt = TOUR_BY_KEY.get(g.tour)
         mtier = mt.tier if mt else 9
         amateur_event = s.tier >= 5
@@ -876,7 +901,11 @@ class Season:
             # a Premier member not in a Premier field: a bounded number of places alongside the residents
             # (PREMIER_VISITOR_SHARE; _bump keeps the bound), by world ranking
             return (10, strength, self.entry_ticket(g, s))
-        if g.tour == s.tour:
+        # rules 2026-11-11: in an ordinary open amateur event a college amateur living in the series' region
+        # enters at the members' class, and members and these college players rotate by amateur starts
+        home_open = self.college_open_access and ordinary_open_amateur(s) and (
+            g.tour == s.tour or self.home_college_amateur(g, mt, s))
+        if g.tour == s.tour or home_open:
             cls = 10
         elif s.category == 'national_open' and g.country == s.host_country:
             cls = 11
@@ -892,7 +921,10 @@ class Season:
             # college and amateur fields rotate like team lineups: who has had fewest starts this
             # season goes first, with ranking a head start of a few starts — so the best play most,
             # and an unranked newcomer still gets starts (and with them, a ranking)
-            starts = len(self.played.get(self.year, {}).get(g.id, ()))
+            if home_open:                                   # amateur (tier 6) starts only: school starts
+                starts = self.open_am_starts.get(self.year, {}).get(g.id, 0)    # do not push them back
+            else:
+                starts = len(self.played.get(self.year, {}).get(g.id, ()))
             rank = self.am_pos.get(g.id)
             strength = starts + ROTATION_RANK_STARTS * (min(1.0, rank / 1500) if rank else 1.0)
         if s.tier == 1:
@@ -2121,6 +2153,8 @@ class Season:
         state.setdefault('deaths', {})
         state.setdefault('mortality_done', set())
         state.setdefault('amateur_return_on', False)          # saves from before the return: never applied
+        state.setdefault('college_open_access', False)        # saves from before rules 2026-11-11: the old order
+        state.setdefault('open_am_starts', defaultdict(Counter))   # (read only with college_open_access)
         state.setdefault('amateur_work_from', {})
         state.setdefault('weather', 'classic')               # saves from before seasonal weather keep the classic
                                                              # draws, so a resumed world replays as it would have
@@ -2343,6 +2377,8 @@ class Season:
             for gid, pos, _ in finish:
                 all_ids.append(gid)
                 self.played[year][gid].append(week)
+                if s.tier == 6:
+                    self.open_am_starts[year][gid] += 1      # the open amateur rotation's count (2026-11-11)
                 aw = self.abs_week(year, week)
                 if s.kind != 'qualifying':
                     g = self.g[gid]
@@ -2536,7 +2572,7 @@ class Season:
         old = lambda y: y < year - 1
         for gid in [gid for gid, (y, _) in self.prior_rounds.items() if y < year]:
             del self.prior_rounds[gid]                       # their first season is over
-        for d in (self.earnings, self.level_earnings, self.played, self.pstats, self.ledgers, self.season_rounds, self.entry_wants,
+        for d in (self.earnings, self.level_earnings, self.played, self.open_am_starts, self.pstats, self.ledgers, self.season_rounds, self.entry_wants,
                   self.entry_misses, self.entry_stats, self.declined, self.school_trips, self.club_trips,
                   self.backer_flows, self.move_log, self.move_blocked, self.familiar_base, self.activity_counts,
                   self.block_flags, self.cash_start, self.support_start, self.overall_start, self.rank_start, self.am_start,

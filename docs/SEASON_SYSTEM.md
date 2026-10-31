@@ -79,7 +79,26 @@ visitors at most 10% of their places (`docs/COMPETITION_ACCESS.md`). Within a gr
 open amateur events rotate their lineups: golfers with fewer starts this season go first, amateur
 ranking counting for about three starts' head start, so the best still play most but a squad's depth
 gets starts too. Open amateur events (club, county, regional) take up to 1.5× their usual field when
-more want to play. Golfers who miss out try their next choice (deferred acceptance), and spare places go
+more want to play.
+
+**College amateurs in ordinary open amateur events (rules 2026-11-11, new worlds).** An *ordinary open
+amateur event* is a regular event of one of the six regional amateur series (tier 6, category `regular`,
+open amateur entry: `ordinary_open_amateur` in `golfsim/season.py`); circuit championships, national and
+elite amateur championships, qualifiers, college (tier 5) and professional events are not. In those events
+a college amateur (on a college tour) whose *home region* is the series' region enters at the members'
+class (10, where college golfers had been class 12, after the members). Home region is where the golfer
+lives (`Season.home_region`: residence, which for a college golfer is their college base; nationality only
+for legacy golfers whose residence was never recorded), the same residence the amateur series' eligibility
+already uses; the series' region is the region its circuit covers (`OPEN_AMATEUR_REGIONS`, from
+`calendar.LOCAL_CIRCUITS`: the Asian series covers Asia and the Middle East). Within that class, members
+and these college players rotate by their **amateur (tier 6) starts this season** (`Season.open_am_starts`,
+a per-season counter kept as events are played), not every start, so college-event starts never push a
+college player back; whoever has fewer goes first, ranking keeping its head start, and the seeded entry
+draw breaks ties. Everyone else in those events (college players from outside the region, other amateurs)
+keeps their class and the rotation by every start; field sizes (1.5×), eligibility, the calendar and every
+other event's entry are unchanged. No place is reserved or guaranteed, and members can lose places in full
+fields. Worlds saved before 2026-11-11 keep the previous order (`Season.college_open_access` is off for
+them). Golfers who miss out try their next choice (deferred acceptance), and spare places go
 to willing players who were just below their bar. Every week records who wanted to play, who was placed
 and who was shut out of every field they tried, by tour (`entry_stats`), so blocked access is reported
 apart from choice, injury, money and having no eligible event.
