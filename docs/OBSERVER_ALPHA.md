@@ -183,7 +183,13 @@ it too makes earlier worlds "another engine"; start the next long run on it so i
   read (wins, top 10s in majors and Premier events, tour and status changes, moments, ranking bands, followed
   tournaments', tours' and courses' editions); a quiet count in the menu, no pop-ups. A ranking band change
   compares the world ranking published in the window's first week with the one published in its last (nothing
-  is claimed for a week whose ranking was not recorded).
+  is claimed for a week whose ranking was not recorded). For followed golfers, coaches and caddies (v16) it also
+  lists injuries (when, where, what, the weeks announced) and returns (the first appearance once they could
+  enter again, and the first main event back when that was a qualifying stage, as the profile's Injuries
+  section shows them), and partnerships with coaches and caddies: each one begun, a reunion when the same pair
+  worked together before, and each one ended with who ended it and why as recorded. Each fact is one item,
+  linked to the people and events, whichever of the pair you follow and whether its season is current or
+  archived. These are digest lines, not notifications: nothing pops up.
 - **Compare careers** (v15): up to four golfers -- now, current Overall, Peak Overall, totals, season by season
   and at the same age (the Overall snapshot at each season's start), with "not recorded" where it was not.
 - **GOAT Lab** (v15): rank careers by your weights over ten components (or a formula of them), with each

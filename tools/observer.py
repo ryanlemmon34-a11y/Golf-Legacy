@@ -1215,19 +1215,12 @@ def injuries_section(w, pid, starts):
     qualifying stage, their first main event, and any lasting losses. Seasons archived before episodes were
     recorded show their announced injury weeks only ("episodes not recorded")."""
     from golfsim.ratings import ATTRIBUTE_LABELS
-    eps, legacy = [], []
-    for y, r in OD.career_rows(w, pid):
-        if r.get('injuries'):
-            eps += [(y, e) for e in r['injuries']]
-        elif r.get('injury_weeks'):
-            legacy.append((y, r['injury_weeks']))
+    eps, legacy = injury_episodes(w, pid)
     lv = w.live
-    if lv is not None:
-        eps += [(lv.cursor['year'], e) for e in (getattr(lv, 'injuries', None) or {}).get(pid, [])]
     now_hurt = lv is not None and pid in set(getattr(lv, 'injured_now', None) or ())
     if not eps and not legacy and not now_hurt:
         return ''
-    played = sorted(((r['year'], r['week']), OD.is_qualifying(r), r['event']) for r in starts)
+    played = appearances(starts)
     out = ['<h2>Injuries</h2>']
     if now_hurt:
         cur = eps[-1][1] if eps else None
@@ -1238,8 +1231,7 @@ def injuries_section(w, pid, starts):
     rows = []
     for y, e in sorted(eps, key=lambda x: (x[0], x[1]['week']), reverse=True):
         back = tuple(e['available'])
-        ret = next((x for x in played if x[0] >= back), None)            # any appearance, qualifying included
-        main = next((x for x in played if x[0] >= back and not x[1]), None)
+        ret, main = injury_return(played, e)
         future = lv is not None and back > (lv.cursor['year'], lv.cursor['week'])
         lost = ', '.join(f'{esc(ATTRIBUTE_LABELS.get(k, k))} −{v}' for k, v in (e.get('lasting') or {}).items())
         rows.append([f'{y} week {e["week"]}', esc(e['kind']), f'{e["announced"]}', f'{e["out"]}',
@@ -1261,6 +1253,37 @@ def injuries_section(w, pid, starts):
                'golfer plays at once. Lasting effects are the ratings a serious injury took for good. Seasons played '
                'before episodes were recorded show only their injury weeks.</p>')
     return ''.join(out)
+
+
+def injury_episodes(w, pid):
+    """([(year, episode)], [(year, injury weeks)]): a golfer's injury episodes as recorded (archived seasons, then the
+    current season's from the snapshot, each season read from one place only), and the season totals of seasons
+    archived before episodes were recorded."""
+    eps, legacy = [], []
+    for y, r in OD.career_rows(w, pid):
+        if r.get('injuries'):
+            eps += [(y, e) for e in r['injuries']]
+        elif r.get('injury_weeks'):
+            legacy.append((y, r['injury_weeks']))
+    lv = w.live
+    if lv is not None and not (w.a and lv.cursor['year'] in w.a.years):
+        eps += [(lv.cursor['year'], e) for e in (getattr(lv, 'injuries', None) or {}).get(pid, [])]
+    return eps, legacy
+
+
+def appearances(starts):
+    """[((year, week), qualifying?, event id)] of a golfer's starts (OD.results rows), in date order."""
+    return sorted(((r['year'], r['week']), OD.is_qualifying(r), r['event']) for r in starts)
+
+
+def injury_return(played, e):
+    """(first appearance back, first main event back) after an injury episode, from `appearances`: the first
+    appearance once they could enter again (a qualifying stage counts: it is competing again) and the first that was
+    not a qualifying stage (the same appearance unless that one was); None where there is none yet."""
+    back = tuple(e['available'])
+    ret = next((x for x in played if x[0] >= back), None)
+    main = next((x for x in played if x[0] >= back and not x[1]), None)
+    return ret, main
 
 
 def _return_cell(w, x):
