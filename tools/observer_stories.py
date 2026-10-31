@@ -1782,7 +1782,9 @@ def headline(w, eid):
     import observer as O
     try:
         rec, st = tell(WorldSource(w, cache_for(w)), eid, None, None, cache_for(w), names=lambda g: plain_name(w, g))
-    except Exception:
+    except Exception as e:                            # a story never breaks the result page it decorates...
+        if type(e).__name__ == 'ArchiveChanged':      # ...but a rolled-back history redraws the page (render)
+            raise
         return ''
     if not st or not st['sentences']:
         return ''
