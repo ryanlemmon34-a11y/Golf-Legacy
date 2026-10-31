@@ -8,6 +8,13 @@ worded, since you last marked it read (or over a window you choose):
   season-end changes of tour or status (from the archived seasons; the current season's status against the last
   archived one), recorded moments (course records and the like), and a change of world-ranking band (No. 1, top
   10, top 50, top 100) between the start of the window and now;
+* a followed golfer's injuries (when, where, what and the weeks announced) and returns (their first appearance
+  once they could enter again, and their first main event back when that appearance was a qualifying stage), as
+  the profile's Injuries section works them out;
+* a followed golfer's, coach's or caddie's partnerships (coaching and caddying stints): each one begun (a reunion
+  when the same pair had worked together before) and each one ended, with who ended it and why as recorded.
+  Stints come from the history's relations table and, for seasons not archived yet, the snapshot; a stint keeps its
+  id, so one available from both is one item. A stint ended at a season's end is dated that season's week 52.
 * a followed tournament's or tour's editions played (with their winners); a course's editions and course records
   set there; a nation's golfers' wins in majors and Premier events; a followed edition once played.
 
@@ -20,6 +27,7 @@ of new items. Nothing here is simulation state: the groups and the "read up to" 
 from __future__ import annotations
 
 from collections import defaultdict
+from types import SimpleNamespace
 from urllib.parse import quote
 
 BANDS = ((1, 'No. 1'), (10, 'the top 10'), (50, 'the top 50'), (100, 'the top 100'))
@@ -86,9 +94,9 @@ def digest(w, items, start, until=None):
     O = _o()
     out, cache = [], {}
 
-    def add(y, wk, kind, html, eid=None):
+    def add(y, wk, kind, html, eid=None, key=None):
         if until is None or (y, wk or 0) <= tuple(until):
-            out.append((y, wk or 0, kind, html))
+            out.append((y, wk or 0, kind, html, key))
     by = defaultdict(list)
     for kind, ident, *_ in items:
         by[kind].append(ident)
@@ -107,6 +115,8 @@ def digest(w, items, start, until=None):
             elif r['pos'] is None and major(info):
                 add(r['year'], r['week'], 'cut', f'{link} missed the cut at the {ev}', r['event'])
         _status_changes(w, pid, start, add)
+        _injuries(w, pid, start, add)
+        _partnerships(w, pid, start, add)
         if w.a and w.a.index is not None:
             for m in w.a.index.moments(person=pid):
                 if _after(start, m['year'], m['week']):
@@ -145,10 +155,94 @@ def digest(w, items, start, until=None):
             add(e['year'], e.get('week'), 'edition', f'{O.event_link(w, eid)} was played: won by {w.person_link(win)}', eid)
     seen, uniq = set(), []
     for x in sorted(out, key=lambda x: (x[0], x[1]), reverse=True):
-        if x[3] not in seen:
-            seen.add(x[3])
-            uniq.append(x)
+        k = x[4] if x[4] is not None else x[3]          # (one item per recorded fact, however it was reached)
+        if k not in seen:
+            seen.add(k)
+            uniq.append(x[:4])
     return uniq
+
+
+def _injuries(w, pid, start, add):
+    """A followed golfer's injury episodes (onset, where, the weeks announced) and returns: the first appearance once
+    they could enter again and, when that was a qualifying stage, the first main event (observer.injury_return, as
+    the profile's Injuries section). Episodes that end at the same appearance share one return."""
+    O = _o()
+    import observer_data as OD
+    eps, _ = O.injury_episodes(w, pid)
+    if not eps:
+        return
+    link = w.person_link(pid)
+    played = O.appearances(OD.results(w, pid))
+    back = defaultdict(list)                            # appearance -> the episodes it ended
+    for y, e in sorted(eps, key=lambda x: (x[0], x[1]['week'])):
+        n = e['announced']
+        if _after(start, y, e['week']):
+            where = f' at the {O.event_link(w, e["event"])}' if e.get('event') else ''
+            add(y, e['week'], 'injury', f'{link} was injured{where} ({O.esc(e["kind"])}): announced as {n} week'
+                f'{"s" if n != 1 else ""}; can enter events again from {e["available"][0]} week {e["available"][1]}',
+                key=('injury', pid, y, e['week'], e['kind'], e.get('event')))
+        ret, main = O.injury_return(played, e)
+        if ret is not None:
+            back[('back', ret)].append((y, e))
+        if main is not None and ret is not None and main != ret:
+            back[('main', main)].append((y, e))
+    for (what, ((ay, awk), qual, eid)), es in back.items():
+        if not _after(start, ay, awk):
+            continue
+        hurt = '; '.join(f'{O.esc(e["kind"])}, {y} week {e["week"]}' for y, e in es)
+        if what == 'back':
+            add(ay, awk, 'return', f'{link} returned from injury ({hurt}) at the {O.event_link(w, eid)}'
+                + (' (a qualifying stage)' if qual else ''), key=('return', pid, eid))
+        else:
+            add(ay, awk, 'return', f'{link} played their first main event since injury ({hurt}): the '
+                f'{O.event_link(w, eid)}', key=('return-main', pid, eid))
+
+
+def stints_of(w, pid):
+    """Every coaching and caddying stint with this person as golfer or as staff (never a school team), oldest first:
+    the history's relations table, then the snapshot's stints begun or ended since (the same stint, by id, read once:
+    the snapshot's is the later record)."""
+    got = {}
+    if w.a is not None and getattr(w.a, 'rel', None) is not None:
+        for x in w.a.rel.of_golfer(pid) + w.a.rel.of_staff(pid):
+            if x.kind != 'school' and x.staff:
+                got[x.id] = x
+    for d in (getattr(w.live, 'stints', None) or ()) if w.live is not None else ():
+        if pid in (d['golfer'], d['staff']) and d['staff']:
+            got[d['id']] = SimpleNamespace(**{**d, 'start': tuple(d['start']),
+                                              'end': tuple(d['end']) if d['end'] else None})
+    return sorted(got.values(), key=lambda x: (x.start, x.id))
+
+
+def _dated(t):
+    """A stint's date as a digest (year, week): week 53, a season's end (after its week 52), is week 52."""
+    return (t[0], min(t[1], 52))
+
+
+def _partnerships(w, pid, start, add):
+    """Partnerships begun (a reunion when this golfer and this coach or caddie had worked together before) and
+    ended (who ended it and why, as recorded) for a followed golfer, coach or caddie. Worded the same whoever is
+    followed, and keyed by stint, so a partnership between two followed people is one item."""
+    O = _o()
+    stints = stints_of(w, pid)
+    for s in stints:
+        g, st = w.person_link(s.golfer), w.person_link(s.staff)
+        if _after(start, *_dated(s.start)):
+            prev = max((x for x in stints if (x.kind, x.staff, x.golfer) == (s.kind, s.staff, s.golfer)
+                        and x.id != s.id and x.end is not None and x.end <= s.start), key=lambda x: x.end, default=None)
+            how = f'started by {O._began(s)}'            # (a paying client's reason is the fee itself)
+            if s.arrangement != 'fee' or not s.reason_start:
+                how += f'; {O._arrangement(s)}'
+            if prev is None:
+                add(*_dated(s.start), 'partnership', f'{g} began working with {st} as {s.kind} ({how})',
+                    key=('stint', s.id, 'start'))
+            else:
+                add(*_dated(s.start), 'reunion', f'{g} and {st} are working together again ({s.kind}), after their '
+                    f'earlier partnership from {O.when(prev.start)} to {O.when(prev.end)} ({how})',
+                    key=('stint', s.id, 'start'))
+        if s.end is not None and _after(start, *_dated(s.end)):
+            add(*_dated(s.end), 'departure', f'{g} and {st} parted ({s.kind}; together from {O.when(s.start)} to '
+                f'{O.when(s.end)}): ended by {O._ended(s)}', key=('stint', s.id, 'end'))
 
 
 def _status_changes(w, pid, start, add):
@@ -366,7 +460,10 @@ def page(w, q):
     return 'My World', ''.join(out) + (
         '<p class="muted">Only recorded facts: wins; top-10s in majors and Premier events; missed cuts in majors; '
         'season-end changes of tour or status; recorded moments; world-ranking band changes (No. 1, top 10, 50, '
-        '100); followed tournaments’, tours’ and courses’ editions; a nation’s wins in majors and Premier events. '
+        '100); injuries and returns (the first appearance once a golfer could enter again, and the first main event '
+        'back when that was a qualifying stage); partnerships with coaches and caddies begun, resumed (the same pair '
+        'together again) and ended, with who ended them and why; followed tournaments’, tours’ and courses’ '
+        'editions; a nation’s wins in majors and Premier events. '
         'Kept with this world in the shortlist file; never read by the simulation.</p>')
 
 
