@@ -1,21 +1,53 @@
-# Persistently cash-blocked adult amateurs: a work / part-time pathway (proposal, for approval)
+# Persistently cash-blocked adult amateurs: the work / part-time pathway
 
-Status: **proposal, not implemented.** It changes career behaviour, so nothing here runs until you approve the
-thresholds. It does not sponsor anyone: amateur support (`docs/AMATEUR_SPONSORSHIP_PROPOSAL.md`, implemented as
-an initial calibration) is for amateurs who show success; this is for the ones who cannot afford to play at all.
+Status: **implemented as an initial calibration (rules 2026-11-03, `golfsim/work_pathway.py`)**, approved by the
+owner on 31 October 2026 with the thresholds below. It does not sponsor anyone: amateur support
+(`docs/AMATEUR_SPONSORSHIP_PROPOSAL.md`) is for amateurs who show success; this is for the ones who cannot afford
+to play at all. It is an employment-and-golf pathway, not sponsorship, forced retirement or guaranteed success.
 
-## The problem, in the evidence we have
+## As implemented
 
-- Test 1 10.30, 2066-2076 (`docs/ZERO_START_REVIEW.md`): 384 zero-start seasons among full-time non-college
-  amateurs, about 35 a season; median age 23 (20-26). Every golfer who played nothing started the next season in
-  debt, with no family money, unable to afford even a $350 home event. The weekly ledger records the reason:
-  "could not afford", not injury and not choice.
-- The move to working (a part-time amateur with a salary) usually comes, but only at a season's end after a whole
-  season without a start, and 39 % stayed full-time for another empty season.
-- The paired three-season measurement of this pass (seed 2027, full population; pass report) counts the same group
-  with and without amateur support: support reaches ranked and title-winning amateurs, not these golfers.
+**Who**: a full-time amateur outside college, aged 21 or over, outside the amateur ranking's top 300 (or
+unranked), holding no amateur support this season, with no family money left.
 
-## Proposed rule
+**Counting the evidence** (every full-time non-college amateur is counted, so the groups left out can be measured
+too), from the weekly access ledger the observer already shows:
+
+| A week recorded as | Effect on the count | Why |
+|---|---|---|
+| could not afford any event (an eligible event existed; none was affordable from spendable funds, support included) | **+1** | The only genuine affordability block |
+| injured | pause (no change) | An injury is not money |
+| no suitable event scheduled; not eligible for the events scheduled | pause | Gaps in the calendar (off weeks, the winter between seasons) must not erase the evidence, nor count as it |
+| played; declined; chose to train or rest; shut out of a full field | **reset to 0** | They could pay for an event that week, so they were not blocked |
+
+The count carries across the year end. **Decision**: at each monthly plan (weeks 1, 5, 9, ... 49), before the
+month is planned, a candidate whose count has reached **8** takes a job from that block on: a part-time (working)
+amateur with the salary, living costs and schedule every working amateur has. The date, the weeks counted, the
+golfer's age, amateur rank, cash and the reason ("could not afford to play: took work") are recorded
+(`work_pathway` in the season's archive file) and written in the career history. Each full-time amateur's longest
+count in the season is archived too (`cash_blocked_max`), for measuring prolonged blocks among those left out
+(younger, ranked or supported amateurs). Tests: `tests/test_work_pathway.py`.
+
+## Departures from the proposal (flagged for the owner)
+
+1. **The way back.** The proposal said the existing winter comeback decision lets a part-timer return to
+   full-time. That was wrong for amateurs: the comeback decision (`careers.p_comeback`) applies to professionals
+   only. A working amateur's existing route to full-time golf is **turning professional** at a season's end
+   (`careers.p_turn_pro`, which already considers part-time amateurs; after 27 it is recorded as a comeback).
+   There is no return to full-time *amateur* golf, for this pathway or for amateurs who took a job at a season's
+   end. Nothing new was added; a return to full-time amateur golf when savings recover would be a new behaviour
+   and needs a decision.
+2. **Funds test.** "Spendable funds below the cheapest eligible event" is not tested separately: it is exactly
+   what the ledger's "could not afford any event" means each counted week. "No family money left" is checked
+   when the decision is made.
+3. **Timing.** The decision waits for the next monthly plan after the 8th counted week, so the count when a job
+   is taken is 8 to 11 (the proposal's "from the next monthly block").
+4. **Consecutive.** "8 consecutive weeks" is 8 counted weeks with pauses allowed in between, as the owner
+   directed (calendar gaps must not keep erasing the evidence).
+
+## The original proposal
+
+### Proposed rule
 
 Checked at each monthly plan (every 4 weeks), for a **full-time, non-college amateur aged 21 or over** with **no
 amateur support** and **outside the amateur ranking's top 300**:
@@ -32,7 +64,7 @@ amateur support** and **outside the amateur ranking's top 300**:
 Nothing is forced on anyone ranked, supported, in college, under 21, injured (injury is a different reason in the
 ledger) or simply choosing not to play; nobody's costs are waived and nobody is given money.
 
-## Thresholds to approve (or change)
+### Thresholds (approved)
 
 | Threshold | Proposed | Why |
 |---|---|---|
@@ -42,7 +74,7 @@ ledger) or simply choosing not to play; nobody's costs are waived and nobody is 
 | Funds test | below the cheapest eligible event, no family money left | The ledger's own definition of unaffordable |
 | Timing | from the next monthly block | Instead of waiting for the season's end |
 
-## Expected effect (to be measured, not assumed)
+### Expected effect (to be measured, not assumed)
 
 Most of the ~35 zero-start full-time amateur seasons a season in a mature world become part-time seasons with a
 few local starts; the second and later empty seasons in a row (42 % of them in Test 1) mostly disappear. The

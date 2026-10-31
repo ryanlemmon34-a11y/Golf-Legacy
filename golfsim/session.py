@@ -97,7 +97,8 @@ class Session:
 
     # ---- creating and opening -------------------------------------------------------------------------
     @classmethod
-    def create(cls, directory, seed=2027, workers=None, world=None, development=True, calendar=None):
+    def create(cls, directory, seed=2027, workers=None, world=None, development=True, calendar=None,
+               amateur_support=True):
         from .population import generate_world
         from .season import Season
         d = Path(directory)
@@ -105,7 +106,8 @@ class Session:
             raise FileExistsError(f'{d} already holds a session')
         d.mkdir(parents=True, exist_ok=True)
         season = Season(world or generate_world(seed=seed), seed=seed, development=development, workers=workers,
-                        calendar=calendar)               # (None: the default for new worlds, schedule.DEFAULT)
+                        calendar=calendar,               # (None: the default for new worlds, schedule.DEFAULT)
+                        amateur_support=amateur_support)  # (False only for a diagnostic comparison arm)
         writer = ArchiveWriter(d / 'archive', season, touch=False)   # published with the first commit
         pending = {'chunks': {}, 'world': writer.world, 'tables': writer.state_tables(season)}
         state = {'format': FORMAT, 'schema': SCHEMA, 'world_id': f'{seed}-{int(time.time())}', 'seed': seed,
@@ -394,7 +396,8 @@ class Session:
                 'archive_through': self.state['archive_through'], 'weeks_played': self.state['weeks_played'],
                 'sha256': digest, 'archive_staged': sorted(self._pending['chunks']) if self._pending else [],
                 'archive_files': staged, 'history_gen': history, 'written': time.strftime('%Y-%m-%d %H:%M:%S'),
-                'calendar': getattr(self.season, 'calendar_version', None)}
+                'calendar': getattr(self.season, 'calendar_version', None),
+                'amateur_support': getattr(self.season, 'amateur_support_on', True)}
         _write_synced(tmp / 'meta.json', json.dumps(meta, indent=1).encode())
         if _sha256(tmp / 'state.pkl.gz') != digest:                    # read back: what was written is whole
             raise IOError('checkpoint did not read back intact')

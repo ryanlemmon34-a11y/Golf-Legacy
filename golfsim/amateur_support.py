@@ -119,6 +119,9 @@ def recent_form(season, year, week):
 def open_season(season, year):
     """Week 1: each amateur's band from last season's facts and this season's places, never more than one band
     below what they held at last season's end; the budget opens for the season."""
+    if not getattr(season, 'amateur_support_on', True):   # a diagnostic arm played without support
+        season.am_support = {}
+        return
     prev = season.am_support_held.get(year - 1, {})
     form = recent_form(season, year, 0)
     found = facts(season, year - 1, (year,))
@@ -141,6 +144,8 @@ def open_season(season, year):
 
 def upgrade(season, year, week):
     """After the week: a new Band A or B achievement raises the cap from the next week (never a cut)."""
+    if not getattr(season, 'amateur_support_on', True):
+        return
     found = facts(season, year, (year, year + 1))
     for g in season.active_golfers():
         if not eligible(g):

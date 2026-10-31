@@ -41,6 +41,7 @@ from . import qualification as Q
 from . import residence as RES
 from .calendar import TOUR_BY_KEY, _in_window
 from . import schedule as SCH
+from . import work_pathway as WP
 from .course_library import default_library, library_version
 from .engine import Conditions
 from .golfer import Caddie
@@ -311,8 +312,12 @@ class Season:
     """The living world: population, calendar, courses and everything that has happened."""
 
     def __init__(self, world, library=None, seed=2027, first_year=None, development=False, workers=None,
-                 calendar=None):
+                 calendar=None, amateur_support=True):
         self.world = world
+        # amateur support is on in every new world; off only for a diagnostic comparison arm (the same rules
+        # otherwise, so support is the one difference: docs/LONG_RUN_PLAN.md)
+        self.amateur_support_on = amateur_support
+        self.work_pathway_on = True                          # cash-blocked adult amateurs can take work (WP)
         self.lib = library or default_library(calendar or SCH.DEFAULT)   # new worlds: the reference calendar
         self.cal = self.lib.calendar
         self.calendar_version = self.cal.version
@@ -428,6 +433,7 @@ class Season:
         self.staff_year = {}                                 # year -> staff id -> that season's work
         self.stuck_blocks = Counter()                        # gid -> consecutive months unable to afford a trip
         self.block_flags = defaultdict(_dd_counter)          # year -> gid -> monthly money state
+        WP.init(self)                                        # the work pathway's evidence and records
         self.year = self.first_year
         from .cards import tour_target
         for k, t in TOUR_BY_KEY.items():
@@ -1861,6 +1867,12 @@ class Season:
         state.setdefault('am_support_log', defaultdict(list))
         state.setdefault('am_support_seasons', {})
         state.setdefault('am_support_held', {})
+        state.setdefault('amateur_support_on', True)
+        state.setdefault('work_pathway_on', False)           # saves from before the pathway: never applied
+        if 'cash_blocked' not in state:
+            state['cash_blocked'] = Counter()
+            state['cash_blocked_max'] = defaultdict(Counter)
+            state['work_pathway'] = defaultdict(list)
         state.setdefault('earned', {})                      # rebuilt from results when first needed
         state.setdefault('college', {})                     # college seasons before the ledger: not recorded
         state.setdefault('wr_seed', {})
@@ -2231,7 +2243,7 @@ class Season:
                   self.assignments, self.staff_year, self.unheld, self.rights, self.earned, self.card_reasons, self.snapshots,
                   self.major_rights, self.travel_grants, self.dev_acc, self.creations, self.injury_lasting,
                   self.rank_top, self.am_support_log, self.am_support_seasons, self.am_support_held,
-                  self.juniors_added, self.new_pros_added, self.stats, self.moments):
+                  self.cash_blocked_max, self.work_pathway, self.juniors_added, self.new_pros_added, self.stats, self.moments):
             for y in [y for y in d if isinstance(y, int) and old(y)]:
                 del d[y]
         for k in [k for k in self.money if old(k[1])]:
@@ -2510,6 +2522,7 @@ class Season:
         its net cost (against the prize they expect from their own record) counts for more the
         tighter their funds. A week not played is a training week, a full rest week when tired, or
         a paid work week when money is short."""
+        WP.decide(self, year, week0)                        # cash-blocked adult amateurs: a job from this month
         weeks = [w for w in range(week0, week0 + 4) if w <= 52]
         eds = [e for e in self.cal.editions(year) if e.week in weeks and not self.is_special(e.series)]
         venues = self.lib.venues(year)
@@ -2655,6 +2668,7 @@ class Season:
                 else:
                     why = {'train': 'chose to train', 'work': 'chose to work'}.get(act, 'chose to rest')
             acc[gid][why] += 1
+            WP.count(self, g, year, week, why)               # the work pathway's evidence (genuine blocks only)
             if why in ('played: alternative', 'shut out: every acceptable field full', 'not selected for the college lineup'):
                 self.access_log[year][gid].append((week, why, self._week_first.get(gid),
                                                    entered[0] if entered and why.startswith('played') else None))

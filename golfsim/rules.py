@@ -40,7 +40,9 @@ VERSIONS = (
                    'cap by band. Coaches\' teaching and scouting and every golfer\'s Prestige are recorded.'),
     ('2026-11-03', 'The other majors\' champions (five) and the Players Championship winners (three) hold the most '
                    'recent editions as of the field, this season\'s included only when it is played before the field '
-                   '(it had been one edition more).'),
+                   '(it had been one edition more). The work pathway: a full-time adult amateur outside the top 300, '
+                   'without support or family money, who cannot afford any eligible event for eight counted weeks '
+                   'takes a job at the next monthly plan and keeps playing as a working amateur.'),
 )
 EARLIER = ('Seasons archived before rules versions were recorded were played under earlier rules. The '
            'differences that matter for reading old results: a winner without a Premier card held no '
@@ -258,6 +260,17 @@ RULES = {
         'then the support, then the golfer; the organizer pays a major trip only when the two cannot. Starting '
         'values to test, not proven amounts.',
         '2026-11-02'),
+    'work-pathway': (
+        'Work pathway for cash-blocked amateurs',
+        'A full-time amateur outside college, aged 21 or over, outside the amateur ranking\'s top 300 (or unranked), '
+        'with no amateur support and no family money left, who could not afford any event they were eligible for '
+        'in 8 counted weeks takes a job at the next monthly plan and keeps playing as an amateur alongside it (the '
+        'salary, living costs and schedule of every working amateur). A week counts when there was an eligible '
+        'event and not one was affordable; an injury, a week with no suitable event and a week with nothing they '
+        'were eligible for neither count nor reset; any week they could pay for an event starts the count again. '
+        'Nobody is given money and no cost is waived; the way back to full-time golf is turning professional, as '
+        'for every working amateur.',
+        '2026-11-03'),
     'injuries': (
         'Injuries',
         'A golfer can be hurt playing an event; the chance rises with tiredness, age and the rounds played and falls '

@@ -269,6 +269,11 @@ class ArchiveWriter:
         # amateur support (rules 2026-11-02): each contract as the season ended -- band, cap, what it drew and on
         # what (events, caddie, coaching), its basis and upgrades, how it ended
         chunk['amateur_support'] = {str(g): c for g, c in getattr(season, 'am_support_seasons', {}).get(year, {}).items()}
+        # the work pathway (rules 2026-11-03): who took work mid-season because they could not afford to play, with
+        # the facts it was decided on, and each full-time amateur's longest count of genuinely blocked weeks
+        chunk['work_pathway'] = [dict(t) for t in getattr(season, 'work_pathway', {}).get(year, [])]
+        chunk['cash_blocked_max'] = {str(g): n for g, n in sorted(getattr(season, 'cash_blocked_max', {}).get(year, {}).items())}
+        chunk['amateur_support_on'] = getattr(season, 'amateur_support_on', True)
         # development evidence -- diagnostics only (hidden facts included; never shown to the player): how each
         # golfer arriving this season started, and what each source moved this season (development.SOURCES)
         from . import development as D
