@@ -15,6 +15,8 @@ Each package cites the decision it implements. Proposals still open are marked a
 | D7 | P2 national participation: no extra golfers because of prestige. Each nation has a share of the fixed new-golfer cohort (the cohort-size rule is unchanged); successful nations gain share at others' expense as national prestige changes; shares normalised to 100 %, smoothed and bounded; future entrants only; no change to existing golfers' countries or to per-golfer talent. Starting shares derived from the existing documented baseline and shown; allocation reproducible; share history shown | P2 package |
 | D8 | Releases to main are allowed for reviewed, passing packages after HAL has checked the exact commit and confirmed readiness; no self-approval, no force pushes | All |
 | D9 | Ryan's local long tests begin around 17:00 UTC (noon Central) on 31 October | Final readiness |
+| D10 | F1.c amateur support form (relayed by HAL): the roadmap asks to distinguish cash sponsorship, equipment, restricted coverage and prize eligibility, not to build all four. The chosen policy is restricted in-kind golf expenses only; no unrestricted cash or living costs; amateur prize eligibility unchanged. The $25k / $12k / $5k caps are the chosen initial test calibration (changing them needs evidence and a decision; keeping them does not) | Built (`golfsim/amateur_support.py`); not a missing feature |
+| D11 | F2 coverage (HAL, in preparation): table-driven reconstructed eligible / cannot-pay fixtures from an independently revalidated manifest of all 269 historical affordability declines -- coverage of the cases, not a historical replay (exact past balances are unknown) | F2 test package (pending the manifest) |
 
 ## Open (proposed, waiting for the owner)
 
