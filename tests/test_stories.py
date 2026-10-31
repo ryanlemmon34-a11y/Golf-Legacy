@@ -511,6 +511,125 @@ def _resolves(src, href):
     return path in ('/grand-slam', '/moments')
 
 
+class StoryArchiveIndexTests(unittest.TestCase):
+    """The archive path of WorldSource: an archived season is decoded once for all its stories, its story index is
+    kept under the season's published signature (reused after a resume, rebuilt when the season is republished),
+    and stories read through it say exactly what the season file says."""
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp())
+        src = self.src = FakeSource()
+        runaway(src, '2030:TOUR_MASTERS', week=20)
+        comeback(src, '2030:PT_OPEN')
+        src.eds['2030:PT_OPEN'].update(series='PT_OPEN', tier=1, category='regular', kind='regular', name='Pine Open',
+                                       week=12, id='2030:PT_OPEN', tour='PT')
+        src.add('2030:PT_SMALL', {1: [70, 70, 70, 70], 2: [71, 71, 71, 71]}, series='PT_SMALL', tier=4,
+                category='regular', kind='regular', name='Small Open', week=30)        # no story index entry
+        src.rank[(2030, 19)] = [2, 1, 3]
+        src.rank[(2030, 11)] = [1, 5]
+        src.pre['2030:PT_OPEN'] = {'probs': {'2': 0.3, '5': 0.01, '1': 0.2}}
+        season = {'events': [{**{k: v for k, v in e.items() if k not in ('year', 'origin')},
+                              'team': {}, 'holes': [{'1': [[4] * 18] * 4}], 'golf': [{}]} for e in src.eds.values()],
+                  'ranking_points': {'19': [[2, 9.0, 40], [1, 8.0, 40], [3, 7.0, 40]], '11': [[1, 9.0, 40], [5, 1.0, 40]]},
+                  'rankings': {'world': {}, 'amateur': {}},
+                  'pre_event': {'2030:PT_OPEN': {'probs': {'2': 0.3, '5': 0.01, '1': 0.2}}}}
+        test = self
+
+        class Arch:
+            years = [2030]
+            world = {'first_year': 2030, 'series': {}}
+            people = {}
+            index = None
+            sig = 'years/2030.g1.json.gz'
+
+            def signature(self, y):
+                return self.sig
+
+            def year(self, y):
+                test.decodes += 1
+                return season
+        self.decodes = 0
+        self.arch = Arch()
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def source(self, cache):
+        src, arch = self.src, self.arch
+        w = type('W', (), {})()
+        w.a, w.live = arch, None
+        w.edition = lambda eid: {'id': eid, 'year': int(eid.split(':')[0]), 'source': 'archive'}
+        w.series_info = lambda sid: {}
+
+        class Src(S.WorldSource):                     # the index-backed reads, from the fake history
+            def person(self, pid):
+                return src.person(pid)
+
+            def course(self, cid):
+                return src.course(cid)
+
+            def series(self, sid):
+                return src.series(sid)
+
+            def first_year(self):
+                return 2030
+
+            def starts(self, pid):
+                return src.starts(pid)
+
+            def series_editions(self, sid):
+                return src.series_editions(sid)
+
+            def series_results(self, sid):
+                return src.series_results(sid)
+
+            def moments(self, eid):
+                return src.moments(eid)
+        return Src(w, cache)
+
+    def texts(self, src, eid, cache, **kw):
+        _, st = S.tell(src, eid, cache=cache, names=NAMES.get, **kw)
+        return [''.join(p if isinstance(p, str) else p[0] for p in s['parts']) for s in st['sentences']]
+
+    def test_one_decode_per_season_and_resume(self):
+        path = self.tmp / 'stories.sqlite'
+        c = S.StoryCache(path)
+        a = self.texts(self.source(c), '2030:TOUR_MASTERS', c)
+        self.assertEqual((self.decodes, c.seasons_built), (1, 1))
+        b = self.texts(self.source(c), '2030:PT_OPEN', c)
+        self.assertEqual(self.decodes, 1)                              # the same season: no second decode
+        # the same words as from the season's own record
+        self.assertEqual(a, [s.text() for s in S.narrate(S.assemble(self.src, '2030:TOUR_MASTERS'), NAMES.get)['sentences']])
+        self.assertEqual(b, [s.text() for s in S.narrate(S.assemble(self.src, '2030:PT_OPEN'), NAMES.get)['sentences']])
+        self.assertTrue(any('1.0%' in t for t in b))                  # the pre-event estimate, through the index
+        # a resume: a new cache over the same file; a new perspective needs new facts, and no decode
+        c2 = S.StoryCache(path)
+        p = self.texts(self.source(c2), '2030:PT_OPEN', c2, perspective=2)
+        self.assertEqual(self.decodes, 1)
+        self.assertEqual(c2.seasons_built, 0)
+        self.assertTrue(p[0].startswith('Bo Park'))
+        # an edition without a story level is read from the season file itself
+        self.texts(self.source(c2), '2030:PT_SMALL', c2)
+
+    def test_republished_season_is_reindexed(self):
+        path = self.tmp / 'stories.sqlite'
+        c = S.StoryCache(path)
+        self.texts(self.source(c), '2030:TOUR_MASTERS', c)
+        self.arch.sig = 'years/2030.g2.json.gz'                       # a recovery published the season again
+        c2 = S.StoryCache(path)
+        self.texts(self.source(c2), '2030:TOUR_MASTERS', c2)
+        self.assertEqual((self.decodes, c2.seasons_built), (2, 1))
+
+    def test_extract_is_compact(self):
+        ext = S.season_extract(self.arch.year(2030))
+        self.assertEqual(sorted(ext['events']), ['2030:PT_OPEN', '2030:TOUR_MASTERS'])
+        for e in ext['events'].values():
+            self.assertNotIn('holes', e)
+            self.assertNotIn('golf', e)
+        self.assertEqual(sorted(ext['world']), ['11', '19'])
+        self.assertIn('2030:PT_OPEN', ext['pre'])
+
+
 class StoryLiveViewTests(unittest.TestCase):
     """The observer's own path (World, WorldSource, the edition page's Story tab, profiles' and My World's
     entry points) over a hand-built snapshot of a current season: no simulation, no archive."""

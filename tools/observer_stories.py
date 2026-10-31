@@ -27,9 +27,15 @@ the world (a temporary folder for histories browsed read-only) under (edition, p
 the stamp of the seasons the facts are drawn from); the story under (that fact record's digest,
 NARRATIVE_VERSION). The stamp of an archived edition covers only its own and earlier seasons, so later seasons
 never invalidate it (the historical perspective is kept) while a recovery that republishes one of those seasons
-does. An edition of the current season is stamped by the snapshot's generation. The indexes the facts read are
-the archive index's (starts by person for earlier wins and best finishes, editions by series for comparisons,
-moments by kind), which grow one season at a time as the history is published.
+does. An edition of the current season is stamped by the snapshot's generation (kept in memory only).
+
+Indexes (T3): earlier wins and best finishes come from the archive index's starts by person, comparisons from its
+editions by series, moments from its moments table -- all one query each, grown a season at a time as the history
+is published. What a story needs of the season file itself (round scores, playoffs, the ranking of the week
+before, the pre-event estimate) is kept in a per-season story index (`season_extract`) beside the cache, built
+the first time a story of that season is opened (one decode, for all its story editions) and kept under the
+season's published signature: a century of history opens each season's stories with a decode at most once, and
+not again after a resume, while a republished season is indexed afresh.
 """
 from __future__ import annotations
 
@@ -37,6 +43,7 @@ import hashlib
 import json
 import sqlite3
 import threading
+import zlib
 from collections import OrderedDict
 from pathlib import Path
 from urllib.parse import quote, urlencode
@@ -113,14 +120,46 @@ def story_href(eid, pid=None, facts=False):
 
 # ---- where the facts come from ------------------------------------------------------------------------------------
 class WorldSource:
-    """The observer World as a fact source (the published history and the committed snapshot). Read-only."""
+    """The observer World as a fact source (the published history and the committed snapshot). Read-only.
 
-    def __init__(self, w):
+    With a StoryCache, an archived season is read through its story index (`season_extract`): the first story
+    of a season decodes the season file once and keeps every story edition's facts, the rankings of the weeks
+    before them and the pre-event estimates, compressed, under the season's published signature; every other
+    story of that season, in this session or after a resume, opens without decoding the season again."""
+
+    def __init__(self, w, cache=None):
         self.w = w
+        self.cache = cache
+
+    def _archived(self, eid):
+        w = self.w
+        y = int(eid.split(':')[0])
+        return not (w.live is not None and eid in w.live.editions) and bool(w.a) and y in w.a.years
+
+    def season(self, y):
+        """Season y's story index (None without a cache, or for a season not in the published history)."""
+        w = self.w
+        if self.cache is None or not (w.a and y in w.a.years):
+            return None
+        sig = str(w.a.signature(y))
+        got = self.cache.get_season(y, sig)
+        if got is None:
+            import observer_history as OH
+            d = OH._season_file(w, y)
+            if d is None:
+                return None
+            got = season_extract(d)
+            self.cache.put_season(y, sig, got)
+        return got
 
     def edition(self, eid):
         import observer_history as OH
         w = self.w
+        if self._archived(eid):
+            y = int(eid.split(':')[0])
+            ext = self.season(y)
+            if ext is not None and eid in ext['events']:
+                return {**ext['events'][eid], 'year': y, 'origin': 'archive'}
         e = w.edition(eid)
         if e is None:
             return None
@@ -201,6 +240,14 @@ class WorldSource:
             year, week = year - 1, 52
         live_year = w.live.year if w.live is not None else None
         href = f'/rankings?{urlencode({"kind": "points", "year": year, "week": week})}'
+        ext = self.season(year) if not (live_year == year and not (w.a and year in w.a.years)) else None
+        if ext is not None:
+            got = (ext['amateur'] if amateur else ext['world']).get(str(week))
+            if got is not None:
+                if amateur or not got['points']:
+                    return {'order': got['order'], 'href': '/rankings?kind=amateur' if amateur else href,
+                            'year': year, 'week': week, 'order_only': True}
+                return {'order': got['order'], 'href': href, 'year': year, 'week': week}
         if live_year == year and not (w.a and year in w.a.years):
             if amateur:
                 return None
@@ -246,6 +293,9 @@ class WorldSource:
             return None
         if not (w.a and y in w.a.years):
             return None
+        ext = self.season(y)
+        if ext is not None and eid in ext['events']:
+            return ext['pre'].get(eid)
         import observer_history as OH
         d = OH._season_file(w, y) or {}
         for key in PRE_EVENT_KEYS:
@@ -270,6 +320,52 @@ class WorldSource:
         """Archived editions are cached on disk; the current season's only in memory (they change weekly)."""
         w = self.w
         return not (w.live is not None and eid in w.live.editions)
+
+
+# ---- the story index of a season (compact, built once per published season) ----------------------------------------
+EXTRACT_VERSION = 1
+EXTRACT_KEYS = ('id', 'series', 'week', 'name', 'tour', 'tier', 'category', 'kind', 'rounds', 'match_play', 'sites',
+                'finish', 'scores', 'playoff', 'playoffs', 'matches', 'prestige', 'field_size')
+
+
+def season_extract(d):
+    """What stories read of one season file, for its story editions only (`story_level`): each edition's
+    classification, sites, finish, round scores, playoffs and matches and the winners' teams (no hole-by-hole
+    cards, statistics, prizes or routes); the world ranking (top 200 order) of each week before one of them and
+    of week 52 (the next season's week-1 events), the amateur ranking likewise; and each edition's recorded
+    pre-event estimate. A few hundred kilobytes a season before compression, against the whole season file."""
+    evs, weeks, am_weeks = {}, {52}, {52}
+    for e in d.get('events', []):
+        if not story_level(e):
+            continue
+        x = {k: e[k] for k in EXTRACT_KEYS if k in e}
+        wins = {g for site in e.get('finish') or [] for g, p, _ in site if p == 1}
+        x['team'] = {str(g): list(t) for g, t in (e.get('team') or {}).items() if int(g) in wins}
+        evs[e['id']] = json_safe(x)
+        (am_weeks if (e.get('tier') or 0) >= 5 else weeks).add(e['week'] - 1)
+    rp, rk = d.get('ranking_points') or {}, d.get('rankings') or {}
+    world, amateur = {}, {}
+    for wk in sorted(weeks):
+        rows = rp.get(str(wk))
+        if rows:
+            world[str(wk)] = {'order': [r[0] for r in rows], 'points': True}
+        elif (rk.get('world') or {}).get(str(wk)):
+            world[str(wk)] = {'order': list(rk['world'][str(wk)]), 'points': False}
+    for wk in sorted(am_weeks):
+        if (rk.get('amateur') or {}).get(str(wk)):
+            amateur[str(wk)] = {'order': list(rk['amateur'][str(wk)]), 'points': False}
+    pre = {}
+    for eid in evs:
+        for key in PRE_EVENT_KEYS:
+            got = _pre_event_entry(d.get(key), eid)
+            if got is not None:
+                pre[eid] = json_safe(got)
+                break
+    return {'version': EXTRACT_VERSION, 'events': evs, 'world': world, 'amateur': amateur, 'pre': pre}
+
+
+def json_safe(x):
+    return json.loads(json.dumps(x, default=list))
 
 
 # The pre-event win estimate (roadmap B1/B2, a parallel package) is read wherever a season records it: the season
@@ -1426,7 +1522,7 @@ class StoryCache:
         self.path = Path(path) if path else None
         self.mem = OrderedDict()
         self.lock = threading.Lock()
-        self.hits = self.misses = 0
+        self.hits = self.misses = self.seasons_built = 0
 
     def _db(self):
         if self.path is None:
@@ -1438,6 +1534,7 @@ class StoryCache:
                        'record TEXT, PRIMARY KEY(event, perspective, site))')
             db.execute('CREATE TABLE IF NOT EXISTS stories(digest TEXT, version INT, story TEXT, '
                        'PRIMARY KEY(digest, version))')
+            db.execute('CREATE TABLE IF NOT EXISTS seasons(year INT PRIMARY KEY, sig TEXT, version INT, data BLOB)')
             return db
         except (sqlite3.Error, OSError):
             return None
@@ -1521,6 +1618,41 @@ class StoryCache:
                 finally:
                     db.close()
 
+    def get_season(self, y, sig):
+        """Season y's story index if it was built from the season as published now (its signature), else None."""
+        k = ('season', y, sig, EXTRACT_VERSION)
+        with self.lock:
+            if k in self.mem:
+                self.mem.move_to_end(k)
+                return self.mem[k]
+        db = self._db()
+        if db is None:
+            return None
+        try:
+            row = db.execute('SELECT sig, version, data FROM seasons WHERE year = ?', (y,)).fetchone()
+        finally:
+            db.close()
+        if row and row[0] == sig and row[1] == EXTRACT_VERSION:
+            got = json.loads(zlib.decompress(row[2]))
+            self._remember(k, got)
+            return got
+        return None
+
+    def put_season(self, y, sig, ext):
+        self._remember(('season', y, sig, EXTRACT_VERSION), ext)
+        self.seasons_built += 1
+        db = self._db()
+        if db is None:
+            return
+        try:
+            with db:                                       # replaces an index of the season as published before
+                db.execute('INSERT OR REPLACE INTO seasons VALUES (?, ?, ?, ?)',
+                           (y, sig, EXTRACT_VERSION, zlib.compress(json.dumps(ext).encode(), 6)))
+        except sqlite3.Error:
+            pass
+        finally:
+            db.close()
+
     def _remember(self, k, v):
         with self.lock:
             self.mem[k] = v
@@ -1600,7 +1732,7 @@ def story_view(w, q, e):
     persp = int(persp) if persp and str(persp).lstrip('-').isdigit() else None
     site = O.one(q, 'site')
     site = int(site) if site and site.isdigit() else None
-    rec, st = tell(WorldSource(w), eid, persp, site, cache_for(w), names=lambda g: plain_name(w, g))
+    rec, st = tell(WorldSource(w, cache_for(w)), eid, persp, site, cache_for(w), names=lambda g: plain_name(w, g))
     if rec is None:
         return '<p class="muted">This edition is not in the published history or the current season.</p>'
     if O.one(q, 'facts'):
@@ -1649,7 +1781,7 @@ def headline(w, eid):
     """The story's first sentence as HTML (for the edition page and the Biggest Upsets list), or ''."""
     import observer as O
     try:
-        rec, st = tell(WorldSource(w), eid, None, None, cache_for(w), names=lambda g: plain_name(w, g))
+        rec, st = tell(WorldSource(w, cache_for(w)), eid, None, None, cache_for(w), names=lambda g: plain_name(w, g))
     except Exception:
         return ''
     if not st or not st['sentences']:
@@ -1660,7 +1792,7 @@ def headline(w, eid):
 def upset_explanation(w, eid):
     """For the Biggest Upsets list: the story's lead and its upset sentences, as HTML ('' without a story)."""
     import observer as O
-    rec, st = tell(WorldSource(w), eid, None, None, cache_for(w), names=lambda g: plain_name(w, g))
+    rec, st = tell(WorldSource(w, cache_for(w)), eid, None, None, cache_for(w), names=lambda g: plain_name(w, g))
     if not st:
         return ''
     keep = [s for s in st['sentences'] if 'upset' in s['facts']] or st['sentences'][:1]
