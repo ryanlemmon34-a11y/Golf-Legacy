@@ -39,7 +39,7 @@ single runner-up is split by strokes gained only when both have statistics for t
 strokes gained do not account for (penalties, rounding) is stated. Personal bests to that date (lowest putt total,
 best strokes-gained putting and total weeks) compare weeks of the same number of rounds at story editions (majors,
 Premier events and championships: the editions the story index keeps), strictly before the event, linked to the
-earlier event, and say "in the retained history" for a career that began before the world. Nothing is said of
+earlier event, each claim naming that format and how many earlier weeks it was compared with, and say "in the retained history" for a career that began before the world. Nothing is said of
 shots, putt lengths or form: none is recorded.
 
 Indexes (T3): earlier wins and best finishes come from the archive index's starts by person, comparisons from its
@@ -1648,24 +1648,29 @@ def _how(w, primary, tags):
     Q = ' in the retained history' if h['initial'] else ''
     lp, bp = h['lowest_putts_before'], h['best_sg_putt_before']
     EV = lambda x: [x['label'], x['href']]
+    # every clause names the format and the sample: the weeks compared are the golfer's earlier weeks of the same
+    # number of rounds at story editions, not every week they played
+    K = f'{num(h["comparable"])} earlier {NR} week{"s" if h["comparable"] != 1 else ""} {GOLF_SCOPE}{Q}'
     if h['lowest_putts']:
         if not h['best_sg_putt'] and bp['value'] > sg['sg_putt']:
-            w.say('The {P} putts were {W}\'s lowest {NR} total {S}{Q} to that date, but the best putting week by '
-                  'strokes gained was still the {EV} ({V}).', ['golf', 'golf_history'], P=g['putts'], W=W, NR=NR,
-                  S=GOLF_SCOPE, Q=Q, EV=EV(bp), V=_sg(bp['value']))
+            w.say('The {P} putts were fewer than in any of {W}\'s {K}, but the best of those {NR} weeks for '
+                  'strokes gained putting was still the {EV} ({V}).', ['golf', 'golf_history'], P=g['putts'], W=W,
+                  K=K, NR=NR, EV=EV(bp), V=_sg(bp['value']))
+        elif h['best_sg_putt']:
+            w.say('The {P} putts were fewer than in any of {W}\'s {K} (the fewest before: {LP} at the {EV}), and '
+                  'its {V} strokes gained putting beat each of those {NR} weeks too (the best before: the {EV2}, '
+                  '{V0}).', ['golf', 'golf_history'], P=g['putts'], W=W, K=K, LP=lp['value'], EV=EV(lp),
+                  V=_sg(sg['sg_putt']), NR=NR, EV2=EV(bp), V0=_sg(bp['value']))
         else:
-            w.say('The {P} putts were {W}\'s lowest {NR} total {S}{Q} to that date (the fewest before: {LP} at the '
-                  '{EV}).', ['golf', 'golf_history'], P=g['putts'], W=W, NR=NR, S=GOLF_SCOPE, Q=Q, LP=lp['value'],
-                  EV=EV(lp))
+            w.say('The {P} putts were fewer than in any of {W}\'s {K} (the fewest before: {LP} at the {EV}).',
+                  ['golf', 'golf_history'], P=g['putts'], W=W, K=K, LP=lp['value'], EV=EV(lp))
     elif h['best_sg_putt']:
-        w.say('It was {W}\'s best putting week by strokes gained {S}{Q} to that date ({V}; the best before was the '
-              '{EV}, {V0}).', ['golf', 'golf_history'], W=W, S=GOLF_SCOPE, Q=Q, V=_sg(sg['sg_putt']), EV=EV(bp),
-              V0=_sg(bp['value']))
+        w.say('Its {V} strokes gained putting was {W}\'s best against {K} (the best before: the {EV}, {V0}).',
+              ['golf', 'golf_history'], W=W, K=K, V=_sg(sg['sg_putt']), EV=EV(bp), V0=_sg(bp['value']))
     if h['best_sg_total'] and not (h['lowest_putts'] or h['best_sg_putt']):
         bt = h['best_sg_total_before']
-        w.say('Its {V} strokes gained in all was {W}\'s best {NR} week {S}{Q} to that date (before: the {EV}, '
-              '{V0}).', ['golf', 'golf_history'], V=_sg(g['sg_total']), W=W, NR=NR, S=GOLF_SCOPE, Q=Q, EV=EV(bt),
-              V0=_sg(bt['value']))
+        w.say('Its {V} strokes gained in all was {W}\'s best {NR} week against {K} (before: the {EV}, {V0}).',
+              ['golf', 'golf_history'], V=_sg(g['sg_total']), W=W, NR=NR, K=K, EV=EV(bt), V0=_sg(bt['value']))
 
 
 def _best_txt(pos):
@@ -2030,8 +2035,8 @@ def tell(src, eid, perspective=None, site=None, cache=None, names=None):
         rec = assemble(src, eid, perspective, site)
         if rec is None:
             return None, None
-        if cache is not None and stamp is not None:      # (facts waiting for the index: this session only)
-            cache.put_facts(rec, stamp, disk and not _pending(rec), perspective, site)
+        if cache is not None and stamp is not None and not _pending(rec):   # facts still waiting for the index
+            cache.put_facts(rec, stamp, disk, perspective, site)             # are never kept: asked again next time
     names = names or (lambda g: src.person(g).get('name') or f'#{g}')
     st = cache.get_story(rec['digest'], disk) if cache is not None else None
     if st is not None and any(names(int(g)) != n for g, n in (st.get('names') or {}).items()):

@@ -614,6 +614,19 @@ def golf_week(src, eid, putts, sg_putt, week=10, rounds=4, name='Open', golfer=1
                    name=name, rounds=rounds, golf=golf)
 
 
+def acceptance_case_current(src, putts=99):
+    """The 2041 Australia Open of the acceptance case on its own (see acceptance_case)."""
+    scores = {1: [67, 67, 68, 68], 2: [70, 69, 70, 69]}
+    golf = {1: golf_vec(putts=putts, fir=(34, 56), gir=41, scr=(23, 31), sand=(5, 6), drives=52, dist=301.2,
+                        sg=(3.00, 4.00, 1.50, 7.10)),
+            2: golf_vec(putts=106, sg=(0.79, 1.68, 0.68, 4.45))}
+    for g in range(3, 13):                               # the rest of the field, all four rounds, all behind
+        scores[g] = [71, 71, 71, 71 + g]
+        golf[g] = golf_vec(putts=110 + g, gir=38, sg=(0.1, 0.2, 0.1, -0.5 - g / 10))
+    return src.add('2041:PT_AUS', scores, week=49, series='PT_AUS', tier=1, category='flagship', kind='regular',
+                   name='Australia Open', golf=golf)
+
+
 def acceptance_case(src):
     """A synthetic reproduction of the reviewed save (fictional data): the 2041 Australia Open won by eight with 99
     putts, SG putting +7.10, 34 of 56 fairways, 41 of 72 greens, 23 of 31 scrambles, 5 of 6 sand saves; earlier
@@ -662,7 +675,9 @@ class StoryGolfTests(unittest.TestCase):
                      'up and down 23 times in 31 tries', '5 of 6 from greenside bunkers',
                      'the engine\'s expected-strokes table', '+2.21 off the tee', '+2.32 on approach',
                      '+0.82 around the green', '+2.65 putting', 'eight-stroke margin',
-                     'lowest four-round total', 'best putting week by strokes gained was still the 2039 Fiji Open (+10.85)'):
+                     'The 99 putts were fewer than in any of Ada Lin\'s three earlier four-round weeks among majors, '
+                     'Premier events and championships, but the best of those four-round weeks for strokes gained '
+                     'putting was still the 2039 Fiji Open (+10.85)'):
             self.assertIn(want, text)
         self.assertNotIn('not accounted', text)
         self.assertNotIn('retained history', text)
@@ -686,8 +701,8 @@ class StoryGolfTests(unittest.TestCase):
         acceptance_case(src)
         src.people[1]['initial'] = True
         _, text, _ = self.story(src)
-        self.assertIn('lowest four-round total among majors, Premier events and championships in the retained '
-                      'history to that date', text)
+        self.assertIn('three earlier four-round weeks among majors, Premier events and championships in the '
+                      'retained history', text)
         rec, text, _ = self.story(src, '2040:PT_TWO')                 # only two comparable weeks before: no claim
         self.assertEqual(rec['facts']['golf_history']['comparable'], 2)
         self.assertNotIn('to that date', text)
@@ -722,6 +737,57 @@ class StoryGolfTests(unittest.TestCase):
             self.assertIn('golf_history', rec['facts'])
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_pending_then_complete_in_the_same_cache(self):
+        """The same cache (one session): once indexing completes, the next opening has the comparison."""
+        src = FakeSource()
+        acceptance_case(src)
+        tmp = Path(tempfile.mkdtemp())
+        try:
+            c = S.StoryCache(tmp / 'stories.sqlite')
+            src.pending = 4
+            rec, st = S.tell(src, '2041:PT_AUS', cache=c, names=NAMES.get)
+            self.assertNotIn('golf_history', rec['facts'])
+            self.assertTrue(any('still being indexed' in m for m in st['missing']))
+            src.pending = 0                                           # the background indexer has finished
+            rec, st = S.tell(src, '2041:PT_AUS', cache=c, names=NAMES.get)
+            self.assertIn('golf_history', rec['facts'])
+            self.assertFalse(any('still being indexed' in m for m in st['missing']))
+            self.assertEqual(rec['digest'], S.assemble(src, '2041:PT_AUS')['digest'])
+            rec2, _ = S.tell(src, '2041:PT_AUS', cache=c, names=NAMES.get)   # complete facts: now kept
+            self.assertEqual(c.hits, 1)
+            self.assertEqual(rec2['digest'], rec['digest'])
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_putting_best_is_qualified_by_format_and_sample(self):
+        """A three-round +30 putting week is another format: the four-round +7.10 is the best only among the
+        four-round weeks, and the text says so with how many weeks it was compared with."""
+        src = FakeSource()
+        golf_week(src, '2038:PT_ONE', 112, 1.0, name='First Open')
+        golf_week(src, '2039:PT_TWO', 111, 0.5, name='Second Open')
+        golf_week(src, '2040:PT_THREE', 110, 0.8, name='Third Open')
+        golf_week(src, '2040:PT_SHORT', 70, 30.0, week=12, rounds=3, name='Short Open')
+        acceptance_case_current(src, putts=115)                       # more putts than before: no putts claim
+        rec, text, _ = self.story(src)
+        h = rec['facts']['golf_history']
+        self.assertEqual(h['comparable'], 3)
+        self.assertTrue(h['best_sg_putt'])
+        sent = next(t for t in text.split('. ') if 'strokes gained putting was' in t)
+        self.assertIn('three earlier four-round weeks among majors, Premier events and championships', sent)
+        self.assertIn('2038 First Open, +1.00', sent)                 # the best before, linked
+        self.assertNotIn('Short Open', text)
+        self.assertNotIn('+30', text)
+        src2 = FakeSource()                                           # fewer putts and the best SG putting too
+        for eid, pu, sp in (('2038:PT_ONE', 112, 1.0), ('2039:PT_TWO', 111, 0.5), ('2040:PT_THREE', 110, 0.8)):
+            golf_week(src2, eid, pu, sp, name=eid.split('_')[1].title() + ' Open')
+        golf_week(src2, '2040:PT_SHORT', 70, 30.0, week=12, rounds=3, name='Short Open')
+        acceptance_case_current(src2, putts=105)
+        _, text2, _ = self.story(src2)
+        self.assertIn('fewer than in any of Ada Lin\'s three earlier four-round weeks among majors, Premier events and '
+                      'championships', text2)
+        self.assertIn('+7.10 strokes gained putting beat each of those four-round weeks too', text2)
+        self.assertNotIn('Short Open', text2)
 
     def test_perspective_golf(self):
         src = FakeSource()
