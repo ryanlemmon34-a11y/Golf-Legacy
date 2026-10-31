@@ -21,3 +21,23 @@ Use an explicit positive synthetic test cost or the current deterministic cost r
 Keep a separate negative/control matrix for injury, retirement, expired eligibility, lost amateur status, no valid right, qualifying, ordinary events, sufficient funds and overlapping support. Where the production path requires a full field, use the smallest legal fixture and document the boundary. A helper-only test is not a substitute for admission-path coverage.
 
 Report 269/269 distinct scenario IDs exercised, Harper 8/8 and modeled subset 6/6, exact commands, results and caveats. These are reconstructed scenarios, not exact historical replays. This manifest itself does not establish that the new code passes.
+
+## F2 coverage test (added with tests/test_major_affordability_269.py; not part of HAL's manifest)
+
+What it covers: every one of the 269 rows, by its category (status, major, earned or conditional, route codes:
+49 categories), through today's real weekly entry path (`Season.run_week` for that major's week:
+`special_field` -> `major_field` -> `lock_rights` -> the trip booked -> the round played -> `record_event`), in
+the row's own year and week. For each row a synthetic golfer with the row's status, residence, lifestyle and a
+caddie is made broke on purpose (no savings, credit line used up, no family money, no backers, no amateur
+support), and only the facts that give the row's routes are recorded (a fresh qualification context per row).
+Asserted per row (subTest by case_id): in the field by one of its own routes and played; the right recorded
+'entered' with the row's routes and state and its money facts (could not pay; paid by the organizer); exactly one
+organizer travel grant covering travel and entry, nothing in the golfer's events ledger, cash moving only by what
+the books show; the caddie's week paid by the golfer. Each of the 172 conditional rows is also run with a golfer
+who has turned professional: the place lapses ('expired: turned professional') and nothing is paid. Summary checks:
+269/269 case ids; Harper 8/8 (2 recorded in 2047 + the 6 modeled 2048-2050).
+
+What it does not do: it is not a replay of Test 1 and uses no historical balance or trip cost (none is recorded;
+null stays unknown). The synthetic golfers are not the historical people, the costs are today's resolver's, and
+the world is a tiny one (scale 0.01) with no other event played that week. Harper's modeled costs are only
+labelled, never used. Run: `nice -n 19 python -m unittest tests.test_major_affordability_269 -v` (about 15 s).
