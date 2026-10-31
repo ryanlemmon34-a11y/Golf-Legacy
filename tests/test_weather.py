@@ -253,6 +253,17 @@ class ControlTests(unittest.TestCase):
             self.assertTrue(all(len(c) == 4 for c in out['conditions']))
             self.assertEqual(len(out['rounds']), 4 * len(golfers))         # every round played by everyone
 
+    def test_match_play_weather_every_day_and_no_match_cancelled(self):
+        course = at('Bergen', 'Norway', 'Parkland', 14.0)
+        golfers = [replace(golfer(60 + i), id=i + 1) for i in range(8)]
+        task = {'event_id': '2030:TEST_AM', 'site': 0, 'course': course, 'golfers': golfers,
+                'caddies': [None] * len(golfers), 'match_play': True, 'rounds': 0, 'cut_top': 0,
+                'prestige': 40.0, 'seed': 11, 'week': 3, 'weather': WX.MODEL}
+        out = SEA.play_site(task)
+        self.assertEqual(len(out['conditions']), 2 + 3)                    # two stroke rounds, three knockout days
+        self.assertEqual(len(out['matches']), 7)                           # every match played
+        self.assertEqual(out['conditions'], SEA.play_site(task)['conditions'])
+
     def test_classic_worlds_keep_classic_records(self):
         golfers = [replace(golfer(70), id=1), replace(golfer(72), id=2)]
         task = {'event_id': '2030:TEST', 'site': 0, 'course': MID, 'golfers': golfers, 'caddies': [None, None],
@@ -262,6 +273,19 @@ class ControlTests(unittest.TestCase):
 
 
 class RecordTests(unittest.TestCase):
+    def test_observer_shows_each_rounds_conditions(self):
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
+        import observer_history as OH
+        full = {'conditions': [[[10.0, 0, 0.5, 270], [22.5, 1, 0.5, 90]]], 'scores': [{'1': [70, 71]}]}
+        text = OH.conditions_lines(full, 0)
+        self.assertIn('R1: wind 10.0 mph from the W, dry', text)
+        self.assertIn('R2: wind 22.5 mph from the E, wet', text)
+        self.assertNotIn('R2', OH.conditions_lines(full, 0, through=1))   # a replay shows nothing ahead
+        mp = {'match_play': True, 'conditions': [[[8.0, 0, 0.4, 0]] * 3], 'scores': [{'1': [70, 72]}]}
+        self.assertIn('knockout day 1: wind 8.0 mph from the N', OH.conditions_lines(mp, 0))
+        self.assertEqual(OH.conditions_lines({'conditions': [None]}, 0), '')                # not recorded: nothing
+
+
     def test_describe(self):
         self.assertEqual(WX.describe([12.5, 1, 0.5]), 'wind 12.5 mph, wet, pin difficulty 0.5')
         self.assertEqual(WX.describe([12.5, 0, 0.5, 225]), 'wind 12.5 mph from the SW, dry, pin difficulty 0.5')

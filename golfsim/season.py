@@ -49,7 +49,7 @@ from .golfer import Caddie
 from .geography import CITY_BY_NAME, COUNTRIES
 from .population import CHALLENGER_BY_COUNTRY, CHALLENGER_BY_REGION
 from .records import Mark, RecordBook
-from .tournament import play_event, play_stroke_and_match
+from .tournament import knockout_days, play_event, play_stroke_and_match
 
 PREMIER_TOURS = ('PT_AMERICAS', 'PT_EUROPE', 'PT_ASIA_PACIFIC')
 FATIGUE_PER_ROUND = 0.03          # a four-round week adds ~0.12 for an average-stamina golfer
@@ -255,8 +255,14 @@ def play_site(task):
         out.update(finish=[], playoff=0)
         return out
     if task['match_play']:
+        cond = None
+        if task.get('weather') == WX.MODEL:          # two stroke-play rounds, then one draw per knockout day
+            cond = WX.draw_conditions(course, task['week'], 2 + knockout_days(len(golfers), 64),
+                                      0.3 + 0.4 * task['prestige'] / 100, task['seed'])
+            out['conditions'] = [WX.archived(c) for _, c in sorted(cond.items())]
         res = play_stroke_and_match(golfers, course, rng, stroke_holes=36, bracket=64, final_holes=36,
-                                    on_round=on_round, on_hole=on_hole, caddies=caddies, on_match=on_match)
+                                    on_round=on_round, on_hole=on_hole, caddies=caddies, on_match=on_match,
+                                    cond_by_round=cond)
         out.update(finish=[(g.id, pos, None) for g, pos in res], playoff=0, matches=matches)
         return out
     pins = 0.3 + 0.4 * task['prestige'] / 100
@@ -300,7 +306,8 @@ class EventResult:
     scores: list = field(default_factory=list)       # per site: {gid: [stroke-play round scores, in order]}
     prizes: list = field(default_factory=list)       # per site: {gid: prize money paid} (paid golfers only)
     conditions: list = field(default_factory=list)   # per site: [[wind mph, rain 0/1, pin difficulty(, wind from
-                                                     # degrees: seasonal weather)] per round]
+                                                     # degrees: seasonal weather)] per round; match play (seasonal
+                                                     # weather only): the stroke rounds, then each knockout day]
     holes: list = field(default_factory=list)        # majors, per site: {gid: [[strokes per hole] per round]}
     pars: list = field(default_factory=list)         # majors, per site: each hole's par (for the scorecards)
     golf: list = field(default_factory=list)         # per site: {gid: golfstats counters + longest drive}

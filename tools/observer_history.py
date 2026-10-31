@@ -899,7 +899,14 @@ def conditions_lines(full, site, through=None):
     if not cond:
         return ''
     rows = cond[:through] if through else cond
-    return ('<p class="muted">Conditions: ' + ' · '.join(f'R{i}: {O.esc(WX.describe(c))}' for i, c in enumerate(rows, 1))
+    stroke = len(rows)
+    if full.get('match_play'):                         # stroke-play rounds first, then each knockout day
+        sc = (full.get('scores') or [])
+        by = sc[site] if site < len(sc) and sc[site] else {}
+        stroke = max((len(v) for v in by.values()), default=2)
+    label = lambda i: f'R{i}' if i <= stroke else f'knockout day {i - stroke}'
+    return ('<p class="muted">Conditions: ' + ' · '.join(f'{label(i)}: {O.esc(WX.describe(c))}'
+                                                          for i, c in enumerate(rows, 1))
             + '. Weather never cancels, shortens or delays a round.</p>')
 
 
