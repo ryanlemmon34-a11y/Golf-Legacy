@@ -116,7 +116,8 @@ class ExclusionByGroup(unittest.TestCase):
          2: (22, 'full_time', False, 410, 0, 0, None, 0, False, None, 'r'),     # no start, never priced out
          3: (22, 'full_time', False, 420, 6, 2, 'C', 5000, False, None, 'r'),   # played, priced out some weeks
          4: (22, 'full_time', True, 430, 0, 0, None, 0, False, None, 'r'),      # college: not tracked
-         5: (22, 'part_time', False, 440, 3, 0, None, 0, False, None, 'r')}     # working: not tracked
+         5: (22, 'part_time', False, 440, 3, 0, None, 0, False, None, 'r'),     # working: not tracked
+         6: (22, 'part_time', False, 450, 2, 8, None, 0, False, 30, 'r')}       # took work by the pathway
     C = {1: (22, 'full_time', False, 400, 0, 3, None, 0, False, None, 'r')}
 
     def table(self):
@@ -126,17 +127,20 @@ class ExclusionByGroup(unittest.TestCase):
     def test_rates_with_denominators(self):
         b, c = self.table()
         cells = [x.strip() for x in b.strip('|').split('|')]
-        self.assertEqual(cells[:9], ['21-22', 'B', '5', '3 / 5 (60.0%)', '3', '2 / 3 (66.7%)', '1 / 3 (33.3%)',
-                                     '1 / 3 (33.3%)', '1 / 3 (33.3%)'])
-        self.assertEqual(cells[9:], ['1 / 5 (20.0%)', '$5,000', '1 / 1 (100.0%)'])
+        self.assertEqual(cells[:10], ['21-22', 'B', '6', '3 / 6 (50.0%)', '3', '1', '2 / 3 (66.7%)', '1 / 3 (33.3%)',
+                                      '1 / 3 (33.3%)', '1 / 3 (33.3%)'])               # the conversion: not tracked
+        self.assertEqual(cells[10:], ['1 / 6 (16.7%)', '$5,000', '1 / 1 (100.0%)'])
         cells = [x.strip() for x in c.strip('|').split('|')]
-        self.assertEqual(cells, ['21-22', 'C', '1', '1 / 1 (100.0%)', '1', '1 / 1 (100.0%)', '0 / 1 (0.0%)',
+        self.assertEqual(cells, ['21-22', 'C', '1', '1 / 1 (100.0%)', '1', '0', '1 / 1 (100.0%)', '0 / 1 (0.0%)',
                                  '1 / 1 (100.0%)', '0 / 1 (0.0%)', '—', '—', '—'])
 
     def test_zero_start_is_not_called_financial_exclusion(self):
         text = '\n'.join(DR.breakdowns(self.run_('B', self.B), self.run_('C', self.C)))
         self.assertIn('Starting no event is not the same as being priced out', text)
         self.assertIn('No start, never cash-blocked', text)
+        self.assertIn('Pathway conversions excluded from the tracked denominators: B 1, C 0 golfer-seasons.', text)
+        self.assertIn('not a paired-person causal estimate', text)
+        self.assertIn('golfer-seasons, not unique people', text)
 
 if __name__ == '__main__':
     unittest.main()

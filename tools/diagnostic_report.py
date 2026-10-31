@@ -304,21 +304,29 @@ def breakdowns(b, c):
     """F1.h: the support comparison, starts and financial exclusion by age and by amateur standing at the season's
     end, both arms, from each season's recorded amateur rows (read only). Every rate shows its denominator."""
     out = [f'### By age and by amateur standing (runs {b.name} and {c.name})', '',
-           'Every amateur season of every recorded season, grouped by age and by the amateur ranking at the season\'s '
-           'end. Starting no event is not the same as being priced out, so the two are counted apart:', '',
-           '- **No start**: no event entered all season (any reason), of all amateur-seasons.',
+           'Every amateur golfer-season of every recorded season (golfer-seasons, not unique people), grouped by age '
+           'and by the amateur ranking at the season\'s end. Starting no event is not the same as being priced out, so '
+           'the two are counted apart:', '',
+           '- **No start**: no event entered all season (any reason), of all amateur golfer-seasons (including those '
+           'who took work by the pathway during the season).',
            '- **Cash-blocked** (financial exclusion): at least one week counted as "could not afford any event" -- '
            'eligible for an event that week and not one of them affordable from spendable funds, support included. '
            'Counted only for full-time amateurs outside college (the work pathway\'s ledger), so its denominator is '
-           'those seasons ("tracked").',
+           '**tracked**: golfer-seasons that ended full-time and outside college. A golfer who took work by the '
+           'pathway during the season ended it part-time, so is not tracked; those conversions are counted in their '
+           'own column (and in total below).',
            '- **Count 8+**: the cash-blocked count reached 8 during the season (injury and calendar gaps pause it, an '
            'affordable week resets it; it can carry weeks over from the winter before).',
            '- **No start, cash-blocked** / **no start, never cash-blocked**: tracked seasons with no start, split by '
            'whether any week was counted as unaffordable.',
-           f'- Support columns are run {b.name}\'s (run {c.name} has none by design).', '']
+           f'- Support columns are run {b.name}\'s (run {c.name} has none by design).', '',
+           f'Reading {b.name} against {c.name}: the same seed and rules with support the only intended difference, but '
+           f'support can change a golfer\'s results, amateur rank and status, so a group (by year-end rank especially) '
+           f'need not hold comparable golfers in the two runs. The differences are supportive evidence about support, '
+           f'not a paired-person causal estimate.', '']
     cap = {'A': 25000, 'B': 12000, 'C': 5000}
     for title, key in (('Age', lambda v: age_band(v[0])), ('Amateur standing', lambda v: standing_band(v[3]))):
-        agg = {run.name: defaultdict(lambda: [0] * 8) for run in (b, c)}
+        agg = {run.name: defaultdict(lambda: [0] * 9) for run in (b, c)}
         for run in (b, c):
             for y in run.years:
                 for v in run.amateurs(y).values():
@@ -333,6 +341,7 @@ def breakdowns(b, c):
                     a[6] += tracked and v[4] == 0 and v[5] == 0
                     if run is b and v[6]:
                         a[7] += 1
+                    a[8] += v[9] is not None                    # took work by the pathway (not tracked)
         drawn = defaultdict(lambda: [0, 0])                     # group -> drawn, cap used up (run b)
         for y in b.years:
             for v in b.amateurs(y).values():
@@ -347,15 +356,18 @@ def breakdowns(b, c):
                 if not a or not a[0]:
                     continue
                 sup = run is b
-                rows.append([k, run.name, f'{a[0]:,}', share(a[1], a[0]), f'{a[2]:,}', share(a[3], a[2]),
+                rows.append([k, run.name, f'{a[0]:,}', share(a[1], a[0]), f'{a[2]:,}', f'{a[8]:,}', share(a[3], a[2]),
                              share(a[4], a[2]), share(a[5], a[2]), share(a[6], a[2]),
                              share(a[7], a[0]) if sup else '—',
                              f'${drawn[k][0] / a[7]:,.0f}' if sup and a[7] else '—',
                              share(drawn[k][1], a[7]) if sup else '—'])
         out += [f'**{title}**', '']
-        out += table([title, 'Run', 'Amateur-seasons', 'No start', 'Tracked (full-time, not college)',
-                      'Cash-blocked 1+ week', 'Count 8+', 'No start, cash-blocked', 'No start, never cash-blocked',
+        out += table([title, 'Run', 'Amateur golfer-seasons', 'No start', 'Tracked (season-end full-time, not college)',
+                      'Took work by the pathway (not tracked)', 'Cash-blocked 1+ week', 'Count 8+', 'No start, cash-blocked', 'No start, never cash-blocked',
                       'Supported', 'Mean drawn', 'Cap used up (of supported)'], rows) + ['']
+    conv = {run.name: sum(v[9] is not None for y in run.years for v in run.amateurs(y).values()) for run in (b, c)}
+    out += [f'Pathway conversions excluded from the tracked denominators: {b.name} {conv[b.name]:,}, '
+            f'{c.name} {conv[c.name]:,} golfer-seasons.', '']
     return out
 
 

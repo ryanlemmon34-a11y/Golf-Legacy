@@ -165,43 +165,47 @@ By region (all seasons): events per amateur and the share of amateur seasons wit
 
 ### By age and by amateur standing (runs B and C)
 
-Every amateur season of every recorded season, grouped by age and by the amateur ranking at the season's end. Starting no event is not the same as being priced out, so the two are counted apart:
+Every amateur golfer-season of every recorded season (golfer-seasons, not unique people), grouped by age and by the amateur ranking at the season's end. Starting no event is not the same as being priced out, so the two are counted apart:
 
-- **No start**: no event entered all season (any reason), of all amateur-seasons.
-- **Cash-blocked** (financial exclusion): at least one week counted as "could not afford any event" -- eligible for an event that week and not one of them affordable from spendable funds, support included. Counted only for full-time amateurs outside college (the work pathway's ledger), so its denominator is those seasons ("tracked").
+- **No start**: no event entered all season (any reason), of all amateur golfer-seasons (including those who took work by the pathway during the season).
+- **Cash-blocked** (financial exclusion): at least one week counted as "could not afford any event" -- eligible for an event that week and not one of them affordable from spendable funds, support included. Counted only for full-time amateurs outside college (the work pathway's ledger), so its denominator is **tracked**: golfer-seasons that ended full-time and outside college. A golfer who took work by the pathway during the season ended it part-time, so is not tracked; those conversions are counted in their own column (and in total below).
 - **Count 8+**: the cash-blocked count reached 8 during the season (injury and calendar gaps pause it, an affordable week resets it; it can carry weeks over from the winter before).
 - **No start, cash-blocked** / **no start, never cash-blocked**: tracked seasons with no start, split by whether any week was counted as unaffordable.
 - Support columns are run B's (run C has none by design).
 
+Reading B against C: the same seed and rules with support the only intended difference, but support can change a golfer's results, amateur rank and status, so a group (by year-end rank especially) need not hold comparable golfers in the two runs. The differences are supportive evidence about support, not a paired-person causal estimate.
+
 **Age**
 
-| Age | Run | Amateur-seasons | No start | Tracked (full-time, not college) | Cash-blocked 1+ week | Count 8+ | No start, cash-blocked | No start, never cash-blocked | Supported | Mean drawn | Cap used up (of supported) |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| under 21 | B | 8,734 | 9 / 8,734 (0.1%) | 2,271 | 86 / 2,271 (3.8%) | 53 / 2,271 (2.3%) | 9 / 2,271 (0.4%) | 0 / 2,271 (0.0%) | 700 / 8,734 (8.0%) | $4,994 | 230 / 700 (32.9%) |
-| under 21 | C | 8,742 | 16 / 8,742 (0.2%) | 2,280 | 111 / 2,280 (4.9%) | 71 / 2,280 (3.1%) | 16 / 2,280 (0.7%) | 0 / 2,280 (0.0%) | — | — | — |
-| 21-22 | B | 5,759 | 0 / 5,759 (0.0%) | 1,030 | 49 / 1,030 (4.8%) | 11 / 1,030 (1.1%) | 0 / 1,030 (0.0%) | 0 / 1,030 (0.0%) | 731 / 5,759 (12.7%) | $5,362 | 272 / 731 (37.2%) |
-| 21-22 | C | 5,764 | 3 / 5,764 (0.1%) | 994 | 59 / 994 (5.9%) | 16 / 994 (1.6%) | 1 / 994 (0.1%) | 0 / 994 (0.0%) | — | — | — |
-| 23-25 | B | 4,975 | 1 / 4,975 (0.0%) | 589 | 21 / 589 (3.6%) | 6 / 589 (1.0%) | 0 / 589 (0.0%) | 0 / 589 (0.0%) | 273 / 4,975 (5.5%) | $5,502 | 119 / 273 (43.6%) |
-| 23-25 | C | 5,074 | 1 / 5,074 (0.0%) | 533 | 22 / 533 (4.1%) | 5 / 533 (0.9%) | 0 / 533 (0.0%) | 0 / 533 (0.0%) | — | — | — |
-| 26-29 | B | 6,488 | 4 / 6,488 (0.1%) | 33 | 1 / 33 (3.0%) | 1 / 33 (3.0%) | 0 / 33 (0.0%) | 0 / 33 (0.0%) | 212 / 6,488 (3.3%) | $5,952 | 94 / 212 (44.3%) |
-| 26-29 | C | 6,631 | 1 / 6,631 (0.0%) | 27 | 3 / 27 (11.1%) | 0 / 27 (0.0%) | 0 / 27 (0.0%) | 0 / 27 (0.0%) | — | — | — |
-| 30+ | B | 12,356 | 1 / 12,356 (0.0%) | 0 | — | — | — | — | 231 / 12,356 (1.9%) | $6,045 | 111 / 231 (48.1%) |
-| 30+ | C | 12,060 | 3 / 12,060 (0.0%) | 0 | — | — | — | — | — | — | — |
+| Age | Run | Amateur golfer-seasons | No start | Tracked (season-end full-time, not college) | Took work by the pathway (not tracked) | Cash-blocked 1+ week | Count 8+ | No start, cash-blocked | No start, never cash-blocked | Supported | Mean drawn | Cap used up (of supported) |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| under 21 | B | 8,734 | 9 / 8,734 (0.1%) | 2,271 | 0 | 86 / 2,271 (3.8%) | 53 / 2,271 (2.3%) | 9 / 2,271 (0.4%) | 0 / 2,271 (0.0%) | 700 / 8,734 (8.0%) | $4,994 | 230 / 700 (32.9%) |
+| under 21 | C | 8,742 | 16 / 8,742 (0.2%) | 2,280 | 0 | 111 / 2,280 (4.9%) | 71 / 2,280 (3.1%) | 16 / 2,280 (0.7%) | 0 / 2,280 (0.0%) | — | — | — |
+| 21-22 | B | 5,759 | 0 / 5,759 (0.0%) | 1,030 | 165 | 49 / 1,030 (4.8%) | 11 / 1,030 (1.1%) | 0 / 1,030 (0.0%) | 0 / 1,030 (0.0%) | 731 / 5,759 (12.7%) | $5,362 | 272 / 731 (37.2%) |
+| 21-22 | C | 5,764 | 3 / 5,764 (0.1%) | 994 | 190 | 59 / 994 (5.9%) | 16 / 994 (1.6%) | 1 / 994 (0.1%) | 0 / 994 (0.0%) | — | — | — |
+| 23-25 | B | 4,975 | 1 / 4,975 (0.0%) | 589 | 58 | 21 / 589 (3.6%) | 6 / 589 (1.0%) | 0 / 589 (0.0%) | 0 / 589 (0.0%) | 273 / 4,975 (5.5%) | $5,502 | 119 / 273 (43.6%) |
+| 23-25 | C | 5,074 | 1 / 5,074 (0.0%) | 533 | 57 | 22 / 533 (4.1%) | 5 / 533 (0.9%) | 0 / 533 (0.0%) | 0 / 533 (0.0%) | — | — | — |
+| 26-29 | B | 6,488 | 4 / 6,488 (0.1%) | 33 | 1 | 1 / 33 (3.0%) | 1 / 33 (3.0%) | 0 / 33 (0.0%) | 0 / 33 (0.0%) | 212 / 6,488 (3.3%) | $5,952 | 94 / 212 (44.3%) |
+| 26-29 | C | 6,631 | 1 / 6,631 (0.0%) | 27 | 0 | 3 / 27 (11.1%) | 0 / 27 (0.0%) | 0 / 27 (0.0%) | 0 / 27 (0.0%) | — | — | — |
+| 30+ | B | 12,356 | 1 / 12,356 (0.0%) | 0 | 0 | — | — | — | — | 231 / 12,356 (1.9%) | $6,045 | 111 / 231 (48.1%) |
+| 30+ | C | 12,060 | 3 / 12,060 (0.0%) | 0 | 0 | — | — | — | — | — | — | — |
 
 **Amateur standing**
 
-| Amateur standing | Run | Amateur-seasons | No start | Tracked (full-time, not college) | Cash-blocked 1+ week | Count 8+ | No start, cash-blocked | No start, never cash-blocked | Supported | Mean drawn | Cap used up (of supported) |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| amateur top 50 | B | 500 | 0 / 500 (0.0%) | 87 | 0 / 87 (0.0%) | 0 / 87 (0.0%) | 0 / 87 (0.0%) | 0 / 87 (0.0%) | 500 / 500 (100.0%) | $6,877 | 31 / 500 (6.2%) |
-| amateur top 50 | C | 500 | 0 / 500 (0.0%) | 72 | 17 / 72 (23.6%) | 4 / 72 (5.6%) | 0 / 72 (0.0%) | 0 / 72 (0.0%) | — | — | — |
-| 51-150 | B | 1,000 | 0 / 1,000 (0.0%) | 163 | 8 / 163 (4.9%) | 5 / 163 (3.1%) | 0 / 163 (0.0%) | 0 / 163 (0.0%) | 672 / 1,000 (67.2%) | $5,378 | 216 / 672 (32.1%) |
-| 51-150 | C | 1,000 | 0 / 1,000 (0.0%) | 135 | 8 / 135 (5.9%) | 5 / 135 (3.7%) | 0 / 135 (0.0%) | 0 / 135 (0.0%) | — | — | — |
-| 151-300 | B | 1,499 | 0 / 1,499 (0.0%) | 219 | 10 / 219 (4.6%) | 3 / 219 (1.4%) | 0 / 219 (0.0%) | 0 / 219 (0.0%) | 521 / 1,499 (34.8%) | $4,780 | 289 / 521 (55.5%) |
-| 151-300 | C | 1,500 | 2 / 1,500 (0.1%) | 180 | 15 / 180 (8.3%) | 10 / 180 (5.6%) | 2 / 180 (1.1%) | 0 / 180 (0.0%) | — | — | — |
-| ranked beyond 300 | B | 34,232 | 9 / 34,232 (0.0%) | 3,368 | 136 / 3,368 (4.0%) | 62 / 3,368 (1.8%) | 9 / 3,368 (0.3%) | 0 / 3,368 (0.0%) | 454 / 34,232 (1.3%) | $4,476 | 290 / 454 (63.9%) |
-| ranked beyond 300 | C | 34,118 | 17 / 34,118 (0.0%) | 3,360 | 154 / 3,360 (4.6%) | 72 / 3,360 (2.1%) | 14 / 3,360 (0.4%) | 0 / 3,360 (0.0%) | — | — | — |
-| unranked | B | 1,081 | 6 / 1,081 (0.6%) | 86 | 3 / 86 (3.5%) | 1 / 86 (1.2%) | 0 / 86 (0.0%) | 0 / 86 (0.0%) | 0 / 1,081 (0.0%) | — | — |
-| unranked | C | 1,153 | 5 / 1,153 (0.4%) | 87 | 1 / 87 (1.1%) | 1 / 87 (1.1%) | 1 / 87 (1.1%) | 0 / 87 (0.0%) | — | — | — |
+| Amateur standing | Run | Amateur golfer-seasons | No start | Tracked (season-end full-time, not college) | Took work by the pathway (not tracked) | Cash-blocked 1+ week | Count 8+ | No start, cash-blocked | No start, never cash-blocked | Supported | Mean drawn | Cap used up (of supported) |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| amateur top 50 | B | 500 | 0 / 500 (0.0%) | 87 | 0 | 0 / 87 (0.0%) | 0 / 87 (0.0%) | 0 / 87 (0.0%) | 0 / 87 (0.0%) | 500 / 500 (100.0%) | $6,877 | 31 / 500 (6.2%) |
+| amateur top 50 | C | 500 | 0 / 500 (0.0%) | 72 | 1 | 17 / 72 (23.6%) | 4 / 72 (5.6%) | 0 / 72 (0.0%) | 0 / 72 (0.0%) | — | — | — |
+| 51-150 | B | 1,000 | 0 / 1,000 (0.0%) | 163 | 0 | 8 / 163 (4.9%) | 5 / 163 (3.1%) | 0 / 163 (0.0%) | 0 / 163 (0.0%) | 672 / 1,000 (67.2%) | $5,378 | 216 / 672 (32.1%) |
+| 51-150 | C | 1,000 | 0 / 1,000 (0.0%) | 135 | 4 | 8 / 135 (5.9%) | 5 / 135 (3.7%) | 0 / 135 (0.0%) | 0 / 135 (0.0%) | — | — | — |
+| 151-300 | B | 1,499 | 0 / 1,499 (0.0%) | 219 | 1 | 10 / 219 (4.6%) | 3 / 219 (1.4%) | 0 / 219 (0.0%) | 0 / 219 (0.0%) | 521 / 1,499 (34.8%) | $4,780 | 289 / 521 (55.5%) |
+| 151-300 | C | 1,500 | 2 / 1,500 (0.1%) | 180 | 5 | 15 / 180 (8.3%) | 10 / 180 (5.6%) | 2 / 180 (1.1%) | 0 / 180 (0.0%) | — | — | — |
+| ranked beyond 300 | B | 34,232 | 9 / 34,232 (0.0%) | 3,368 | 217 | 136 / 3,368 (4.0%) | 62 / 3,368 (1.8%) | 9 / 3,368 (0.3%) | 0 / 3,368 (0.0%) | 454 / 34,232 (1.3%) | $4,476 | 290 / 454 (63.9%) |
+| ranked beyond 300 | C | 34,118 | 17 / 34,118 (0.0%) | 3,360 | 232 | 154 / 3,360 (4.6%) | 72 / 3,360 (2.1%) | 14 / 3,360 (0.4%) | 0 / 3,360 (0.0%) | — | — | — |
+| unranked | B | 1,081 | 6 / 1,081 (0.6%) | 86 | 6 | 3 / 86 (3.5%) | 1 / 86 (1.2%) | 0 / 86 (0.0%) | 0 / 86 (0.0%) | 0 / 1,081 (0.0%) | — | — |
+| unranked | C | 1,153 | 5 / 1,153 (0.4%) | 87 | 5 | 1 / 87 (1.1%) | 1 / 87 (1.1%) | 1 / 87 (1.1%) | 0 / 87 (0.0%) | — | — | — |
+
+Pathway conversions excluded from the tracked denominators: B 224, C 247 golfer-seasons.
 
 ## The work pathway and the amateurs it leaves out
 
@@ -240,10 +244,15 @@ Full-time non-college amateur seasons, by why the pathway does or does not apply
 Resumed segments (HAL's instruction of 04:3x UTC: identical checkout 473690a, seed, support-on setting, committed
 checkpoint and saved run state; --resume; the 420 s safeguard and external watchdog unchanged; at most two
 diagnostic jobs at once; original processes confirmed gone and no implementation test or measurement running):
-| B | 2 (resume) | 2026-10-31 04:34:11 | | from 2033 | |
-| A | 2 (resume) | 2026-10-31 04:45:47 | | from 2033 | |
+| B | 2 (resume) | 2026-10-31 04:34:11 | about 04:45 (the resume script then started A) | 2034-2036 (3 more; 10 committed in all) | resumed after season 2033 (the guard stops a run after the season that tripped it is committed); completed |
+| A | 2 (resume) | 2026-10-31 04:45:47 | | from 2034 | (its end is the next row) |
 | D seed 3031, 10 seasons, support on, workers 2 | 1 | 2026-10-31 05:03:04 | 05:39 (approx.) | 2027-2036 (10) | Completed; all reconciliations clean; started by the launch script after C (fresh world) |
 | Replay of B season 5 (2031) | 1 | after D (launch script) | | 1 season | Completed, exit 0: identical in all 15 recorded parts (results, performance, rounds_and_holes, development, familiarity, finances, staff, fatigue_injuries, rankings, records, moments, history, cursor, diagnostics, published); the B copy world_2027_after4 was advanced in place as designed |
-| A | 2 (resume) ended | 2026-10-31 04:45:47 | about 06:14-06:30 | 2033-2054 (22 more; 28 committed in all) | Ended when this session's worker process was restarted (a host-side restart during a usage-limit pause, not a safeguard): every process stopped mid-season 2055; nothing of 2055 was committed (checkpoint generation 28 = state 28 seasons, no pending season file); the dead process's lock (pid 28127) is taken over by the session's stale-lock rule |
+| A | 2 (resume) ended | 2026-10-31 04:45:47 | about 06:14-06:30 | 2034-2054 inclusive (21 more; 28 committed in all) | Ended when this session's worker process was restarted (a host-side restart during a usage-limit pause, not a safeguard): every process stopped mid-season 2055; nothing of 2055 was committed (checkpoint generation 28 = state 28 seasons, no pending season file); the dead process's lock (pid 28127) is taken over by the session's stale-lock rule |
 | A | 3 (resume) | 2026-10-31 06:33:07 | | from 2055 | identical checkout 473690a (clean), seed 360013, support on, workers 2, --resume from committed generation 28; 420 s safeguard and watchdog unchanged |
+
+Correction (2026-10-31 ~06:50 UTC, from review): the resume rows of A and B said "from 2033" and A's second segment
+"2033-2054 (22 more)". Season 2033 was committed by the first segment (the guard stops a run after the season that
+tripped it); the second segments began at 2034: A's covered 2034-2054 inclusive (21 seasons), B's 2034-2036 (3). The
+uncorrected text is kept in PROVENANCE.before-correction-0650.md.
 
