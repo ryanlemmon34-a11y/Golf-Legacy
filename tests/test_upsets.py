@@ -279,6 +279,23 @@ class PageTests(unittest.TestCase):
         self.assertFalse(any(i.startswith('2030') for i in ids))       # B2: nothing reconstructed
         self.assertEqual(ids, self.ranked_ids())                        # the same inputs, the same ranking
 
+    def test_tied_chances_share_a_rank(self):
+        import observer_upsets as OU
+        rows = [{'p': p, 'year': 2031, 'week': wk, 'event_id': f'2031:E{wk}'}
+                for p, wk in ((0.01, 1), (0.02, 3), (0.02, 2), (0.03, 4), (0.04, 5), (0.04, 6), (0.04, 7))]
+        ranked = sorted(rows, key=OU.rank_key)
+        self.assertEqual([r['event_id'] for r in ranked][1:3], ['2031:E2', '2031:E3'])   # tied: by date
+        self.assertEqual(OU.competition_ranks(ranked), [(1, False), (2, True), (2, True), (4, False), (5, True),
+                                                        (5, True), (5, True)])
+        # on the page: the fixture's two equal chances are both ranked 1 and marked tied; the next row is 3rd
+        html = self.page()
+        cells = [c.split('</td>')[0] for c in html.split('<tr><td class=n>')[1:]]
+        self.assertEqual([c.split(' ')[0] for c in cells], ['1', '1', '3', '4', '5'])
+        self.assertEqual(sum('tied</span>' in c for c in cells), 2)
+        self.assertIn('Equal chances share a rank (competition ranking: 1, 2, 2, 4)', html)
+        self.assertIn('not calibrated betting odds', html)
+        self.assertIn('leaves out form, course fit', html)
+
     def test_drama_never_enters_the_ranking(self):
         import observer_upsets as OU
         rows, _ = OU.rows_for(self.w)

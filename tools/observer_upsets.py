@@ -32,8 +32,8 @@ MODEL_NOTE = ('How the estimate is made (' + UP.VERSION + '): before the first s
               'moment gives an expected score and spread (the engine\'s measured rating ladder); every entrant\'s '
               'chance of the lowest total is worked out for that exact field and number of rounds, adding up to 100%. '
               'It leaves out form, course fit, familiarity, fatigue, weather and pressure, and it is an estimate from '
-              'ratings, not betting odds. Match play is not estimated by this model. Equal chances rank equal; the '
-              'list then goes by date. The world ranking is the one published before the event (amateurs also show '
+              'ratings, not calibrated betting odds. Match play is not estimated by this model. Equal chances share a '
+              'rank (competition ranking: 1, 2, 2, 4), marked tied; tied rows are listed by date, then event. The world ranking is the one published before the event (amateurs also show '
               'their amateur ranking).')
 
 
@@ -68,8 +68,22 @@ def rows_for(w):
 
 
 def rank_key(r):
-    """The stable order: the lowest recorded chance first, then date, then event id."""
+    """The stable row order: the lowest recorded chance first, then date, then event id."""
     return (r['p'], r['year'], r['week'], r['event_id'])
+
+
+def competition_ranks(ranked):
+    """Standard competition ranks of rows already in rank_key order ("1, 2, 2, 4"): a row's rank is 1 + the number
+    of rows with a strictly lower chance, so equal chances share a rank. Returns [(rank, tied)]."""
+    out, n = [], len(ranked)
+    for i, r in enumerate(ranked):
+        if i and ranked[i - 1]['p'] == r['p']:
+            rank = out[-1][0]
+        else:
+            rank = i + 1
+        tied = (i and ranked[i - 1]['p'] == r['p']) or (i + 1 < n and ranked[i + 1]['p'] == r['p'])
+        out.append((rank, bool(tied)))
+    return out
 
 
 def select(w, rows, q):
@@ -229,12 +243,15 @@ def page(w, q):
            + (f'; {len(not_estimated):,} not estimated (match play)' if not_estimated else '') + '.')
     chunk, pager = O.paged(ranked, q, PATH, size=PAGE)
     start = (max(1, min(_int(O.one(q, 'page')) or 1, (len(ranked) + PAGE - 1) // PAGE or 1)) - 1) * PAGE
+    ranks = competition_ranks(ranked)                     # over the whole list, not only this page
     body = []
-    for i, r in enumerate(chunk, start + 1):
+    for i, r in enumerate(chunk, start):
+        rank, tied = ranks[i]
         f_ = r['detail'].get('winner_facts') or {}
         status = dict(STATUS).get(r['status'], r['status'] or '—')
         body.append([
-            str(i), w.person_link(r['winner']) + ' · ' + O.results_link(r['winner'], 'results', year=r['year']),
+            f'{rank}' + (' <span class="tag" title="the same pre-event chance as the row beside it">tied</span>'
+                         if tied else ''), w.person_link(r['winner']) + ' · ' + O.results_link(r['winner'], 'results', year=r['year']),
             f'{O.esc(r["age"]) if r["age"] is not None else "—"}* · {O.esc(status)}',
             O.event_link(w, r['event_id']) + f' <span class="muted">{r["year"]} wk {r["week"]}</span>',
             O.esc(dict(LEVELS).get(str(r['tier']), r['tier'])), O.esc(ranking_text(f_)),

@@ -25,7 +25,7 @@ numbers are never touched (the estimate uses no random numbers at all).
    GRID_MAX points; relative error about 3e-4 against a fine grid), the products summed as logs so that very
    small chances stay representable; the chances are then scaled to add up to exactly 1.
 5. Stored values are rounded to 6 significant figures (so that a ranking does not depend on the last bit of a
-   platform's maths library). Equal chances rank equal; lists break ties by date, then event id.
+   platform's maths library). Equal chances share a rank (1, 2, 2, 4); tied rows are listed by date, then event id.
 
 What it leaves out (so a reader does not over-read it): recent form, course fit and familiarity, fatigue,
 caddies, weather, pressure, the cut (a missed cut is simply a high total) and the discreteness of scores (ties
