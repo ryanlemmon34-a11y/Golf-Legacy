@@ -25,8 +25,18 @@ Coaches
 
     Golfers get a coach by hiring one they can afford, or by being approached: coaches scout young, raw
     players near them, judging from what can be watched (current level, typical growth for their age,
-    last year's improvement) through their own scouting error — never hidden potential — and back the
-    ones they believe can reach about Challenger standard, for a share of future prize money.
+    last year's improvement) through their own scouting error — never hidden potential — which firms up
+    with the seasons they have watched a player, and back the ones they believe can reach about
+    Challenger standard, for a share of future prize money.
+
+Recruitment is two-way (rules 2026-11-04)
+    Development coaches (youth specialists) look for promising growth; the others for established
+    success (Prestige, rankings, a known fit, earned major places). A golfer may turn a coach's approach
+    down, a coach may turn a golfer down as their book fills, and a caddie may turn a bag down (earnings,
+    compatibility, stability). Coaches of established players court established golfers of any age for a fee,
+    and caddies without a bag offer to carry one; the golfer answers within their means. A partnership's
+    loyalty (rapport, fit, results together) stands against a better-known offer, and ends only once another
+    is accepted. Every approach records who made it, why, and why it was accepted or refused.
 
 Caddies
     The six skills the shot engine uses (strategy, yardage, mental support, green reading, course
@@ -75,6 +85,41 @@ CLIENTS_MEAN, CLIENTS_MIN, CLIENTS_MAX = 6, 4, 8  # individual clients a coach t
 CADDIE_TIERS = 2                                  # tour tiers whose members hire professional caddies
 SELF_CADDIE = 40.0                                # skills of carrying your own bag / a friend on the bag
 COACH_RETIRE_AGE, CADDIE_RETIRE_AGE = 68.0, 60.0
+
+# ---- recruitment (rules 2026-11-04): PROPOSED starting values -----------------------------------------------
+# Every constant below is a proposal awaiting the owner's approval, measured on small worlds against the build
+# before it (docs/RECRUITMENT_PACKAGE.md). None of the decisions they tune reads a golfer's hidden potential or
+# ceilings: only what can be watched (level seen with error, growth for the age, last year's improvement),
+# public standing (Prestige, rankings, earned major places, last season's prize money) and the recorded pair.
+SCOUT_LOOK = 60                     # young players a coach looks at each winter
+WATCH_FOLLOW = 20                   # of them, at most this many followed from earlier winters ...
+WATCH_FOLLOW_MARGIN = 4.0           # ... those whose projected level came within this of the coach's bar
+WATCH_FIRMING = 0.5                 # a scout's error x 1 / sqrt(1 + 0.5 (seasons watched - 1)): 1, .82, .71, .63
+WATCH_MAX = 6                       # seasons watched beyond this firm up no further (error x 0.53)
+WATCH_FORGET = 2                    # a followed player not looked at for this many winters is forgotten (others: 1)
+DEV_GROWTH, DEV_RISE = 0.6, 0.5     # development coach's ranking: projected level + 0.6 room to grow + 0.5 rise
+ELITE_GROWTH = 0.1                  # elite coach's ranking: projected level + 0.1 room to grow ...
+ELITE_ACHIEVED, ELITE_FIT, ELITE_MAJORS = 1.0, 1.0, 1.0   # ... + achievement + known fit + earned major places
+COACH_TAKES_BASE, COACH_TAKES_INTEREST, COACH_TAKES_FULL = 5.5, 1.2, 5.0   # a coach taking on a paying client
+GOLFER_SAYS_YES = 1.8               # a golfer without a coach accepting a share deal (about 86% before the terms)
+GOLFER_REP, GOLFER_FIT = 0.3, 0.5   # ... per 10 points of the coach's reputation over 50; per point of known fit
+GOLFER_COLLEGE = 0.8                # ... less likely while their college team coaches them
+GOLFER_EARNING = 1.0                # ... less likely the more prize money they won last season (to $100k)
+SWITCH_BASE, SWITCH_GAIN, SWITCH_CAP = -0.5, 1.2, 2.5      # leaving a coach for an approach: per 10 points better
+LOYALTY_RAPPORT, LOYALTY_FIT, LOYALTY_RESULTS = 4.0, 1.0, 1.5   # loyalty: rapport (0-1), fit (-2..2), results
+CADDIE_SAYS_YES = 2.5               # a caddie accepting a bag (about 92% before the terms)
+CADDIE_PAY, CADDIE_FIT, CADDIE_STABLE = 0.6, 1.0, 0.5      # per 10 points of earnings gap; known fit; a Premier bag
+CADDIE_WAITING = 0.5                # each bag turned down this winter makes a caddie this much readier to say yes
+# staff who make the first move beyond youth scouting (bounded: candidates looked at and offers made per winter)
+ESTABLISHED_REP = 55.0              # coaches of established players this well known court established golfers ...
+ESTABLISHED_BAR = 4.0               # ... who show at least this achievement (Prestige 40, or 25 and a top-100 rank)
+ESTABLISHED_LOOK, ESTABLISHED_OFFERS = 30, 1   # ... looking at the 30 most accomplished near them, offering 1 a winter
+GOLFER_FEE_YES = 0.5                # a golfer without a coach accepting a paid coach's approach (62% before terms)
+GOLFER_COACHABLE = 1.0              # ... per 50 points of coachability over 50 (some want no individual coach)
+CADDIE_LOOK, CADDIE_OFFERS = 30, 1  # a free caddie looks at the 30 best-placed bags in their region, offers 1
+CADDIE_APPROACH_MIN = 0.85          # ... and only to a golfer they would accept at least this readily
+GOLFER_CADDIE_YES, GOLFER_CADDIE_REP = 1.5, 0.5   # a golfer without a caddie accepting an approach; per 10 points
+                                    # of the caddie's reputation against the golfer's own results level
 
 
 def _clip(x, lo=5.0, hi=99.0):
@@ -205,6 +250,7 @@ class Staff:
         self.caddie_of = {}            # golfer -> caddie (index of open caddying stints)
         self.taken = set()             # names in use (for generating new names only)
         self.unserved = {}             # year -> country -> golfers who could pay but found no coach with room
+        self.watched = {}              # (coach, golfer) -> (seasons watched, last winter watched, still following)
 
     # -- creating people --------------------------------------------------------------------------
     def new_coach(self, rng, country, year, age, teaching, scouting, speciality, youth, reputation, background,
@@ -262,11 +308,11 @@ class Staff:
         return k
 
     # -- relationships (the only way assignments change) --------------------------------------------
-    def assign_coach(self, season, g, c, arrangement, when, started_by, reason):
+    def assign_coach(self, season, g, c, arrangement, when, started_by, reason, accept=''):
         # a paying client's fee is agreed when they start and holds for the stint (a coach whose
         # reputation rises charges new clients more, not existing ones)
         self.rel.begin('coach', c.id, g.id, when, arrangement, started_by, reason,
-                       terms=c.fee if arrangement == 'fee' else 0.0)
+                       terms=c.fee if arrangement == 'fee' else 0.0, accept=accept)
         self.coach_of[g.id], self.deal[g.id] = c.id, arrangement
         if season:
             season.log(g.id, when[0], when[1], f'{"Approached by" if started_by == "coach" else "Hired"} coach {c.name} '
@@ -282,13 +328,13 @@ class Staff:
             season.log(gid, when[0], when[1], f'Coaching with {self.coaches[cid].name} ended ({reason})')
         return s
 
-    def assign_caddie(self, season, g, k, when, reason='hired for the season'):
+    def assign_caddie(self, season, g, k, when, reason='hired for the season', accept='', started_by='golfer'):
         if k.id in self._bags():
             raise ValueError(f'caddie {k.id} already has a bag')
-        self.rel.begin('caddie', k.id, g.id, when, 'tour bag', 'golfer', reason)
+        self.rel.begin('caddie', k.id, g.id, when, 'tour bag', started_by, reason, accept=accept)
         self.caddie_of[g.id] = k.id
         if season:
-            season.log(g.id, when[0], when[1], f'Hired caddie {k.name}')
+            season.log(g.id, when[0], when[1], f'{"Approached by" if started_by == "caddie" else "Hired"} caddie {k.name}')
 
     def end_caddie(self, season, gid, when, reason, ended_by):
         kid = self.caddie_of.pop(gid, None)
@@ -298,6 +344,14 @@ class Staff:
         if season:
             season.log(gid, when[0], when[1], f'Caddie {self.caddies[kid].name} off the bag ({reason})')
         return s
+
+    def refuse(self, season, kind, person, g, when, asked_by, refused_by, reason_asked, reason):
+        """An approach turned down, recorded with both people and both reasons (history.Relations.refuse)."""
+        self.rel.refuse(kind, person.id, g.id, when, asked_by, refused_by, reason_asked, reason)
+        if season:
+            role = 'coach' if kind == 'coach' else 'caddie'
+            season.log(g.id, when[0], when[1], f'Turned down an approach from {role} {person.name} ({reason})'
+                       if refused_by == 'golfer' else f'{role.title()} {person.name} declined to work with them ({reason})')
 
     def _bags(self):
         return set(self.caddie_of.values())
@@ -408,12 +462,18 @@ def wants_caddie(g):
     return g.status == 'pro' and g.lifestyle == 'full_time' and t is not None and t.tier <= CADDIE_TIERS
 
 
-def scouting_estimate(season, g, year, rng, sd, coach_id=0):
+def firming(seasons):
+    """How much of a scout's error remains once they have watched a player for this many seasons (this one
+    included): watching longer firms an assessment up, with diminishing returns."""
+    return 1 / math.sqrt(1 + WATCH_FIRMING * (min(max(1, seasons), WATCH_MAX) - 1))
+
+
+def scouting_estimate(season, g, year, rng, sd, coach_id=0, seasons=1):
     """A coach's judgement of where a young player is heading, from what can be watched: their
     current level (seen with some error), the growth typical for their age, and how much they really
     improved over the last year (a fast improver looks like more to come) — through the coach's own
-    scouting error. Never the player's hidden potential, so coaches back players who do not make it
-    and miss some who do."""
+    scouting error, which shrinks with the seasons this coach has watched this player (`firming`).
+    Never the player's hidden potential, so coaches back players who do not make it and miss some who do."""
     from .population import age_deficit
     age = g.age(year)
     seen = g.overall + rng.gauss(0, 2.0)
@@ -421,9 +481,343 @@ def scouting_estimate(season, g, year, rng, sd, coach_id=0):
     recent = (g.overall - last) if last is not None else 0.0
     typical = age_deficit(age, 27.0) - age_deficit(age + 1, 27.0)     # a typical year's growth at this age
     # the coach's view of this player persists (a scout does not re-roll their opinion every winter);
-    # it moves only as the player's observed level and improvement move
+    # it moves only as the player's observed level and improvement move, and firms up as they watch longer
     view = random.Random(f'{season.seed}:view:{coach_id}:{g.id}').gauss(0, sd)
-    return seen + age_deficit(age, 27.0) + 1.5 * (recent - typical) + view + rng.gauss(0, 0.3 * sd)
+    error = view + rng.gauss(0, 0.3 * sd)
+    return seen + age_deficit(age, 27.0) + 1.5 * (recent - typical) + firming(seasons) * error
+
+
+# ---- recruitment: two-way, each side for its own reasons (rules 2026-11-04) ---------------------------------
+# Every input below is something the people involved can see: a level watched with error, growth for the age,
+# last year's improvement, Prestige, rankings, earned major places, last season's prize money, reputation, and
+# the recorded pair (fit, rapport, results together). Hidden potential and ceilings are never read.
+def motivation(c):
+    """What a coach looks for: youth specialists develop promising growth; the others build on established
+    success."""
+    return 'development' if c.youth else 'established'
+
+
+def recent_rise(season, g, year):
+    """Last year's real improvement against the growth typical for the age (0 when it was not seen)."""
+    from .population import age_deficit
+    last = season.overall_start.get(year - 1, {}).get(g.id)
+    if last is None:
+        return 0.0
+    age = g.age(year)
+    return max(-5.0, min(5.0, (g.overall - last) - (age_deficit(age, 27.0) - age_deficit(age + 1, 27.0))))
+
+
+def earned_majors(season, year):
+    """golfer -> the majors this season they hold an earned place in (the published qualification ledger)."""
+    out = {}
+    for book in season.major_rights.get(year, {}).values():
+        for gid, r in book.items():
+            if r.get('state') == 'earned':
+                out[gid] = out.get(gid, 0) + 1
+    return out
+
+
+def achievement(season, g):
+    """Established achievement as anyone can see it, on a 0-13 scale: Prestige / 10 plus up to 3 for a world
+    ranking inside 200 or an amateur ranking inside 300."""
+    wr, am = season.wr_pos.get(g.id), season.am_pos.get(g.id)
+    rank = max(3 * (1 - wr / 200) if wr else 0.0, 3 * (1 - am / 300) if am else 0.0, 0.0)
+    return season.player_prestige(g.id) / 10 + rank
+
+
+def coach_rates(season, st, c, g, year, est, raw, majors=0):
+    """How a scouting coach ranks a candidate they believe can reach their bar, and why: a development coach
+    by the room to grow they see and last year's rise; a coach of established players by achievement, a known
+    fit (only from a pair that already worked together) and earned major places."""
+    if motivation(c) == 'development':
+        rise = recent_rise(season, g, year)
+        why = 'a fast improver over the last year' if DEV_RISE * rise > DEV_GROWTH * raw / 2 else 'saw promising growth'
+        return est + DEV_GROWTH * raw + DEV_RISE * rise, why + ' (a development coach)'
+    past = st.rel.pairs.get(('coach', c.id, g.id))
+    terms = {'established results': ELITE_ACHIEVED * achievement(season, g),
+             'a known good fit': ELITE_FIT * past.fit if past else 0.0,
+             'a chance at the majors': ELITE_MAJORS * min(3, majors)}
+    top = max(terms, key=lambda k: (terms[k], k))
+    why = top if terms[top] >= 1.0 else 'saw a player who can reach the professional game'
+    return est + ELITE_GROWTH * raw + sum(terms.values()), why + ' (a coach of established players)'
+
+
+def loyalty(st, kind, staff_id, gid, year):
+    """What holds a working partnership together, from the record: rapport (time actually worked together,
+    worn by time apart), the pair's fit and the results they have shared (evidence-weighted progress). Returns
+    (total, {reason: part})."""
+    tr, ev = trend(st.rel.current(kind, gid))
+    p = st.rel.pairs.get((kind, staff_id, gid))
+    parts = {'a strong working relationship': LOYALTY_RAPPORT * st.rel.rapport(kind, staff_id, gid, year),
+             'a good fit': LOYALTY_FIT * (p.fit if p else 0.0),
+             'progress together': LOYALTY_RESULTS * max(-1.0, min(2.0, tr)) * min(1.0, ev)}
+    return sum(parts.values()), parts
+
+
+def last_prize(season, g, year):
+    """Last season's prize money (the recorded ledger; 0 before the world's first season ends)."""
+    led = season.ledgers.get(year - 1, {}).get(g.id)
+    return led.prize if led else 0.0
+
+
+def golfer_answers(season, st, g, c, year, arrangement='share'):
+    """A golfer's answer to a coach's approach: (chance of yes, why yes, why no). A share of future prize money
+    (youth scouting): without a coach, likelier the better known the coach and with a known good fit; less likely
+    while a college team coaches them or when last season's prize money makes a share costly. A fee (a coach of
+    established players): only if the coach's fee fits what they can commit to a coach (coach_budget, the hiring
+    rule); without a coach, likelier the better known the coach, the more coachable they are and with a known good
+    fit. With a coach, either way: the gain in reputation against the partnership's loyalty, so a better-known
+    offer alone rarely breaks a good one."""
+    cur = st.coach(g.id)
+    if arrangement == 'fee' and c.fee > coach_budget(season, g, year):
+        return 0.0, '', f'could not afford the fee (${c.fee:,.0f} a year)'
+    if cur is None and arrangement == 'fee':
+        past = st.rel.pairs.get(('coach', c.id, g.id))
+        terms = {'the coach was not well known': GOLFER_REP * (c.reputation - 50) / 10,
+                 'had not worked well together before': GOLFER_FIT * past.fit if past else 0.0,
+                 'did not want individual coaching': GOLFER_COACHABLE * (g.personality['coachability'] - 50) / 50}
+        low = min(terms, key=lambda k: (terms[k], k))
+        yes = (('a well-known coach' if c.reputation >= 60 else 'a coach who sought them out')
+               + ('; had worked well together before' if past and past.fit > 0.5 else ''))
+        no = low if terms[low] < 0 else 'preferred to carry on as they were'
+        return _sig(GOLFER_FEE_YES + sum(terms.values())), yes, no
+    if cur is None:
+        past = st.rel.pairs.get(('coach', c.id, g.id))
+        terms = {'the coach was not well known': GOLFER_REP * (c.reputation - 50) / 10,
+                 'had not worked well together before': GOLFER_FIT * past.fit if past else 0.0,
+                 'happy with their college team\'s coaching': -GOLFER_COLLEGE if g.tour.startswith('CO_') else 0.0,
+                 'did not want to give up a share of their winnings':
+                     -GOLFER_EARNING * min(1.0, last_prize(season, g, year) / 100_000)}
+        low = min(terms, key=lambda k: (terms[k], k))
+        yes = ('a share deal costs nothing now' + ('; a well-known coach' if c.reputation >= 60 else '')
+               + ('; had worked well together before' if past and past.fit > 0.5 else ''))
+        no = low if terms[low] < 0 else 'preferred to carry on as they were'
+        return _sig(GOLFER_SAYS_YES + sum(terms.values())), yes, no
+    loyal, parts = loyalty(st, 'coach', cur.id, g.id, year)
+    gain = SWITCH_GAIN * min(SWITCH_CAP, (c.reputation - cur.reputation) / 10)
+    held = [k for k, v in sorted(parts.items(), key=lambda kv: (-kv[1], kv[0])) if v >= 0.5]
+    no = f'stayed with {cur.name}: ' + (', '.join(held) if held else 'did not think the move worth it')
+    yes = f'a clearly better-known coach than {cur.name}' + ('' if loyal > 1.0 else ', with little yet built together')
+    return _sig(SWITCH_BASE + gain - loyal), yes, no
+
+
+def coach_takes(season, st, c, g, year, load, majors=0):
+    """A coach's answer to a golfer asking to be a paying client: (chance of yes, why yes, why no). A coach with
+    room rarely says no; as their book fills they keep the places for the players they look for (young players
+    with promising growth, or established results and major places), and a known poor fit counts against."""
+    past = st.rel.pairs.get(('coach', c.id, g.id))
+    if motivation(c) == 'development':
+        interest = (1.0 if g.age(year) <= YOUTH_AGE else -1.0) + recent_rise(season, g, year) / 3
+        want = 'young players with promising growth'
+    else:
+        interest = achievement(season, g) / 4 + 0.3 * min(3, majors) - 1.0
+        want = 'players with established results'
+    if past:
+        interest += past.fit
+    p = _sig(COACH_TAKES_BASE + COACH_TAKES_INTEREST * interest - COACH_TAKES_FULL * load / max(1, c.capacity))
+    no = ('had not worked well together before' if past and past.fit < -1.0
+          else f'keeping the room left in their book for {want}')
+    yes = f'the kind of player they look for ({want})' if interest > 0 else 'had room for a paying client'
+    return p, yes, no
+
+
+def results_level(season, g, year):
+    """A golfer's results on a caddie's reputation scale: last season's prize money (20 log10(1 + prize / $1,000),
+    the scale a caddie's reputation follows) or Prestige (20 + 0.85 x Prestige), whichever is higher."""
+    return max(20 * math.log10(1 + last_prize(season, g, year) / 1000), 20 + 0.85 * season.player_prestige(g.id))
+
+
+CADDIE_GOOD = {'wanted a bag with bigger earnings': 'a bag with good earnings',
+               'had not got on with them before': 'had worked well together before',
+               'wanted the security of a Premier bag': 'a secure Premier bag'}
+
+
+def caddie_answers(st, k, g, level, turned_down=0):
+    """A caddie's answer to a golfer offering the bag: (chance of yes, why yes, why no). Expected earnings (the
+    golfer's results against what the caddie's own reputation could earn), compatibility (the pair's fit and
+    time together, only if they worked together before) and stability (a Premier card); a caddie who has
+    already turned bags down this winter grows readier to say yes."""
+    past = st.rel.pairs.get(('caddie', k.id, g.id))
+    t = TOUR_BY_KEY.get(g.tour)
+    terms = {'wanted a bag with bigger earnings': CADDIE_PAY * max(-4.0, min(2.0, (level - k.reputation) / 10)),
+             'had not got on with them before': CADDIE_FIT * (past.fit + min(1.0, past.work / 60)) if past else 0.0,
+             'wanted the security of a Premier bag': CADDIE_STABLE * (1.0 if t and t.tier == 1 else -1.0)}
+    low = min(terms, key=lambda x: (terms[x], x))
+    high = max(terms, key=lambda x: (terms[x], x))
+    p = _sig(CADDIE_SAYS_YES + sum(terms.values()) + CADDIE_WAITING * turned_down)
+    return p, (CADDIE_GOOD[high] if terms[high] >= 0.3 else 'the work on offer'), (low if terms[low] < 0 else 'kept waiting')
+
+
+def approach(season, c, g, why, when, rng, students=None, shares=None, arrangement='share'):
+    """A coach approaches a player -- a young one for a share of future prize money, or an established one for
+    a fee -- and the player answers (golfer_answers): only a yes ends the player's current coaching (recorded as
+    leaving for the approach) and opens the new stint with both reasons; a no is recorded with both reasons (on
+    the partnership kept, if any). `students` and `shares` (coach -> count) are kept up to date when given. True
+    if the player said yes."""
+    st = season.staff
+    cur = st.coach(g.id)
+    p, yes, no = golfer_answers(season, st, g, c, when[0], arrangement)
+    if rng.random() >= p:
+        st.refuse(season, 'coach', c, g, when, 'coach', 'golfer', why, no)
+        return False
+    students, shares = ({} if students is None else students), ({} if shares is None else shares)
+    if cur is not None:
+        students[cur.id] = students.get(cur.id, 0) - 1
+        if st.deal.get(g.id) == 'share':
+            shares[cur.id] = shares.get(cur.id, 0) - 1
+        st.end_coach(season, g.id, when, f'left for an approach from {c.name}', 'golfer')
+    st.assign_coach(season, g, c, arrangement, when, 'coach', why, yes)
+    students[c.id] = students.get(c.id, 0) + 1
+    if arrangement == 'share':
+        shares[c.id] = shares.get(c.id, 0) + 1
+    return True
+
+
+def started_now(st, kind, gid, when):
+    """Whether this golfer's current partnership of this kind began in this very market (they are not courted
+    again the same winter)."""
+    s = st.rel.current(kind, gid)
+    return s is not None and tuple(s.start) == tuple(when)
+
+
+def established_approaches(season, year, offered, students, majors=None):
+    """Coaches of established players with room in their book (reputation ESTABLISHED_REP or more) court
+    established golfers near them -- in their country, or their region when well known (60+), as in scouting --
+    by achievement anyone can see (Prestige and a ranking, at least ESTABLISHED_BAR), a known fit and earned major
+    places; never potential. Separate from youth scouting: any age, and the offer is a fee. Each coach looks at
+    the ESTABLISHED_LOOK most accomplished candidates within reach and makes at most ESTABLISHED_OFFERS offers;
+    one offer per pair per winter (`offered`). Returns {coach id: offers made}."""
+    st = season.staff
+    when = (year, 1)
+    majors = earned_majors(season, year) if majors is None else majors
+    home = season.home_country
+    coaches = sorted((c for c in st.coaches.values() if c.status == 'active' and motivation(c) == 'established'
+                      and c.reputation >= ESTABLISHED_REP and students.get(c.id, 0) < c.capacity),
+                     key=lambda c: (-c.reputation, c.id))
+    if not coaches:
+        return {}
+    ach = {}
+    for g in season.world.golfers:
+        if g.lifestyle != 'retired' and g.status in ('pro', 'amateur'):
+            a = achievement(season, g)
+            if a >= ESTABLISHED_BAR:
+                ach[g.id] = a
+    by_country = {}
+    for gid in sorted(ach, key=lambda x: (-ach[x], x)):            # most accomplished first
+        by_country.setdefault(home(season.g[gid]), []).append(season.g[gid])
+    made = {}
+    for c in coaches:
+        here = season.places.country(c.id, c.country)
+        reach = [here] + [cc for cc in sorted(by_country) if cc != here and region(cc) == region(here)] \
+            if c.reputation >= 60 else [here]                       # (well-known coaches: their whole region)
+        pool = sorted((g for cc in reach for g in by_country.get(cc, ())), key=lambda g: (-ach[g.id], g.id))
+        look = []
+        for g in pool:
+            if len(look) >= ESTABLISHED_LOOK:
+                break
+            cur = st.coach(g.id)
+            if (('coach', c.id, g.id) in offered or cur is c or started_now(st, 'coach', g.id, when)
+                    or (cur is not None and cur.reputation >= c.reputation - 5)):
+                continue                              # (no approach to a player with a coach of their standing)
+            look.append(g)
+        picks = []
+        for g in look:
+            score, why = coach_rates(season, st, c, g, year, 0.0, 0.0, majors.get(g.id, 0))
+            picks.append((score, g.id, g, why))
+        crng = random.Random(f'{season.seed}:court:{year}:{c.id}')
+        for _, _, g, why in sorted(picks, key=lambda x: (x[0], x[1]), reverse=True)[:ESTABLISHED_OFFERS]:
+            if students.get(c.id, 0) >= c.capacity:
+                break
+            offered.add(('coach', c.id, g.id))
+            made[c.id] = made.get(c.id, 0) + 1
+            approach(season, c, g, f'{why}; ${c.fee:,.0f} a year', when, crng, students, arrangement='fee')
+    return made
+
+
+def golfer_takes_caddie(season, st, g, k, year):
+    """A golfer's answer to a caddie offering to carry their bag: (chance of yes, why yes, why no). Only if the
+    caddie's fees fit what they can commit to a caddie (caddie_budget, the hiring rule). Without a caddie: likelier
+    the better known the caddie against the golfer's own results level, and with a known good fit. With a caddie:
+    the gain in reputation against the partnership's loyalty (rapport, fit, results together)."""
+    events = max(1, season.target_events(g))
+    if k.weekly_fee * events > caddie_budget(season, g, year):
+        return 0.0, '', f'could not afford their fee (${k.weekly_fee:,.0f} a week)'
+    cur = st.caddie(g.id)
+    if cur is None:
+        past = st.rel.pairs.get(('caddie', k.id, g.id))
+        gap = (k.reputation - results_level(season, g, year)) / 10
+        terms = {'expected a better-known caddie': GOLFER_CADDIE_REP * max(-4.0, min(2.0, gap)),
+                 'had not got on with them before': CADDIE_FIT * (past.fit + min(1.0, past.work / 60)) if past else 0.0}
+        low = min(terms, key=lambda x: (terms[x], x))
+        yes = 'had worked well together before' if past and past.fit > 0.5 else 'a caddie they could afford'
+        return _sig(GOLFER_CADDIE_YES + sum(terms.values())), yes, (low if terms[low] < 0 else 'preferred to look further')
+    loyal, parts = loyalty(st, 'caddie', cur.id, g.id, year)
+    gain = SWITCH_GAIN * min(SWITCH_CAP, (k.reputation - cur.reputation) / 10)
+    held = [x for x, v in sorted(parts.items(), key=lambda kv: (-kv[1], kv[0])) if v >= 0.5]
+    no = f'stayed with {cur.name}: ' + (', '.join(held) if held else 'did not think the move worth it')
+    yes = f'a clearly better-known caddie than {cur.name}' + ('' if loyal > 1.0 else ', with little yet built together')
+    return _sig(SWITCH_BASE + gain - loyal), yes, no
+
+
+def caddie_offer(season, k, g, why, when, rng):
+    """A caddie offers to carry a golfer's bag and the golfer answers (golfer_takes_caddie): only a yes ends the
+    golfer's current caddie's stint (recorded as leaving for the approach) and opens the new one, started by the
+    caddie, with both reasons; a no is recorded with both reasons (on the partnership kept, if any). True if yes."""
+    st = season.staff
+    cur = st.caddie(g.id)
+    p, yes, no = golfer_takes_caddie(season, st, g, k, when[0])
+    if rng.random() >= p:
+        st.refuse(season, 'caddie', k, g, when, 'caddie', 'golfer', why, no)
+        return False
+    if cur is not None:
+        st.end_caddie(season, g.id, when, f'left for an approach from {k.name}', 'golfer')
+    st.assign_caddie(season, g, k, when, why, yes, started_by='caddie')
+    return True
+
+
+def caddie_approaches(season, year, offered):
+    """Caddies without a bag make the first move: each looks at the CADDIE_LOOK golfers wanting a caddie in their
+    region with the best results (last season's prize money or Prestige), skipping those whose caddie is as well
+    known as they are, and offers to carry the bag of the one they would most readily accept (caddie_answers:
+    earnings, a known fit, a Premier card), if at least CADDIE_APPROACH_MIN; at most CADDIE_OFFERS offers each,
+    one per pair per winter (`offered`). Returns {caddie id: offers made}."""
+    st = season.staff
+    when = (year, 1)
+    bags = st._bags()
+    free = sorted((k for k in st.caddies.values() if k.status == 'active' and k.id not in bags),
+                  key=lambda k: (-k.reputation, k.id))
+    if not free:
+        return {}
+    level, by_region = {}, {}
+    for g in sorted(season.world.golfers, key=lambda x: x.id):
+        if g.lifestyle != 'retired' and wants_caddie(g):
+            level[g.id] = results_level(season, g, year)
+            by_region.setdefault(region(season.home_country(g)), []).append(g)
+    for gs in by_region.values():
+        gs.sort(key=lambda g: (-level[g.id], g.id))
+    made = {}
+    for k in free:
+        look = []
+        for g in by_region.get(region(season.places.country(k.id, k.country)), ()):
+            if len(look) >= CADDIE_LOOK:
+                break
+            cur = st.caddie(g.id)
+            if (('caddie', k.id, g.id) in offered or started_now(st, 'caddie', g.id, when)
+                    or (cur is not None and cur.reputation >= k.reputation - 5)):
+                continue
+            look.append(g)
+        picks = []
+        for g in look:
+            p, why, _ = caddie_answers(st, k, g, level[g.id])
+            if p >= CADDIE_APPROACH_MIN:
+                picks.append((p, level[g.id], g.id, g, why))
+        krng = random.Random(f'{season.seed}:caddie-offer:{year}:{k.id}')
+        for _, _, _, g, why in sorted(picks, key=lambda x: x[:3], reverse=True)[:CADDIE_OFFERS]:
+            offered.add(('caddie', k.id, g.id))
+            made[k.id] = made.get(k.id, 0) + 1
+            if caddie_offer(season, k, g, why, when, krng):
+                break
+    return made
 
 
 def sync_school(season, year, week, closing=False):
@@ -446,7 +840,9 @@ def sync_school(season, year, week, closing=False):
 
 
 def start_of_season(season, year):
-    """School teams, coaches scouting, golfers hiring coaches, and caddies hired for the season."""
+    """School teams, coaches scouting young players and courting established ones, golfers hiring coaches,
+    caddies offering to carry bags, and golfers hiring caddies for the season. One offer per pair per winter
+    (`offered`), whoever makes it."""
     st = season.staff
     rng = random.Random(f'{season.seed}:staff-market:{year}')
     when = (year, 1)
@@ -457,6 +853,7 @@ def start_of_season(season, year):
         c = st.coach(g.id)
         if c is not None and st.deal.get(g.id) == 'fee' and st.agreed_fee(g.id) > 1.5 * coach_budget(season, g, year):
             st.end_coach(season, g.id, when, 'could no longer afford the fee', 'golfer')
+    offered = set()                                   # (kind, staff, golfer): one offer per pair per winter
     students, shares = {}, {}
     for gid, cid in st.coach_of.items():
         students[cid] = students.get(cid, 0) + 1
@@ -468,11 +865,15 @@ def start_of_season(season, year):
     by_region = {}
     for c in coaches:
         by_region.setdefault(region(lives[c.id]), []).append(c)
-    # 1. scouting: coaches approach young, raw players they believe in
+    # 1. scouting: coaches approach young, raw players they believe in, and the player may say no
     young = [g for g in active if g.age(year) <= SCOUT_AGE and g.status in ('amateur', 'pro')]
     near = {}
     for g in young:
         near.setdefault(home(g), []).append(g)
+    majors = earned_majors(season, year)
+    watched = st.watched
+    for key in [key for key, w in watched.items() if w[1] < year - (WATCH_FORGET if w[2] else 1)]:
+        del watched[key]                              # not looked at for a while: forgotten
     for c in sorted(coaches, key=lambda c: (-c.reputation, c.id)):
         # a coach still has to make a living from paying students: at most a third of their book is
         # players coached for a share of future winnings
@@ -486,31 +887,34 @@ def start_of_season(season, year):
         if not pool:
             continue
         crng = random.Random(f'{season.seed}:scout:{year}:{c.id}')
-        look = crng.sample(pool, min(60, len(pool)))
+        # they keep following the promising players they watched in earlier winters, and look at new ones
+        followed = [g for g in pool if watched.get((c.id, g.id), (0, 0, False))[2]][:WATCH_FOLLOW]
+        keep = {g.id for g in followed}
+        rest = [g for g in pool if g.id not in keep]
+        look = followed + crng.sample(rest, min(SCOUT_LOOK - len(followed), len(rest)))
         sd = 3 + 12 * (1 - c.scouting / 100)
         # a share of prize money is only worth anything if the player can reach a level where professionals
         # earn (about Challenger standard); better-known coaches hold out for better prospects
         bar = max(SHARE_BAR, 50 + 0.35 * c.reputation)
         picks = []
         for g in sorted(look, key=lambda x: x.id):
-            est = scouting_estimate(season, g, year, crng, sd, c.id)   # what this coach believes they can become
+            w = watched.get((c.id, g.id))
+            seasons = (w[0] + (w[1] < year)) if w else 1
+            est = scouting_estimate(season, g, year, crng, sd, c.id, seasons)   # what they believe g can become
             raw = est - g.overall
+            watched[(c.id, g.id)] = (seasons, year, est >= bar - WATCH_FOLLOW_MARGIN)
             if est >= bar and raw >= 6:
-                picks.append((est + 0.3 * raw, g.id, g))
-        for _, _, g in sorted(picks, reverse=True)[:min(2, free)]:
+                score, why = coach_rates(season, st, c, g, year, est, raw, majors.get(g.id, 0))
+                picks.append((score, g.id, g, why))
+        for _, _, g, why in sorted(picks, key=lambda x: (x[0], x[1]), reverse=True)[:min(2, free)]:
             cur = st.coach(g.id)
             if cur is not None and cur.reputation >= c.reputation - 5:
-                continue
-            if crng.random() < 0.85:
-                if cur is not None:
-                    students[cur.id] -= 1
-                    if st.deal.get(g.id) == 'share':
-                        shares[cur.id] -= 1
-                    st.end_coach(season, g.id, when, f'joined {c.name}', 'golfer')
-                st.assign_coach(season, g, c, 'share', when, 'coach', 'saw their potential')
-                students[c.id] = students.get(c.id, 0) + 1
-                shares[c.id] = shares.get(c.id, 0) + 1
-    # 2. golfers looking for a coach they can pay
+                continue                              # (no approach to a player with a coach of their standing)
+            offered.add(('coach', c.id, g.id))
+            approach(season, c, g, why, when, crng, students, shares)
+    # 2. coaches of established players court established golfers, for a fee
+    established_approaches(season, year, offered, students, majors)
+    # 3. golfers looking for a coach they can pay
     st.unserved[year] = {}
 
     def priority(g):
@@ -530,42 +934,64 @@ def start_of_season(season, year):
                                                   if g.ceilings else 0, cat))
         options = by_region.get(region(home(g)), []) + [c for c in coaches if c.reputation >= 70
                                                          and region(lives[c.id]) != region(home(g))]
-        best = None
+        ranked = []
         affordable = False
         for c in options:
             if c.fee > budget:
                 continue
             affordable = True
-            if students.get(c.id, 0) >= c.capacity:
+            if students.get(c.id, 0) >= c.capacity or ('coach', c.id, g.id) in offered:
                 continue
             past = st.rel.pairs.get(('coach', c.id, g.id))
             v = c.reputation + (12 if c.speciality == weak else 0) + (10 if c.youth and g.age(year) <= YOUTH_AGE else 0) \
                 + (5 if lives[c.id] == home(g) else 0) + (4 * past.fit if past else 0) + rng.gauss(0, 4)
-            if best is None or v > best[0]:
-                best = (v, c)
-        if best:
-            st.assign_coach(season, g, best[1], 'fee', when, 'golfer', f'${best[1].fee:,.0f} a year')
-            students[best[1].id] = students.get(best[1].id, 0) + 1
-        elif affordable:                              # could pay, but every coach they could afford was full
-            st.unserved[year][home(g)] = st.unserved[year].get(home(g), 0) + 1
-    # 3. caddies (one touring golfer each)
+            why = ('had worked well together before' if past and past.fit > 0.5
+                   else 'a specialist in what they want to improve' if c.speciality == weak
+                   else 'a youth specialist' if c.youth and g.age(year) <= YOUTH_AGE else 'the best-known coach they could afford')
+            ranked.append((v, c.id, c, why))
+        # they ask the coaches they like best in turn; each coach answers for their own reasons
+        for _, _, c, why in sorted(ranked, key=lambda x: (x[0], x[1]), reverse=True):
+            offered.add(('coach', c.id, g.id))
+            p, yes, no = coach_takes(season, st, c, g, year, students.get(c.id, 0), majors.get(g.id, 0))
+            if rng.random() < p:
+                st.assign_coach(season, g, c, 'fee', when, 'golfer', f'{why}; ${c.fee:,.0f} a year', yes)
+                students[c.id] = students.get(c.id, 0) + 1
+                break
+            st.refuse(season, 'coach', c, g, when, 'golfer', 'coach', why, no)
+        else:
+            if affordable:                            # could pay, but every coach they could afford was full
+                st.unserved[year][home(g)] = st.unserved[year].get(home(g), 0) + 1   # (or said no)
+    # 4. caddies (one touring golfer each)
     for g in active:
         k = st.caddie(g.id)
         if k is not None and (not wants_caddie(g)
                               or k.weekly_fee * season.target_events(g) > 1.5 * caddie_budget(season, g, year)):
             st.end_caddie(season, g.id, when, 'no longer on a tour that needs one' if not wants_caddie(g)
                           else 'could no longer afford them', 'golfer')
+    caddie_approaches(season, year, offered)          # caddies without a bag make the first move
     bags = st._bags()
     free_cads = sorted((k for k in st.caddies.values() if k.status == 'active' and k.id not in bags),
                        key=lambda k: (-k.reputation - rng.gauss(0, 8), k.id))
+    turned_down = {}                                  # caddie -> bags they have said no to this winter
     for g in sorted((g for g in active if wants_caddie(g) and g.id not in st.caddie_of), key=priority):
         budget = caddie_budget(season, g, year)
         events = max(1, season.target_events(g))
-        for i, k in enumerate(free_cads):
-            if k.weekly_fee * events <= budget:
-                st.assign_caddie(season, g, k, when)
-                free_cads.pop(i)
+        level = results_level(season, g, year)
+        # caddies they worked well with come first; then the best-looking ones, as everyone sees them
+        known = {s.staff for s in st.rel.of_golfer(g.id, 'caddie')
+                 if st.rel.pairs[('caddie', s.staff, g.id)].fit > 0.5}
+        for k in [k for k in free_cads if k.id in known] + [k for k in free_cads if k.id not in known]:
+            if k.weekly_fee * events > budget or ('caddie', k.id, g.id) in offered:
+                continue
+            offered.add(('caddie', k.id, g.id))
+            why = 'had worked well together before' if k.id in known else 'the best caddie they could afford'
+            p, yes, no = caddie_answers(st, k, g, level, turned_down.get(k.id, 0))
+            if rng.random() < p:
+                st.assign_caddie(season, g, k, when, why, yes)
+                free_cads.remove(k)
                 break
+            turned_down[k.id] = turned_down.get(k.id, 0) + 1
+            st.refuse(season, 'caddie', k, g, when, 'golfer', 'caddie', why, no)
 
 
 def observed_progress(season, g, row, year):

@@ -34,16 +34,33 @@ level, so they pick better things to work on.
    can watch — current level (seen with some error), the growth typical for the player's age, and how
    much the player really improved over the last year — through the noise of their own scouting skill,
    **never the player's hidden potential**. A coach's opinion of a player persists (a fixed personal
-   misjudgement plus a small yearly wobble) rather than being re-rolled every winter. They approach young,
-   *raw* players they believe can reach about Challenger standard (where a share of prize money is worth
-   something), and no more than a third of a coach's book is unpaid share deals (the better the coach, the
-   higher their bar). Players usually accept, and switch only to a clearly better-known coach. The coach
+   misjudgement plus a small yearly wobble) rather than being re-rolled every winter, and **firms up with the
+   seasons they have watched that player** (from rules 2026-11-04: the error × 1/√(1 + 0.5 × (seasons − 1)),
+   at most six seasons); a coach keeps following up to 20 promising players from earlier winters among the 60.
+   They approach young, *raw* players they believe can reach about Challenger standard (where a share of prize
+   money is worth something), and no more than a third of a coach's book is unpaid share deals (the better
+   the coach, the higher their bar). **Development coaches** (the youth specialists) rank those prospects by
+   the room to grow they see and last year's rise; **coaches of established players** by achievement anyone
+   can see (Prestige, a world or amateur ranking), a known fit from working together before and earned major
+   places — never potential. The player answers: most accept a share deal (it costs nothing now), fewer while
+   a college team coaches them or when last season's prize money makes a share costly; a player who already
+   has a coach weighs the newcomer's extra reputation against the partnership's **loyalty** (below). The coach
    works for free in return for **5% of future prize money**.
+   **Courting established players** (from rules 2026-11-04). Separately, coaches of established players with
+   reputation 55+ and room in their book court established golfers of any age near them (their country; from
+   reputation 60 their region): each looks at the 30 most accomplished candidates (Prestige and a world or
+   amateur ranking; never potential) and offers a **fee** to the one they rate highest (achievement, a known fit,
+   earned major places), one offer a winter. The golfer accepts only if the fee fits 10% of their means (the
+   hiring rule); without a coach, more readily from a better-known coach and the more coachable they are; with
+   one, against the partnership's loyalty.
 2. **Hiring.** Golfers who want a coach (coachability, and almost every tour professional) hire the
    best-looking coach they can afford: the fee must fit 10% of their **means** (spendable funds plus 80% of
    last year's earned income — money they have, not winnings they hope for). They see reputation, not teaching skill, and look for a speciality matching
-   what *they believe* is their weakest area. The best-known players choose first. Many college players
-   and most amateurs therefore have no coach.
+   what *they believe* is their weakest area. The best-known players choose first, asking the coaches they
+   like best in turn. **A coach may say no** (from rules 2026-11-04): rarely while their book has room; as it
+   fills they keep the places for the players they look for (a development coach: young players with
+   promising growth; the others: established results and major places), and a known poor fit counts against.
+   Many college players and most amateurs therefore have no coach.
 3. **Leaving.** Golfers who can no longer afford the fee leave; a difficult season (falling ranking,
    relegation) sometimes ends the relationship; coaches retire (smoothly with age, from the late sixties).
 
@@ -58,9 +75,18 @@ of their own. Caddies gain a little skill with experience — in proportion to t
 season (none for an idle year), growing towards 95 and never pulling a higher skill down — until about 50 and stop caddying smoothly
 with age (around 60).
 
-Full-time professionals on the Premier and Challenger tours hire a caddie each season: the best-known
-players first, each taking the best available caddie they can afford (a weekly fee of $800 + $25 per
-reputation point, plus 8% of prize money). A caddie's reputation follows their employer's prize money.
+Full-time professionals on the Premier and Challenger tours have a caddie each season. **Caddies make the
+first move** (from rules 2026-11-04): each caddie without a bag looks at the 30 golfers wanting a caddie in
+their region with the best results and offers to carry the bag of the one they would most readily accept (at
+least 85% ready, by the same earnings, fit and stability terms below), one offer a winter; the golfer accepts
+only if the caddie's fees fit their caddie budget, without a caddie more readily the better known the caddie
+against their own results, with one against the partnership's loyalty. Then the golfers still without a caddie
+hire: the best-known players first, each offering the bag to a caddie they worked well with before, then to the best-looking
+caddies they can afford (a weekly fee of $800 + $25 per reputation point, plus 8% of prize money). **A
+caddie may say no** (from rules 2026-11-04): they weigh expected earnings (the golfer's last season's prize
+money or Prestige, on the scale their own reputation follows), compatibility (the pair's fit and time
+together, where they worked together before) and stability (a Premier card), and grow readier to accept
+with each bag they turn down that winter. A caddie's reputation follows their employer's prize money.
 A difficult season can cost a caddie the bag. **Everyone else carries their own bag** (or a friend
 does): skills of 40 — weaker help than any professional caddie, where before everyone silently had an
 average (50) caddie.
@@ -110,25 +136,34 @@ season's end and as each history is published), and for a coach or caddie their 
 role keeps its own value and directories sort by the one they list; unlike measures are never combined. A
 famous coach is not necessarily the best teacher or scout, and a golfer's potential is never shown.
 
-**Planned, not built: richer recruitment (roadmap S2/S3).** Scouting already reads only what can be watched --
+**Two-way recruitment (rules 2026-11-04; roadmap S2/S3).** Scouting still reads only what can be watched --
 the level seen with error, the growth typical for the age, the last year's real improvement -- through an error
-that shrinks with scouting skill, with each coach's view of a player persisting, so good scouts tend to spot
-real improvers, are sometimes wrong, and miss late bloomers. The next step keeps that and adds: assessments that
-firm up with more seasons watched; development coaches pursuing promising growth while elite coaches weigh
-established achievement (Prestige and results, never potential), fit and major chances; caddies weighing
-earnings, compatibility and stability; and loyalty from the recorded rapport, fit and shared results, so a
-better-known offer does not dissolve a working partnership by itself. Approach, acceptance, refusal and
-departure reasons are recorded on the stints both people already share. Constants are proposed and validated
-across seeds before they are chosen.
+that shrinks with scouting skill, with each coach's view of a player persisting; now the error also shrinks with
+the seasons that coach has watched that player (kept per coach and player in `Staff.watched`), so good scouts
+tend to spot real improvers, are sometimes wrong, firm up their view the longer they follow someone, and still
+miss late bloomers. Development coaches pursue promising growth; coaches of established players weigh Prestige,
+rankings, a known fit and earned major places (never potential); caddies weigh earnings, compatibility and
+stability; golfers, coaches and caddies can each turn an approach down. **Loyalty** comes from the record --
+rapport (time actually worked together), fit and results together (evidence-weighted progress) -- and stands
+against a better-known coach's approach, so a better-known offer alone rarely dissolves a working partnership;
+departures still follow the winter odds above (progress, rapport, fit, money) and retirement. **Reasons are
+recorded**: why each partnership was proposed (`reason_start`) and why the other side said yes
+(`reason_accept`) on the stint both people share; every refusal (both people, who asked and why, who said no
+and why) in `Relations.refusals`, and on the partnership a golfer kept when they said no out of loyalty
+(`declined`); all archived in `relations.json.gz` and shown on both profiles (how each partnership began, and
+the approaches turned down, also for someone no partnership ever began with, and this season's before it is
+archived). Each stint records who made the first move (`started_by`: the golfer, the coach or the caddie). One
+offer per pair per winter, whoever makes it; a golfer whose partnership began in this market is not courted again
+until the next; an existing partnership ends only once the golfer has accepted another. The weights are proposed starting values awaiting approval
+(`docs/RECRUITMENT_PACKAGE.md`).
 
 **Fit is recorded and shown.** Each pairing's fit is drawn once (normal, clipped to −2..+2) and saved with the
 relationship history (`Relations.pairs`: kind, staff member, golfer, work together, last year worked, fit), so
 it survives saves, reunions and archiving. Both profiles show it beside each partnership, with the rapport as it
 stood at the end of the archive (`tools/observer.py: pair_cells`), the same values the engine uses. There is no
-second compatibility score. The richer staff system builds on these: recruitment and retention can weigh a
-pair's known fit (already used when a golfer goes back to a coach they worked with), their rapport and shared
-results; a staff member's motivations (development, established success, earnings, stability) and loyalty can
-read the same dated stints and pair records rather than new state.
+second compatibility score. Recruitment and retention read these: a known fit (when a golfer goes back to a
+coach or caddie they worked with, and in what a coach or caddie answers), rapport and shared results (loyalty);
+motivations and loyalty read the same dated stints and pair records rather than new state.
 
 **School and local instruction.** Young amateurs (22 and under) have local or school instruction
 (quality 0.38, against 0.3 for teaching yourself); college golfers have their team's coaching (0.48),
@@ -141,6 +176,7 @@ applies. College events are school-paid, and a golfer's personal debt never bloc
 | Who | More likely when | Less likely when |
 |---|---|---|
 | Golfer leaves a coach | a poor run of observed progress, a poor fit, a fee that has outgrown their means | strong rapport, real progress |
+| Golfer leaves for another coach's approach (winter market) | a clearly better-known coach, little yet built together | loyalty: rapport, a good fit, progress together |
 | Coach who backed a prospect moves on | several seasons of evidence of stagnation | little evidence yet (one season, or seasons with few events or a long injury count for little), progress |
 | Coach drops a paying client | a poor fit (rare) | — |
 | Golfer changes caddie | a poor run, a poor fit | strong rapport |

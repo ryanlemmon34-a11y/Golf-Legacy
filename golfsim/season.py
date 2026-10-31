@@ -2066,6 +2066,12 @@ class Season:
             state['cash_blocked'] = Counter()
             state['cash_blocked_max'] = defaultdict(Counter)
             state['work_pathway'] = defaultdict(list)
+        st = state.get('staff')                             # saves from before two-way recruitment (2026-11-04):
+        if st is not None:                                  # nothing watched, refused or declined yet
+            st.__dict__.setdefault('watched', {})
+            st.rel.__dict__.setdefault('refusals', [])
+            for s in st.rel.stints:
+                s.__dict__.setdefault('declined', [])
         state.setdefault('earned', {})                      # rebuilt from results when first needed
         state.setdefault('college', {})                     # college seasons before the ledger: not recorded
         state.setdefault('wr_seed', {})

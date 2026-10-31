@@ -1670,6 +1670,7 @@ def _staff(w, pid, role):
               'together and who ended it and why. ' + PAIR_NOTE + ' Results during a partnership are the client’s '
               'achievements, association not proof of cause. Starts together count the archived seasons.</p>')
         out.append(_staff_seasons(w, pid, role, stints))
+    out.append(refusals_section(w, pid))              # (also for someone no partnership ever began with)
     if w.a and pid in w.a.people:
         hist = (w.a.people[pid].get(role) or {}).get('history') or []
         if hist:
@@ -1733,7 +1734,33 @@ def pair_cells(w, s):
 def _began(s):
     who = {'golfer': 'the player', 'coach': 'the coach (an approach)', 'caddie': 'the caddie', 'school': 'the school'}
     text = who.get(s.started_by, s.started_by or 'not recorded')
-    return esc(text + (f': {s.reason_start}' if s.reason_start else ''))
+    return esc(text + (f': {s.reason_start}' if s.reason_start else '')
+               + (f'; accepted: {s.reason_accept}' if getattr(s, 'reason_accept', '') else ''))
+
+
+def refusals_section(w, pid):
+    """Approaches this person made or received that were turned down (recorded from rules 2026-11-04), each with
+    both people, both reasons and who said no: the history's relations table, then the running world's refusals in
+    seasons the history does not hold yet (observer_live: a refusal is the same record in both, read once). Shown
+    for a golfer, coach or caddie whether or not any partnership ever began; empty when there are none."""
+    rel = w.a.rel if w.a is not None else None
+    live = getattr(w.live, 'refusals', None) if w.live is not None else None
+    rows = list(dict.fromkeys(tuple(r) for r in list(getattr(rel, 'refusals', ())) + list(live or ())
+                              if pid in (r[1], r[2])))
+    if not rows:
+        return ''
+    rows.sort(key=lambda r: (r[3], r[4], r[1], r[2]))
+    archived = set(w.a.years) if w.a is not None else set()
+    asked = {'golfer': 'the player', 'coach': 'the coach', 'caddie': 'the caddie'}
+    said_no = {'golfer': 'the player', 'coach': 'the coach', 'caddie': 'the caddie'}
+    return (f'<h2>Approaches turned down ({len(rows)})</h2>' + table(
+        ['When', 'Kind', 'Player', 'Coach or caddie', 'Who asked, and why', 'Who said no, and why'],
+        [[when((r[3], r[4])) + ('' if r[3] in archived else ' <span class="muted">(this season)</span>'), esc(r[0]),
+          w.person_link(r[2]), w.person_link(r[1]), esc(f'{asked.get(r[5], r[5])}: {r[7]}'),
+          esc(f'{said_no.get(r[6], r[6])}: {r[8]}')] for r in rows[-40:]])
+        + '<p class="muted">As recorded when the approach was turned down (the latest 40); no partnership began. A '
+          'player who said no out of loyalty stayed in the partnership they had. This season\'s are shown as the '
+          'running world records them, before the season is archived.</p>')
 
 
 def _ended(s):
