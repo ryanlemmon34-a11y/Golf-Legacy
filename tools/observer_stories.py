@@ -29,27 +29,51 @@ NARRATIVE_VERSION). The stamp of an archived edition covers only its own and ear
 never invalidate it (the historical perspective is kept) while a recovery that republishes one of those seasons
 does. An edition of the current season is stamped by the snapshot's generation (kept in memory only).
 
+How they won (golf statistics): the edition's recorded golf-statistics counters (golfsim/golfstats.py, an
+edition's `golf`, kept since the golf-statistics update; definitions at /rules#golf-statistics) give the winner's
+putts, fairways hit of first tee shots on par 4s and 5s, measured driving distance, greens in regulation of holes
+played, scrambling and greenside sand saves with their attempts, and strokes gained off the tee, on approach,
+around the green and putting -- against the engine's own expected-strokes table, always labelled so, never as a
+real-world baseline. The field comparison is among golfers who played the same number of rounds; the margin over a
+single runner-up is split by strokes gained only when both have statistics for the same rounds, and any part the
+strokes gained do not account for (penalties, rounding) is stated. Personal bests to that date (lowest putt total,
+best strokes-gained putting and total weeks) compare weeks of the same number of rounds at story editions (majors,
+Premier events and championships: the editions the story index keeps), strictly before the event, linked to the
+earlier event, and say "in the retained history" for a career that began before the world. Nothing is said of
+shots, putt lengths or form: none is recorded.
+
 Indexes (T3): earlier wins and best finishes come from the archive index's starts by person, comparisons from its
 editions by series, moments from its moments table -- all one query each, grown a season at a time as the history
 is published. What a story needs of the season file itself (round scores, playoffs, the ranking of the week
 before, the pre-event estimate) is kept in a per-season story index (`season_extract`) beside the cache, built
 the first time a story of that season is opened (one decode, for all its story editions) and kept under the
 season's published signature: a century of history opens each season's stories with a decode at most once, and
-not again after a resume, while a republished season is indexed afresh.
+not again after a resume, while a republished season is indexed afresh. The same pass records every edition's
+number of rounds (`edition_rounds`: the tournament's history compares 72-hole winners with 72-hole winners) and
+each golfer's golf weeks at story editions (`golf_weeks`, indexed by golfer). A story that needs more than
+INLINE_SEASONS unindexed seasons starts a background process that indexes the rest of the history once, says
+meanwhile which comparisons are still being indexed, and keeps those facts for the session only.
 """
 from __future__ import annotations
 
+import gzip
 import hashlib
 import json
 import sqlite3
+import sys
 import threading
 import zlib
 from collections import OrderedDict
 from pathlib import Path
 from urllib.parse import quote, urlencode
 
-FACT_VERSION = 2
-NARRATIVE_VERSION = 1
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+from golfsim import golfstats as GS                                     # noqa: E402  (definitions only)
+
+FACT_VERSION = 3
+NARRATIVE_VERSION = 2
 
 # pattern thresholds (strokes, or a probability), documented on the story page
 UPSET_P = 0.03                 # recorded pre-event win estimate below 3 %
@@ -57,6 +81,16 @@ COMEBACK_FINAL = 3             # three or more behind entering the final round
 COMEBACK_ANY = 5               # or five or more behind after an earlier round
 RUNAWAY = 5                    # won by five or more
 CLOSE = 1                      # won by one
+GOLF_HISTORY_MIN = 3           # earlier comparable weeks needed before a personal-best claim is made
+INLINE_SEASONS = 2             # seasons indexed while a story waits; more are indexed in the background
+# the golf-statistics counters a story reads (golfsim/golfstats.py, definitions version 1; strokes gained in
+# hundredths, against the engine's own expected-strokes table)
+GOLF_KEYS = ('rounds', 'holes', 'strokes', 'drives', 'drive_tenths', 'fairways', 'fairway_att', 'gir', 'putts',
+             'scr_att', 'scr_made', 'sand_att', 'sand_saves', 'penalties', 'sg_ott', 'sg_app', 'sg_arg', 'sg_putt')
+SG_PARTS = (('sg_ott', 'off the tee'), ('sg_app', 'on approach'), ('sg_arg', 'around the green'),
+            ('sg_putt', 'putting'))
+SG_TABLE = ['the engine\'s expected-strokes table', '/rules#golf-statistics']
+GOLF_SCOPE = 'among majors, Premier events and championships'   # the editions a story's index keeps (story_level)
 
 MAJOR_SERIES = ('TOUR_MASTERS', 'PREMIER_TOUR_CHAMPIONSHIP', 'USA_OPEN', 'BRITANNIA_OPEN')
 PRESTIGE_CATEGORIES = ('flagship', 'circuit_championship', 'national_open', 'national_amateur', 'elite_amateur',
@@ -66,16 +100,16 @@ PATTERN_NAMES = {'playoff': 'Playoff', 'upset': 'Upset', 'comeback': 'Comeback',
                  'wire_to_wire': 'Wire to wire', 'first_win': 'First win', 'close_finish': 'Close finish',
                  'match_play': 'Match play', 'standard': 'Recap'}
 STRUCTURES = {
-    'playoff': ('lead', 'stakes', 'rounds', 'playoff', 'milestones', 'history', 'moments', 'perspective'),
-    'upset': ('lead', 'upset', 'stakes', 'rounds', 'separation', 'milestones', 'history', 'moments', 'perspective'),
-    'comeback': ('lead', 'comeback', 'stakes', 'rounds', 'separation', 'milestones', 'history', 'moments',
+    'playoff': ('lead', 'stakes', 'rounds', 'playoff', 'how', 'milestones', 'history', 'moments', 'perspective'),
+    'upset': ('lead', 'upset', 'stakes', 'rounds', 'separation', 'how', 'milestones', 'history', 'moments', 'perspective'),
+    'comeback': ('lead', 'comeback', 'stakes', 'rounds', 'separation', 'how', 'milestones', 'history', 'moments',
                  'perspective'),
-    'runaway': ('lead', 'separation', 'stakes', 'rounds', 'milestones', 'history', 'moments', 'perspective'),
-    'wire_to_wire': ('lead', 'rounds', 'separation', 'stakes', 'milestones', 'history', 'moments', 'perspective'),
-    'first_win': ('lead', 'milestones', 'stakes', 'rounds', 'separation', 'history', 'moments', 'perspective'),
-    'close_finish': ('lead', 'stakes', 'rounds', 'separation', 'milestones', 'history', 'moments', 'perspective'),
+    'runaway': ('lead', 'separation', 'how', 'stakes', 'rounds', 'milestones', 'history', 'moments', 'perspective'),
+    'wire_to_wire': ('lead', 'rounds', 'separation', 'how', 'stakes', 'milestones', 'history', 'moments', 'perspective'),
+    'first_win': ('lead', 'milestones', 'stakes', 'rounds', 'separation', 'how', 'history', 'moments', 'perspective'),
+    'close_finish': ('lead', 'stakes', 'rounds', 'separation', 'how', 'milestones', 'history', 'moments', 'perspective'),
     'match_play': ('lead', 'stakes', 'matches', 'milestones', 'history', 'perspective'),
-    'standard': ('lead', 'stakes', 'rounds', 'separation', 'milestones', 'history', 'moments', 'perspective'),
+    'standard': ('lead', 'stakes', 'rounds', 'separation', 'how', 'milestones', 'history', 'moments', 'perspective'),
 }
 
 
@@ -203,9 +237,53 @@ class WorldSource:
     def series_editions(self, sid):
         return self.w.editions_of(sid)
 
-    def series_results(self, sid):
-        """[{event, year, week, layout, course, winner, winner_total, second_total}] of every edition (first
-        site), from the archive index (one query) and the snapshot; None without an index (not compared)."""
+    def indexed(self, years):
+        """(the archived seasons among `years` whose story index matches the season as published, the number still
+        being indexed). Up to INLINE_SEASONS missing seasons are indexed now; more start the background indexer
+        (StoryCache.start_indexer) and are reported as pending."""
+        w = self.w
+        if self.cache is None or not w.a:
+            return set(), 0
+        sigs = {y: str(w.a.signature(y)) for y in years if y in w.a.years}
+        have = self.cache.indexed_years(sigs)
+        missing = sorted(set(sigs) - have)
+        if missing and len(missing) <= INLINE_SEASONS:
+            for y in missing:
+                self.season(y)
+            return set(sigs), 0
+        if missing:
+            every = {y: str(w.a.signature(y)) for y in w.a.years}
+            done = self.cache.indexed_years(every)
+            self.cache.start_indexer([[y, str(w.a.year_path(y)), every[y]] for y in sorted(set(every) - done)])
+        return have, len(missing)
+
+    def golf_history(self, pid, y, wk, eid):
+        """(the golfer's golf weeks before (y, wk) at story editions: [{event, year, week, rounds, putts, sg_ott,
+        sg_app, sg_arg, sg_putt}], seasons still being indexed), or (None, 0) without a story index."""
+        w = self.w
+        if self.cache is None or self.cache.path is None:
+            return None, 0
+        rows = [r for r in self.starts(pid) if (r['year'], r['week']) < (y, wk) and r['event'] != eid
+                and story_level(r) and not r.get('live')]
+        have, pending = self.indexed({r['year'] for r in rows})
+        out = self.cache.golf_weeks(pid, sorted(have))
+        out = [r for r in out if (r['year'], r['week']) < (y, wk) and r['event'] != eid]
+        if w.live is not None:                           # the current season's earlier story editions
+            for e in w.live.editions.values():
+                if (int(e['id'].split(':')[0]), e['week']) >= (y, wk) or e['id'] == eid or not story_level(e):
+                    continue
+                for site in e.get('golf') or []:
+                    v = site.get(str(pid)) or site.get(pid)
+                    if v:
+                        c = dict(zip(GS.FIELDS, v))
+                        out.append({'event': e['id'], 'year': int(e['id'].split(':')[0]), 'week': e['week'],
+                                    **{k: c[k] for k in ('rounds', 'putts', 'sg_ott', 'sg_app', 'sg_arg', 'sg_putt')}})
+        return out, pending
+
+    def series_results(self, sid, before=None):
+        """[{event, year, week, layout, course, winner, winner_total, second_total, rounds}] of every edition
+        (first site), from the archive index (one query) and the snapshot, with each edition's own number of
+        rounds from the story index (None for a season not indexed yet); None without an index (not compared)."""
         w = self.w
         if not (w.a and w.a.index is not None) and w.a:
             return None
@@ -219,8 +297,13 @@ class WorldSource:
                  'FROM editions e LEFT JOIN sites si ON si.eid = e.eid AND si.site = 0 WHERE e.series = ?'
                  + idx.upto('e.year') + ' ORDER BY e.year, e.week')
             out = [{'event': eid, 'year': y, 'week': wk, 'course': c, 'layout': lay, 'winner': g,
-                    'winner_total': t, 'second_total': s2}
+                    'winner_total': t, 'second_total': s2, 'rounds': None}
                    for eid, y, wk, c, lay, g, t, s2 in idx.db.execute(q, (sid,))]
+            want = [r for r in out if before is None or (r['year'], r['week']) < tuple(before)]
+            have, _ = self.indexed({r['year'] for r in want})
+            known = self.cache.edition_rounds([r['event'] for r in want if r['year'] in have]) if self.cache else {}
+            for r in out:
+                r['rounds'] = known.get(r['event'])
         if w.live is not None:
             for e in w.live.editions.values():
                 if e['series'] != sid or not e['finish'] or not e['finish'][0]:
@@ -230,7 +313,8 @@ class WorldSource:
                 others = [t for g, p, t in fin if p is not None and p > 1 and t is not None]
                 out.append({'event': e['id'], 'year': int(e['id'].split(':')[0]), 'week': e['week'],
                             'course': e['sites'][0][0], 'layout': e['sites'][0][1], 'winner': win[0],
-                            'winner_total': win[1], 'second_total': min(others) if others else None})
+                            'winner_total': win[1], 'second_total': min(others) if others else None,
+                            'rounds': e.get('rounds')})
         return out
 
     def ranking(self, year, week, amateur=False):
@@ -245,7 +329,7 @@ class WorldSource:
             got = (ext['amateur'] if amateur else ext['world']).get(str(week))
             if got is not None:
                 if amateur or not got['points']:
-                    return {'order': got['order'], 'href': '/rankings?kind=amateur' if amateur else href,
+                    return {'order': got['order'], 'href': _order_href(amateur, year, week),
                             'year': year, 'week': week, 'order_only': True}
                 return {'order': got['order'], 'href': href, 'year': year, 'week': week}
         if live_year == year and not (w.a and year in w.a.years):
@@ -263,7 +347,7 @@ class WorldSource:
                 return {'order': [r[0] for r in rows], 'href': href, 'year': year, 'week': week}
         order = ((d.get('rankings') or {}).get('amateur' if amateur else 'world') or {}).get(str(week))
         if order:
-            return {'order': list(order), 'href': '/rankings?kind=amateur' if amateur else href, 'year': year,
+            return {'order': list(order), 'href': _order_href(amateur, year, week), 'year': year,
                     'week': week, 'order_only': True}
         return None
 
@@ -300,8 +384,13 @@ class WorldSource:
         return not (w.live is not None and eid in w.live.editions)
 
 
+def _order_href(amateur, year, week):
+    """The recorded order of a past week's world or amateur ranking (the Rankings page, that week)."""
+    return f'/rankings?{urlencode({"kind": "amateur" if amateur else "world", "year": year, "week": week})}'
+
+
 # ---- the story index of a season (compact, built once per published season) ----------------------------------------
-EXTRACT_VERSION = 2
+EXTRACT_VERSION = 3
 EXTRACT_KEYS = ('id', 'series', 'week', 'name', 'tour', 'tier', 'category', 'kind', 'rounds', 'match_play', 'sites',
                 'finish', 'scores', 'playoff', 'playoffs', 'matches', 'prestige', 'field_size', 'upset')
 
@@ -311,14 +400,28 @@ def season_extract(d):
     classification, sites, finish, round scores, playoffs and matches and the winners' teams (no hole-by-hole
     cards, statistics, prizes or routes) and its recorded pre-event estimate (`upset`); the world ranking (top 200
     order) of each week before one of them and of week 52 (the next season's week-1 events), the amateur ranking
-    likewise. A few hundred kilobytes a season before compression, against the whole season file."""
+    likewise. Also each story edition's golf statistics (GOLF_KEYS of every golfer, `golf_keys` naming them), the
+    number of rounds of every edition of the season (`rounds_of`: comparisons are made format to format) and
+    each golfer's golf weeks at story editions (`golf_weeks`: their personal bests to any date). A few hundred
+    kilobytes a season compressed, against the whole season file."""
     evs, weeks, am_weeks = {}, {52}, {52}
+    rounds_of, golf_weeks = {}, []
+    pick = [GS.IDX[k] for k in GOLF_KEYS]
     for e in d.get('events', []):
+        rounds_of[e['id']] = e.get('rounds')
         if not story_level(e):
             continue
         x = {k: e[k] for k in EXTRACT_KEYS if k in e}
         wins = {g for site in e.get('finish') or [] for g, p, _ in site if p == 1}
         x['team'] = {str(g): list(t) for g, t in (e.get('team') or {}).items() if int(g) in wins}
+        if e.get('golf'):
+            x['golf'] = [{str(g): [v[i] for i in pick] for g, v in site.items()} for site in e['golf']]
+            x['golf_keys'] = list(GOLF_KEYS)
+            for site in e['golf']:
+                for g, v in site.items():
+                    golf_weeks.append([int(g), e['week'], e['id'], v[GS.IDX['rounds']], v[GS.IDX['putts']],
+                                       v[GS.IDX['sg_ott']], v[GS.IDX['sg_app']], v[GS.IDX['sg_arg']],
+                                       v[GS.IDX['sg_putt']]])
         evs[e['id']] = json_safe(x)
         (am_weeks if (e.get('tier') or 0) >= 5 else weeks).add(e['week'] - 1)
     rp, rk = d.get('ranking_points') or {}, d.get('rankings') or {}
@@ -332,7 +435,8 @@ def season_extract(d):
     for wk in sorted(am_weeks):
         if (rk.get('amateur') or {}).get(str(wk)):
             amateur[str(wk)] = {'order': list(rk['amateur'][str(wk)]), 'points': False}
-    return {'version': EXTRACT_VERSION, 'events': evs, 'world': world, 'amateur': amateur}
+    return {'version': EXTRACT_VERSION, 'events': evs, 'world': world, 'amateur': amateur, 'rounds_of': rounds_of,
+            'golf_weeks': golf_weeks}
 
 
 def json_safe(x):
@@ -517,14 +621,34 @@ def assemble(src, eid, perspective=None, site=None):
         pre['src'] = [ref('pre-event estimate', _event_href(eid)),
                       ref('recorded values', story_href(eid, facts=True) + '#f-upset')]
         facts['upset'] = pre
+    # ---- how the winner played: the recorded golf statistics, against the field and the runner-up
+    golf = golf_of(e, site)
+    if e.get('match_play'):
+        pass
+    elif golf is None:
+        missing.append('golf statistics (played before they were kept; never estimated from scores)')
+    else:
+        g = _golf_fact(eid, golf, winner, runners, facts['result']['margin'])
+        if g is None:
+            missing.append('the winner\'s golf statistics')
+        else:
+            facts['golf'] = g
+            if not g.get('vs_runner_up') and len(runners) == 1 and facts['result']['margin']:
+                missing.append('a strokes-gained comparison with the runner-up (their statistics are not comparable)')
+            gh = _golf_history(src, winner, person, y, wk, eid, g, missing)
+            if gh is not None:
+                facts['golf_history'] = gh
     # ---- comparisons with the tournament's earlier editions
-    hist = src.series_results(sid)
+    hist = _series_results(src, sid, (y, wk))
     if hist is None:
         missing.append('comparisons with earlier editions (the history index is not available)')
     else:
-        facts_h = _history(src, hist, eid, y, wk, sid, to_par, facts['result']['margin'], rounds_n)
+        facts_h = _history(src, hist, eid, y, wk, sid, to_par, facts['result']['margin'], played)
         if facts_h is not None:
             facts['history'] = facts_h
+            if facts_h['unknown_format']:
+                missing.append(f'comparisons with {facts_h["unknown_format"]} earlier edition(s) whose format is still '
+                               'being indexed')
     # ---- moments recorded during the event
     ms = []
     for m in src.moments(eid) or ():
@@ -551,6 +675,11 @@ def assemble(src, eid, perspective=None, site=None):
     # ---- a golfer's own view
     if perspective is not None and perspective != winner:
         facts['perspective'] = _perspective(src, perspective, e, site, finish, scores, winner, par, y, wk, eid)
+        mine = (golf or {}).get(perspective)
+        if mine and mine.get('rounds'):
+            facts['perspective']['golf'] = {'rounds': mine['rounds'], 'putts': mine['putts'],
+                                            'sg': {k: mine[k] / 100 for k, _ in SG_PARTS},
+                                            'sg_total': round(sum(mine[k] for k, _ in SG_PARTS) / 100, 2)}
     return _record(eid, site, perspective if perspective != winner else None, facts, missing)
 
 
@@ -693,23 +822,116 @@ def _career(src, gid, person, e, y, wk, eid, missing):
             'src': [ref('results', _results_href(gid)), ref('wins', _results_href(gid, outcome='win'))]}
 
 
+def _series_results(src, sid, before):
+    try:
+        return src.series_results(sid, before=before)
+    except TypeError:                                    # (a source without the date bound)
+        return src.series_results(sid)
+
+
 def _history(src, hist, eid, y, wk, sid, to_par, margin, rounds_n):
+    """The tournament's earlier editions of the same format (the same number of rounds, each edition's own; each
+    winning total against its own venue's par for that many rounds): is this the lowest winning score to par,
+    the widest margin? Editions of another format are left out; while some formats are still being indexed, no
+    'lowest' or 'widest' claim is made."""
     prior = [h for h in hist if (h['year'], h['week']) < (y, wk) and h['event'] != eid]
     if not prior:
         return None
+    known = [h for h in prior if h.get('rounds')]
+    same = [h for h in known if h['rounds'] == rounds_n]
     tp, mg = [], []
-    for h in prior:
+    for h in same:
         c = src.course(h.get('course')) if h.get('course') else {}
         p = ((c.get('layouts') or {}).get(h.get('layout')) or {}).get('par')
-        if h.get('winner_total') is not None and p and rounds_n:
-            tp.append(h['winner_total'] - p * rounds_n)
+        if h.get('winner_total') is not None and p:
+            tp.append(h['winner_total'] - p * h['rounds'])
         if h.get('winner_total') is not None and h.get('second_total') is not None:
             mg.append(h['second_total'] - h['winner_total'])
-    out = {'prior': len(prior), 'compared_to_par': len(tp), 'compared_margin': len(mg),
+    complete = len(known) == len(prior)
+    out = {'prior': len(prior), 'rounds': rounds_n, 'same_format': len(same), 'other_format': len(known) - len(same),
+           'unknown_format': len(prior) - len(known), 'compared_to_par': len(tp), 'compared_margin': len(mg),
            'lowest_to_par_before': min(tp) if tp else None, 'largest_margin_before': max(mg) if mg else None,
            'src': [ref('every edition', f'/series/{quote(sid)}')]}
-    out['lowest_to_par'] = bool(to_par is not None and tp and len(tp) == len(prior) and to_par < min(tp))
-    out['largest_margin'] = bool(margin is not None and mg and len(mg) == len(prior) and margin > max(mg))
+    out['lowest_to_par'] = bool(complete and to_par is not None and tp and len(tp) == len(same) and to_par < min(tp))
+    out['largest_margin'] = bool(complete and margin is not None and mg and len(mg) == len(same) and margin > max(mg))
+    return out
+
+
+def golf_of(e, site):
+    """{golfer: counters} of an edition's site from its recorded golf statistics (the season file's FIELDS order,
+    or the story index's GOLF_KEYS), or None where none were recorded."""
+    g = e.get('golf')
+    if not g or site >= len(g) or not g[site]:
+        return None
+    keys = e.get('golf_keys') or GS.FIELDS
+    return {int(pid): dict(zip(keys, v)) for pid, v in g[site].items()}
+
+
+def _golf_fact(eid, golf, winner, runners, margin):
+    """The winner's recorded statistics, their place in the field among golfers who played the same number of
+    rounds, and the margin over a single runner-up split by strokes gained (engine table)."""
+    me = golf.get(winner)
+    if not me or not me.get('rounds'):
+        return None
+    n = me['rounds']
+    comp = [c for c in golf.values() if c.get('rounds') == n]
+
+    def rank(key, lower=False):
+        v = me[key]
+        better = sum(1 for c in comp if (c[key] < v if lower else c[key] > v))
+        return [1 + better, sum(1 for c in comp if c[key] == v) > 1]
+    sg = {k: me[k] / 100 for k, _ in SG_PARTS}
+    out = {'golfer': winner, 'rounds': n, 'holes': me['holes'], 'putts': me['putts'], 'fairways': me['fairways'],
+           'fairway_att': me['fairway_att'], 'drives': me['drives'],
+           'distance': round(me['drive_tenths'] / me['drives'] / 10, 1) if me['drives'] else None,
+           'gir': me['gir'], 'scr_made': me['scr_made'], 'scr_att': me['scr_att'], 'sand_saves': me['sand_saves'],
+           'sand_att': me['sand_att'], 'penalties': me.get('penalties'), 'sg': sg,
+           'sg_total': round(sum(me[k] for k, _ in SG_PARTS) / 100, 2), 'comparable': len(comp),
+           'ranks': {'putts': rank('putts', True), 'gir': rank('gir'), **{k: rank(k) for k, _ in SG_PARTS}},
+           'src': [ref('statistics', _event_href(eid, view='stats')), ref('definitions', '/rules#golf-statistics')]}
+    if len(runners) == 1 and margin:
+        r = golf.get(runners[0])
+        if r and r.get('rounds') == n:
+            parts = {k: round((me[k] - r[k]) / 100, 2) for k, _ in SG_PARTS}
+            total = round(sum(me[k] - r[k] for k, _ in SG_PARTS) / 100, 2)
+            out['vs_runner_up'] = {'golfer': runners[0], 'margin': margin, 'parts': parts, 'sum': total,
+                                   'unaccounted': round(margin - total, 2)}
+    return out
+
+
+def _golf_history(src, pid, person, y, wk, eid, this, missing):
+    """The golfer's earlier golf weeks of the same number of rounds at story editions, strictly before this one:
+    their lowest putt total and best strokes-gained putting and total weeks to that date, with the events."""
+    fn = getattr(src, 'golf_history', None)
+    rows, pending = fn(pid, y, wk, eid) if fn else (None, 0)
+    if rows is None:
+        missing.append('comparisons with their earlier weeks (no story index for this history)')
+        return None
+    if pending:
+        missing.append(f'comparisons with their earlier weeks ({pending} season(s) still being indexed)')
+        return None
+    n = this['rounds']
+    same = [r for r in rows if r['rounds'] == n and (r['year'], r['week']) < (y, wk) and r['event'] != eid]
+    tot = lambda r: sum(r[k] for k, _ in SG_PARTS)
+    out = {'golfer': pid, 'rounds': n, 'comparable': len(same), 'initial': bool(person.get('initial')),
+           'scope': GOLF_SCOPE, 'src': [ref('results', _results_href(pid))]}
+    if not same:
+        return out
+    label = lambda r: f'{r["year"]} {src.series(r["event"].split(":", 1)[1]).get("name") or r["event"].split(":", 1)[1]}'
+    lp = min(same, key=lambda r: (r['putts'], r['year'], r['week'], r['event']))
+    bp = max(same, key=lambda r: (r['sg_putt'], -r['year'], -r['week']))
+    bt = max(same, key=lambda r: (tot(r), -r['year'], -r['week']))
+    week = lambda r, v: {'event': r['event'], 'label': label(r), 'year': r['year'], 'value': v,
+                         'href': _event_href(r['event'], view='stats')}
+    out.update({'lowest_putts_before': week(lp, lp['putts']), 'best_sg_putt_before': week(bp, bp['sg_putt'] / 100),
+                'best_sg_total_before': week(bt, round(tot(bt) / 100, 2)),
+                'lowest_putts': this['putts'] < lp['putts'], 'equalled_putts': this['putts'] == lp['putts'],
+                'best_sg_putt': round(this['sg']['sg_putt'], 2) > bp['sg_putt'] / 100,
+                'best_sg_total': this['sg_total'] > round(tot(bt) / 100, 2)})
+    for k in ('lowest_putts_before', 'best_sg_putt_before', 'best_sg_total_before'):
+        r_ = ref(out[k]['label'], out[k]['href'])
+        if r_ not in out['src']:
+            out['src'].append(r_)
     return out
 
 
@@ -968,6 +1190,8 @@ def narrate(rec, names):
     secs = list(STRUCTURES[primary])
     if 'comeback' in tags and 'comeback' not in secs and 'rounds' in secs:   # a comeback inside an upset or playoff
         secs.insert(secs.index('rounds') + 1, 'comeback')
+    if 'upset' in tags and 'upset' not in secs:          # an upset inside a playoff: its chance right after the lead
+        secs.insert(1, 'upset')
     for section in secs:
         SECTIONS[section](w, primary, tags)
     return {'primary': primary, 'patterns': tags, 'sentences': w.out, 'missing': rec['missing'],
@@ -1055,10 +1279,11 @@ def _lead(w, primary, tags):
         return
     if primary == 'first_win':
         c = f['winner']
-        Q = 'in the retained history' if c['initial'] else 'of a recorded career'
-        tpl = w.pick('lead', ['{W} won for the first time {Q} at the {E}, finishing at {T}.',
-                              'The {E} brought the first win {Q} for {W}, at {T}.'])
-        w.say(tpl, ['result', 'winner'], W=W, E=E, T=T, Q=Q)
+        S = 'on the professional tours' if c['scope'] == 'professional' else 'in amateur and college golf'
+        Q = ' in the retained history' if c['initial'] else ''
+        tpl = w.pick('lead', ['{W} won {S} for the first time{Q} at the {E}, finishing at {T}.',
+                              'The {E} brought {W}\'s first win {S}{Q}, at {T}.'])
+        w.say(tpl, ['result', 'winner'], W=W, E=E, T=T, S=S, Q=Q)
         return
     if primary == 'close_finish':
         tpl = w.pick('lead', ['{W} won the {E} by a single stroke at {T}, ahead of {L}.',
@@ -1141,6 +1366,13 @@ def _upset(w, primary, tags):
         return
     win = w.f['result']['winner']
     W = w.who(win)
+    if primary != 'upset':                               # the lead told another shape: the chance comes first here
+        if up.get('winner_rank') and up.get('field'):
+            w.say(w.pick('uchance', ['{W} had gone in with a pre-event chance of {P}, {R} of {N} in the field.',
+                                     'Before the first shot, the estimate gave {W} {P} to win, {R} of {N}.']),
+                  ['upset'], W=W, P=odds_text(up['winner_p']), R=ordinal(up['winner_rank']), N=f'{up["field"]:,}')
+        else:
+            w.say('{W} had gone in with a pre-event chance of {P}.', ['upset'], W=W, P=odds_text(up['winner_p']))
     if up.get('overall') is not None and up.get('overall_rank') and up.get('field'):
         w.say(w.pick('uov', ['By Overall at the event, {W} ({O}) was {R} of {N}.',
                              '{W}\'s Overall at the event was {O}, {R} of {N} in the field.']),
@@ -1356,6 +1588,86 @@ def _milestones(w, primary, tags):
             w.say('{K} caddied for {W} that week.', ['team'], W=W, K=w.who(t['caddie']))
 
 
+def _sg(x):
+    return f'{x:+.2f}'
+
+
+GOLF_FIRSTS = (('putts', 'putts (fewest)'), ('gir', 'greens in regulation'), ('sg_putt', 'strokes gained putting'),
+               ('sg_app', 'strokes gained on approach'), ('sg_arg', 'strokes gained around the green'),
+               ('sg_ott', 'strokes gained off the tee'))
+
+
+def _how(w, primary, tags):
+    """How the winner played, from the recorded golf statistics: the figures over the week with their
+    denominators, strokes gained against the engine's table, where they led the field, the margin over the
+    runner-up split by strokes gained, and their earlier weeks."""
+    g = w.f.get('golf')
+    if not g:
+        return
+    W = w.who(g['golfer'])
+    n = g['rounds']
+    R = f'{num(n)} round{"s" if n != 1 else ""}'
+    D = f' (measured drives averaged {g["distance"]:.1f} yards)' if g['distance'] else ''
+    SC = (f', and got up and down {g["scr_made"]} times in {g["scr_att"]} tries after missing a green'
+          if g['scr_att'] else '')
+    SA = f' ({g["sand_saves"]} of {g["sand_att"]} from greenside bunkers)' if g['sand_att'] else ''
+    w.say(w.pick('golf', ['Over the {R}, {W} took {P} putts ({PR} a round), hit {F} of {FA} fairways{D} and {G} of {H} '
+                          'greens in regulation{SC}{SA}.',
+                          '{W} hit {F} of {FA} fairways{D} and {G} of {H} greens in regulation over the {R}, took {P} '
+                          'putts ({PR} a round){SC}{SA}.']),
+          ['golf'], W=W, R=R, P=g['putts'], PR=f'{g["putts"] / n:.2f}', F=g['fairways'], FA=g['fairway_att'], D=D,
+          G=g['gir'], H=g['holes'], SC=SC, SA=SA)
+    sg = g['sg']
+    w.say(w.pick('sg', ['By strokes gained against {T}: putting {PU}, approach {AP}, around the green {AR}, off the tee '
+                        '{OT}, {TO} in all.',
+                        'Against {T}, {W}\'s strokes gained came to {TO} in all: {PU} putting, {AP} on approach, {AR} '
+                        'around the green and {OT} off the tee.']),
+          ['golf'], T=SG_TABLE, W=W, PU=_sg(sg['sg_putt']), AP=_sg(sg['sg_app']), AR=_sg(sg['sg_arg']),
+          OT=_sg(sg['sg_ott']), TO=_sg(g['sg_total']))
+    firsts = [(label, g['ranks'][k][1]) for k, label in GOLF_FIRSTS if g['ranks'][k][0] == 1]
+    if firsts and g['comparable'] >= 10:
+        items = [label + (' (shared)' if tied else '') for label, tied in firsts]
+        items = items[0] if len(items) == 1 else ', '.join(items[:-1]) + ' and ' + items[-1]
+        w.say('Among the {C} golfers who played all {R}, {W} led in {I}.', ['golf'], C=g['comparable'], R=R,
+              W=W, I=items)
+    vs = g.get('vs_runner_up')
+    if vs:
+        p = vs['parts']
+        rest = (f'; {vs["unaccounted"]:+.2f} is not accounted for by strokes gained' if abs(vs['unaccounted']) >= 0.05
+                else '')
+        w.say(w.pick('vs', ['Against {L}, the {M}-stroke margin breaks down by strokes gained into {OT} off the tee, {AP} '
+                            'on approach, {AR} around the green and {PU} putting{X}.',
+                            'Split by strokes gained, the {M}-stroke margin over {L} was {OT} off the tee, {AP} on '
+                            'approach, {AR} around the green and {PU} putting{X}.']),
+              ['golf'], L=w.who(vs['golfer']), M=num(vs['margin']), OT=_sg(p['sg_ott']), AP=_sg(p['sg_app']),
+              AR=_sg(p['sg_arg']), PU=_sg(p['sg_putt']), X=rest)
+    h = w.f.get('golf_history')
+    if not h or h['comparable'] < GOLF_HISTORY_MIN:
+        return
+    NR = f'{num(n)}-round'
+    Q = ' in the retained history' if h['initial'] else ''
+    lp, bp = h['lowest_putts_before'], h['best_sg_putt_before']
+    EV = lambda x: [x['label'], x['href']]
+    if h['lowest_putts']:
+        if not h['best_sg_putt'] and bp['value'] > sg['sg_putt']:
+            w.say('The {P} putts were {W}\'s lowest {NR} total {S}{Q} to that date, but the best putting week by '
+                  'strokes gained was still the {EV} ({V}).', ['golf', 'golf_history'], P=g['putts'], W=W, NR=NR,
+                  S=GOLF_SCOPE, Q=Q, EV=EV(bp), V=_sg(bp['value']))
+        else:
+            w.say('The {P} putts were {W}\'s lowest {NR} total {S}{Q} to that date (the fewest before: {LP} at the '
+                  '{EV}).', ['golf', 'golf_history'], P=g['putts'], W=W, NR=NR, S=GOLF_SCOPE, Q=Q, LP=lp['value'],
+                  EV=EV(lp))
+    elif h['best_sg_putt']:
+        w.say('It was {W}\'s best putting week by strokes gained {S}{Q} to that date ({V}; the best before was the '
+              '{EV}, {V0}).', ['golf', 'golf_history'], W=W, S=GOLF_SCOPE, Q=Q, V=_sg(sg['sg_putt']), EV=EV(bp),
+              V0=_sg(bp['value']))
+    if h['best_sg_total'] and not (h['lowest_putts'] or h['best_sg_putt']):
+        bt = h['best_sg_total_before']
+        w.say('Its {V} strokes gained in all was {W}\'s best {NR} week {S}{Q} to that date (before: the {EV}, '
+              '{V0}).', ['golf', 'golf_history'], V=_sg(g['sg_total']), W=W, NR=NR, S=GOLF_SCOPE, Q=Q, EV=EV(bt),
+              V0=_sg(bt['value']))
+
+
 def _best_txt(pos):
     return 'none recorded' if pos is None else ('a win' if pos == 1 else ordinal(pos))
 
@@ -1365,13 +1677,17 @@ def _history_section(w, primary, tags):
     if not h:
         return
     res = w.f['result']
-    if h['lowest_to_par'] and h['prior'] >= 3:
-        w.say(w.pick('hist', ['{T} was the lowest winning score to par in the {N} editions played before it.',
-                              'No earlier winner of the {E2}, in {N} editions, had finished as low as {T}.']),
-              ['history', 'result'], T=to_par_text(res['to_par']), N=num(h['prior']), E2=w.f['event']['name'])
-    if h['largest_margin'] and h['prior'] >= 3:
-        w.say('The {M}-stroke margin was the widest in the tournament\'s {N} earlier editions.', ['history', 'result'],
-              M=num(res['margin']), N=num(h['prior']))
+    H = f'{h["rounds"] * 18}-hole' if h.get('rounds') else 'same-format'
+    X = (f' ({num(h["other_format"])} earlier edition{"s" if h["other_format"] != 1 else ""} over another number of '
+         'holes not compared)') if h.get('other_format') else ''
+    if h['lowest_to_par'] and h['same_format'] >= 3:
+        w.say(w.pick('hist', ['{T} was the lowest winning score to par in the {N} earlier {H} editions{X}.',
+                              'No earlier winner of the {E2}, in {N} {H} editions, had finished as low as {T}{X}.']),
+              ['history', 'result'], T=to_par_text(res['to_par']), N=num(h['same_format']), H=H, X=X,
+              E2=w.f['event']['name'])
+    if h['largest_margin'] and h['same_format'] >= 3:
+        w.say('The {M}-stroke margin was the widest in the tournament\'s {N} earlier {H} editions{X}.',
+              ['history', 'result'], M=num(res['margin']), N=num(h['same_format']), H=H, X=X)
 
 
 def _moments_section(w, primary, tags):
@@ -1431,6 +1747,12 @@ def _perspective_section(w, primary, tags):
                   D=', the lowest of that round' if b['day_low'] else '')
     if p.get('behind') is not None and p['pos'] is not None:
         w.say('{P} finished {B} behind the winner.', ['perspective'], P=P, B=strokes(p['behind']))
+    pg = p.get('golf')
+    if pg:
+        w.say('{P} took {N} putts over {R}; strokes gained against {S}: {T} in all, {PU} putting.', ['perspective'],
+              extra_src=[['statistics', _event_href(w.rec['event'], view='stats')]], P=P, N=pg['putts'],
+              R=f'{num(pg["rounds"])} round{"s" if pg["rounds"] != 1 else ""}', T=_sg(pg['sg_total']), S=SG_TABLE,
+              PU=_sg(pg['sg']['sg_putt']))
     if 'best_major_before' in p and p['pos'] is not None:
         prev = p['best_major_before']
         Q = ' in the retained history' if p['initial'] else ''
@@ -1440,7 +1762,7 @@ def _perspective_section(w, primary, tags):
             w.say('It was {P}\'s best finish in a major{Q} (before: {B}).', ['perspective'], P=P, Q=Q, B=_best_txt(prev))
 
 
-SECTIONS = {'lead': _lead, 'stakes': _stakes, 'upset': _upset, 'comeback': _comeback, 'rounds': _rounds,
+SECTIONS = {'how': _how, 'lead': _lead, 'stakes': _stakes, 'upset': _upset, 'comeback': _comeback, 'rounds': _rounds,
             'separation': _separation, 'playoff': _playoff_section, 'milestones': _milestones,
             'history': _history_section, 'moments': _moments_section, 'matches': _matches_section,
             'perspective': _perspective_section}
@@ -1466,11 +1788,18 @@ class StoryCache:
         try:
             self.path.parent.mkdir(parents=True, exist_ok=True)
             db = sqlite3.connect(self.path, timeout=5)
+            db.execute('PRAGMA journal_mode=WAL')          # (the background indexer writes while pages read)
             db.execute('CREATE TABLE IF NOT EXISTS facts(event TEXT, perspective INT, site INT, version INT, stamp TEXT, '
                        'record TEXT, PRIMARY KEY(event, perspective, site))')
             db.execute('CREATE TABLE IF NOT EXISTS stories(digest TEXT, version INT, story TEXT, '
                        'PRIMARY KEY(digest, version))')
             db.execute('CREATE TABLE IF NOT EXISTS seasons(year INT PRIMARY KEY, sig TEXT, version INT, data BLOB)')
+            db.execute('CREATE TABLE IF NOT EXISTS edition_rounds(event_id TEXT PRIMARY KEY, year INT, rounds INT)')
+            db.execute('CREATE TABLE IF NOT EXISTS golf_weeks(person INT, year INT, week INT, event_id TEXT, rounds INT, '
+                       'putts INT, sg_ott INT, sg_app INT, sg_arg INT, sg_putt INT)')
+            db.execute('CREATE INDEX IF NOT EXISTS golf_weeks_person ON golf_weeks(person, year)')
+            db.execute('CREATE INDEX IF NOT EXISTS golf_weeks_year ON golf_weeks(year)')
+            db.execute('CREATE INDEX IF NOT EXISTS edition_rounds_year ON edition_rounds(year)')
             return db
         except (sqlite3.Error, OSError):
             return None
@@ -1575,6 +1904,8 @@ class StoryCache:
         return None
 
     def put_season(self, y, sig, ext):
+        ext = dict(ext)
+        rounds_of, golf_weeks = ext.pop('rounds_of', {}), ext.pop('golf_weeks', [])
         self._remember(('season', y, sig, EXTRACT_VERSION), ext)
         self.seasons_built += 1
         db = self._db()
@@ -1582,12 +1913,87 @@ class StoryCache:
             return
         try:
             with db:                                       # replaces an index of the season as published before
+                db.execute('DELETE FROM edition_rounds WHERE year = ?', (y,))
+                db.execute('DELETE FROM golf_weeks WHERE year = ?', (y,))
+                db.executemany('INSERT OR REPLACE INTO edition_rounds VALUES (?, ?, ?)',
+                               [(eid, y, r) for eid, r in rounds_of.items()])
+                db.executemany('INSERT INTO golf_weeks VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                               [(g, y, wk, eid, n, pu, a, b, c, d) for g, wk, eid, n, pu, a, b, c, d in golf_weeks])
                 db.execute('INSERT OR REPLACE INTO seasons VALUES (?, ?, ?, ?)',
                            (y, sig, EXTRACT_VERSION, zlib.compress(json.dumps(ext).encode(), 6)))
         except sqlite3.Error:
             pass
         finally:
             db.close()
+
+    def indexed_years(self, sigs):
+        """The seasons of {year: signature} whose story index was built from the season as published now."""
+        db = self._db()
+        if db is None or not sigs:
+            if db is not None:
+                db.close()
+            return set()
+        try:
+            rows = db.execute('SELECT year, sig, version FROM seasons').fetchall()
+        finally:
+            db.close()
+        return {y for y, sig, v in rows if sigs.get(y) == sig and v == EXTRACT_VERSION}
+
+    def golf_weeks(self, pid, years):
+        db = self._db()
+        if db is None or not years:
+            if db is not None:
+                db.close()
+            return []
+        try:
+            q = (f'SELECT year, week, event_id, rounds, putts, sg_ott, sg_app, sg_arg, sg_putt FROM golf_weeks WHERE '
+                 f'person = ? AND year IN ({",".join("?" * len(years))}) ORDER BY year, week, event_id')
+            keys = ('year', 'week', 'event', 'rounds', 'putts', 'sg_ott', 'sg_app', 'sg_arg', 'sg_putt')
+            return [dict(zip(keys, r)) for r in db.execute(q, [pid, *years])]
+        finally:
+            db.close()
+
+    def edition_rounds(self, eids):
+        db = self._db()
+        if db is None or not eids:
+            if db is not None:
+                db.close()
+            return {}
+        try:
+            out = {}
+            for i in range(0, len(eids), 500):
+                chunk = eids[i:i + 500]
+                out.update(db.execute(f'SELECT event_id, rounds FROM edition_rounds WHERE event_id IN '
+                                      f'({",".join("?" * len(chunk))})', chunk).fetchall())
+            return out
+        finally:
+            db.close()
+
+    def start_indexer(self, jobs):
+        """Index these seasons ([year, season file, signature]) in a separate process (decoding season files would
+        otherwise hold up the pages), once at a time; the stories that wait for them say so meanwhile."""
+        if self.path is None or not jobs or self.indexing():
+            return
+        import subprocess
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        jobfile = self.path.with_suffix('.jobs.json')
+        jobfile.write_text(json.dumps(jobs))
+        with open(self.path.with_suffix('.log'), 'w') as err:
+            self.indexer = subprocess.Popen([sys.executable, str(Path(__file__).resolve()), 'index', str(self.path),
+                                             str(jobfile)], stdout=subprocess.DEVNULL, stderr=err)
+
+    def indexing(self):
+        p = getattr(self, 'indexer', None)
+        return p is not None and p.poll() is None
+
+    def stop_indexer(self):
+        p = getattr(self, 'indexer', None)
+        if p is not None and p.poll() is None:
+            p.terminate()
+            try:
+                p.wait(5)
+            except Exception:
+                p.kill()
 
     def _remember(self, k, v):
         with self.lock:
@@ -1598,10 +2004,20 @@ class StoryCache:
 
 
 def story_data(story):
-    """A narrated story as plain data (what the cache keeps)."""
+    """A narrated story as plain data (what the cache keeps), with the names it shows ({golfer: name}): a cached
+    story is used only while every name still reads the same."""
+    names = {}
+    for s in story['sentences']:
+        for p in s.parts:
+            if not isinstance(p, str) and str(p[1]).startswith('/golfer/') and str(p[1])[8:].isdigit():
+                names[str(p[1])[8:]] = p[0]
     return {'primary': story['primary'], 'patterns': story['patterns'], 'missing': story['missing'],
             'sentences': [s.to_dict() for s in story['sentences']], 'version': NARRATIVE_VERSION,
-            'fact_digest': story.get('fact_digest')}
+            'fact_digest': story.get('fact_digest'), 'names': names}
+
+
+def _pending(rec):
+    return any('still being indexed' in m for m in rec['missing'])
 
 
 def tell(src, eid, perspective=None, site=None, cache=None, names=None):
@@ -1614,11 +2030,13 @@ def tell(src, eid, perspective=None, site=None, cache=None, names=None):
         rec = assemble(src, eid, perspective, site)
         if rec is None:
             return None, None
-        if cache is not None and stamp is not None:
-            cache.put_facts(rec, stamp, disk, perspective, site)
+        if cache is not None and stamp is not None:      # (facts waiting for the index: this session only)
+            cache.put_facts(rec, stamp, disk and not _pending(rec), perspective, site)
+    names = names or (lambda g: src.person(g).get('name') or f'#{g}')
     st = cache.get_story(rec['digest'], disk) if cache is not None else None
+    if st is not None and any(names(int(g)) != n for g, n in (st.get('names') or {}).items()):
+        st = None                                        # a name reads differently now: written again
     if st is None:
-        names = names or (lambda g: src.person(g).get('name') or f'#{g}')
         st = story_data(narrate(rec, names))
         if cache is not None:
             cache.put_story(rec['digest'], st, disk)
@@ -1757,3 +2175,21 @@ def profile_section(w, pid, rows):
     return (f'<h2>Stories ({len(got)})</h2><ul>{items}</ul>{more}<p class="muted">Wins in majors, Premier events and '
             'flagship championships, top-10 finishes in majors and top-5s in Premier events; each story is written '
             'from the recorded results when opened.</p>')
+
+
+# ---- the background indexer (a separate process: python tools/observer_stories.py index STORE JOBS) -------------------
+def index_seasons(store, jobs):
+    """Build the story index of each [year, season file, signature] not already indexed as published."""
+    c = StoryCache(store)
+    for y, path, sig in jobs:
+        if y in c.indexed_years({y: sig}):
+            continue
+        with gzip.open(path, 'rt') as f:
+            d = json.load(f)
+        c.put_season(y, sig, season_extract(d))
+        c.mem.clear()
+
+
+if __name__ == '__main__':
+    if len(sys.argv) == 4 and sys.argv[1] == 'index':
+        index_seasons(Path(sys.argv[2]), json.loads(Path(sys.argv[3]).read_text()))

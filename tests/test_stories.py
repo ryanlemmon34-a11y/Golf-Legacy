@@ -24,6 +24,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / 'tools'))
 import observer_stories as S                                          # noqa: E402
+from golfsim import golfstats as GS                                   # noqa: E402
 
 PAR = 72
 NAMES = {1: 'Ada Lin', 2: 'Bo Park', 3: 'Cy Moss', 4: 'Di Vale', 5: 'Ed Roy', 6: 'Fay Orr', 7: 'Gus Hale',
@@ -38,15 +39,16 @@ class FakeSource:
         self.fy = first_year
         self.no_index = False
         self.stamps = {}
+        self.pending = 0                                 # seasons the golf history is still waiting for
         for g, n in NAMES.items():
             self.people[g] = {'name': n, 'country': 'USA', 'born': 1995 + g, 'initial': False}
 
     # building
     def add(self, eid, scores, week=20, series='TOUR_MASTERS', tier=0, category='major', kind='major', name='Masters',
-            playoff=None, finish=None, holes=None, course=('AUG', 'main')):
+            playoff=None, finish=None, holes=None, course=('AUG', 'main'), rounds=4, golf=None):
         y = int(eid.split(':')[0])
         if finish is None:
-            tot = sorted(((sum(v), g) for g, v in scores.items() if len(v) == 4), key=lambda x: (x[0], x[1]))
+            tot = sorted(((sum(v), g) for g, v in scores.items() if len(v) == rounds), key=lambda x: (x[0], x[1]))
             finish, last, pos = [], None, 0
             for i, (t, g) in enumerate(tot, 1):
                 if t != last:
@@ -58,9 +60,9 @@ class FakeSource:
                 for r in finish:
                     if r[2] == finish[0][2]:
                         r[1] = 1 if r[0] == win else 2
-            finish += [[g, None, None] for g, v in scores.items() if len(v) < 4]
+            finish += [[g, None, None] for g, v in scores.items() if len(v) < rounds]
         e = {'id': eid, 'series': series, 'week': week, 'year': y, 'name': name, 'tour': 'MAJORS' if tier == 0 else 'PT',
-             'tier': tier, 'category': category, 'kind': kind, 'rounds': 4, 'match_play': False,
+             'tier': tier, 'category': category, 'kind': kind, 'rounds': rounds, 'match_play': False,
              'sites': [[course[0], course[1], 'Augusta']], 'finish': [finish],
              'scores': [{str(g): v for g, v in scores.items()}] if scores else None,
              'playoff': (len(playoff['holes']) if playoff and playoff.get('holes') else (1 if playoff else 0)),
@@ -70,6 +72,8 @@ class FakeSource:
             del e['scores']
         if e['playoffs'] is None:
             del e['playoffs']
+        if golf:                                         # {golfer: counters (FIELDS order)}, as a season file keeps them
+            e['golf'] = [{str(g): v for g, v in golf.items()}]
         self.eds[eid] = e
         return e
 
@@ -89,7 +93,7 @@ class FakeSource:
                 'NOPAR': {'name': 'Unrated Links', 'layouts': {}}}.get(cid, {})
 
     def series(self, sid):
-        return {'name': sid}
+        return {'name': next((e['name'] for e in self.eds.values() if e['series'] == sid), sid)}
 
     def starts(self, pid):
         out = []
@@ -108,7 +112,20 @@ class FakeSource:
                  'winner': next((g for g, p, _ in e['finish'][0] if p == 1), None)}
                 for e in self.eds.values() if e['series'] == sid]
 
-    def series_results(self, sid):
+    def golf_history(self, pid, y, wk, eid):
+        out = []
+        for e in self.eds.values():
+            if not S.story_level(e) or e['id'] == eid or (e['year'], e['week']) >= (y, wk):
+                continue
+            for site in e.get('golf') or []:
+                v = site.get(str(pid))
+                if v:
+                    c = dict(zip(GS.FIELDS, v))
+                    out.append({'event': e['id'], 'year': e['year'], 'week': e['week'],
+                                **{k: c[k] for k in ('rounds', 'putts', 'sg_ott', 'sg_app', 'sg_arg', 'sg_putt')}})
+        return out, self.pending
+
+    def series_results(self, sid, before=None):
         if self.no_index:
             return None
         out = []
@@ -120,7 +137,7 @@ class FakeSource:
             oth = [t for g, p, t in fin if p is not None and p > 1 and t is not None]
             out.append({'event': e['id'], 'year': e['year'], 'week': e['week'], 'course': e['sites'][0][0],
                         'layout': e['sites'][0][1], 'winner': w[0], 'winner_total': w[1],
-                        'second_total': min(oth) if oth else None})
+                        'second_total': min(oth) if oth else None, 'rounds': e['rounds']})
         return out
 
     def ranking(self, year, week, amateur=False):
@@ -136,6 +153,19 @@ class FakeSource:
 
     def cacheable(self, eid):
         return True
+
+
+def golf_vec(rounds=4, putts=None, fir=(30, 56), gir=45, scr=(15, 27), sand=(3, 5), drives=50, dist=300.0,
+             sg=(0.0, 0.0, 0.0, 0.0), strokes=None):
+    """A golfer's golf-statistics counters for one edition, in the archive's order (golfstats.FIELDS, then the
+    longest drive): strokes gained in hundredths, distance in tenths of a yard."""
+    c = dict.fromkeys(GS.FIELDS, 0)
+    c.update(rounds=rounds, holes=18 * rounds, strokes=strokes or 70 * rounds, drives=drives,
+             drive_tenths=round(dist * 10 * drives), fairways=fir[0], fairway_att=fir[1], gir=gir,
+             putts=putts if putts is not None else 29 * rounds, scr_made=scr[0], scr_att=scr[1], sand_saves=sand[0],
+             sand_att=sand[1], sg_ott=round(sg[0] * 100), sg_app=round(sg[1] * 100), sg_arg=round(sg[2] * 100),
+             sg_putt=round(sg[3] * 100))
+    return [c[k] for k in GS.FIELDS] + [3105, 2, 7]
 
 
 def upset_record(winner=5, p=0.00291, rank=6, field=6, favourite=2, favourite_p=0.3, overall=71.4, overall_rank=5,
@@ -324,6 +354,31 @@ class StoryPatternTests(unittest.TestCase):
         self.assertNotIn('upset', self.primary(src, '2031:TOUR_MASTERS')[1])
         src.eds['2031:TOUR_MASTERS']['upset'] = upset_record(p=0.0299, rank=4)
         self.assertEqual(self.primary(src, '2031:TOUR_MASTERS')[0], 'upset')
+
+    def test_playoff_upset_keeps_the_upset_context(self):
+        """A playoff leads the story, but a winner with a recorded 0.291% chance still gets the chance, the favourite
+        and the model -- in the story and in the sentences the Biggest Upsets page takes (those citing 'upset')."""
+        src = FakeSource()
+        playoff_case(src)                                             # Di Vale (4) beats Cy Moss (3) in a playoff
+        src.eds['2032:TOUR_MASTERS']['upset'] = upset_record(winner=4, p=0.00291, rank=5, field=5, favourite=1,
+                                                             favourite_p=0.35, overall=70.2, overall_rank=5)
+        rec = S.assemble(src, '2032:TOUR_MASTERS')
+        primary, tags = S.patterns(rec)
+        self.assertEqual(primary, 'playoff')
+        self.assertIn('upset', tags)
+        st = S.narrate(rec, NAMES.get)
+        texts = [s.text() for s in st['sentences']]
+        self.assertIn('playoff', texts[0])
+        upset = [s.text() for s in st['sentences'] if 'upset' in s.facts]
+        joined = ' '.join(upset)
+        self.assertIn('1 in 344', joined)
+        self.assertIn('5th of 5', joined)
+        self.assertIn('Ada Lin', joined)                              # the favourite, at 35.0%, and how they finished
+        self.assertIn('35.0%', joined)
+        self.assertIn('upset-model-1', joined)
+        self.assertEqual(texts[1], upset[0])                          # straight after the playoff lead
+        self.assertEqual(texts, [s.text() for s in S.narrate(S.assemble(src, '2032:TOUR_MASTERS'),
+                                                             NAMES.get)['sentences']])   # deterministic
 
     def test_first_win(self):
         src = FakeSource()
@@ -519,7 +574,9 @@ class StoryIsolationTests(unittest.TestCase):
                 mods |= {a.name for a in node.names}
             elif isinstance(node, ast.ImportFrom):
                 mods.add(node.module or '')
-        self.assertFalse({m for m in mods if m.startswith('golfsim')}, mods)
+        self.assertFalse({m for m in mods if m.startswith('golfsim')} - {'golfsim'}, mods)
+        froms = {(n.module, a.name) for n in ast.walk(tree) if isinstance(n, ast.ImportFrom) for a in n.names}
+        self.assertEqual({(m, a) for m, a in froms if (m or '').startswith('golfsim')}, {('golfsim', 'golfstats')})
         for p in (ROOT / 'golfsim').glob('*.py'):
             self.assertNotIn('observer_stories', p.read_text(), p)
 
@@ -546,6 +603,190 @@ def _resolves(src, href):
     if path == '/rankings':
         return (int(q['year'][0]), int(q['week'][0])) in src.rank
     return path in ('/grand-slam', '/moments')
+
+
+def golf_week(src, eid, putts, sg_putt, week=10, rounds=4, name='Open', golfer=1):
+    """An earlier story edition (Premier) where `golfer` played every round with these putts and SG putting."""
+    sc = {golfer: [70] * rounds, 2: [71] * rounds, 3: [72] * rounds}
+    golf = {golfer: golf_vec(rounds=rounds, putts=putts, sg=(0.5, 0.5, 0.2, sg_putt)),
+            2: golf_vec(rounds=rounds), 3: golf_vec(rounds=rounds)}
+    return src.add(eid, sc, week=week, series=eid.split(':', 1)[1], tier=1, category='regular', kind='regular',
+                   name=name, rounds=rounds, golf=golf)
+
+
+def acceptance_case(src):
+    """A synthetic reproduction of the reviewed save (fictional data): the 2041 Australia Open won by eight with 99
+    putts, SG putting +7.10, 34 of 56 fairways, 41 of 72 greens, 23 of 31 scrambles, 5 of 6 sand saves; earlier
+    four-round weeks with more putts but, in 2039 Fiji, better SG putting (+10.85); a three-round week with fewer
+    putts (another format) and a later week (after the event) that must not count."""
+    golf_week(src, '2038:PT_ONE', 110, 1.0, name='First Open')
+    golf_week(src, '2039:PT_FIJI', 104, 10.85, name='Fiji Open')
+    golf_week(src, '2040:PT_TWO', 101, 3.0, name='Second Open')
+    golf_week(src, '2040:PT_THREE', 70, 2.0, week=12, rounds=3, name='Short Open')
+    golf_week(src, '2042:PT_LATE', 95, 12.0, name='Late Open')
+    scores = {1: [67, 67, 68, 68], 2: [70, 69, 70, 69]}
+    golf = {1: golf_vec(putts=99, fir=(34, 56), gir=41, scr=(23, 31), sand=(5, 6), drives=52, dist=301.2,
+                        sg=(3.00, 4.00, 1.50, 7.10)),
+            2: golf_vec(putts=106, sg=(0.79, 1.68, 0.68, 4.45))}
+    for g in range(3, 13):                               # the rest of the field, all four rounds, all behind
+        scores[g] = [71, 71, 71, 71 + g]
+        golf[g] = golf_vec(putts=110 + g, gir=38, sg=(0.1, 0.2, 0.1, -0.5 - g / 10))
+    return src.add('2041:PT_AUS', scores, week=49, series='PT_AUS', tier=1, category='flagship', kind='regular',
+                   name='Australia Open', golf=golf)
+
+
+class StoryGolfTests(unittest.TestCase):
+    """How the winner played, from the recorded golf statistics: figures with their denominators, strokes gained
+    (engine table) against the field and the runner-up, and personal bests to that date with links to the
+    earlier event -- format to format, strictly before the event, qualified for careers that began earlier."""
+
+    def story(self, src, eid='2041:PT_AUS', **kw):
+        rec = S.assemble(src, eid, **kw)
+        return rec, ' '.join(s.text() for s in S.narrate(rec, NAMES.get)['sentences']), \
+            S.story_data(S.narrate(rec, NAMES.get))
+
+    def test_acceptance_example(self):
+        src = FakeSource()
+        acceptance_case(src)
+        rec, text, st = self.story(src)
+        g = rec['facts']['golf']
+        self.assertEqual((g['putts'], g['fairways'], g['fairway_att'], g['gir'], g['holes'], g['scr_made'],
+                          g['scr_att'], g['sand_saves'], g['sand_att']), (99, 34, 56, 41, 72, 23, 31, 5, 6))
+        self.assertAlmostEqual(g['sg']['sg_putt'], 7.10)
+        vs = g['vs_runner_up']
+        self.assertEqual((vs['golfer'], vs['margin']), (2, 8))
+        self.assertEqual(vs['parts'], {'sg_ott': 2.21, 'sg_app': 2.32, 'sg_arg': 0.82, 'sg_putt': 2.65})
+        self.assertEqual((vs['sum'], vs['unaccounted']), (8.0, 0.0))
+        self.assertRegex(text, r'putting \+7\.10|\+7\.10 putting')
+        for want in ('99 putts (24.75 a round)', 'hit 34 of 56 fairways', '41 of 72 greens in regulation',
+                     'up and down 23 times in 31 tries', '5 of 6 from greenside bunkers',
+                     'the engine\'s expected-strokes table', '+2.21 off the tee', '+2.32 on approach',
+                     '+0.82 around the green', '+2.65 putting', 'eight-stroke margin',
+                     'lowest four-round total', 'best putting week by strokes gained was still the 2039 Fiji Open (+10.85)'):
+            self.assertIn(want, text)
+        self.assertNotIn('not accounted', text)
+        self.assertNotIn('retained history', text)
+        h = rec['facts']['golf_history']
+        self.assertEqual(h['comparable'], 3)                          # 2038, 2039, 2040: four rounds, before 2041
+        self.assertEqual(h['lowest_putts_before']['event'], '2040:PT_TWO')
+        self.assertEqual(h['best_sg_putt_before']['event'], '2039:PT_FIJI')
+        self.assertTrue(h['lowest_putts'])
+        self.assertFalse(h['best_sg_putt'])
+        self.assertNotIn('Late Open', text)                           # after the event: never used
+        self.assertNotIn('Short Open', text)                          # three rounds: not comparable
+        links = {p[1] for s in st['sentences'] for p in s['parts'] if not isinstance(p, str)}
+        self.assertIn('/event/2039%3APT_FIJI?view=stats', links)      # the earlier event, linked
+        self.assertIn('/rules#golf-statistics', links)
+        srcs = {h_ for s in st['sentences'] for _, h_ in s['src']}
+        self.assertIn('/event/2041%3APT_AUS?view=stats', srcs)        # the edition's statistics page
+        self.assertIn('led in putts (fewest)', text)
+
+    def test_retained_history_and_strict_cutoff(self):
+        src = FakeSource()
+        acceptance_case(src)
+        src.people[1]['initial'] = True
+        _, text, _ = self.story(src)
+        self.assertIn('lowest four-round total among majors, Premier events and championships in the retained '
+                      'history to that date', text)
+        rec, text, _ = self.story(src, '2040:PT_TWO')                 # only two comparable weeks before: no claim
+        self.assertEqual(rec['facts']['golf_history']['comparable'], 2)
+        self.assertNotIn('to that date', text)
+
+    def test_unaccounted_and_missing_statistics(self):
+        src = FakeSource()
+        e = acceptance_case(src)
+        v = e['golf'][0]['2']
+        v[GS.IDX['sg_putt']] += 50                                    # the parts now sum to 7.50, not 8
+        _, text, _ = self.story(src)
+        self.assertIn('+0.50 is not accounted for by strokes gained', text)
+        del e['golf']
+        rec, text, _ = self.story(src)
+        self.assertTrue(any('golf statistics' in m for m in rec['missing']))
+        for word in ('putts', 'fairways', 'strokes gained', 'greens in regulation'):
+            self.assertNotIn(word, text)
+
+    def test_pending_index_is_honest_and_not_kept(self):
+        src = FakeSource()
+        acceptance_case(src)
+        src.pending = 4
+        tmp = Path(tempfile.mkdtemp())
+        try:
+            c = S.StoryCache(tmp / 'stories.sqlite')
+            rec, st = S.tell(src, '2041:PT_AUS', cache=c, names=NAMES.get)
+            self.assertNotIn('golf_history', rec['facts'])
+            self.assertTrue(any('4 season(s) still being indexed' in m for m in rec['missing']))
+            self.assertIsNone(S.StoryCache(tmp / 'stories.sqlite').get_facts('2041:PT_AUS', None, None,
+                                                                              'archive:fixed'))   # not kept on disk
+            src.pending = 0
+            rec, _ = S.tell(src, '2041:PT_AUS', cache=S.StoryCache(tmp / 'stories.sqlite'), names=NAMES.get)
+            self.assertIn('golf_history', rec['facts'])
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_perspective_golf(self):
+        src = FakeSource()
+        acceptance_case(src)
+        _, text, _ = self.story(src, perspective=2)
+        self.assertIn('Bo Park took 106 putts over four rounds; strokes gained against the engine\'s expected-strokes '
+                      'table: +7.60 in all, +4.45 putting', text)
+
+
+class StoryDefectTests(unittest.TestCase):
+    """Fixtures for the review's defects at aafe369."""
+
+    def test_first_professional_win_after_an_amateur_win(self):
+        src = FakeSource()
+        src.add('2029:AM_CUP', {7: [70] * 4, 8: [72] * 4}, series='AM_CUP', tier=6, category='national_amateur',
+                kind='regular', name='Amateur Cup')
+        src.add('2030:TOUR_MASTERS', {7: [70, 70, 70, 70], 8: [71, 70, 70, 70], 9: [72, 72, 72, 72]})
+        rec = S.assemble(src, '2030:TOUR_MASTERS')
+        self.assertEqual(rec['facts']['winner']['wins_before'], 0)
+        self.assertEqual(S.patterns(rec)[0], 'first_win')
+        text = ' '.join(s.text() for s in S.narrate(rec, NAMES.get)['sentences'])
+        self.assertIn('on the professional tours', text)
+        self.assertNotIn('recorded career', text)
+        amateur = S.assemble(src, '2029:AM_CUP')
+        t2 = ' '.join(s.text() for s in S.narrate(amateur, NAMES.get)['sentences'])
+        self.assertIn('in amateur and college golf', t2)
+
+    def test_history_compares_format_to_format(self):
+        """A prior three-round 200 (-16 against its own 216) is not read as a four-round total."""
+        src = FakeSource()
+        for y, sc in ((2026, 278), (2027, 276), (2028, 274)):        # -10, -12, -14 over 72 holes
+            src.add(f'{y}:TOUR_MASTERS', {1: [sc - 210, 70, 70, 70], 2: [80, 80, 80, 80]})
+        src.add('2029:TOUR_MASTERS', {3: [66, 67, 67], 2: [75, 75, 75]}, rounds=3)   # 200: -16 over 54 holes
+        src.add('2030:TOUR_MASTERS', {4: [67, 67, 68, 68], 2: [72, 72, 72, 72]})     # 270: -18 over 72 holes
+        h = S.assemble(src, '2030:TOUR_MASTERS')['facts']['history']
+        self.assertEqual((h['prior'], h['same_format'], h['other_format'], h['unknown_format']), (4, 3, 1, 0))
+        self.assertEqual(h['lowest_to_par_before'], -14)
+        self.assertTrue(h['lowest_to_par'])
+        text = ' '.join(s.text() for s in S.narrate(S.assemble(src, '2030:TOUR_MASTERS'), NAMES.get)['sentences'])
+        self.assertIn('earlier 72-hole editions (one earlier edition over another number of holes not compared)', text)
+        # a format not yet indexed: no 'lowest' claim, and an honest omission
+        src.series_results = lambda sid, before=None: [dict(r, rounds=None) if r['event'] == '2029:TOUR_MASTERS'
+                                                       else r for r in FakeSource.series_results(src, sid)]
+        rec = S.assemble(src, '2030:TOUR_MASTERS')
+        self.assertFalse(rec['facts']['history']['lowest_to_par'])
+        self.assertTrue(any('being indexed' in m for m in rec['missing']))
+
+    def test_historical_ranking_links(self):
+        self.assertEqual(S._order_href(True, 2031, 7), '/rankings?kind=amateur&year=2031&week=7')
+        self.assertEqual(S._order_href(False, 2031, 7), '/rankings?kind=world&year=2031&week=7')
+
+    def test_names_are_checked_when_a_story_is_reused(self):
+        src = FakeSource()
+        runaway(src)
+        tmp = Path(tempfile.mkdtemp())
+        try:
+            c = S.StoryCache(tmp / 'stories.sqlite')
+            _, st = S.tell(src, '2030:TOUR_MASTERS', cache=c, names=NAMES.get)
+            self.assertIn('Ada Lin', S.render_sentence(st['sentences'][0], str))
+            renamed = {**NAMES, 1: 'Ada Lin-Moss'}
+            _, st2 = S.tell(src, '2030:TOUR_MASTERS', cache=S.StoryCache(tmp / 'stories.sqlite'), names=renamed.get)
+            self.assertIn('Ada Lin-Moss', S.render_sentence(st2['sentences'][0], str))
+            self.assertEqual(st2['names']['1'], 'Ada Lin-Moss')
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
 
 
 class StoryArchiveIndexTests(unittest.TestCase):
@@ -660,8 +901,8 @@ class StoryArchiveIndexTests(unittest.TestCase):
         ext = S.season_extract(self.arch.year(2030))
         self.assertEqual(sorted(ext['events']), ['2030:PT_OPEN', '2030:TOUR_MASTERS'])
         for e in ext['events'].values():
-            self.assertNotIn('holes', e)
-            self.assertNotIn('golf', e)
+            self.assertNotIn('holes', e)                              # no hole-by-hole cards
+            self.assertEqual(e['golf_keys'], list(S.GOLF_KEYS))        # golf: only the counters stories read
         self.assertEqual(sorted(ext['world']), ['11', '19'])
         self.assertEqual(ext['events']['2030:PT_OPEN']['upset'], upset_record())
         self.assertNotIn('upset', ext['events']['2030:TOUR_MASTERS'])
