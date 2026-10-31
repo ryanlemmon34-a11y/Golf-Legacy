@@ -87,7 +87,7 @@ Status is what was built and tested, not what was proposed. Report: `docs/V17_PA
 
 | Roadmap item | Status | Where |
 |---|---|---|
-| F1 Support successful amateurs | Built as an initial calibration (bands A/B/C, in kind, coaching included); measured over three seasons; work pathway for cash-blocked adult amateurs **proposed only** | `golfsim/amateur_support.py`, `docs/AMATEUR_WORK_PATHWAY_PROPOSAL.md` |
+| F1 Support successful amateurs | Built as an initial calibration (bands A/B/C, in kind, coaching included); measured over three seasons; work pathway for cash-blocked adult amateurs built as an initial calibration (rules 2026-11-03); ten-season comparison in the diagnostic runs | `golfsim/amateur_support.py`, `docs/AMATEUR_WORK_PATHWAY_PROPOSAL.md` |
 | F2 Earned major trip guarantee | Built and tested for all four majors, every status, inaugural Masters invitees, alternates, expired amateur places, injury; representative reconstructed scenarios (not each of the 269 cases) | `tests/test_major_funding.py` |
 | F3 Rule and observer defects | Built (U1 tenth anniversary, one status rule, one retirement event, comparisons, cohort level) | v16 |
 | E1 Evidence | Built (money behind major places, injury episodes, creation and development by source, dated aging); target-event components and retirement inputs partly (decisions are recorded) | v16 |
@@ -106,7 +106,7 @@ Status is what was built and tested, not what was proposed. Report: `docs/V17_PA
 | T1-T3 Tournament stories, linked history | Planned | -- |
 | C1 Calibration | Waiting for the long runs (`docs/LONG_RUN_PLAN.md`, for approval) | -- |
 | C2 Death after retirement | Planned, after the identity foundations | -- |
-| Qualification windows | Documented, tested; one policy choice for the owner | `docs/QUALIFICATION_WINDOWS.md` |
+| Qualification windows | Decided 31 October: the N most recent editions for P2, U5, B3 and M3, P3, U6, B4 (rules 2026-11-03); others unchanged; boundary tests | `docs/QUALIFICATION_WINDOWS.md` |
 | Long histories | Index validated/rebuilt, side index for read-only histories, exports include it; benchmarked | this pass |
 | Mobile and small screens | Deferred | -- |
 | Hide Results | Stays removed | -- |
