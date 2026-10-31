@@ -138,6 +138,38 @@ class NoHindsightTests(unittest.TestCase):
         # the same estimate whoever wins: only the lookup differs
         self.assertEqual(UP.record(pre, 1, lambda g: {})['top'], rec['top'])
 
+    def test_every_stored_chance_is_reproduced_from_the_snapshot_alone(self):
+        rng = random.Random(11)
+        for n, rounds in ((156, 4), (80, 3), (30, 2), (6, 4)):
+            field = [(rng.randrange(1000, 60000), rng.gauss(62, 12)) for _ in range(n)]
+            field[5] = (field[5][0], None)                              # an unknown Overall travels as None
+            winner = field[n // 2][0]
+            rec = UP.record(UP.estimate(field, rounds), winner, lambda g: {'status': 'pro', 'age': 30, 'wr': None})
+            rec = json.loads(json.dumps(rec))                           # as archived (JSON)
+            self.assertEqual(sorted(rec['inputs']), ['ids', 'overall'])  # ids and Overall only: nothing hidden
+            self.assertEqual(rec['inputs']['ids'], [g for g, _ in field])
+            self.assertTrue(all(o is None or o == round(o, UP.OVERALL_DECIMALS) for o in rec['inputs']['overall']))
+            again = UP.reproduce(rec)                                    # from model, rounds and inputs alone
+            self.assertEqual(again[rec['winner']], rec['p'])
+            self.assertEqual(again[rec['favourite']], rec['favourite_p'])
+            self.assertEqual([[g, again[g]] for g, _ in rec['top']], rec['top'])
+            self.assertEqual(rec['rank'], 1 + sum(1 for p in again.values() if p > rec['p']))
+        with self.assertRaises(ValueError):
+            UP.reproduce({'model': 'upset-model-0', 'estimated': True, 'rounds': 4})
+
+    def test_snapshot_size_per_edition(self):
+        """Archive growth (docs/HISTORY_AND_PERSISTENCE.md): about 11 bytes per entrant for the snapshot and about
+        450 bytes for the rest of the record (uncompressed JSON; ids up to five digits, Overall to one decimal)."""
+        rng = random.Random(2)
+        for n in (30, 80, 156):
+            field = [(rng.randrange(10000, 60000), rng.gauss(62, 12)) for _ in range(n)]
+            rec = UP.record(UP.estimate(field, 4), field[3][0], lambda g: {'status': 'pro', 'age': 31, 'wr': 412,
+                                                                          'ar': None})
+            inputs = len(json.dumps(rec['inputs'], separators=(',', ':')))
+            whole = len(json.dumps(rec, separators=(',', ':')))
+            self.assertLessEqual(inputs, 12 * n + 30, n)
+            self.assertLessEqual(whole - inputs, 500, n)
+
     def test_play_site_estimate_is_made_before_play_and_changes_nothing(self):
         """The worker's estimate is computed from the field before any shot, uses no random numbers and leaves
         the result exactly as without it (a tiny one-round event: a unit test, not a simulation run)."""

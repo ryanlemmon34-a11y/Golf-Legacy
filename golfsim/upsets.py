@@ -4,8 +4,9 @@ facts known then, with a documented and versioned model.
 The model -- ``upset-model-1``
 ------------------------------
 Inputs, per entrant, all read when the field is set and before any shot is struck: the golfer's Overall at that
-moment (the base rating the profile shows, before this week's development), the number of stroke-play rounds and
-the field itself. Nothing later enters: no result, no later rating, no later career. The event's own random
+moment (the base rating the profile shows, before this week's development), rounded to one decimal (the
+precision the model uses and stores, so that the estimate can be reproduced from the record), the number of
+stroke-play rounds and the field itself. The model is ratings-based only: no hidden potential or other hidden fact. Nothing later enters: no result, no later rating, no later career. The event's own random
 numbers are never touched (the estimate uses no random numbers at all).
 
 1. Expected strokes per round and the round-to-round spread come from the engine's measured rating ladder
@@ -35,7 +36,10 @@ estimated by model 1 (a bracket is not a lowest-total contest): such editions ar
 What is stored (archive: an edition's ``upset``): the model version, the site (0: the edition's winner), the
 field size, the winner's chance, the winner's rank in the field by the model and by Overall, their Overall,
 status, age and world (or amateur) ranking at the event, the favourite and their chance, and the top TOP_K
-entrants' chances. Every entrant's chance is worked out but not stored (TOP_K plus the winner's are).
+entrants' chances; and the complete input snapshot (``inputs``: the entrants' ids and their Overall at the estimate,
+two parallel lists in field order; None for an unknown Overall), from which ``reproduce`` recomputes every stored
+chance exactly. Every entrant's chance is worked out but only TOP_K and the winner's are stored (the snapshot lets
+anyone recompute the rest).
 """
 from __future__ import annotations
 
@@ -50,6 +54,7 @@ SD_FLOOR = 2.5
 STRETCH = 1.15                 # differences in expected strokes from the Overall-75 golfer are multiplied by this
 TAU = 0.85                     # shared per-round offset, strokes (see CALIBRATION)
 TOP_K = 5
+OVERALL_DECIMALS = 1           # the Overall precision the model uses and stores
 GRID_MAX = 81
 _DIV = 4.0                     # grid step: the narrowest spread / _DIV
 CALIBRATION = 'balance report section 6 (see the module notes, point 3)'
@@ -142,10 +147,21 @@ def estimate(entrants, rounds, match_play=False):
         return {'model': VERSION, 'estimated': False, 'why': 'match play (model 1 covers stroke play only)'}
     if not entrants:
         return {'model': VERSION, 'estimated': False, 'why': 'no field'}
+    entrants = [(gid, None if o is None else round(o, OVERALL_DECIMALS)) for gid, o in entrants]
     ps = win_probabilities([o for _, o in entrants], rounds)
     ov = {gid: o for gid, o in entrants}
     return {'model': VERSION, 'estimated': True, 'rounds': rounds,
-            'p': {gid: sig(p) for (gid, _), p in zip(entrants, ps)}, 'overall': ov}
+            'p': {gid: sig(p) for (gid, _), p in zip(entrants, ps)}, 'overall': ov,
+            'inputs': {'ids': [g for g, _ in entrants], 'overall': [o for _, o in entrants]}}
+
+
+def reproduce(rec):
+    """{gid: chance} recomputed from an archived record's input snapshot alone (model, rounds, ids, Overall)."""
+    if rec.get('model') != VERSION or not rec.get('estimated') or not rec.get('inputs'):
+        raise ValueError(f'not reproducible with {VERSION}: {rec.get("model")}, inputs '
+                         f'{"present" if rec.get("inputs") else "missing"}')
+    inp = rec['inputs']
+    return estimate(list(zip(inp['ids'], inp['overall'])), rec['rounds'])['p']
 
 
 def _rank(values, key):
@@ -165,7 +181,8 @@ def record(pre, winner, facts):
     out = {'model': pre['model'], 'estimated': True, 'site': 0, 'field': len(p), 'rounds': pre['rounds'],
            'top': [[g, p[g]] for g in order[:TOP_K]],
            'favourite': order[0], 'favourite_p': p[order[0]],
-           'favourite_overall': _r1(pre['overall'][order[0]]), 'favourite_facts': facts(order[0])}
+           'favourite_overall': _r1(pre['overall'][order[0]]), 'favourite_facts': facts(order[0]),
+           'inputs': {'ids': list(pre['inputs']['ids']), 'overall': list(pre['inputs']['overall'])}}
     if winner is None or winner not in p:
         out['winner'] = None
         return out
