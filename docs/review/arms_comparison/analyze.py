@@ -33,7 +33,8 @@ DEFAULT_BUILD = V18 / 'arms' / 'build_c0d1ea5'
 DEFAULT_ARMS = {k: V18 / 'arms' / k for k in ('a21old', 'a18old', 'a18new', 'seed2')}
 DEFAULT_STORY_ARCHIVE = V18 / 'runs' / 'A' / 'world_360013' / 'archive'
 # what each arm's sections read of the season summaries (the rest is dropped after loading, to keep memory modest)
-_COMMON = {'prestige', 'created', 'arrival_log', 'venue_sites'}
+_COMMON = {'prestige', 'created', 'arrival_log', 'venue_sites', 'ar_ev', 'cash_blocked_max', 'work_pathway', 'transitions',
+           'careers'}
 KEEP = {'a21old': {'plans', 'careers', 'transitions', 'work_pathway', 'oo', 'open_starts', 't5_starts', 'start_weeks'} | _COMMON,
         'a18old': {'plans', 'careers', 'transitions', 'work_pathway', 'oo', 'open_starts', 't5_starts', 'start_weeks'} | _COMMON,
         'a18new': {'careers', 'transitions', 'work_pathway', 'oo', 'open_starts', 't5_starts', 'weather',
@@ -386,8 +387,9 @@ def original_cohort(a21, a18, lines):
                f'(`log`, written by careers.add_juniors: "Arrived on the scene at 18 (<tour>)", the tour assigned by '
                f'population.junior_class at creation); lifestyle at creation is the Golfer default, full-time '
                f'(golfer.py). Verification: {len(juniors)} junior arrivals in a21old, {len(cr18)} creation records in '
-               f'a18old vs {len(cr21)} in a21old; identical creation record, arrival line and identity in both arms for '
-               f'{len(same_rec)}/{len(juniors)} — ' + ('PASSED' if ok_c else 'NOT identical: the cohort keeps only the '
+               f'a18old vs {len(cr21)} in a21old; identical extracted creation fields (path, age, Overall, week), arrival '
+               f'line and identity (name, birth year, country) in both arms for '
+               f'{len(same_rec)}/{len(juniors)} — ' + ('PASSED (full attributes and ceilings were not compared)' if ok_c else 'NOT identical: the cohort keeps only the '
                                                          'identical ones') + '. Kept: juniors (all aged 18 at creation) '
                f'whose creation tour is not a college tour. Left out: ' + (', '.join(f'{k} {v}' for k, v in exc_c.items())
                                                                           or 'none') +
@@ -1099,6 +1101,7 @@ def venue_section(arms, lines):
                 gap = ev[sid] - (co.get(cur) or 0.0)
                 n = watch[sid] = watch.get(sid, 0) + 1 if gap >= PR.VENUE_GAP else 0
                 c['gap'] += gap >= PR.VENUE_GAP
+                c['near'] += abs(gap - PR.VENUE_GAP) <= 0.01
                 if n < PR.VENUE_SUSTAIN:
                     continue
                 c['sustained'] += 1
@@ -1137,13 +1140,19 @@ def venue_section(arms, lines):
             rows.append((a['name'], y, c['eligible'], c['gap'], c['sustained'], 0,
                          c['blocked: not at this course in Y+2'], c['blocked: no better eligible course in the city'],
                          c['blocked: better course booked that week'], c['would move'],
-                         len(p['venue_moves_decided'])))
+                         len(p['venue_moves_decided']), c['near']))
     lines.append(table(['arm', 'season', 'eligible events held', f'gap ≥ {PR.VENUE_GAP:g}', f'sustained {PR.VENUE_SUSTAIN} season ends',
                         'blocked: cooldown', 'blocked: not at this course in Y+2', 'blocked: no better eligible course in the city',
-                        'blocked: better course booked that week', 'reconstructed: would move', 'moves recorded'], rows))
+                        'blocked: better course booked that week', 'reconstructed: would move', 'moves recorded',
+                        f'gap within ±0.01 of {PR.VENUE_GAP:g} (unclassifiable)'], rows))
     lines.append('')
+    near = sum(r[-1] for r in rows)
     lines.append('A nonzero "reconstructed: would move" alongside zero recorded moves would mean this reconstruction '
-                 'differs from the rule as run; the two columns are shown side by side for that check.')
+                 'differs from the rule as run; the two columns are shown side by side for that check. Rounding: the '
+                 'archived event and course prestige are rounded to 0.01, so a gap within ±0.01 of the threshold cannot '
+                 f'be classified with certainty; {near} eligible event-seasons fall in that band over these '
+                 f'{len(rows)} seasons. Natural move frequency remains unvalidated; the positive fixtures in '
+                 'tests/test_venue_moves.py remain valid.')
     lines.append('')
 
 
@@ -1333,6 +1342,173 @@ def section3(arms, lines, all_arms=()):
     lines.append('')
 
 
+# ---- section 5: amateur return and re-block (D5.c) -----------------------------------------------------------------
+RETURN_KIND = 'amateur returned to full-time golf'           # golfsim/amateur_return.KIND
+BANDS5 = (('18–20', 18, 20), ('21–24', 21, 24), ('25–29', 25, 29), ('30+', 30, 999))
+
+
+def band5(age):
+    return next((b for b, lo, hi in BANDS5 if age is not None and lo <= age <= hi), 'unknown')
+
+
+def section_return(arms, lines):
+    lines.append('## 5. Amateur return and re-block (D5.c), all four arms')
+    lines.append('')
+    lines.append('Sources (the build\'s own records, read from the season files): **episodes** are the winter transitions '
+                 f'"{RETURN_KIND}" in season Y\'s `transitions` (careers.decide: `note(AR.KIND, …)` after a successful '
+                 'draw), effective in season Y+1, with the age recorded at the decision; **evaluations** are every '
+                 '`amateur_return` row of decision evidence /2 (`careers` part): careers.decide records one for every '
+                 'part-time non-college amateur it evaluates, including p = 0 (a blocking condition: work, funds or '
+                 'results; no draw then). Return rates use all evaluations as the denominator, and separately the '
+                 'eligible ones (p > 0); the denominator is never limited to former pathway entrants. For each episode '
+                 'whose season Y+1 is archived: any cash-blocked week in Y+1 (season file `cash_blocked_max` ≥ 1: only '
+                 'a genuinely unaffordable week adds to it), a work-pathway re-entry in Y+1 (`work_pathway`; entries '
+                 'whose in-season count stayed below 8 used a count carried over), a winter "amateur took a job" '
+                 'decision after Y+1, starts in Y+1 (`careers.events`), and the competing outcomes of the winter after '
+                 'Y+1 (turned pro or comeback, retired, became coach or caddie, death in that winter from the people '
+                 'table). Returns in an arm\'s last season have no archived Y+1: they are **censored**, counted '
+                 'separately, never as successes. Episodes are not independent people: a golfer can return more than '
+                 'once, so unique people are counted separately. Age bands by age at the decision.')
+    lines.append('')
+    head = ['band', 'evaluations (all, p = 0 included)', 'eligible (p > 0)', 'returns (episodes)', 'returns / all evaluations',
+            'returns / eligible', 'unique people', 'censored (no archived Y+1)', 'any cash-blocked week in Y+1',
+            'pathway re-entry in Y+1 (count carried)', 'winter "took a job" after Y+1', 'starts in Y+1 (min/q1/med/q3/max)',
+            'turned pro / comeback', 'retired', 'became staff', 'died']
+    pooled = defaultdict(Counter)
+    pooled_starts = defaultdict(list)
+    pooled_people = defaultdict(set)
+    checks = []
+    for a in arms:
+        if not a['seasons'] or 'ar_ev' not in a['summ'][a['seasons'][0]]:
+            continue
+        last = a['seasons'][-1]
+        C = defaultdict(Counter)
+        starts = defaultdict(list)
+        people = defaultdict(set)
+        n_ev_out = n_tr = 0
+        for y in a['seasons']:
+            S_ = a['summ'][y]
+            for g, (p, u, out, age, blocked) in S_['ar_ev'].items():
+                if age is None:
+                    born = (a['people'].get(g) or {}).get('born')
+                    age = y - born if born else None
+                for b in (band5(age), 'all'):
+                    C[b]['ev'] += 1
+                    C[b]['elig'] += (p or 0) > 0
+                n_ev_out += out == 1
+            for t in S_['transitions']:
+                if t.get('kind') != RETURN_KIND:
+                    continue
+                n_tr += 1
+                g, age = t['gid'], t.get('age')
+                bs = (band5(age), 'all')
+                for b in bs:
+                    C[b]['ret'] += 1
+                    people[b].add(g)
+                if y == last:
+                    for b in bs:
+                        C[b]['cens'] += 1
+                    continue
+                S1 = a['summ'][y + 1]
+                cb = S1['cash_blocked_max'].get(g, 0)
+                re_ = [r for r in S1['work_pathway'] if r['gid'] == g]
+                tj = any(t2.get('gid') == g and t2.get('kind') == 'amateur took a job' for t2 in S1['transitions'])
+                kinds = {t2['kind'] for t2 in S1['transitions'] if t2.get('gid') == g}
+                died = (a['people'].get(g) or {}).get('died')
+                for b in bs:
+                    C[b]['obs'] += 1
+                    C[b]['blocked'] += cb >= 1
+                    C[b]['reentry'] += bool(re_)
+                    C[b]['carried'] += bool(re_) and cb < 8
+                    C[b]['tookjob'] += tj
+                    C[b]['pro'] += bool(kinds & {'turned pro', 'comeback'})
+                    C[b]['retired'] += 'retired' in kinds
+                    C[b]['staff'] += bool(kinds & {'became coach', 'became caddie'})
+                    C[b]['died'] += died is not None and died in (y, y + 1)
+                    starts[b].append((S1['careers'].get(g) or {}).get('events', 0) or 0)
+        checks.append(f'{a["name"]}: {n_tr} return transitions, {n_ev_out} evaluations with outcome 1'
+                      + ('' if n_tr == n_ev_out else ' (DIFFER)'))
+        rows = []
+        for b in [x for x, _, _ in BANDS5] + ['unknown', 'all']:
+            c = C[b]
+            if not c['ev'] and not c['ret']:
+                continue
+            rows.append(row5(b, c, len(people[b]), starts[b]))
+            for k, v in c.items():
+                pooled[b][k] += v
+            pooled_starts[b] += starts[b]
+            pooled_people[b] |= {(a['name'], g) for g in people[b]}
+        lines.append(f'**{a["name"]}** ({seasons_label(a)}; censored = returns decided in {last})')
+        lines.append('')
+        lines.append(table(head, rows))
+        lines.append('')
+    rows = [row5(b, pooled[b], len(pooled_people[b]), pooled_starts[b]) for b in [x for x, _, _ in BANDS5] + ['unknown', 'all']
+            if pooled[b]['ev'] or pooled[b]['ret']]
+    lines.append('**POOLED over the four arms** — sums of episodes from different worlds (two seeds, three rule settings); '
+                 'unique people are (arm, golfer) pairs; no causal reading.')
+    lines.append('')
+    lines.append(table(head, rows))
+    lines.append('')
+    lines.append('Consistency of the two sources: ' + '; '.join(checks) + '. Death counts a death in the winter of the '
+                 'return or the winter after Y+1 (people table `died`).')
+    lines.append('')
+
+
+def row5(b, c, people, starts):
+    o = c['obs']
+    return (b, c['ev'], c['elig'], c['ret'], frac(c['ret'], c['ev'], 2), frac(c['ret'], c['elig'], 1), people,
+            frac(c['cens'], c['ret']), frac(c['blocked'], o), f'{frac(c["reentry"], o)} ({c["carried"]})',
+            frac(c['tookjob'], o), dist(starts), frac(c['pro'], o), frac(c['retired'], o), frac(c['staff'], o),
+            frac(c['died'], o))
+
+
+# ---- section 6: upset snapshot cost ------------------------------------------------------------------------------
+def section_upsets(lines, path):
+    lines.append('## 6. Upset snapshot cost (a18new and seed2)')
+    lines.append('')
+    if not path.exists():
+        lines += ['Not measured yet (run `upset_cost.py`).', '']
+        return
+    u = json.loads(path.read_text())
+    lines.append('Bytes of each edition\'s archived `upset` record (golfsim/upsets.record), in the archive\'s own JSON '
+                 'encoding (compact separators, archive._write). "gzip alone" compresses a season\'s upset records (or '
+                 'their `inputs` snapshots) by themselves at the archive\'s level 6: an approximation of their '
+                 'contribution inside the whole-file compression, not an exact share of the gzip file.')
+    lines.append('')
+    rows, tot = [], Counter()
+    for name, arm in u['arms'].items():
+        for r in arm['seasons']:
+            rows.append((name, r['year'], r['with_upset'], f'{r["upset_json"] / 1e6:.2f} MB', f'{r["upset_json"] / r["with_upset"]:.0f}',
+                         f'{r["inputs_json"] / 1e6:.2f} MB', f'{r["inputs_json"] / r["with_upset"]:.0f}',
+                         pct(r['upset_json'], r['file_raw']), pct(r['inputs_json'], r['file_raw']),
+                         f'{r["upset_gz_alone"] / 1e6:.2f} MB', f'{r["inputs_gz_alone"] / 1e6:.2f} MB',
+                         pct(r['upset_gz_alone'], r['file_gz']), f'{r["file_gz"] / 1e6:.1f} MB'))
+            for k in ('with_upset', 'upset_json', 'inputs_json', 'file_raw', 'upset_gz_alone', 'inputs_gz_alone', 'file_gz'):
+                tot[k] += r[k]
+    rows.append(('all', f'{sum(len(a["seasons"]) for a in u["arms"].values())} seasons', tot['with_upset'],
+                 f'{tot["upset_json"] / 1e6:.1f} MB', f'{tot["upset_json"] / tot["with_upset"]:.0f}',
+                 f'{tot["inputs_json"] / 1e6:.1f} MB', f'{tot["inputs_json"] / tot["with_upset"]:.0f}',
+                 pct(tot['upset_json'], tot['file_raw']), pct(tot['inputs_json'], tot['file_raw']),
+                 f'{tot["upset_gz_alone"] / 1e6:.1f} MB', f'{tot["inputs_gz_alone"] / 1e6:.1f} MB',
+                 pct(tot['upset_gz_alone'], tot['file_gz']), f'{tot["file_gz"] / 1e6:.0f} MB'))
+    lines.append(table(['arm', 'season', 'editions with a record', 'upset JSON', 'bytes / edition', 'inputs JSON',
+                        'inputs bytes / edition', 'upset share of raw season file', 'inputs share of raw',
+                        'upset gzip alone', 'inputs gzip alone', 'upset gzip alone / season .gz', 'season .gz'], rows))
+    lines.append('')
+    lines.append('**CPU: offline recomputation from stored inputs.** It excludes the fact capture at field-set time and '
+                 'any engine-side bookkeeping, so it is not the in-engine overhead (the season engine has no per-phase '
+                 'timing for upset estimates, and none is inferred from season run times). Each estimated record\'s '
+                 '`inputs` snapshot (ids, Overall, rounds) is passed to `golfsim.upsets.reproduce`; only that call is '
+                 'timed, with process CPU time, under `nice -n 19` while the test suite ran.')
+    lines.append('')
+    rows = [(c['arm'], c['year'], c['editions'], f'{c["equal"]}/{c["editions"]}', f'{c["max_abs_diff"]:g}', c['cpu_total_s'],
+             c['cpu_per_edition_ms'], c['cpu_median_ms'], c['cpu_max_ms']) for c in u['cpu']]
+    lines.append(table(['arm', 'season', 'estimated records recomputed', 'reproduced = stored (top 5, favourite, winner)',
+                        'largest |difference|', 'CPU per season (s)', 'CPU per edition, mean (ms)', 'median (ms)',
+                        'max (ms)'], rows))
+    lines.append('')
+
+
 # ---- section 4: story timing -------------------------------------------------------------------------------------
 def section4(lines, timing_path):
     lines.append('## 4. Story timing on the pinned long archive (run A, 45 seasons, build 473690a)')
@@ -1442,6 +1618,8 @@ def main():
     else:
         lines += ['## 3. Two-seed bounded metrics', '', 'Not available yet (a18new and seed2 have no committed season).', '']
     section4(lines, HERE / 'story_timing.json')
+    section_return([arms[k] for k in ('a21old', 'a18old', 'a18new', 'seed2')], lines)
+    section_upsets(lines, HERE / 'upset_cost.json')
     lines.append('## What the runs do not record (and the workaround used)')
     lines.append('')
     lines += [
@@ -1480,12 +1658,13 @@ def publish(report):
     import shutil
     out = HERE / 'publish'
     out.mkdir(exist_ok=True)
-    for f in ('analyze.py', 'extract.py', 'stories_timing.py'):
+    for f in ('analyze.py', 'extract.py', 'stories_timing.py', 'upset_cost.py'):
         shutil.copyfile(HERE / f, out / f)
     shutil.copyfile(report, out / 'ARMS_COMPARISON.md')
-    st = HERE / 'story_timing.json'
-    if st.exists():
-        (out / 'story_timing.json').write_text(sanitize(st.read_text()))
+    for name in ('story_timing.json', 'upset_cost.json'):
+        st = HERE / name
+        if st.exists():
+            (out / name).write_text(sanitize(st.read_text()))
     left = [str(p) for p in out.iterdir() if str(V18) in p.read_text(errors='ignore')]
     print(f'published to {out}' + (f'; WARNING machine paths remain in {left}' if left else ''), flush=True)
 

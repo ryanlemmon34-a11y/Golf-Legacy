@@ -1,0 +1,236 @@
+{
+ "model": "upset-model-1",
+ "arms": {
+  "a18new": {
+   "seed": "4207",
+   "seasons": [
+    {
+     "year": 2027,
+     "file": "years/2027.g000001.json.gz",
+     "editions": 1458,
+     "with_upset": 1438,
+     "estimated": 1435,
+     "file_raw": 54655720,
+     "file_gz": 13039656,
+     "upset_json": 1811715,
+     "inputs_json": 1190422,
+     "upset_gz_alone": 620582,
+     "inputs_gz_alone": 469828
+    },
+    {
+     "year": 2028,
+     "file": "years/2028.g000002.json.gz",
+     "editions": 1456,
+     "with_upset": 1436,
+     "estimated": 1433,
+     "file_raw": 51920424,
+     "file_gz": 12567224,
+     "upset_json": 1834329,
+     "inputs_json": 1212531,
+     "upset_gz_alone": 633879,
+     "inputs_gz_alone": 483630
+    },
+    {
+     "year": 2029,
+     "file": "years/2029.g000003.json.gz",
+     "editions": 1456,
+     "with_upset": 1436,
+     "estimated": 1433,
+     "file_raw": 52500789,
+     "file_gz": 12689229,
+     "upset_json": 1836792,
+     "inputs_json": 1214802,
+     "upset_gz_alone": 636716,
+     "inputs_gz_alone": 486766
+    },
+    {
+     "year": 2030,
+     "file": "years/2030.g000004.json.gz",
+     "editions": 1460,
+     "with_upset": 1440,
+     "estimated": 1437,
+     "file_raw": 53854197,
+     "file_gz": 12918730,
+     "upset_json": 1867969,
+     "inputs_json": 1242619,
+     "upset_gz_alone": 645213,
+     "inputs_gz_alone": 495036
+    },
+    {
+     "year": 2031,
+     "file": "years/2031.g000005.json.gz",
+     "editions": 1461,
+     "with_upset": 1441,
+     "estimated": 1438,
+     "file_raw": 55360741,
+     "file_gz": 13141120,
+     "upset_json": 1900278,
+     "inputs_json": 1273639,
+     "upset_gz_alone": 654881,
+     "inputs_gz_alone": 503837
+    },
+    {
+     "year": 2032,
+     "file": "years/2032.g000006.json.gz",
+     "editions": 1461,
+     "with_upset": 1441,
+     "estimated": 1438,
+     "file_raw": 57246263,
+     "file_gz": 13431077,
+     "upset_json": 1933947,
+     "inputs_json": 1306107,
+     "upset_gz_alone": 665309,
+     "inputs_gz_alone": 514758
+    },
+    {
+     "year": 2033,
+     "file": "years/2033.g000007.json.gz",
+     "editions": 1460,
+     "with_upset": 1440,
+     "estimated": 1437,
+     "file_raw": 59211101,
+     "file_gz": 13763281,
+     "upset_json": 1966318,
+     "inputs_json": 1337690,
+     "upset_gz_alone": 677453,
+     "inputs_gz_alone": 526335
+    },
+    {
+     "year": 2034,
+     "file": "years/2034.g000008.json.gz",
+     "editions": 1461,
+     "with_upset": 1441,
+     "estimated": 1438,
+     "file_raw": 60227106,
+     "file_gz": 13907906,
+     "upset_json": 1984223,
+     "inputs_json": 1353955,
+     "upset_gz_alone": 682294,
+     "inputs_gz_alone": 531720
+    },
+    {
+     "year": 2035,
+     "file": "years/2035.g000009.json.gz",
+     "editions": 1460,
+     "with_upset": 1440,
+     "estimated": 1437,
+     "file_raw": 62253055,
+     "file_gz": 14210708,
+     "upset_json": 2010949,
+     "inputs_json": 1379774,
+     "upset_gz_alone": 692344,
+     "inputs_gz_alone": 541226
+    },
+    {
+     "year": 2036,
+     "file": "years/2036.g000010.json.gz",
+     "editions": 1461,
+     "with_upset": 1441,
+     "estimated": 1438,
+     "file_raw": 63546680,
+     "file_gz": 14428789,
+     "upset_json": 2031174,
+     "inputs_json": 1398926,
+     "upset_gz_alone": 698790,
+     "inputs_gz_alone": 548731
+    }
+   ]
+  },
+  "seed2": {
+   "seed": "5309",
+   "seasons": [
+    {
+     "year": 2027,
+     "file": "years/2027.g000001.json.gz",
+     "editions": 1453,
+     "with_upset": 1433,
+     "estimated": 1430,
+     "file_raw": 54354667,
+     "file_gz": 13016599,
+     "upset_json": 1810487,
+     "inputs_json": 1191008,
+     "upset_gz_alone": 620908,
+     "inputs_gz_alone": 470224
+    },
+    {
+     "year": 2028,
+     "file": "years/2028.g000002.json.gz",
+     "editions": 1453,
+     "with_upset": 1433,
+     "estimated": 1430,
+     "file_raw": 52073393,
+     "file_gz": 12621395,
+     "upset_json": 1836855,
+     "inputs_json": 1216860,
+     "upset_gz_alone": 636295,
+     "inputs_gz_alone": 485879
+    },
+    {
+     "year": 2029,
+     "file": "years/2029.g000003.json.gz",
+     "editions": 1459,
+     "with_upset": 1439,
+     "estimated": 1436,
+     "file_raw": 53448222,
+     "file_gz": 12879346,
+     "upset_json": 1856333,
+     "inputs_json": 1233255,
+     "upset_gz_alone": 645658,
+     "inputs_gz_alone": 495042
+    },
+    {
+     "year": 2030,
+     "file": "years/2030.g000004.json.gz",
+     "editions": 1458,
+     "with_upset": 1438,
+     "estimated": 1435,
+     "file_raw": 54701011,
+     "file_gz": 13059899,
+     "upset_json": 1882575,
+     "inputs_json": 1258188,
+     "upset_gz_alone": 652361,
+     "inputs_gz_alone": 502043
+    },
+    {
+     "year": 2031,
+     "file": "years/2031.g000005.json.gz",
+     "editions": 1460,
+     "with_upset": 1440,
+     "estimated": 1437,
+     "file_raw": 56445281,
+     "file_gz": 13314342,
+     "upset_json": 1914411,
+     "inputs_json": 1287133,
+     "upset_gz_alone": 660905,
+     "inputs_gz_alone": 510043
+    }
+   ]
+  }
+ },
+ "cpu": [
+  {
+   "arm": "a18new",
+   "year": 2027,
+   "editions": 1435,
+   "equal": 1435,
+   "max_abs_diff": 0.0,
+   "cpu_total_s": 2.898,
+   "cpu_per_edition_ms": 2.019,
+   "cpu_median_ms": 1.813,
+   "cpu_max_ms": 9.078,
+   "compared": "top 5, favourite and winner chances as stored (6 significant figures)"
+  },
+  {
+   "arm": "a18new",
+   "year": 2036,
+   "editions": 1438,
+   "equal": 1438,
+   "max_abs_diff": 0.0,
+   "cpu_total_s": 2.804,
+   "cpu_per_edition_ms": 1.95,
+   "cpu_median_ms": 1.832,
+   "cpu_max_ms": 5.615,
+   "compared": "top 5, favourite and winner chances as stored (6 significant figures)"
+  }
+ ]
+}

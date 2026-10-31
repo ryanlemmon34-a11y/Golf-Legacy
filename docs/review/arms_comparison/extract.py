@@ -25,7 +25,7 @@ sys.dont_write_bytecode = True          # never write __pycache__ into the pinne
 
 HERE = Path(__file__).resolve().parent
 CACHE = HERE / 'cache'
-EXTRACT_VERSION = 4                       # bump when the summary's contents change
+EXTRACT_VERSION = 5                       # bump when the summary's contents change
 
 
 def use_build(build):
@@ -193,7 +193,7 @@ def extract_season(path, year, defs, homeclub_country, lib_sites):
     # career evaluations of every amateur -- through decision_evidence.read
     blk = d.get('decision_evidence')
     out['evidence_format'] = blk.get('format') if blk else None
-    plans, careers_ev = {}, {}
+    plans, careers_ev, ar_ev = {}, {}, {}
     if blk:
         for gid, rec in car.items():
             if rec['status'] != 'amateur':
@@ -203,7 +203,11 @@ def extract_season(path, year, defs, homeclub_country, lib_sites):
                 plans[gid] = [(r['week'], r['availability'], r['plan'], r['injured_weeks']) for r in ev['schedule']]
             if ev['careers']:
                 careers_ev[gid] = [(c['model'], c['p'], c['outcome']) for c in ev['careers']]
+                for c in ev['careers']:
+                    if c['model'] == 'amateur_return':      # every evaluation, p = 0 included (careers.decide)
+                        ar_ev[gid] = (c['p'], c['u'], c['outcome'], c['inputs'].get('age'), c['inputs'].get('blocked'))
     out['plans'] = plans
+    out['ar_ev'] = ar_ev
     out['career_ev'] = careers_ev
     dg = (d.get('diagnostics') or {})
     lay = (dg.get('layout') or {}).get('overall_by_source', [25, 30])

@@ -1,6 +1,6 @@
 # Arms comparison (pinned build c0d1ea5)
 
-Written 2026-10-31 12:02 UTC by armsan/analyze.py from the run folders as committed at read time (read-only). Same build for every arm; seeds pinned. Partial arms are labelled with the seasons included. No conclusions beyond the data; effects are noted, not tuned.
+Written 2026-10-31 12:23 UTC by armsan/analyze.py from the run folders as committed at read time (read-only). Same build for every arm; seeds pinned. Partial arms are labelled with the seasons included. No conclusions beyond the data; effects are noted, not tuned.
 
 | arm | seed | build | arm recorded | pathway min age in force | seasons | run state read from | archive generation |
 |---|---|---|---|---|---|---|---|
@@ -63,7 +63,7 @@ Status at the end of 2036 is the golfer's 2036 season row before that winter's d
 
 ### ARRIVAL COHORT: juniors created for 2028 (fixed at creation, the same people in both arms)
 
-Golfers who arrived for 2028 (first row in 2028), defined by their creation record, not their end-of-2028 row. Fields used: the 2028 season file's `diagnostics.created` (written by Season.note_creation at creation, week 0: path, age, Overall, attributes) and the arrival line of their history at week 1 (`log`, written by careers.add_juniors: "Arrived on the scene at 18 (<tour>)", the tour assigned by population.junior_class at creation); lifestyle at creation is the Golfer default, full-time (golfer.py). Verification: 295 junior arrivals in a21old, 711 creation records in a18old vs 711 in a21old; identical creation record, arrival line and identity in both arms for 295/295 — PASSED. Kept: juniors (all aged 18 at creation) whose creation tour is not a college tour. Left out: in college at creation 232. Late entrants (new professionals, path "late_entrant", aged 21–26) are not amateurs and are not included.
+Golfers who arrived for 2028 (first row in 2028), defined by their creation record, not their end-of-2028 row. Fields used: the 2028 season file's `diagnostics.created` (written by Season.note_creation at creation, week 0: path, age, Overall, attributes) and the arrival line of their history at week 1 (`log`, written by careers.add_juniors: "Arrived on the scene at 18 (<tour>)", the tour assigned by population.junior_class at creation); lifestyle at creation is the Golfer default, full-time (golfer.py). Verification: 295 junior arrivals in a21old, 711 creation records in a18old vs 711 in a21old; identical extracted creation fields (path, age, Overall, week), arrival line and identity (name, birth year, country) in both arms for 295/295 — PASSED (full attributes and ceilings were not compared). Kept: juniors (all aged 18 at creation) whose creation tour is not a college tour. Left out: in college at creation 232. Late entrants (new professionals, path "late_entrant", aged 21–26) are not amateurs and are not included.
 
 N = 63 (by age in 2028: 18: 63). Outcomes over seasons 2028–2036; denominator N in both columns (the same people).
 
@@ -377,25 +377,25 @@ Venue moves (`prestige.venue_moves_decided` at the season's end; `venue_moves`: 
 
 Trigger funnel per season, reconstructed from retained data and the build's static course plan (Season.review_venues; no simulation): eligible = held this season, single-site series, not a major or qualifying stage; gap = archived event prestige − archived course prestige of the course it was played on (both as set at the season end, which review_venues reads) ≥ 5; sustained = that gap at 3 consecutive held season ends (counted from the world's first season, as `venue_watch` starts empty); cooldown = a move in the last 10 seasons (none were recorded, so it blocks nothing); candidate = a course in the same city that the event's level may use (course_library.LEVEL_LAYOUTS) and physically better (prestige.COURSE_QUALITY), not elite in a major week; free = not booked that week in season Y+2 and the event still planned at its current course then (with no moves in force, the world's venues equal the library plan `CourseLibrary.venues`, so this is reconstructable). The edition's week in season Y+2 comes from the static calendar.
 
-| arm | season | eligible events held | gap ≥ 5 | sustained 3 season ends | blocked: cooldown | blocked: not at this course in Y+2 | blocked: no better eligible course in the city | blocked: better course booked that week | reconstructed: would move | moves recorded |
-|---|---|---|---|---|---|---|---|---|---|---|
-| a18new | 2027 | 1434 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| a18new | 2028 | 1432 | 104 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| a18new | 2029 | 1432 | 103 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| a18new | 2030 | 1436 | 103 | 29 | 0 | 23 | 6 | 0 | 0 | 0 |
-| a18new | 2031 | 1437 | 94 | 38 | 0 | 32 | 6 | 0 | 0 | 0 |
-| a18new | 2032 | 1437 | 100 | 47 | 0 | 38 | 9 | 0 | 0 | 0 |
-| a18new | 2033 | 1436 | 93 | 42 | 0 | 34 | 8 | 0 | 0 | 0 |
-| a18new | 2034 | 1437 | 100 | 46 | 0 | 38 | 8 | 0 | 0 | 0 |
-| a18new | 2035 | 1436 | 91 | 49 | 0 | 39 | 10 | 0 | 0 | 0 |
-| a18new | 2036 | 1437 | 102 | 53 | 0 | 43 | 10 | 0 | 0 | 0 |
-| seed2 | 2027 | 1429 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| seed2 | 2028 | 1429 | 102 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| seed2 | 2029 | 1435 | 105 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| seed2 | 2030 | 1434 | 101 | 28 | 0 | 22 | 6 | 0 | 0 | 0 |
-| seed2 | 2031 | 1436 | 85 | 37 | 0 | 31 | 6 | 0 | 0 | 0 |
+| arm | season | eligible events held | gap ≥ 5 | sustained 3 season ends | blocked: cooldown | blocked: not at this course in Y+2 | blocked: no better eligible course in the city | blocked: better course booked that week | reconstructed: would move | moves recorded | gap within ±0.01 of 5 (unclassifiable) |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| a18new | 2027 | 1434 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| a18new | 2028 | 1432 | 104 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| a18new | 2029 | 1432 | 103 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| a18new | 2030 | 1436 | 103 | 29 | 0 | 23 | 6 | 0 | 0 | 0 | 0 |
+| a18new | 2031 | 1437 | 94 | 38 | 0 | 32 | 6 | 0 | 0 | 0 | 0 |
+| a18new | 2032 | 1437 | 100 | 47 | 0 | 38 | 9 | 0 | 0 | 0 | 0 |
+| a18new | 2033 | 1436 | 93 | 42 | 0 | 34 | 8 | 0 | 0 | 0 | 0 |
+| a18new | 2034 | 1437 | 100 | 46 | 0 | 38 | 8 | 0 | 0 | 0 | 1 |
+| a18new | 2035 | 1436 | 91 | 49 | 0 | 39 | 10 | 0 | 0 | 0 | 0 |
+| a18new | 2036 | 1437 | 102 | 53 | 0 | 43 | 10 | 0 | 0 | 0 | 0 |
+| seed2 | 2027 | 1429 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| seed2 | 2028 | 1429 | 102 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| seed2 | 2029 | 1435 | 105 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| seed2 | 2030 | 1434 | 101 | 28 | 0 | 22 | 6 | 0 | 0 | 0 | 1 |
+| seed2 | 2031 | 1436 | 85 | 37 | 0 | 31 | 6 | 0 | 0 | 0 | 0 |
 
-A nonzero "reconstructed: would move" alongside zero recorded moves would mean this reconstruction differs from the rule as run; the two columns are shown side by side for that check.
+A nonzero "reconstructed: would move" alongside zero recorded moves would mean this reconstruction differs from the rule as run; the two columns are shown side by side for that check. Rounding: the archived event and course prestige are rounded to 0.01, so a gap within ±0.01 of the threshold cannot be classified with certainty; 2 eligible event-seasons fall in that band over these 15 seasons. Natural move frequency remains unvalidated; the positive fixtures in tests/test_venue_moves.py remain valid.
 
 ### Entrant allocation check (all arms, all committed seasons)
 
@@ -641,6 +641,92 @@ Facts the sampled stories list as not recorded (`missing`, pass 2; editions of t
 
 - a pre-event win estimate (not recorded: played before estimates were kept, and none is worked out afterwards), so no upset is claimed: 20 of 20 editions
 - results before the world began in 2027 (counts are of the retained history): 5 of 20 editions
+
+## 5. Amateur return and re-block (D5.c), all four arms
+
+Sources (the build's own records, read from the season files): **episodes** are the winter transitions "amateur returned to full-time golf" in season Y's `transitions` (careers.decide: `note(AR.KIND, …)` after a successful draw), effective in season Y+1, with the age recorded at the decision; **evaluations** are every `amateur_return` row of decision evidence /2 (`careers` part): careers.decide records one for every part-time non-college amateur it evaluates, including p = 0 (a blocking condition: work, funds or results; no draw then). Return rates use all evaluations as the denominator, and separately the eligible ones (p > 0); the denominator is never limited to former pathway entrants. For each episode whose season Y+1 is archived: any cash-blocked week in Y+1 (season file `cash_blocked_max` ≥ 1: only a genuinely unaffordable week adds to it), a work-pathway re-entry in Y+1 (`work_pathway`; entries whose in-season count stayed below 8 used a count carried over), a winter "amateur took a job" decision after Y+1, starts in Y+1 (`careers.events`), and the competing outcomes of the winter after Y+1 (turned pro or comeback, retired, became coach or caddie, death in that winter from the people table). Returns in an arm's last season have no archived Y+1: they are **censored**, counted separately, never as successes. Episodes are not independent people: a golfer can return more than once, so unique people are counted separately. Age bands by age at the decision.
+
+**a21old** (a21old: seasons 2027–2036 (10); censored = returns decided in 2036)
+
+| band | evaluations (all, p = 0 included) | eligible (p > 0) | returns (episodes) | returns / all evaluations | returns / eligible | unique people | censored (no archived Y+1) | any cash-blocked week in Y+1 | pathway re-entry in Y+1 (count carried) | winter "took a job" after Y+1 | starts in Y+1 (min/q1/med/q3/max) | turned pro / comeback | retired | became staff | died |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 18–20 | 11 | 4 | 2 | 2/11 (18.18%) | 2/4 (50.0%) | 2 | 0/2 (0.0%) | 0/2 (0.0%) | 0/2 (0.0%) (0) | 0/2 (0.0%) | 17 / 17 / 18 / 18 / 18 (n=2) | 0/2 (0.0%) | 0/2 (0.0%) | 0/2 (0.0%) | 0/2 (0.0%) |
+| 21–24 | 2977 | 809 | 213 | 213/2977 (7.15%) | 213/809 (26.3%) | 213 | 23/213 (10.8%) | 0/190 (0.0%) | 0/190 (0.0%) (0) | 77/190 (40.5%) | 11 / 15 / 17 / 17 / 19 (n=190) | 5/190 (2.6%) | 0/190 (0.0%) | 0/190 (0.0%) | 0/190 (0.0%) |
+| 25–29 | 7247 | 2324 | 128 | 128/7247 (1.77%) | 128/2324 (5.5%) | 125 | 18/128 (14.1%) | 0/110 (0.0%) | 0/110 (0.0%) (0) | 76/110 (69.1%) | 12 / 15 / 16 / 17 / 20 (n=110) | 5/110 (4.5%) | 0/110 (0.0%) | 0/110 (0.0%) | 0/110 (0.0%) |
+| 30+ | 11408 | 1372 | 3 | 3/11408 (0.03%) | 3/1372 (0.2%) | 3 | 1/3 (33.3%) | 0/2 (0.0%) | 0/2 (0.0%) (0) | 2/2 (100.0%) | 17 / 17 / 17 / 17 / 17 (n=2) | 0/2 (0.0%) | 0/2 (0.0%) | 0/2 (0.0%) | 0/2 (0.0%) |
+| all | 21643 | 4509 | 346 | 346/21643 (1.60%) | 346/4509 (7.7%) | 333 | 42/346 (12.1%) | 0/304 (0.0%) | 0/304 (0.0%) (0) | 155/304 (51.0%) | 11 / 15 / 16 / 17 / 20 (n=304) | 10/304 (3.3%) | 0/304 (0.0%) | 0/304 (0.0%) | 0/304 (0.0%) |
+
+**a18old** (a18old: seasons 2027–2036 (10); censored = returns decided in 2036)
+
+| band | evaluations (all, p = 0 included) | eligible (p > 0) | returns (episodes) | returns / all evaluations | returns / eligible | unique people | censored (no archived Y+1) | any cash-blocked week in Y+1 | pathway re-entry in Y+1 (count carried) | winter "took a job" after Y+1 | starts in Y+1 (min/q1/med/q3/max) | turned pro / comeback | retired | became staff | died |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 18–20 | 66 | 1 | 1 | 1/66 (1.52%) | 1/1 (100.0%) | 1 | 0/1 (0.0%) | 0/1 (0.0%) | 0/1 (0.0%) (0) | 0/1 (0.0%) | 17 / 17 / 17 / 17 / 17 (n=1) | 0/1 (0.0%) | 0/1 (0.0%) | 0/1 (0.0%) | 0/1 (0.0%) |
+| 21–24 | 2989 | 802 | 189 | 189/2989 (6.32%) | 189/802 (23.6%) | 189 | 20/189 (10.6%) | 0/169 (0.0%) | 0/169 (0.0%) (0) | 54/169 (32.0%) | 10 / 16 / 17 / 17 / 19 (n=169) | 6/169 (3.6%) | 0/169 (0.0%) | 0/169 (0.0%) | 0/169 (0.0%) |
+| 25–29 | 7216 | 2366 | 136 | 136/7216 (1.88%) | 136/2366 (5.7%) | 136 | 14/136 (10.3%) | 0/122 (0.0%) | 0/122 (0.0%) (0) | 84/122 (68.9%) | 11 / 14 / 16 / 17 / 18 (n=122) | 1/122 (0.8%) | 0/122 (0.0%) | 0/122 (0.0%) | 0/122 (0.0%) |
+| 30+ | 11457 | 1280 | 2 | 2/11457 (0.02%) | 2/1280 (0.2%) | 2 | 0/2 (0.0%) | 0/2 (0.0%) | 0/2 (0.0%) (0) | 2/2 (100.0%) | 16 / 16 / 16 / 17 / 17 (n=2) | 0/2 (0.0%) | 0/2 (0.0%) | 0/2 (0.0%) | 0/2 (0.0%) |
+| all | 21728 | 4449 | 328 | 328/21728 (1.51%) | 328/4449 (7.4%) | 314 | 34/328 (10.4%) | 0/294 (0.0%) | 0/294 (0.0%) (0) | 140/294 (47.6%) | 10 / 15 / 16 / 17 / 19 (n=294) | 7/294 (2.4%) | 0/294 (0.0%) | 0/294 (0.0%) | 0/294 (0.0%) |
+
+**a18new** (a18new: seasons 2027–2036 (10); censored = returns decided in 2036)
+
+| band | evaluations (all, p = 0 included) | eligible (p > 0) | returns (episodes) | returns / all evaluations | returns / eligible | unique people | censored (no archived Y+1) | any cash-blocked week in Y+1 | pathway re-entry in Y+1 (count carried) | winter "took a job" after Y+1 | starts in Y+1 (min/q1/med/q3/max) | turned pro / comeback | retired | became staff | died |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 18–20 | 54 | 4 | 1 | 1/54 (1.85%) | 1/4 (25.0%) | 1 | 0/1 (0.0%) | 0/1 (0.0%) | 0/1 (0.0%) (0) | 0/1 (0.0%) | 16 / 16 / 16 / 16 / 16 (n=1) | 0/1 (0.0%) | 0/1 (0.0%) | 0/1 (0.0%) | 0/1 (0.0%) |
+| 21–24 | 2923 | 739 | 206 | 206/2923 (7.05%) | 206/739 (27.9%) | 206 | 24/206 (11.7%) | 0/182 (0.0%) | 0/182 (0.0%) (0) | 71/182 (39.0%) | 8 / 14 / 16 / 17 / 19 (n=182) | 2/182 (1.1%) | 0/182 (0.0%) | 0/182 (0.0%) | 0/182 (0.0%) |
+| 25–29 | 7206 | 2412 | 154 | 154/7206 (2.14%) | 154/2412 (6.4%) | 152 | 19/154 (12.3%) | 0/135 (0.0%) | 0/135 (0.0%) (0) | 101/135 (74.8%) | 8 / 11 / 15 / 17 / 18 (n=135) | 0/135 (0.0%) | 0/135 (0.0%) | 0/135 (0.0%) | 0/135 (0.0%) |
+| 30+ | 11236 | 1344 | 1 | 1/11236 (0.01%) | 1/1344 (0.1%) | 1 | 0/1 (0.0%) | 0/1 (0.0%) | 0/1 (0.0%) (0) | 1/1 (100.0%) | 15 / 15 / 15 / 15 / 15 (n=1) | 0/1 (0.0%) | 0/1 (0.0%) | 0/1 (0.0%) | 0/1 (0.0%) |
+| all | 21419 | 4499 | 362 | 362/21419 (1.69%) | 362/4499 (8.0%) | 350 | 43/362 (11.9%) | 0/319 (0.0%) | 0/319 (0.0%) (0) | 173/319 (54.2%) | 8 / 13 / 16 / 17 / 19 (n=319) | 2/319 (0.6%) | 0/319 (0.0%) | 0/319 (0.0%) | 0/319 (0.0%) |
+
+**seed2** (seed2: seasons 2027–2031 (5); censored = returns decided in 2031)
+
+| band | evaluations (all, p = 0 included) | eligible (p > 0) | returns (episodes) | returns / all evaluations | returns / eligible | unique people | censored (no archived Y+1) | any cash-blocked week in Y+1 | pathway re-entry in Y+1 (count carried) | winter "took a job" after Y+1 | starts in Y+1 (min/q1/med/q3/max) | turned pro / comeback | retired | became staff | died |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 18–20 | 32 | 0 | 0 | 0/32 (0.00%) | 0/0 | 0 | 0/0 | 0/0 | 0/0 (0) | 0/0 | — | 0/0 | 0/0 | 0/0 | 0/0 |
+| 21–24 | 1098 | 360 | 88 | 88/1098 (8.01%) | 88/360 (24.4%) | 88 | 25/88 (28.4%) | 0/63 (0.0%) | 0/63 (0.0%) (0) | 16/63 (25.4%) | 11 / 14 / 16 / 17 / 18 (n=63) | 1/63 (1.6%) | 0/63 (0.0%) | 0/63 (0.0%) | 0/63 (0.0%) |
+| 25–29 | 2129 | 562 | 42 | 42/2129 (1.97%) | 42/562 (7.5%) | 42 | 13/42 (31.0%) | 0/29 (0.0%) | 0/29 (0.0%) (0) | 21/29 (72.4%) | 11 / 16 / 16 / 17 / 18 (n=29) | 0/29 (0.0%) | 0/29 (0.0%) | 0/29 (0.0%) | 0/29 (0.0%) |
+| 30+ | 4903 | 479 | 0 | 0/4903 (0.00%) | 0/479 (0.0%) | 0 | 0/0 | 0/0 | 0/0 (0) | 0/0 | — | 0/0 | 0/0 | 0/0 | 0/0 |
+| all | 8162 | 1401 | 130 | 130/8162 (1.59%) | 130/1401 (9.3%) | 128 | 38/130 (29.2%) | 0/92 (0.0%) | 0/92 (0.0%) (0) | 37/92 (40.2%) | 11 / 15 / 16 / 17 / 18 (n=92) | 1/92 (1.1%) | 0/92 (0.0%) | 0/92 (0.0%) | 0/92 (0.0%) |
+
+**POOLED over the four arms** — sums of episodes from different worlds (two seeds, three rule settings); unique people are (arm, golfer) pairs; no causal reading.
+
+| band | evaluations (all, p = 0 included) | eligible (p > 0) | returns (episodes) | returns / all evaluations | returns / eligible | unique people | censored (no archived Y+1) | any cash-blocked week in Y+1 | pathway re-entry in Y+1 (count carried) | winter "took a job" after Y+1 | starts in Y+1 (min/q1/med/q3/max) | turned pro / comeback | retired | became staff | died |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 18–20 | 163 | 9 | 4 | 4/163 (2.45%) | 4/9 (44.4%) | 4 | 0/4 (0.0%) | 0/4 (0.0%) | 0/4 (0.0%) (0) | 0/4 (0.0%) | 16 / 17 / 17 / 17 / 18 (n=4) | 0/4 (0.0%) | 0/4 (0.0%) | 0/4 (0.0%) | 0/4 (0.0%) |
+| 21–24 | 9987 | 2710 | 696 | 696/9987 (6.97%) | 696/2710 (25.7%) | 696 | 92/696 (13.2%) | 0/604 (0.0%) | 0/604 (0.0%) (0) | 218/604 (36.1%) | 8 / 15 / 16 / 17 / 19 (n=604) | 14/604 (2.3%) | 0/604 (0.0%) | 0/604 (0.0%) | 0/604 (0.0%) |
+| 25–29 | 23798 | 7664 | 460 | 460/23798 (1.93%) | 460/7664 (6.0%) | 455 | 64/460 (13.9%) | 0/396 (0.0%) | 0/396 (0.0%) (0) | 282/396 (71.2%) | 8 / 14 / 16 / 17 / 20 (n=396) | 6/396 (1.5%) | 0/396 (0.0%) | 0/396 (0.0%) | 0/396 (0.0%) |
+| 30+ | 39004 | 4475 | 6 | 6/39004 (0.02%) | 6/4475 (0.1%) | 6 | 1/6 (16.7%) | 0/5 (0.0%) | 0/5 (0.0%) (0) | 5/5 (100.0%) | 15 / 16 / 17 / 17 / 17 (n=5) | 0/5 (0.0%) | 0/5 (0.0%) | 0/5 (0.0%) | 0/5 (0.0%) |
+| all | 72952 | 14858 | 1166 | 1166/72952 (1.60%) | 1166/14858 (7.8%) | 1125 | 157/1166 (13.5%) | 0/1009 (0.0%) | 0/1009 (0.0%) (0) | 505/1009 (50.0%) | 8 / 15 / 16 / 17 / 20 (n=1009) | 20/1009 (2.0%) | 0/1009 (0.0%) | 0/1009 (0.0%) | 0/1009 (0.0%) |
+
+Consistency of the two sources: a21old: 346 return transitions, 346 evaluations with outcome 1; a18old: 328 return transitions, 328 evaluations with outcome 1; a18new: 362 return transitions, 362 evaluations with outcome 1; seed2: 130 return transitions, 130 evaluations with outcome 1. Death counts a death in the winter of the return or the winter after Y+1 (people table `died`).
+
+## 6. Upset snapshot cost (a18new and seed2)
+
+Bytes of each edition's archived `upset` record (golfsim/upsets.record), in the archive's own JSON encoding (compact separators, archive._write). "gzip alone" compresses a season's upset records (or their `inputs` snapshots) by themselves at the archive's level 6: an approximation of their contribution inside the whole-file compression, not an exact share of the gzip file.
+
+| arm | season | editions with a record | upset JSON | bytes / edition | inputs JSON | inputs bytes / edition | upset share of raw season file | inputs share of raw | upset gzip alone | inputs gzip alone | upset gzip alone / season .gz | season .gz |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| a18new | 2027 | 1438 | 1.81 MB | 1260 | 1.19 MB | 828 | 3.3% | 2.2% | 0.62 MB | 0.47 MB | 4.8% | 13.0 MB |
+| a18new | 2028 | 1436 | 1.83 MB | 1277 | 1.21 MB | 844 | 3.5% | 2.3% | 0.63 MB | 0.48 MB | 5.0% | 12.6 MB |
+| a18new | 2029 | 1436 | 1.84 MB | 1279 | 1.21 MB | 846 | 3.5% | 2.3% | 0.64 MB | 0.49 MB | 5.0% | 12.7 MB |
+| a18new | 2030 | 1440 | 1.87 MB | 1297 | 1.24 MB | 863 | 3.5% | 2.3% | 0.65 MB | 0.50 MB | 5.0% | 12.9 MB |
+| a18new | 2031 | 1441 | 1.90 MB | 1319 | 1.27 MB | 884 | 3.4% | 2.3% | 0.65 MB | 0.50 MB | 5.0% | 13.1 MB |
+| a18new | 2032 | 1441 | 1.93 MB | 1342 | 1.31 MB | 906 | 3.4% | 2.3% | 0.67 MB | 0.51 MB | 5.0% | 13.4 MB |
+| a18new | 2033 | 1440 | 1.97 MB | 1365 | 1.34 MB | 929 | 3.3% | 2.3% | 0.68 MB | 0.53 MB | 4.9% | 13.8 MB |
+| a18new | 2034 | 1441 | 1.98 MB | 1377 | 1.35 MB | 940 | 3.3% | 2.2% | 0.68 MB | 0.53 MB | 4.9% | 13.9 MB |
+| a18new | 2035 | 1440 | 2.01 MB | 1396 | 1.38 MB | 958 | 3.2% | 2.2% | 0.69 MB | 0.54 MB | 4.9% | 14.2 MB |
+| a18new | 2036 | 1441 | 2.03 MB | 1410 | 1.40 MB | 971 | 3.2% | 2.2% | 0.70 MB | 0.55 MB | 4.8% | 14.4 MB |
+| seed2 | 2027 | 1433 | 1.81 MB | 1263 | 1.19 MB | 831 | 3.3% | 2.2% | 0.62 MB | 0.47 MB | 4.8% | 13.0 MB |
+| seed2 | 2028 | 1433 | 1.84 MB | 1282 | 1.22 MB | 849 | 3.5% | 2.3% | 0.64 MB | 0.49 MB | 5.0% | 12.6 MB |
+| seed2 | 2029 | 1439 | 1.86 MB | 1290 | 1.23 MB | 857 | 3.5% | 2.3% | 0.65 MB | 0.50 MB | 5.0% | 12.9 MB |
+| seed2 | 2030 | 1438 | 1.88 MB | 1309 | 1.26 MB | 875 | 3.4% | 2.3% | 0.65 MB | 0.50 MB | 5.0% | 13.1 MB |
+| seed2 | 2031 | 1440 | 1.91 MB | 1329 | 1.29 MB | 894 | 3.4% | 2.3% | 0.66 MB | 0.51 MB | 5.0% | 13.3 MB |
+| all | 15 seasons | 21577 | 28.5 MB | 1320 | 19.1 MB | 885 | 3.4% | 2.3% | 9.8 MB | 7.6 MB | 4.9% | 199 MB |
+
+**CPU: offline recomputation from stored inputs.** It excludes the fact capture at field-set time and any engine-side bookkeeping, so it is not the in-engine overhead (the season engine has no per-phase timing for upset estimates, and none is inferred from season run times). Each estimated record's `inputs` snapshot (ids, Overall, rounds) is passed to `golfsim.upsets.reproduce`; only that call is timed, with process CPU time, under `nice -n 19` while the test suite ran.
+
+| arm | season | estimated records recomputed | reproduced = stored (top 5, favourite, winner) | largest |difference| | CPU per season (s) | CPU per edition, mean (ms) | median (ms) | max (ms) |
+|---|---|---|---|---|---|---|---|---|
+| a18new | 2027 | 1435 | 1435/1435 | 0 | 2.898 | 2.019 | 1.813 | 9.078 |
+| a18new | 2036 | 1438 | 1438/1438 | 0 | 2.804 | 1.95 | 1.832 | 5.615 |
 
 ## What the runs do not record (and the workaround used)
 

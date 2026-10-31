@@ -25,6 +25,10 @@ From the folder that holds `arms/` and `runs/` (the default inputs), in `armsan/
   reads seasons added since the last run.
 - `stories_timing.py` runs in its own process when `--stories` is given. Without that flag, the report uses the existing
   `story_timing.json`.
+- `upset_cost.py` measures the upset records' bytes (a18new, seed2) and the offline recomputation CPU, and writes
+  `upset_cost.json`, which the report reads. Run it separately (about 30 s):
+
+      nice -n 19 ionice -c3 python3 -B upset_cost.py
 
 ## Read-only method
 
@@ -49,8 +53,10 @@ The report keeps two kinds of denominator apart, and never mixes them in one tab
   three, never pooled:
   - **PRETREATMENT:** full-time, non-college amateurs aged 17–20 in the shared 2027 baseline. The two arms' 2027 rows are
     identical.
-  - **ARRIVAL:** juniors created for 2028, defined by their creation record. That is the season file's
-    `diagnostics.created` plus their arrival history line, both verified identical in both arms.
+  - **ARRIVAL:** juniors created for 2028, defined by their creation record: the season file's `diagnostics.created`
+    plus their arrival history line. Verified identical in both arms for the extracted creation fields (path, age,
+    Overall, week), the arrival line and identity (name, birth year, country). Full attributes and ceilings were not
+    compared.
   - **FIXED COHORT selected by the control arm's (a21old) end-2028 status:** the same people in both arms, but chosen
     after the divergence in week 45 of 2028, so not pretreatment.
   - Section 2's cohort is fixed at creation (pretreatment): the 2027 college players and series members. Their tour and
@@ -95,3 +101,16 @@ identical between `a21old` and `a18old`, so the report makes no individual compa
     by tests/test_upset_examples.py and tests/test_stories.py.
   - The timing was measured with `nice -n 19` while two simulations ran on the same machine.
   - Neither instant cold UI opens nor the local 120 s season target are claimed.
+- **Venue-move gaps.** Archived prestige values are rounded to 0.01, so a gap within ±0.01 of the 5-point threshold
+  cannot be classified with certainty. The report counts those event-seasons. Natural move frequency remains
+  unvalidated.
+- **Amateur return (section 5).** Episodes come from the winter transitions; evaluations, p = 0 included, come from
+  decision evidence /2 (`amateur_return` rows).
+  - Returns in an arm's last season are censored, not successes.
+  - Episodes are not independent people; unique people are counted separately.
+  - Pooled tables sum episodes from different worlds and carry no causal reading.
+- **Upset cost (section 6).**
+  - "gzip alone" compresses the upset records by themselves, an approximation of their share inside the whole-file
+    compression.
+  - The CPU figure is an offline recomputation from the stored inputs (`golfsim.upsets.reproduce`). It excludes the
+    fact capture at field-set time and any engine-side bookkeeping, so it is not the in-engine overhead.
