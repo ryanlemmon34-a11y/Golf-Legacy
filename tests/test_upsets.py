@@ -160,6 +160,198 @@ class NoHindsightTests(unittest.TestCase):
         self.assertEqual(est['rounds'], 1)
 
 
+def _edition(eid, week, tier, field, winner, rounds=4, kind='pro', category='regular', tour='PT_AMERICAS',
+             recorded=True, playoff=0, scores=None, facts=None, match_play=False):
+    """An edition record (archive.edition_record form) with, when `recorded`, its pre-event estimate."""
+    totals = {g: 280 + i for i, (g, _) in enumerate(field)}
+    totals[winner] = 270 if not playoff else 279
+    order = sorted(totals, key=lambda g: (totals[g], g != winner))
+    finish = [[(g, 1 if g == winner else 2 + i, None if match_play else totals[g]) for i, g in enumerate(order)]]
+    e = {'id': eid, 'series': eid.split(':')[1], 'week': week, 'name': eid.split(':')[1].title(), 'tour': tour,
+         'tier': tier, 'kind': kind, 'category': category, 'rounds': rounds, 'match_play': match_play,
+         'playoff': playoff, 'finish': finish, 'sites': [['c1', 'L1', 'City']]}
+    if scores:
+        e['scores'] = [scores]
+    if recorded:
+        pre = UP.estimate(field, rounds, match_play)
+        f = facts or {}
+        e['upset'] = UP.record(pre, winner, lambda g: f.get(g, {'status': 'pro', 'age': 30, 'wr': g, 'ar': None}))
+    return e
+
+
+FIELD = [(1, 85.0), (2, 80.0), (3, 75.0), (4, 70.0), (5, 65.0), (6, 60.0)]
+
+
+def season_events():
+    y30 = [_edition('2030:OLD_MAJOR', 10, 0, FIELD, 6, kind='major', category='major', tour='MAJORS', recorded=False),
+           _edition('2030:OLD_EVENT', 12, 2, FIELD, 5, recorded=False)]
+    am = {4: {'status': 'amateur', 'age': 19, 'wr': None, 'ar': 3}}
+    y31 = [_edition('2031:MAJOR_A', 14, 0, FIELD, 5, kind='major', category='major', tour='MAJORS'),
+           _edition('2031:PREMIER_B', 15, 1, FIELD, 4, facts=am, playoff=2),
+           _edition('2031:REGIONAL_C', 16, 3, FIELD, 6, scores={'6': [72, 70, 69, 59], '1': [66, 66, 66, 75],
+                                                                 '2': [70, 70, 70, 70]}),
+           _edition('2031:REGIONAL_D', 16, 3, FIELD, 6),               # the same field and winner: an equal chance
+           _edition('2031:FAVOURITE_E', 17, 2, FIELD, 1),
+           _edition('2031:MATCH_F', 18, 6, FIELD, 2, match_play=True, kind='amateur'),
+           _edition('2031:QUAL_G', 18, 7, FIELD, 6, kind='qualifying', category='qualifier')]
+    return {2030: y30, 2031: y31}
+
+
+class FakeWorld:
+    """What the Upsets page reads of a world: the statistics store, people, names and tours."""
+
+    def __init__(self, db, people, live=None, years=(2030, 2031)):
+        from types import SimpleNamespace
+        self.db = db
+        self.a = SimpleNamespace(years=list(years), people=people)
+        self.live = live
+
+    def statistics(self):
+        return self.db, None
+
+    def person(self, pid):
+        return self.a.people.get(pid)
+
+    def person_link(self, pid):
+        import observer as O
+        return f'<a href="/golfer/{pid}">{O.esc(self.a.people[pid]["name"])}</a>' if pid else '-'
+
+    def series_name(self, sid):
+        return sid.title()
+
+    def tours(self):
+        return {'PT_AMERICAS': {'name': 'Premier Tour Americas'}, 'MAJORS': {'name': 'Majors'}}
+
+
+def _q(**q):
+    return {k: [str(v)] for k, v in q.items()}
+
+
+class PageTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        import tempfile
+        import observer_stats as ST
+        cls.tmp = Path(tempfile.mkdtemp())
+        store = ST.StatsStore(cls.tmp / 's.sqlite')
+        cls.events = season_events()
+        for y, evs in cls.events.items():
+            store.put(y, str(y), {}, {}, {}, {}, upsets=ST.upset_rows(evs, y))
+        cls.store = store
+        people = {g: {'name': f'Golfer {g}', 'country': 'USA' if g % 2 else 'ENG', 'born': 2012 - g,
+                      'golfer': {'status': 'pro'}} for g in range(1, 7)}
+        people[6]['initial'] = True
+        cls.w = FakeWorld(store.db, people)
+
+    @classmethod
+    def tearDownClass(cls):
+        import shutil
+        cls.store.close()
+        shutil.rmtree(cls.tmp, ignore_errors=True)
+
+    def page(self, **q):
+        import observer_upsets as OU
+        return OU.page(self.w, _q(**q))[1]
+
+    def ranked_ids(self, **q):
+        import observer_upsets as OU
+        rows, _ = OU.rows_for(self.w)
+        chosen = OU.select(self.w, rows, _q(**q))
+        return [r['event_id'] for r in sorted((r for r in chosen if r['p'] is not None), key=OU.rank_key)]
+
+    def test_rows_from_the_record(self):
+        import observer_stats as ST
+        rows = {r[2]: r for r in ST.upset_rows(self.events[2031], 2031)}
+        self.assertNotIn('2031:QUAL_G', rows)                          # qualifying stages are not listed
+        c = rows['2031:REGIONAL_C']
+        self.assertEqual(c[16], 13)                                    # 211 after three rounds, the leader 198
+        self.assertEqual(c[14], 10)                                    # margin: kept apart from the estimate
+        self.assertIsNone(rows['2031:MATCH_F'][10])                    # match play: not estimated
+        self.assertEqual(rows['2031:MATCH_F'][9], UP.VERSION)
+        old = ST.upset_rows(self.events[2030], 2030)
+        self.assertTrue(all(r[9] is None and r[10] is None and r[19] is None for r in old))   # not recorded
+
+    def test_ranking_lowest_chance_first_with_stable_ties(self):
+        ids = self.ranked_ids()
+        self.assertEqual(ids[:2], ['2031:REGIONAL_C', '2031:REGIONAL_D'])   # equal chances: by date, then id
+        self.assertEqual(ids[-1], '2031:FAVOURITE_E')
+        self.assertNotIn('2031:MATCH_F', ids)
+        self.assertFalse(any(i.startswith('2030') for i in ids))       # B2: nothing reconstructed
+        self.assertEqual(ids, self.ranked_ids())                        # the same inputs, the same ranking
+
+    def test_drama_never_enters_the_ranking(self):
+        import observer_upsets as OU
+        rows, _ = OU.rows_for(self.w)
+        a = [r['event_id'] for r in sorted((r for r in rows if r['p'] is not None), key=OU.rank_key)]
+        for r in rows:
+            r['margin'], r['playoff'], r['back'] = 99, 5, 20
+        b = [r['event_id'] for r in sorted((r for r in rows if r['p'] is not None), key=OU.rank_key)]
+        self.assertEqual(a, b)
+
+    def test_majors_only_and_filters(self):
+        self.assertEqual(self.ranked_ids(scope='major'), ['2031:MAJOR_A'])
+        self.assertEqual(set(self.ranked_ids(level=3)), {'2031:REGIONAL_C', '2031:REGIONAL_D'})
+        self.assertEqual(self.ranked_ids(**{'from': 2032}), [])
+        self.assertEqual(len(self.ranked_ids(to=2031)), 5)
+        self.assertEqual(self.ranked_ids(nation='ENG'), ['2031:REGIONAL_C', '2031:REGIONAL_D', '2031:PREMIER_B'])
+        self.assertEqual(self.ranked_ids(event='premier'), ['2031:PREMIER_B'])
+        self.assertEqual(self.ranked_ids(series='MAJOR_A'), ['2031:MAJOR_A'])
+        self.assertEqual(self.ranked_ids(field=100), [])
+        html = self.page(scope='major')
+        self.assertIn('aria-pressed="true">Majors only', html)
+
+    def test_status_and_age_at_the_event(self):
+        # golfer 4 is a professional now; they won 2031:PREMIER_B as a 19-year-old amateur
+        self.assertEqual(self.ranked_ids(status='amateur'), ['2031:PREMIER_B'])
+        html = self.page(status='amateur')
+        self.assertIn('19* · amateur', html)
+        self.assertIn('amateur No. 3', html)
+        self.assertIn('amateur winner', html)
+
+    def test_entries_link_to_the_result_and_the_golfer_and_explain(self):
+        import observer as O
+        html = self.page()
+        self.assertIn('href="/event/2031%3AREGIONAL_C"', html)
+        self.assertIn('href="/golfer/6"', html)
+        self.assertIn('/golfer/6?tab=results&year=2031', html)
+        self.assertIn('6th of 6 by Overall', html)
+        self.assertIn('favourite <a href="/golfer/1">', html)
+        self.assertIn('came from 13 back', html)
+        self.assertIn('playoff (2 extra holes)', html)
+        self.assertEqual(O.PAGES['/upsets'].__module__, 'observer_upsets')
+
+    def test_first_win_counts_unrecorded_editions_too(self):
+        import observer_upsets as OU
+        rows, _ = OU.rows_for(self.w)
+        first = OU.first_wins(rows)
+        self.assertTrue(first['2030:OLD_MAJOR'])                       # golfer 6's first win (2030, not recorded)
+        self.assertFalse(first['2031:REGIONAL_C'])
+        self.assertTrue(first['2031:PREMIER_B'])
+
+    def test_b2_unrecorded_seasons_say_so(self):
+        import observer_upsets as OU
+        html = self.page(to=2030)
+        self.assertIn('2 not recorded', html)
+        self.assertIn('No winner with a recorded estimate matches', html)
+        self.assertIn('not calibrated win probabilities', html)
+        old = OU.event_panel(self.w, self.events[2030][0])
+        self.assertIn('not recorded', old)
+        self.assertNotIn('%', old)
+        panel = OU.event_panel(self.w, self.events[2031][0])
+        self.assertIn('Pre-event estimate', panel)
+        self.assertIn(UP.VERSION, panel)
+        self.assertIn('not estimated', OU.event_panel(self.w, self.events[2031][5]))
+        self.assertEqual(OU.event_panel(self.w, self.events[2031][6]), '')   # a qualifying stage: nothing
+
+    def test_live_season_rows(self):
+        from types import SimpleNamespace
+        import observer_upsets as OU
+        live = SimpleNamespace(cursor={'year': 2032, 'week': 3},
+                               editions={'2032:LIVE': _edition('2032:LIVE', 2, 2, FIELD, 3)})
+        rows, _ = OU.rows_for(FakeWorld(self.w.db, self.w.a.people, live=live))
+        self.assertIn('2032:LIVE', {r['event_id'] for r in rows})
+
+
 @unittest.skipUnless(os.environ.get('GOLF_HEAVY_TESTS') == '1', 'whole-season run: set GOLF_HEAVY_TESTS=1')
 class HeavyEquivalenceTests(unittest.TestCase):
     """Same seed, recording on and off: every outcome identical (results, statistics, rankings, money, records)."""

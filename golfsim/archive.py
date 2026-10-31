@@ -22,7 +22,8 @@ Layout of an archive directory (JSON, gzip):
     years/YYYY.json.gz  one season: every edition (series, week, venues, finishers per site, and the
                         coach and caddie each golfer had that week; since rules 2026-10-30 also each
                         golfer's round scores and prize money, each round's conditions, and a major's
-                        hole-by-hole scores), the rules version it was played under, each golfer's season (tour, events,
+                        hole-by-hole scores; since Biggest Upsets an edition's pre-event estimate, `upset`),
+                        the rules version it was played under, each golfer's season (tour, events,
                         wins, money -- net, income and costs as finally settled after winter expenses,
                         with net_at_decision, the figure the career decisions saw -- rankings, injuries,
                         where they lived that season), career decisions

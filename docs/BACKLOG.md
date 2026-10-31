@@ -102,7 +102,7 @@ Status is what was built and tested, not what was proposed. Report: `docs/V17_PA
 | G2 Visible Aggression | Planned | -- |
 | G3 Seasonal weather | Planned | -- |
 | Record Book; nation count links | Record Book built; nation counts linked to their exact population **not yet** | -- |
-| B1/B2 Biggest Upsets | Planned | -- |
+| B1/B2 Biggest Upsets | Built: pre-event estimate recorded per edition (`upset-model-1`, recording only), observer page with a majors-only view and filters; whole-season equivalence and cost measurement pending the CPU release | `golfsim/upsets.py`, `tools/observer_upsets.py` |
 | T1-T3 Tournament stories, linked history | Planned | -- |
 | C1 Calibration | Waiting for the long runs (`docs/LONG_RUN_PLAN.md`, for approval) | -- |
 | C2 Death after retirement | Planned, after the identity foundations | -- |

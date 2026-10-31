@@ -213,6 +213,16 @@ began (`ranking_seed`). The index (schema 4) adds each start's points (`starts.p
 statistics store (schema 2, derived and rebuilt from the season files) sums the counters per golfer, season and
 tour and keeps per-season record rows (longest drives, event driving averages, winning margins, match results).
 
+**Recorded since Biggest Upsets (roadmap B1/B2):** each won, single-site, non-qualifying edition carries its
+pre-event estimate (`upset`, `golfsim/upsets.py`): the model version (`upset-model-1`), field size and rounds, the
+winner's chance, their rank in the field by the model and by Overall, their Overall, and their status, age, world
+and amateur ranking as the field was set; the favourite (chance, Overall, the same facts) and the top 5 chances.
+It is worked out in the simulation from the field before any shot (no random numbers; no outcome reads it); every
+entrant's chance is computed but only the top 5 and the winner's are kept. Match play is marked not estimated.
+Editions played before it have none and are shown as not recorded (never reconstructed). The statistics store
+(schema 6) keeps one `upsets` row per won edition for the observer's Biggest Upsets page, with the margin, playoff
+and strokes behind before the final round kept apart from the estimate.
+
 ### Queries (`archive.Archive`)
 
 | Question | Call |

@@ -48,6 +48,7 @@ import observer_cohort as OC                                          # noqa: E4
 import observer_compare as OCMP                                       # noqa: E402
 import observer_goat as GOAT                                          # noqa: E402
 import observer_qual as OQ                                            # noqa: E402
+import observer_upsets as OU                                          # noqa: E402
 
 PAGE_SIZE = 100
 
@@ -618,7 +619,7 @@ def page(w, title, body, job=None, notices=()):
            '<h4>Explore</h4><a href="/golfers">Golfers</a><a href="/coaches">Coaches</a><a href="/caddies">Caddies</a>'
            '<a href="/courses">Courses</a><a href="/nations">Nations</a><a href="/tours">Tours</a>'
            '<a href="/tournaments">Tournaments</a>' + my_world_link(w) + '<a href="/views">Saved views</a>'
-           '<h4>History</h4><a href="/seasons">Seasons</a><a href="/records">Record Book</a>'
+           '<h4>History</h4><a href="/seasons">Seasons</a><a href="/records">Record Book</a><a href="/upsets">Biggest Upsets</a>'
            '<a href="/grand-slam">Career Grand Slam</a><a href="/moments">Moments</a><a href="/cohort">Where are they now</a>'
            '<a href="/compare">Compare careers</a><a href="/goat">GOAT Lab</a>'
            '<a href="/rules">Rules</a>'
@@ -1730,6 +1731,7 @@ def event(w, q, eid):
         lines = OH.playoff_lines(w, full, k, OH._layout_par(w, full['sites'][k]) if k < len(full.get('sites') or ()) else None)
         if lines:
             out.append((f'<h3>Site {k + 1}</h3>' if multi else '') + lines)
+    out.append(OU.event_panel(w, full))                # Biggest Upsets: the pre-event estimate (or not recorded)
     tag = lambda r: (f' <span class="tag">{esc(OH.playoff_status(full, r["site"], r["person"]))}</span>'
                      if OH.playoff_status(full, r['site'], r['person']) else '')
     out.append(table((['Site'] if multi else []) + ['Pos', 'Golfer', 'Total', 'Prize', 'Coach', 'Caddie', 'How they got in'], [
@@ -2185,7 +2187,9 @@ SCOPED = {'most-wins', 'most-starts', 'not-won-yet', 'retired-without-a-win', 's
 
 
 def records(w, q):
-    first = '<li><a href="/grand-slam">Career Grand Slam</a> — winners of all four majors</li>' + ''.join(f'<li><a href="/records/{k}">{esc(BOARDS[k][0])}</a>'
+    first = ('<li><a href="/grand-slam">Career Grand Slam</a> — winners of all four majors</li>'
+             '<li><a href="/upsets">Biggest Upsets</a> — winners ranked by their pre-event chance '
+             '(<a href="/upsets?scope=major">majors only</a>)</li>') + ''.join(f'<li><a href="/records/{k}">{esc(BOARDS[k][0])}</a>'
                     + (' — <span class="muted">by tour: choose a tour on the list</span>' if k in SCOPED else '') + '</li>'
                     for k in FEATURED)
     rest = ''.join(f'<li><a href="/records/{k}">{esc(t)}</a></li>' for k, (t, _, _) in BOARDS.items() if k not in FEATURED)
@@ -2266,7 +2270,7 @@ PAGES = {'/': overview, '/rankings': rankings, '/search': search, '/golfers': go
          '/rules': OH.rules_page,
          '/grand-slam': OH.grand_slam_page, '/views': V.views_page, '/cohort': OC.cohort_page,
          '/compare': OCMP.compare_page, '/goat': GOAT.goat_page, '/qualification': OQ.qualification_page,
-         '/standings': OQ.standings_page}
+         '/standings': OQ.standings_page, '/upsets': OU.page}
 
 
 def render(w, path, q):
