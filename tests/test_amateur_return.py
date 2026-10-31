@@ -23,13 +23,17 @@ class Golfer(NS):
         return year - self.born
 
 
-def world(cash=20000.0, backing=0.0, born=2004, work_from=(2025, 1), events=16, spent=8000.0):
+def world(cash=20000.0, backing=0.0, born=2004, work_from=(2025, 1), events=16, spent=8000.0, coach_fee=0.0,
+          caddie_fee=None):
     """A working amateur and the facts their winter decision reads (p_amateur_job's runway is patched in Return
     tests to a fixed value; see setUp)."""
     g = Golfer(id=1, born=born, cash=cash, backing=backing, tour='AM_X', personality={'work_ethic': 50, 'big_stage': 50})
     led = FIN.Ledger()
     led.events = spent
-    s = NS(seed=7, amateur_work_from={1: work_from} if work_from else {}, ledgers={2027: {1: led}})
+    coach = NS(id=9) if coach_fee else None
+    caddie = NS(id=8, weekly_fee=caddie_fee) if caddie_fee else None
+    staff = NS(coach=lambda gid: coach, agreed_fee=lambda gid: coach_fee, caddie=lambda gid: caddie)
+    s = NS(seed=7, amateur_work_from={1: work_from} if work_from else {}, ledgers={2027: {1: led}}, staff=staff)
     row = {'events': events, 'am_end': 150, 'am_start': 180, 'wins': 0, 'top3': 1}
     return s, g, row
 
@@ -71,7 +75,37 @@ class Conditions(unittest.TestCase):
         s, g, row = world(cash=5000.0, backing=3000.0)                  # family money counts
         self.assertGreater(AR.chance(s, g, row, 2027, standing(150))[0], 0)
         s, g, row = world(events=1, spent=100.0)                        # too few trips: a regional trip's cost
-        self.assertEqual(AR.season_cost(s, 1, 2027, row), round(16 * AR.FALLBACK_TRIP, 6))
+        self.assertEqual(AR.season_cost(s, g, 2027, row), round(16 * AR.FALLBACK_TRIP, 6))
+
+    def test_committed_staff_costs_count_once(self):
+        """Review regression: a 23-year-old working amateur, two seasons in work, ranked 150 with a top 3, $8,000
+        in cash, no family money or support, 8 trips last season costing $4,000, and a coach on a $12,500 yearly fee
+        needs at least $8,000 + $12,500 = $20,500 for a full-time season: no return (it was 11.75 %)."""
+        s, g, row = world(born=2004, cash=8000.0, work_from=(2026, 1), events=8, spent=4000.0, coach_fee=12500.0)
+        self.assertEqual(AR.season_cost(s, g, 2027, row), 16 * 500 + 12500)
+        p, facts = AR.chance(s, g, row, 2027, standing(150))
+        self.assertEqual(p, 0.0)
+        self.assertIn('savings', facts['blocked'])
+        s, g, row = world(cash=30000.0, caddie_fee=1000.0, coach_fee=5000.0)        # caddie per event, coach once
+        self.assertEqual(AR.season_cost(s, g, 2027, row), 16 * 500 + 16 * 1000 + 5000)
+        s, g, row = world(cash=30000.0)
+        s.staff.coach = lambda gid: NS(id=9)                                     # a share deal: no fee up front
+        self.assertEqual(AR.season_cost(s, g, 2027, row), 16 * 500)
+
+    def test_keep_up_reads_the_complete_budget(self):
+        from unittest import mock
+        s, g, row = world(cash=40000.0, coach_fee=12500.0)
+        seen = {}
+        from golfsim import careers
+        real = careers.p_amateur_job
+
+        def spy(season, gg, rr, year):
+            seen['cash'] = gg.cash
+            return real(season, gg, rr, year)
+        with mock.patch.object(careers, 'p_amateur_job', spy):
+            AR.chance(s, g, row, 2027, standing(150))
+        self.assertEqual(seen['cash'], 40000.0 - (16 * 500 + 12500))             # the season paid in full
+        self.assertEqual(g.cash, 40000.0)                                         # (restored)
 
     def test_results_worth_going_back_for(self):
         s, g, row = world()

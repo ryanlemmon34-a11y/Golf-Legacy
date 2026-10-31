@@ -13,10 +13,13 @@ then a chance:
     in work      at least MIN_SEASONS full seasons worked since they took the job (a job taken mid-season starts
                  counting from the next season); a working amateur already in work when the world's records
                  begin counts as having worked long enough
-    funding      not in debt, and their own savings plus family money cover a full-time amateur season of golf:
-                 FULL_TIME_EVENTS events at their own average trip cost last season (or a regional amateur
-                 trip when they played too few to tell). Amateur support never counts (it is restricted to golf
-                 and lapses each season); salary does not either (they give the job up)
+    funding      not in debt, and their own savings plus family money cover a full-time amateur season of golf
+                 with the staff they are already committed to: FULL_TIME_EVENTS events at their own average trip
+                 cost last season (or a regional amateur trip when they played too few to tell), plus their
+                 caddie's weekly fee for those events if they employ one, plus their coach's agreed yearly fee if
+                 they pay one (a share deal costs nothing up front). Each cost is counted once. Amateur support
+                 never counts (it is restricted to golf, lapses each season and is not promised for the next);
+                 salary does not either (they give the job up)
     results      something to go back for in the season just ended: amateur ranking inside the top 300, a win or
                  a top-3 finish, or a rise of 100 places or more in the amateur ranking
 
@@ -72,12 +75,21 @@ def seasons_in_work(season, gid, year):
     return max(0, year - y0 + (1 if w0 <= 1 else 0))
 
 
-def season_cost(season, gid, year, row):
-    """A full-time amateur season of golf at the golfer's own average trip cost last season."""
-    led = season.ledgers.get(year, {}).get(gid)
+def season_cost(season, g, year, row):
+    """A full-time amateur season of golf: FULL_TIME_EVENTS trips at the golfer's own average travel and entry
+    cost last season (the ledger's events line: travel and fees only), plus the committed staff -- their caddie's
+    weekly fee for each of those events and their coach's agreed yearly fee. Each counted once."""
+    led = season.ledgers.get(year, {}).get(g.id)
     events = row.get('events', 0)
     trip = led.events / events if led is not None and events >= MIN_TRIPS_SEEN else FALLBACK_TRIP
-    return FULL_TIME_EVENTS * max(trip, FALLBACK_TRIP)
+    cost = FULL_TIME_EVENTS * max(trip, FALLBACK_TRIP)
+    st = season.staff
+    k = st.caddie(g.id)
+    if k is not None:
+        cost += FULL_TIME_EVENTS * k.weekly_fee
+    if st.coach(g.id) is not None:
+        cost += st.agreed_fee(g.id)
+    return cost
 
 
 def results_signal(row, standing):
@@ -104,7 +116,7 @@ def chance(season, g, row, year, standing):
     is not met (facts then say which)."""
     age = g.age(year)
     worked = seasons_in_work(season, g.id, year)
-    cost = season_cost(season, g.id, year, row)
+    cost = season_cost(season, g, year, row)
     funds = max(0.0, g.cash) + g.backing
     signal, why = results_signal(row, standing)
     facts = {'age': age, 'seasons_in_work': worked, 'cash': round(g.cash), 'family': round(g.backing),
