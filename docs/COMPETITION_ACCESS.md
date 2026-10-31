@@ -109,7 +109,9 @@ grow without limit.
   schedule (in the USA, the country they study in). Not making a lineup is recorded as such
   (`not selected for the college lineup`), separately from a shortage of golf.
 - **Open amateur events** take up to 1.5× their usual field when more want to play (club, county and
-  regional amateur golf), with lineups rotating by starts so newcomers get in.
+  regional amateur golf), with lineups rotating by starts so newcomers get in. From rules 2026-11-11 (new
+  worlds), college amateurs living in the series' region enter its regular events at the members' class,
+  and members and they rotate by amateur (tier 6) starts rather than every start (`docs/SEASON_SYSTEM.md`).
 
 The course library grows with the calendar (520 courses; the calendar needs 443, the rest give the
 busiest cities a choice of venue).

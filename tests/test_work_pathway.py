@@ -265,11 +265,12 @@ class Age18Tests(unittest.TestCase):
 
     def test_rules_version(self):
         from golfsim import rules as R
-        self.assertEqual(R.RULES_VERSION, '2026-11-10')
         dates = [v for v, _ in R.VERSIONS]
         self.assertEqual(dates, sorted(dates))
         self.assertEqual(len(dates), len(set(dates)))
-        self.assertEqual(dates[-2:], ['2026-11-09', '2026-11-10'])
+        self.assertEqual(dates[dates.index('2026-11-09') + 1], '2026-11-10')   # (later versions may follow)
+        self.assertGreaterEqual(R.RULES_VERSION, '2026-11-10')
+        self.assertEqual(dates[-1], R.RULES_VERSION)
         text = dict(R.VERSIONS)['2026-11-10']
         self.assertIn('minimum age is 18', text)
         self.assertIn('Nothing else in the pathway changes', text)

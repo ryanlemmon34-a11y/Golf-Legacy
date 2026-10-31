@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import re
 
-RULES_VERSION = '2026-11-10'
+RULES_VERSION = '2026-11-11'
 RANKING_RULE = 'world-ranking-1'     # the world ranking's formula (unchanged since the world began; named now)
 VERSIONS = (
     ('2026-10-30', 'Winners\' exemptions count whatever a golfer\'s membership (a non-member champion earns a '
@@ -89,6 +89,16 @@ VERSIONS = (
                    'eight counted weeks takes a job at the next monthly plan and keeps playing as a working amateur; '
                    'nobody is given money and no start is guaranteed. Worlds started earlier keep the minimum age '
                    'of 21.'),
+    ('2026-11-11', 'College amateurs in open amateur golf at home: in an ordinary open amateur event (the regular '
+                   'events of a regional amateur series) a college golfer whose home region -- where they live, their '
+                   'college base while at college -- is the series\' region enters at the same class as the series\' '
+                   'members, and members and these college golfers rotate by their amateur (tier 6) starts this '
+                   'season, not every start, so college events do not push a college golfer back; ranking keeps its '
+                   'head start of a few starts. Unchanged: circuit, national and elite amateur championships and '
+                   'qualifying, college events, professional events, college golfers from outside the region, '
+                   'eligibility, field sizes (up to 1.5 times the usual field) and the calendar; no place is '
+                   'reserved or guaranteed, and members can lose places in full fields. Worlds started earlier keep '
+                   'the previous order.'),
 )
 EARLIER = ('Seasons archived before rules versions were recorded were played under earlier rules. The '
            'differences that matter for reading old results: a winner without a Premier card held no '
@@ -164,8 +174,12 @@ RULES = {
         'Open amateur events',
         'Ordinary amateur events of a circuit are open to the circuit\'s members, amateurs of its countries, '
         'amateurs living in its countries, and college golfers studying there (up to 1.5 times the usual field '
-        'when more want to play).',
-        '2026-10-30'),
+        'when more want to play). Members enter first; college golfers living in the circuit\'s region enter '
+        'with them, at the same class, and the two rotate by amateur (tier 6) starts this season, fewest first, '
+        'with amateur ranking worth a head start of a few starts (college events do not count). Everyone else '
+        'follows by class as before, by starts of every kind. Worlds started before rules 2026-11-11 put college '
+        'golfers after the members and rotated by every start.',
+        '2026-11-11'),
     'amateur-home-circuit': (
         'An amateur\'s home circuit',
         'An amateur\'s home circuit is the one where they live: a graduate who stays where they studied keeps '
