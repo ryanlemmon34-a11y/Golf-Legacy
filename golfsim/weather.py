@@ -22,13 +22,17 @@ How a course's climate is set (all from the course itself, never from who is pla
     municipal parkland holds water: STYLE_SOAK).
 
 Each event draws a weather "system" for its week (its wind level, prevailing direction and how unsettled it
-is) and each round draws its own wind, direction and whether it is wet, all from hashes of the event's seed,
+is) and each round draws its own wind, direction, gustiness and whether it is wet, all from hashes of the event's seed,
 so the same seed always gives the same conditions and a resumed save replays them exactly. Conditions
 never cancel, shorten or delay a round: wet rounds are played, they only change how the ball behaves.
 
 Holes have no surveyed orientation, so every course gets a stable routing: each hole's bearing (the compass
 direction from tee to green) is derived from the course's identity alone (`hole_bearings`), the same for all
 its layouts. Links run out and back (front nine one way, back nine the other); other courses turn freely.
+Gustiness is the shot-to-shot spread of the wind around the round's mean (0.05-0.45): higher on the coast,
+in unsettled weeks and windier months. The engine draws each golfer's gusts from its own stream seeded by the
+recorded conditions (gust_seed), so the shot stream is untouched and an archived round replays its gusts.
+
 Temperature and turf firmness by season are NOT modelled (an open decision for the owner).
 """
 from __future__ import annotations
@@ -122,15 +126,30 @@ def local_month(month, south):
     return (month + 6) % 12 if south else month
 
 
-def seasonal(course, week):
-    """(mean wind in mph, wet-round probability) for this course in this week of the year."""
+def _month(course, week):
+    """(this month's wind factor, wet-round probability) for the course."""
     cl = climate_of(course)
     m = local_month(month_of(week), cl.south)
     wind, wet = CLIMATE[cl.group]
     f = wind[m]
     if cl.coastal:
         f = 1 + COASTAL_SWING * (f - 1)
-    return course.typical_wind * f, wet[m]
+    return f, wet[m]
+
+
+def seasonal(course, week):
+    """(mean wind in mph, wet-round probability) for this course in this week of the year."""
+    f, wet = _month(course, week)
+    return course.typical_wind * f, wet
+
+
+def gustiness(coastal, unsettled, factor):
+    """A round's expected gustiness (the shot-to-shot spread of the wind around its mean): steadier inland,
+    in settled weeks and calm months; gustier on the coast, in unsettled weeks and windy months."""
+    return 0.10 + (0.08 if coastal else 0.0) + 0.06 * (unsettled - 1) + 0.25 * (factor - 1)
+
+
+GUST_RANGE = (0.05, 0.45)
 
 
 def soak(course):
@@ -144,7 +163,8 @@ def draw_conditions(course, week, rounds, pin_difficulty, seed):
     Values are rounded before they are used (wind to 0.1 mph, direction to the degree, pins to 0.01), so
     what is archived is exactly what was played."""
     from .engine import Conditions
-    mean, p_wet = seasonal(course, week)
+    factor, p_wet = _month(course, week)
+    mean = course.typical_wind * factor
     cl = climate_of(course)
     ev = random.Random(_h('weather', seed, 'event'))
     wind = max(0.0, ev.gauss(mean, 0.25 * mean + 1.0))        # the week's weather system
@@ -157,17 +177,27 @@ def draw_conditions(course, week, rounds, pin_difficulty, seed):
         w = round(max(0.0, wind + rr.gauss(0.0, 0.2 * mean + 1.0)), 1)
         rain = rr.random() < min(MAX_WET, p_wet * unsettled)
         frm = int(round(heading + rr.gauss(0.0, 35.0))) % 360
-        out[r] = Conditions(wind_mph=w, rain=rain, pin_difficulty=pins, wind_from=frm)
+        gust = round(max(GUST_RANGE[0], min(GUST_RANGE[1], gustiness(cl.coastal, unsettled, factor)
+                                                 + rr.gauss(0.0, 0.03))), 2)
+        out[r] = Conditions(wind_mph=w, rain=rain, pin_difficulty=pins, wind_from=frm, gust=gust)
     return out
 
 
 def archived(cond):
-    """A round's conditions as archived: [wind mph, wet 0/1, pin difficulty, wind direction (from, degrees)];
-    the classic model (no direction) keeps its three values."""
+    """A round's conditions as archived: [wind mph, wet 0/1, pin difficulty, wind direction (from, degrees),
+    gustiness]; the classic model (no direction) keeps its three values. (Rows with four values were archived
+    before gusts were recorded: readers treat them as gustiness not recorded.)"""
     row = [round(cond.wind_mph, 1), int(cond.rain), round(cond.pin_difficulty, 2)]
     if cond.wind_from is not None:
-        row.append(int(cond.wind_from))
+        row += [int(cond.wind_from), round(cond.gust, 2)]
     return row
+
+
+def gust_seed(course, cond, golfer, round_no):
+    """The seed of one golfer's gusts in one round: from the round's recorded conditions, the course and who is
+    playing (identity only: id and name), so a replay of the archived conditions meets the same gusts."""
+    return _h('gust', course.familiarity_key, cond.wind_mph, cond.wind_from, cond.gust, cond.rain,
+              cond.pin_difficulty, getattr(golfer, 'id', 0), getattr(golfer, 'name', ''), round_no)
 
 
 # ---- routing ------------------------------------------------------------------------------------------------
@@ -225,4 +255,5 @@ def describe(row):
         return 'not recorded'
     wind, wet, pins = row[0], row[1], row[2]
     frm = f' from the {compass(row[3])}' if len(row) > 3 and row[3] is not None else ''
-    return f'wind {wind} mph{frm}, {"wet" if wet else "dry"}, pin difficulty {pins}'
+    gust = f', gusts ±{round(100 * row[4])}%' if len(row) > 4 and row[4] else ''
+    return f'wind {wind} mph{frm}{gust}, {"wet" if wet else "dry"}, pin difficulty {pins}'

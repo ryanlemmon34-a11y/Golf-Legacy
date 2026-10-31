@@ -15,6 +15,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from golfsim import season as SEA                                      # noqa: E402
 from golfsim import weather as WX                                      # noqa: E402
+from golfsim import engine as E                                         # noqa: E402
 from golfsim.course import ashford_ridge, windy_links                  # noqa: E402
 from golfsim.course_gen import generate_site                           # noqa: E402
 from golfsim.engine import Conditions, Player, RoundStats, HoleState, play_hole, play_round  # noqa: E402
@@ -123,8 +124,9 @@ class ClimateTests(unittest.TestCase):
         self.assertEqual(WX.draw_conditions(c, 28, 2, 0.61234, 991), {1: a[1], 2: a[2]})   # per (seed, round)
         for cond in a.values():
             row = WX.archived(cond)
-            self.assertEqual(row, [cond.wind_mph, int(cond.rain), cond.pin_difficulty, cond.wind_from])
-            back = Conditions(wind_mph=row[0], rain=bool(row[1]), pin_difficulty=row[2], wind_from=row[3])
+            self.assertEqual(row, [cond.wind_mph, int(cond.rain), cond.pin_difficulty, cond.wind_from, cond.gust])
+            back = Conditions(wind_mph=row[0], rain=bool(row[1]), pin_difficulty=row[2], wind_from=row[3],
+                              gust=row[4])
             self.assertEqual(back, cond)                                  # archived weather does not drift
 
     def test_bearings_are_stable_and_links_run_out_and_back(self):
@@ -191,6 +193,104 @@ class WindDirectionTests(unittest.TestCase):
         self.assertAlmostEqual(avg, 1.0, delta=0.01)
 
 
+def holes_played(cond, n, holeno=4, g=None, seed=3):
+    """n plays of one hole (each by a different golfer id, so each has its own gusts): RoundStats."""
+    g = g or golfer()
+    st, rng = RoundStats(), random.Random(seed)
+    for i in range(n):
+        pl = Player(replace(g, id=i + 1), MID, cond, None, rng)
+        play_hole(pl, MID.holes[holeno - 1], holeno - 1, rng, st, 0.0, HoleState(), (0.0, 0.0))
+    return st
+
+
+class GustTests(unittest.TestCase):
+    def test_gustiness_follows_coast_and_month_within_bounds(self):
+        coast, inland = site('Southport'), site('Manchester')
+        draws = lambda c, wk: [x.gust for s in range(400) for x in WX.draw_conditions(c, wk, 4, 0.5, s).values()]
+        for wk in (WINTER_N, SUMMER_N):
+            self.assertGreater(S.fmean(draws(coast, wk)), S.fmean(draws(inland, wk)) + 0.04)
+            self.assertTrue(all(WX.GUST_RANGE[0] <= x <= WX.GUST_RANGE[1] for x in draws(coast, wk)))
+        self.assertGreater(S.fmean(draws(inland, WINTER_N)), S.fmean(draws(inland, SUMMER_N)))   # windier month
+
+    def test_gusts_reproduce_from_the_archived_row(self):
+        c = at('Carnoustie', 'Scotland', 'Links', 16.0)
+        played = WX.draw_conditions(c, 30, 4, 0.55, 77)
+        g = replace(golfer(), id=42)
+        for r, cond in played.items():
+            row = WX.archived(cond)
+            replay = Conditions(wind_mph=row[0], rain=bool(row[1]), pin_difficulty=row[2], wind_from=row[3],
+                                gust=row[4])
+            self.assertGreater(replay.gust, 0)
+            a = play_round(g, c, random.Random(r), cond, round_no=r)
+            b = play_round(g, c, random.Random(r), replay, round_no=r)   # a resumed or replayed round
+            self.assertEqual((a.holes, a.drives), (b.holes, b.drives))
+
+    def test_gusts_have_their_own_stream(self):
+        cond = Conditions(wind_mph=20.0, wind_from=90, gust=0.3)
+        rng = random.Random(1)
+        state = rng.getstate()
+        pl = Player(golfer(), MID, cond, None, rng)
+        self.assertGreater(pl.gust, 0)
+        rng2 = random.Random(1)
+        Player(golfer(), MID, Conditions(wind_mph=20.0, wind_from=90), None, rng2)
+        self.assertEqual(rng.getstate(), rng2.getstate())                  # building a gusty player draws nothing extra
+        self.assertNotEqual(state, rng.getstate())
+        seq = lambda gid: [Player(replace(golfer(), id=gid), MID, cond, None, random.Random(0)).gust_draw()
+                           for _ in range(1)]
+        self.assertEqual(seq(5), seq(5))                                   # deterministic per golfer and round
+        self.assertNotEqual(seq(5), seq(6))
+
+    def test_gustier_rounds_vary_more_shot_to_shot(self):
+        exposed = replace(MID, name='Exposed test', holes=tuple(replace(h, wind_exposure=1.0) for h in MID.holes))
+        b = WX.hole_bearings(exposed)[4]
+        g = golfer(ball_flight=40, striking_consistency=99, focus=99)      # few mishits: the wind shows
+
+        def drives(gust):
+            st, rng = RoundStats(), random.Random(3)
+            for i in range(3000):
+                pl = Player(replace(g, id=i + 1), exposed, Conditions(wind_mph=30.0, wind_from=b, gust=gust), None, rng)
+                play_hole(pl, exposed.holes[3], 3, rng, st, 0.0, HoleState(), (0.0, 0.0))
+            return st.drives
+        steady, gusty = drives(0.05), drives(0.45)
+        self.assertGreater(S.pstdev(gusty), 1.25 * S.pstdev(steady))       # (measured: 29.9 vs 20.2 yards)
+        self.assertAlmostEqual(S.fmean(gusty), S.fmean(steady), delta=3.0)  # same mean wind, same mean drive
+        # the shot terms themselves: each shot's distance factor and spread vary around the steady values
+        pl = Player(replace(g, id=1), exposed, Conditions(wind_mph=30.0, wind_from=b, gust=0.45), None, random.Random(1))
+        dfac = E.wind_distance(pl, exposed.holes[3])
+        gs = [pl.gust_draw() for _ in range(4000)]
+        self.assertAlmostEqual(S.fmean(dfac - (1 - dfac) * x for x in gs), dfac, delta=0.003)
+        self.assertGreater(S.pstdev(dfac - (1 - dfac) * x for x in gs), 0.03)
+        self.assertTrue(all(-0.9 <= x <= 0.9 for x in gs))                 # bounded: never a reversed wind
+
+    def test_mean_wind_damage_preserved_at_equal_mean_speed(self):
+        b = WX.hole_bearings(MID)[1]
+        g = golfer()
+        diff = S.fmean(mean_score(g, MID, Conditions(wind_mph=20.0, wind_from=b, gust=0.45), 400, seed)
+                       - mean_score(g, MID, Conditions(wind_mph=20.0, wind_from=b, gust=0.0), 400, seed)
+                       for seed in (5, 6))
+        self.assertLess(abs(diff), 0.15)
+
+    def test_gusts_felt_less_with_control_never_zero(self):
+        cond = Conditions(wind_mph=20.0, wind_from=0, gust=0.4)
+        felt = lambda g, cad=None: Player(g, MID, cond, cad, random.Random(1)).gust
+        from golfsim.golfer import neutral_caddie
+        weak, strong = felt(golfer(ball_flight=40, management=40)), felt(golfer(ball_flight=95, management=95))
+        self.assertLess(strong, weak)
+        self.assertGreater(strong, 0.2)
+        self.assertLess(felt(golfer(), neutral_caddie(95)), felt(golfer(), neutral_caddie(30)))
+
+    def test_no_gusts_in_calm_air_or_the_classic_model(self):
+        for cond in (Conditions(wind_mph=0.0, wind_from=90, gust=0.4), Conditions(wind_mph=20.0, gust=0.4)):
+            self.assertEqual(Player(golfer(), MID, cond, None, random.Random(1)).gust, 0.0)
+        for i in range(4):                                                 # calm: the gust value changes nothing
+            a = play_round(golfer(), MID, random.Random(i), Conditions(wind_mph=0.0, wind_from=90, gust=0.4))
+            b = play_round(golfer(), MID, random.Random(i), Conditions(wind_mph=0.0))
+            self.assertEqual((a.holes, a.drives), (b.holes, b.drives))
+            a = play_round(golfer(), MID, random.Random(i), Conditions(wind_mph=20.0, gust=0.4))   # classic: ignored
+            b = play_round(golfer(), MID, random.Random(i), Conditions(wind_mph=20.0))
+            self.assertEqual((a.holes, a.drives), (b.holes, b.drives))
+
+
 class MitigationTests(unittest.TestCase):
     def test_skill_reduces_wind_loss_without_immunity(self):
         b = WX.hole_bearings(MID)[1]
@@ -253,7 +353,7 @@ class ControlTests(unittest.TestCase):
                     'prestige': 50.0, 'seed': seed, 'week': 2, 'weather': WX.MODEL}
             out = SEA.play_site(task)
             self.assertEqual(len(out['conditions']), 4)
-            self.assertTrue(all(len(c) == 4 for c in out['conditions']))
+            self.assertTrue(all(len(c) == 5 for c in out['conditions']))
             self.assertEqual(len(out['rounds']), 4 * len(golfers))         # every round played by everyone
 
     def test_match_play_weather_every_day_and_no_match_cancelled(self):
@@ -292,6 +392,8 @@ class RecordTests(unittest.TestCase):
     def test_describe(self):
         self.assertEqual(WX.describe([12.5, 1, 0.5]), 'wind 12.5 mph, wet, pin difficulty 0.5')
         self.assertEqual(WX.describe([12.5, 0, 0.5, 225]), 'wind 12.5 mph from the SW, dry, pin difficulty 0.5')
+        self.assertEqual(WX.describe([12.5, 0, 0.5, 225, 0.32]),
+                         'wind 12.5 mph from the SW, gusts ±32%, dry, pin difficulty 0.5')
         self.assertEqual(WX.describe(None), 'not recorded')
 
     def test_rule_recorded(self):

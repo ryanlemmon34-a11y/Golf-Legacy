@@ -306,7 +306,7 @@ class EventResult:
     scores: list = field(default_factory=list)       # per site: {gid: [stroke-play round scores, in order]}
     prizes: list = field(default_factory=list)       # per site: {gid: prize money paid} (paid golfers only)
     conditions: list = field(default_factory=list)   # per site: [[wind mph, rain 0/1, pin difficulty(, wind from
-                                                     # degrees: seasonal weather)] per round; match play (seasonal
+                                                     # degrees, gustiness: seasonal weather)] per round; match play (seasonal
                                                      # weather only): the stroke rounds, then each knockout day]
     holes: list = field(default_factory=list)        # majors, per site: {gid: [[strokes per hole] per round]}
     pars: list = field(default_factory=list)         # majors, per site: each hole's par (for the scorecards)

@@ -40,12 +40,13 @@ reproduces every shot exactly.
 from __future__ import annotations
 
 import math
+import random
 from dataclasses import dataclass, field
 
 from . import ratings as R
 from .baseline import expected as baseline
 from .golfer import neutral_caddie
-from .weather import hole_geometry, soak as style_soak
+from .weather import gust_seed, hole_geometry, soak as style_soak
 
 TOUR_DRIVE = 298.0          # tour-average driver distance, the club-selection reference
 RUNAWAY_GUARD = 60          # a hole this long means a bug: raise, never invent a score
@@ -70,6 +71,7 @@ class Conditions:
     rain: bool = False
     pin_difficulty: float = 0.45     # 0 centre pins .. 1 tucked tournament pins
     wind_from: float = None          # None: classic model (no direction)
+    gust: float = 0.0                # gustiness: shot-to-shot spread of the wind around its mean (0 steady .. 0.45)
 
 
 # per-hole wind terms in the classic model, or in calm air: (dispersion direction factor, headwind distance
@@ -246,8 +248,25 @@ class Player:
                 if cache is None or cache[0] is not course:
                     cache = cond._hw = (course, _hole_wind(course, cond))
                 self.hw = cache[1]
+        # Gusts: each full shot meets the wind at its own strength around the round's mean (bounded, mean 1, so
+        # the round's average wind damage is unchanged; only its shot-to-shot spread grows). A low, controlled
+        # flight, the caddie's yardage and good management feel less of it. Drawn from the golfer's own gust
+        # stream (weather.gust_seed), never from the shot stream; no gusts at all in calm air or the classic model.
+        self.gust = 0.0
+        if self.hw and cond.gust > 0:
+            self.gust = min(0.5, cond.gust * (1 - 0.30 * self.bfc) * (1 - 0.10 * self.c_yard)
+                            * (1 - 0.20 * (self.mgmt - 0.75)))
+            self.gust_rng = random.Random(gust_seed(course, cond, golfer, round_no))
+            # Scoring is convex in spread, so a varying spread costs more than a steady one of the same mean:
+            # the wind's spread is trimmed by the gusts' second moment so the round's mean wind damage at a given
+            # mean speed stays what the steady wind gave (tests: test_weather.GustTests).
+            self.gust_comp = 1 - GUST_CONVEXITY * self.gust * self.gust
         self.reach_fw = self.drive * 0.90       # 3-wood from a fairway
         self.plans = {}
+
+    def gust_draw(self):
+        """This shot's gust: the wind's strength relative to the round's mean, minus 1 (mean 0, within +/-0.9)."""
+        return self.gust * max(-1.8, min(1.8, self.gust_rng.gauss(0.0, 1.0)))
 
     # -- situational multipliers -------------------------------------------
     def pressure_effect(self, pressure):
@@ -338,6 +357,25 @@ class HoleState:
 _SIDE_COST = {'open': 0.30, 'trees': 0.80, 'water': 1.15, 'ob': 1.9}
 
 
+def wind_distance(pl, hole):
+    """The steady wind's distance factor on this hole (seasonal model): < 1 into the wind, > 1 downwind, exactly
+    1.0 with no direction. Every plan and decision uses it (club, reach, effective approach distance); a shot's
+    gust varies the result around it."""
+    if not pl.hw:
+        return 1.0
+    _, loss, back = pl.hw[hole.number][:3]
+    return 1 - loss + back * pl.bfc
+
+
+GUST_CONVEXITY = 0.65            # measured: keeps the mean damage of a gusty round equal to a steady one
+
+
+def _gusted(pl, wind_f, g):
+    """A shot's spread relative to the steady wind's, for gust g: the wind part of the spread scales with the
+    gust's strength (mean g = 0), trimmed by pl.gust_comp so the mean damage is unchanged."""
+    return (1 + (wind_f - 1) * pl.gust_comp * (1 + g)) / wind_f
+
+
 def _tee_plan(pl, hole, rng):
     """Choose a tee club for this hole today: (name, distance factor, spread factor)."""
     key = hole.number
@@ -345,8 +383,8 @@ def _tee_plan(pl, hole, rng):
         return pl.plans[key]
     clubs = (('driver', 1.0, 1.0), ('3-wood', 0.92, 0.87), ('iron', 0.80, 0.72))
     best, best_v = None, 1e9
-    dirf, loss, back = (pl.hw[hole.number] if pl.hw else _NO_DIRECTION)[:3]
-    dfac = 1 - loss + back * pl.bfc
+    dirf = pl.hw[hole.number][0] if pl.hw else 1.0
+    dfac = wind_distance(pl, hole)
     wind_f = 1 + pl.wind * hole.wind_exposure * (0.55 - 0.40 * pl.bfc) * pl.wind_skill * dirf
     for name, df, sf in clubs:
         carry = pl.drive * df * pl.roll * dfac
@@ -433,8 +471,8 @@ def play_hole(pl, hole, hidx, rng, st, pressure=0.0, state=None, pin=None):
     state.press = pl.pressure_effect(pressure)
     fat = (hidx / 17.0) * pl.fatigue_round + pl.fatigue_week
     state.fat = fat
-    dirf, loss, back, tail_firm, ax, ay, dsdf = pl.hw[hole.number] if pl.hw else _NO_DIRECTION
-    dfac = 1 - loss + back * pl.bfc                     # distance factor (1.0 exactly with no direction)
+    dirf, _, _, tail_firm, ax, ay, dsdf = pl.hw[hole.number] if pl.hw else _NO_DIRECTION
+    dfac = wind_distance(pl, hole)                      # steady wind distance factor (decisions use it)
     wind_f = 1 + pl.wind * hole.wind_exposure * (0.55 - 0.40 * pl.bfc) * (1 - 0.10 * pl.c_yard) * pl.wind_skill * dirf
     disp = pl.day_disp * wind_f * (1 + 0.15 * state.press) * (1 + 0.09 * state.tilt) * (1 + 0.08 * fat)
     err_p = (pl.mishit * (1 + 0.9 * state.press) * (1 + 0.6 * state.tilt) * (1 + 0.7 * fat)
@@ -502,8 +540,14 @@ def play_hole(pl, hole, hidx, rng, st, pressure=0.0, state=None, pin=None):
         # ------------------------------------------------------- tee shot
         if lie == 'tee' and par >= 4:
             club, df, sf = _tee_plan(pl, hole, rng)
-            total = pl.drive * df * pl.roll * (1 + rng.gauss(0, dist_sd)) * (1 - 0.012 * fat) * dfac
-            sigma = pl.sigma * sf * disp
+            if pl.gust:                                 # this drive's gust: spread and carry vary around the plan
+                g = pl.gust_draw()
+                total = (pl.drive * df * pl.roll * (1 + rng.gauss(0, 0.035 + (dist_sd - 0.035) * (1 + g)))
+                         * (1 - 0.012 * fat) * (dfac - (1 - dfac) * g))
+                sigma = pl.sigma * sf * disp * _gusted(pl, wind_f, g)
+            else:
+                total = pl.drive * df * pl.roll * (1 + rng.gauss(0, dist_sd)) * (1 - 0.012 * fat) * dfac
+                sigma = pl.sigma * sf * disp
             if mis:
                 total *= 0.65 + 0.23 * rng.random()
                 sigma *= 2.0
@@ -674,6 +718,7 @@ def play_hole(pl, hole, hidx, rng, st, pressure=0.0, state=None, pin=None):
             ev_lay = 1 + baseline('fairway', 95) + 0.25 * (pl.m_wedge - 1)
             ev_go -= 0.15 * pl.aggr
             lay_up = ev_go + rng.gauss(0, pl.noise) > ev_lay
+        g = pl.gust_draw() if pl.gust else 0.0          # this shot's gust (decided before it: the plan is steady)
         if lay_up:
             prev_lie = lie
             if dist - reach <= 70 and par == 4:
@@ -683,6 +728,9 @@ def play_hole(pl, hole, hidx, rng, st, pressure=0.0, state=None, pin=None):
                 target = min(reach, max(dist - 100, dist * 0.55))
             sigma = pl.sigma * 0.55 * disp * (2.0 if mis else 1.0)
             go = target * (1 + rng.gauss(0, 0.05)) * (0.7 if mis else 1.0)
+            if g:
+                sigma *= _gusted(pl, wind_f, g)
+                go *= 1 - (1 - dfac) * g / dfac
             lat = rng.gauss(0, sigma)
             dist = max(15.0, dist - go)
             half = hole.fairway_width / 2
@@ -738,7 +786,11 @@ def play_hole(pl, hole, hidx, rng, st, pressure=0.0, state=None, pin=None):
             # Approach misses are mostly distance (long/short) rather than direction.
             s = mean_ft / 1.2533 / 3
             # head/tail wind adds to the long/short error, crosswind to the left/right error
-            bx = pin_x * aim_k + rng.gauss(0, s * 1.2 * ax)
+            if g:                   # a gust widens or narrows the miss and carries the ball short or long
+                s *= _gusted(pl, wind_f, g)
+                bx = pin_x * aim_k - dist * (1 - dfac) * g + rng.gauss(0, s * 1.2 * ax)
+            else:
+                bx = pin_x * aim_k + rng.gauss(0, s * 1.2 * ax)
             by = pin_y * aim_k + rng.gauss(0, s * 0.78 * ay)
         from_centre = math.hypot(bx, by)
         to_pin = math.hypot(bx - pin_x, by - pin_y)

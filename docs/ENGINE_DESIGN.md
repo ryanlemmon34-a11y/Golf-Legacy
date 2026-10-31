@@ -235,7 +235,7 @@ current measured values.
 - Pressure in the tournament harness is set from the position at the start of each round; the full world
   engine will feed it live from the chronological tee sheet (v0.13's best feature, to be carried over).
 - Weather (rules 2026-11-09, `golfsim/weather.py`): simulated seasonal climate per city and week, wind direction
-  against each hole's derived bearing (head/tail/cross), wet rounds; Course Management, familiarity and caddie
+  against each hole's derived bearing (head/tail/cross), per-shot gusts (mean damage unchanged), wet rounds; Course Management, familiarity and caddie
   skills mitigate alongside Ball-Flight Control. No per-wave weather; temperature and seasonal firmness are not
   modelled (open decision). Worlds started earlier keep the classic speed-only model.
 - Distance may still be ~20–40% more valuable than real-world estimates; revisit once world-level
