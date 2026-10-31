@@ -528,7 +528,8 @@ class Season:
         self.staff_year = {}                                 # year -> staff id -> that season's work
         self.stuck_blocks = Counter()                        # gid -> consecutive months unable to afford a trip
         self.block_flags = defaultdict(_dd_counter)          # year -> gid -> monthly money state
-        WP.init(self)                                        # the work pathway's evidence and records
+        WP.init(self)                                        # the work pathway's evidence, records and
+                                                             # minimum age (new worlds: 18, rules 2026-11-10)
         self.mortality_on = True                             # deaths after retirement (mortality.py, D6)
         self.deaths = {}                                     # person id -> {year, week (53), age, roles}
         self.mortality_done = set()                          # winters (season years) already processed
@@ -2117,6 +2118,7 @@ class Season:
         state.setdefault('am_support_held', {})
         state.setdefault('amateur_support_on', True)
         state.setdefault('work_pathway_on', False)           # saves from before the pathway: never applied
+        state.setdefault('work_pathway_min_age', WP.MIN_AGE_BEFORE)  # saves from before rules 2026-11-10: 21
         state.setdefault('mortality_on', False)              # saves from before deaths: nobody dies (no migration)
         state.setdefault('deaths', {})
         state.setdefault('mortality_done', set())
