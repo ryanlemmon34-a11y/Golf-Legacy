@@ -462,16 +462,17 @@ def season_view(w, q, pid, p):
     # ratings at the start and the end of the season (recorded snapshots only)
     keys = (w.a.world.get('rating_keys') if w.a else None) or ['overall', *ATTRIBUTE_KEYS]
     snaps = OD.rating_snapshots(w, pid)
-    start = dict(zip(keys, snaps[y])) if y in snaps else None
+    start = OD.with_groups(dict(zip(keys, snaps[y]))) if y in snaps else None
     if live:
         cur_r = w.live.people[pid].get('ratings')
-        end = dict(zip(['overall', *ATTRIBUTE_KEYS], cur_r)) if cur_r else None
+        end = OD.with_groups(dict(zip(['overall', *ATTRIBUTE_KEYS], cur_r))) if cur_r else None
         end_label = 'Now'
     else:
-        end = dict(zip(keys, snaps[y + 1])) if (y + 1) in snaps else None
+        end = OD.with_groups(dict(zip(keys, snaps[y + 1]))) if (y + 1) in snaps else None
         end_label = 'End of season'
     if start or end:
-        lab = {'overall': 'Overall', **ATTRIBUTE_LABELS}
+        groups = {g: f'{label} (group mean)' for g, (label, _) in OD.RATING_GROUPS.items()}
+        lab = {'overall': 'Overall', **groups, **ATTRIBUTE_LABELS}
         def cell(d, k):
             return f'{d[k]:.1f}' if d and d.get(k) is not None else 'unavailable'
         def change(k):
@@ -481,9 +482,10 @@ def season_view(w, q, pid, p):
             return f'<span class="{"up" if d > 0 else "down" if d < 0 else "muted"}">{d:+.1f}</span>'
         out.append('<h2>Ratings</h2>' + O.table(['', f'Start of {y}', end_label, 'Change'],
                                                 [[O.esc(lab.get(k, k)), cell(start, k), cell(end, k), change(k)]
-                                                 for k in ['overall', *ATTRIBUTE_KEYS]], numeric=(1, 2, 3))
+                                                 for k in ['overall', *groups, *ATTRIBUTE_KEYS]], numeric=(1, 2, 3))
                    + '<p class="muted">Recorded snapshots only (ratings at the start of a season are recorded when the '
-                     'season before it is archived): “unavailable” where none was recorded. Potential is never shown.</p>')
+                     'season before it is archived): “unavailable” where none was recorded. Potential is never shown. '
+                   + O.esc(OD.GROUP_NOTE) + '</p>')
     else:
         out.append('<h2>Ratings</h2><p class="muted">Not recorded for this season (seasons archived before ratings were '
                    'kept, or the world\'s first season): today\'s ratings are not shown in their place.</p>')

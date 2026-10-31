@@ -36,6 +36,11 @@ def q(xs, p):
     return xs[min(len(xs) - 1, int(p * len(xs)))] if xs else None
 
 
+def rating_at_age(ov, born, age):
+    """The season-end Overall of the season the golfer was exactly `age` ({year: overall}); None if not recorded."""
+    return next((ov[y] for y in sorted(ov) if y - born == age), None)
+
+
 def f(x, d=1):
     return '—' if x is None else f'{x:.{d}f}'
 
@@ -197,15 +202,19 @@ def careers(r):
     rows = []
     for peak, gid in best:
         v, ov = g[gid], by[gid]
-        at19 = next((ov[y] for y in sorted(ov) if y - v['born'] >= 19), None)
+        at19 = rating_at_age(ov, v['born'], 19)
+        y0 = min(ov)
         py = max(ov, key=lambda y: ov[y])
         pot = next((r.dbg[y][gid][1] for y in sorted(ov) if gid in r.dbg.get(y, {})), None)
         wins = sum(r.d['rows'][y][gid]['wins'] for y in ov if gid in r.d['rows'].get(y, {}))
         majors = sum(r.d['rows'][y][gid]['majors'] for y in ov if gid in r.d['rows'].get(y, {}))
-        rows.append([v['name'], v['country'], v['created'], f(at19), f(pot), f(peak), py - v['born'], wins, majors,
+        rows.append([v['name'], v['country'], v['created'], f(at19), f'{f(ov[y0])} at {y0 - v["born"]}', f(pot),
+                     f(peak), py - v['born'], wins, majors,
                      f'retired at {ex[gid][1]}' if gid in ex else 'active'])
-    out += table(['Golfer', 'Nation', 'Arrived', 'Overall at 19', 'Potential', 'Peak', 'Peak age', 'Wins', 'Majors',
-                  'Now'], rows)
+    out += table(['Golfer', 'Nation', 'Arrived', 'Overall at 19', 'First recorded (Overall at age)', 'Potential',
+                  'Peak', 'Peak age', 'Wins', 'Majors', 'Now'], rows)
+    out += ['', '"Overall at 19" is the season-end rating of the season they were exactly 19; "—" when no such '
+            'season was recorded (they arrived older, or it is not played yet).']
     return out + ['']
 
 

@@ -38,7 +38,8 @@ PREFIXES = {'/records/': 'Record', '/golf-records/': 'Golf record'}
 TRANSIENT = ('default',)                     # never part of a view
 LABELS = {'year': 'season', 'tour': 'tour', 'q': 'search', 'sort': 'sorted by', 'page': 'page', 'show': 'showing',
           'min': 'minimum rounds', 'nation': 'nation', 'status': 'status', 'role': 'role', 'kind': 'kind',
-          'rounds': 'rounds', 'field': 'field', 'decade': 'decade'}
+          'rounds': 'rounds', 'field': 'field', 'decade': 'decade', 'active': 'playing now', 'top': 'world top',
+          'champion': 'honors'}
 
 
 def is_list(path):

@@ -281,6 +281,14 @@ DISK_FLOOR = 3e9                 # bytes free below which the run stops
 POPULATION_FLAG = 0.20           # active population moving more than this from its start: flagged, checked
 
 
+def check_support(saved, asked, what):
+    """A resumed run keeps the amateur-support setting its world was created with: a different flag on the
+    command line is refused (never silently relabelled or switched)."""
+    if bool(saved) != bool(asked):
+        raise SystemExit(f'{what} was created with amateur support {"on" if saved else "off"}; resume it with '
+                         f'{"no --no-amateur-support" if saved else "--no-amateur-support"}')
+
+
 class Stop(Exception):
     """A long run's safeguard tripped: the run stops with what it has saved, and says why."""
 
@@ -326,6 +334,7 @@ def run_world_session(seed, years, workers, out, resume=False, scale=1.0, amateu
         with open(state_path, 'rb') as f:
             data, debug, created, initial = pickle.load(f)
         print(f'seed {seed}: resuming after {data["years"]} seasons', flush=True)
+        check_support(data.get('amateur_support', True), amateur_support, f'seed {seed} (its saved run state)')
     else:
         if (d / 'CURRENT').exists():
             raise SystemExit(f'{d} already holds a world; pass --resume or use a new directory')
@@ -341,6 +350,7 @@ def run_world_session(seed, years, workers, out, resume=False, scale=1.0, amateu
         debug = {'format': FORMAT, 'seed': seed, 'rows': {}}
         s.close()
     w = observer.World(d)
+    check_support(getattr(w.session.season, 'amateur_support_on', True), amateur_support, f'seed {seed} (its world)')
     first = data['first']
     if pending_path.exists():                       # a season captured but not yet merged when the run stopped
         with open(pending_path, 'rb') as f:
@@ -1002,6 +1012,8 @@ def main():
             raise SystemExit(f'{out} holds checkpoints from another engine (commit {man.get("commit")}); use a new directory')
         if man and not a.resume and any(int(k) in a.seeds for k in man.get('seeds', {})):
             raise SystemExit(f'{out} already holds these seeds; pass --resume to continue them or use a new directory')
+        if man and 'amateur_support' in man:                 # a resume keeps the folder's recorded setting
+            check_support(man['amateur_support'], not a.no_amateur_support, str(out))
         from golfsim.savegame import engine_id as _eid
         sys.path.insert(0, str(ROOT / 'tools'))
         from benchmark_skip import machine
