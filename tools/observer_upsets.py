@@ -18,6 +18,7 @@ from golfsim import upsets as UP
 import observer_stories as STORY                                    # the edition's story page (story_href)
 
 PATH = '/upsets'
+NO_REASON = 'no reason recorded'
 PAGE = 50
 LEVELS = (('0', 'Major'), ('1', 'Premier'), ('2', 'Challenger'), ('3', 'Regional'), ('4', 'Mini tour'),
           ('5', 'College'), ('6', 'Amateur'), ('8', 'Club professional'))
@@ -200,6 +201,19 @@ def explanation(w, r):
             f'Overall; the model put them {ordinal(d.get("rank"))} of {r["field"]} at {UP.odds_text(r["p"])}; {favtxt}.')
 
 
+def not_estimated_text(rows):
+    """'; N not estimated: <reason> (n), ...' for the chosen editions whose record says not estimated, with the reason
+    recorded with each (never assumed: an edition without one says so), or '' when there is none."""
+    if not rows:
+        return ''
+    why = {}
+    for r in rows:
+        k = (r.get('detail') or {}).get('why') or NO_REASON
+        why[k] = why.get(k, 0) + 1
+    return (f'; {len(rows):,} not estimated: '
+            + ', '.join(f'{k} ({n:,})' for k, n in sorted(why.items(), key=lambda x: (-x[1], x[0]))))
+
+
 def story_link(r):
     """' · story': the link from an upset's row to its edition's tournament story (observer_stories: the Story tab
     of the edition page, which any edition in the history has), or '' for a row without an edition id."""
@@ -251,7 +265,7 @@ def page(w, q):
     cov = (f'{len(ranked):,} winners with a recorded estimate'
            + (f' (seasons {rec_years[0]}–{rec_years[-1]})' if rec_years else '')
            + f'; {len(unrecorded):,} not recorded (played before estimates were kept)'
-           + (f'; {len(not_estimated):,} not estimated (match play)' if not_estimated else '') + '.')
+           + not_estimated_text(not_estimated) + '.')
     chunk, pager = O.paged(ranked, q, PATH, size=PAGE)
     start = (max(1, min(_int(O.one(q, 'page')) or 1, (len(ranked) + PAGE - 1) // PAGE or 1)) - 1) * PAGE
     ranks = competition_ranks(ranked)                     # over the whole list, not only this page
@@ -290,7 +304,7 @@ def event_panel(w, full):
         return ('<p class="muted">Pre-event estimate: not recorded (this edition was played before estimates were '
                 'kept; none is worked out afterwards).</p>')
     if not up.get('estimated'):
-        return f'<p class="muted">Pre-event estimate: not estimated ({O.esc(up.get("why"))}).</p>'
+        return f'<p class="muted">Pre-event estimate: not estimated ({O.esc(up.get("why") or NO_REASON)}).</p>'
     top = ', '.join(f'{w.person_link(g)} {UP.odds_text(p)}' for g, p in up.get('top') or [])
     line = ''
     if up.get('winner') is not None:
