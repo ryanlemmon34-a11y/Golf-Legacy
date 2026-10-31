@@ -20,6 +20,14 @@ How a hole is played
 5. Putting: make chance by distance (Short Putting, Green Reading, green speed
    and slope); misses leave a second putt whose length depends on Lag Putting.
 
+Weather (golfsim.weather draws it from the course's climate and the week): wind
+has a speed and, in the seasonal model, a direction relative to each hole --
+headwinds shorten the ball and lengthen approaches, tailwinds do the opposite
+and make greens harder to hold, crosswinds widen the lateral spread. Wet rounds
+shorten roll, thicken rough, make sand heavier, soften greens and add grip and
+concentration errors. Skills reduce the damage but never remove it (see
+Player: wind_skill, wet terms). Conditions never stop or shorten a round.
+
 Throughout: Ball-Striking Consistency and Focus control mishits and mental
 errors, Putting Consistency the day's putting form, Composure how much
 pressure costs, Resilience how long a bad hole lingers, Stamina/Recovery how
@@ -32,12 +40,14 @@ reproduces every shot exactly.
 from __future__ import annotations
 
 import math
+import random
 from dataclasses import dataclass, field
 
 from . import ratings as R
 from .baseline import expected as baseline
 from .familiarity import SCALE as FAM_SCALE
 from .golfer import neutral_caddie
+from .weather import gust_seed, hole_geometry, soak as style_soak
 
 TOUR_DRIVE = 298.0          # tour-average driver distance, the club-selection reference
 RUNAWAY_GUARD = 60          # a hole this long means a bug: raise, never invent a score
@@ -53,9 +63,22 @@ _MAKE_LOGIT = tuple((d, math.log(p / (1 - p))) for d, p in _MAKE)
 
 @dataclass
 class Conditions:
+    """A round's weather and set-up, shared by everyone playing it.
+
+    wind_from None is the classic model (wind speed only, rain only shortens the roll): what worlds started
+    before seasonal weather, and the balance tools, still use. With a direction (compass degrees the wind
+    blows FROM) the seasonal model applies: head/tail/cross wind per hole and the full wet-round effects."""
     wind_mph: float = 6.0
     rain: bool = False
     pin_difficulty: float = 0.45     # 0 centre pins .. 1 tucked tournament pins
+    wind_from: float = None          # None: classic model (no direction)
+    gust: float = 0.0                # gustiness: shot-to-shot spread of the wind around its mean (0 steady .. 0.45)
+
+
+# per-hole wind terms in the classic model, or in calm air: (dispersion direction factor, headwind distance
+# loss, its share Ball-Flight Control can win back, tailwind firmness, distance-error, lateral-error, distance
+# spread). The distance factor is 1 - loss + back * ball-flight (exactly 1.0 here).
+_NO_DIRECTION = (1.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0)
 
 
 def pin_sheet(course, cond, rng):
@@ -157,8 +180,18 @@ class Player:
         cfam *= R.norm(cad.skills['course_knowledge']) * comm
         self.fam = fam + (1 - fam) * 0.5 * cfam
 
-        firm = sum(h.green_firmness for h in course.holes) / 18 - (0.3 if cond.rain else 0)
-        self.roll = 1 + (firm - 0.5) * 0.06 - (0.03 if cond.rain else 0)
+        seasonal = cond.wind_from is not None
+        # Wetness: the classic model's rain only shortens the roll; the seasonal model's wet round also
+        # thickens the rough, makes sand heavier, softens the greens and adds grip and concentration errors,
+        # scaled by how much this course's style holds water (weather.STYLE_SOAK).
+        wet = (style_soak(course) if seasonal else 1.0) if cond.rain else 0.0
+        firm = sum(h.green_firmness for h in course.holes) / 18 - 0.3 * wet
+        self.roll = 1 + (firm - 0.5) * 0.06 - 0.03 * wet
+        if not seasonal:
+            wet = 0.0                                    # (classic: nothing beyond the roll)
+        self.wet_rough = 0.12 * wet                      # heavier rough on approaches (Recovery Play scales it)
+        self.wet_sev = 0.15 * wet                        # and around the green
+        self.wet_soft = 0.20 * wet                       # receptive greens: approaches hold better
         self.drive = ip(R.DRIVE_DISTANCE, a['power'])
         # Accuracy is angular: the same rating sprays a longer drive further offline.
         self.sigma = ip(R.DRIVE_SIGMA, a['driving_accuracy']) * self.drive / TOUR_DRIVE
@@ -169,7 +202,7 @@ class Player:
         self.m_chip = ip(R.SHORT_MULT, a['chipping'])
         self.m_sand = ip(R.SHORT_MULT, a['bunker'])
         self.chip_fail = ip(R.CHIP_FAIL, a['chipping'])
-        self.sand_fail = ip(R.BUNKER_FAIL, a['bunker'])
+        self.sand_fail = ip(R.BUNKER_FAIL, a['bunker']) * (1 + 0.25 * wet)    # wet, heavy sand
         self.rec_ok = ip(R.RECOVERY_SUCCESS, a['recovery_play'])
         self.rough_skill = ip(R.ROUGH_SKILL, a['recovery_play'])
         self.lapse = ip(R.PUTT_LAPSE, a['putting_consistency'])
@@ -178,8 +211,10 @@ class Player:
         self.read = ip(R.READ_SHIFT, a['green_reading'])
         self.read_n = R.norm(a['green_reading'])
         self.bfc = R.norm(a['ball_flight'])
-        self.mishit = ip(R.MISHIT_RATE, a['striking_consistency'])
-        self.mental = ip(R.MENTAL_ERROR, a['focus'])
+        self.mishit = ip(R.MISHIT_RATE, a['striking_consistency']) * (1 + 0.15 * wet)   # wet grips
+        # discomfort in the rain: Focus (and a caddie's mental support) keep the mind on the shot
+        self.mental = ip(R.MENTAL_ERROR, a['focus']) * (1 + 0.35 * wet * (1 - 0.6 * R.norm(a['focus']))
+                                                        * (1 - 0.15 * self.c_mental))
         self.noise = ip(R.DECISION_NOISE, a['management']) * (1 - 0.2 * self.c_strat) * (1 - 0.2 * self.fam)
         self.composure = R.norm(a['composure'])
         self.mgmt = R.norm(a['management'])
@@ -201,8 +236,38 @@ class Player:
         self.day_disp = math.exp(rng.gauss(0, ip(R.STRIKE_FORM_SD, a['striking_consistency'])) + wf.strike)
         self.day_putt = rng.gauss(0, ip(R.PUTT_FORM_SD, a['putting_consistency'])) + wf.putt
         self.wind = cond.wind_mph / 20.0
+        # Wind: Ball-Flight Control and the caddie's yardage (in play_hole) as always; in the seasonal model
+        # also Course Management (playing the wind: club and target, centred on a tour-average manager) and
+        # familiarity with the course (the golfer's own, helped by the caddie's course knowledge). Bounded
+        # well above zero: nobody is immune.
+        self.wind_skill = 1.0
+        self.hw = None
+        if seasonal:
+            self.wind_skill = (1 - 0.20 * (self.mgmt - 0.75)) * (1 - 0.10 * self.fam)
+            if cond.wind_mph > 0:                          # shared by everyone in the round: built once
+                cache = cond.__dict__.get('_hw')
+                if cache is None or cache[0] is not course:
+                    cache = cond._hw = (course, _hole_wind(course, cond))
+                self.hw = cache[1]
+        # Gusts: each full shot meets the wind at its own strength around the round's mean (bounded, mean 1, so
+        # the round's average wind damage is unchanged; only its shot-to-shot spread grows). A low, controlled
+        # flight, the caddie's yardage and good management feel less of it. Drawn from the golfer's own gust
+        # stream (weather.gust_seed), never from the shot stream; no gusts at all in calm air or the classic model.
+        self.gust = 0.0
+        if self.hw and cond.gust > 0:
+            self.gust = min(0.5, cond.gust * (1 - 0.30 * self.bfc) * (1 - 0.10 * self.c_yard)
+                            * (1 - 0.20 * (self.mgmt - 0.75)))
+            self.gust_rng = random.Random(gust_seed(course, cond, golfer, round_no))
+            # Scoring is convex in spread, so a varying spread costs more than a steady one of the same mean:
+            # the wind's spread is trimmed by the gusts' second moment so the round's mean wind damage at a given
+            # mean speed stays what the steady wind gave (tests: test_weather.GustTests).
+            self.gust_comp = 1 - GUST_CONVEXITY * self.gust * self.gust
         self.reach_fw = self.drive * 0.90       # 3-wood from a fairway
         self.plans = {}
+
+    def gust_draw(self):
+        """This shot's gust: the wind's strength relative to the round's mean, minus 1 (mean 0, within +/-0.9)."""
+        return self.gust * max(-1.8, min(1.8, self.gust_rng.gauss(0.0, 1.0)))
 
     # -- situational multipliers -------------------------------------------
     def pressure_effect(self, pressure):
@@ -248,6 +313,34 @@ class Player:
         return max(0.25, rng.gammavariate(2.0, mean / 2.0))
 
 
+def _hole_wind(course, cond):
+    """Per-hole wind terms for a round (seasonal model), the same for every golfer: {hole number: (dispersion
+    direction factor, headwind distance loss, the part of it Ball-Flight Control wins back per unit of control,
+    tailwind firmness, distance-error factor, lateral-error factor, distance-spread factor)}.
+
+    along +1 = straight into the face, -1 = straight behind; cross = share across the line. The dispersion
+    factor averages ~1.0 over all directions (crosswind 1.0, headwind 0.85, tailwind 0.30), so a round's
+    average wind damage matches the classic speed-only model; direction moves it between holes. Distance:
+    a headwind costs 0.75% per exposed mph (Ball-Flight Control flights it down: up to 35% less), a tailwind
+    adds 0.45%. Exposure is the hole's own (0 sheltered .. 1 open)."""
+    out = {}
+    w = cond.wind_mph
+    geo = hole_geometry(course, cond.wind_from)
+    for h in course.holes:
+        along, cross = geo[h.number]
+        head, tail = max(along, 0.0), max(-along, 0.0)
+        e = w * h.wind_exposure                       # exposed mph
+        ew = e / 20.0
+        out[h.number] = (cross + 0.85 * head + 0.30 * tail,
+                         e * (0.0075 * head - 0.0045 * tail),
+                         e * 0.0075 * 0.35 * head,
+                         0.25 * tail * ew,
+                         1 + 0.25 * ew * (abs(along) - 0.637),
+                         1 + 0.25 * ew * (cross - 0.637),
+                         1.2 * abs(along) + 0.35 * cross)
+    return out
+
+
 class HoleState:
     __slots__ = ('tilt', 'press', 'disp', 'err', 'fat')
 
@@ -265,6 +358,25 @@ class HoleState:
 _SIDE_COST = {'open': 0.30, 'trees': 0.80, 'water': 1.15, 'ob': 1.9}
 
 
+def wind_distance(pl, hole):
+    """The steady wind's distance factor on this hole (seasonal model): < 1 into the wind, > 1 downwind, exactly
+    1.0 with no direction. Every plan and decision uses it (club, reach, effective approach distance); a shot's
+    gust varies the result around it."""
+    if not pl.hw:
+        return 1.0
+    _, loss, back = pl.hw[hole.number][:3]
+    return 1 - loss + back * pl.bfc
+
+
+GUST_CONVEXITY = 0.65            # measured: keeps the mean damage of a gusty round equal to a steady one
+
+
+def _gusted(pl, wind_f, g):
+    """A shot's spread relative to the steady wind's, for gust g: the wind part of the spread scales with the
+    gust's strength (mean g = 0), trimmed by pl.gust_comp so the mean damage is unchanged."""
+    return (1 + (wind_f - 1) * pl.gust_comp * (1 + g)) / wind_f
+
+
 def _tee_plan(pl, hole, rng):
     """Choose a tee club for this hole today: (name, distance factor, spread factor)."""
     key = hole.number
@@ -272,9 +384,11 @@ def _tee_plan(pl, hole, rng):
         return pl.plans[key]
     clubs = (('driver', 1.0, 1.0), ('3-wood', 0.92, 0.87), ('iron', 0.80, 0.72))
     best, best_v = None, 1e9
-    wind_f = 1 + pl.wind * hole.wind_exposure * (0.55 - 0.40 * pl.bfc)
+    dirf = pl.hw[hole.number][0] if pl.hw else 1.0
+    dfac = wind_distance(pl, hole)
+    wind_f = 1 + pl.wind * hole.wind_exposure * (0.55 - 0.40 * pl.bfc) * pl.wind_skill * dirf
     for name, df, sf in clubs:
-        carry = pl.drive * df * pl.roll
+        carry = pl.drive * df * pl.roll * dfac
         sigma = pl.sigma * sf * wind_f
         half = hole.fairway_width / 2
         extra_rough = 0.0
@@ -332,10 +446,10 @@ def _reach(pl, lie, dfac=1.0):
     from rough or a fairway bunker. It follows their physical distance (Power, age, season fatigue), never
     Aggression. `dfac` scales that distance for the conditions of the shot (1.0 = calm; a caller with wind or
     other conditions passes its effective-distance factor, so reach is always the physical reach that day)."""
-    reach = pl.reach_fw * dfac * (0.88 if lie == 'rough' else 0.78 if lie == 'fairway_bunker' else 1.0)
+    reach = pl.reach_fw * (0.88 if lie == 'rough' else 0.78 if lie == 'fairway_bunker' else 1.0)
     if lie == 'fairway_bunker':
-        reach = min(reach, 210 * pl.drive * dfac / TOUR_DRIVE)
-    return reach
+        reach = min(reach, 210 * pl.drive / TOUR_DRIVE)
+    return reach * dfac                 # (in this order: the same arithmetic as the weather model's steady wind)
 
 
 def _go_or_lay_up(pl, hole, par, strokes, lie, dist, de, rng, dfac=1.0):
@@ -387,11 +501,13 @@ def play_hole(pl, hole, hidx, rng, st, pressure=0.0, state=None, pin=None):
     state.press = pl.pressure_effect(pressure)
     fat = (hidx / 17.0) * pl.fatigue_round + pl.fatigue_week
     state.fat = fat
-    wind_f = 1 + pl.wind * hole.wind_exposure * (0.55 - 0.40 * pl.bfc) * (1 - 0.10 * pl.c_yard)
+    dirf, _, _, tail_firm, ax, ay, dsdf = pl.hw[hole.number] if pl.hw else _NO_DIRECTION
+    dfac = wind_distance(pl, hole)                      # steady wind distance factor (decisions use it)
+    wind_f = 1 + pl.wind * hole.wind_exposure * (0.55 - 0.40 * pl.bfc) * (1 - 0.10 * pl.c_yard) * pl.wind_skill * dirf
     disp = pl.day_disp * wind_f * (1 + 0.15 * state.press) * (1 + 0.09 * state.tilt) * (1 + 0.08 * fat)
     err_p = (pl.mishit * (1 + 0.9 * state.press) * (1 + 0.6 * state.tilt) * (1 + 0.7 * fat)
              + pl.mental * (1 + 1.5 * fat) * (1 + 0.6 * state.press))
-    dist_sd = 0.035 + 0.025 * pl.wind * hole.wind_exposure
+    dist_sd = 0.035 + 0.025 * pl.wind * hole.wind_exposure * dsdf
 
     G = hole.green_radius
     if pin is None:
@@ -454,8 +570,14 @@ def play_hole(pl, hole, hidx, rng, st, pressure=0.0, state=None, pin=None):
         # ------------------------------------------------------- tee shot
         if lie == 'tee' and par >= 4:
             club, df, sf = _tee_plan(pl, hole, rng)
-            total = pl.drive * df * pl.roll * (1 + rng.gauss(0, dist_sd)) * (1 - 0.012 * fat)
-            sigma = pl.sigma * sf * disp
+            if pl.gust:                                 # this drive's gust: spread and carry vary around the plan
+                g = pl.gust_draw()
+                total = (pl.drive * df * pl.roll * (1 + rng.gauss(0, 0.035 + (dist_sd - 0.035) * (1 + g)))
+                         * (1 - 0.012 * fat) * (dfac - (1 - dfac) * g))
+                sigma = pl.sigma * sf * disp * _gusted(pl, wind_f, g)
+            else:
+                total = pl.drive * df * pl.roll * (1 + rng.gauss(0, dist_sd)) * (1 - 0.012 * fat) * dfac
+                sigma = pl.sigma * sf * disp
             if mis:
                 total *= 0.65 + 0.23 * rng.random()
                 sigma *= 2.0
@@ -579,7 +701,7 @@ def play_hole(pl, hole, hidx, rng, st, pressure=0.0, state=None, pin=None):
                 mean *= 1 + _harder(0.04 * (hole.green_speed - 11.5), amp)
                 mean *= (1.35 if short_sided else 1.0) * math.sqrt(pl.day_disp)
             else:
-                sev = hole.rough_severity if lie in ('around', 'rough') else 0.0
+                sev = min(1.0, hole.rough_severity + pl.wet_sev) if lie in ('around', 'rough') else 0.0
                 lie_m = 0.55 if lie == 'fringe' else (1.0 if lie == 'fairway' else 1.0 + 0.55 * sev * pl.rough_skill)
                 fail = pl.chip_fail * (1 + 0.8 * sev) * (1.4 if short_sided else 1) * (1 + 0.9 * state.press) * (1 + 0.3 * state.tilt)
                 if lie == 'fringe':
@@ -612,7 +734,10 @@ def play_hole(pl, hole, hidx, rng, st, pressure=0.0, state=None, pin=None):
             lie = 'trees'
             before = baseline('trees', dist)
         de = dist * (TOUR_DRIVE / pl.drive) ** 0.5
-        lay_up, reach = _go_or_lay_up(pl, hole, par, strokes, lie, dist, de, rng)
+        de /= dfac                          # into the wind the green is further away (effective distance)
+        # the go-for-it decision reads the reach and effective distance in this hole's wind (dfac), not still air
+        lay_up, reach = _go_or_lay_up(pl, hole, par, strokes, lie, dist, de, rng, dfac)
+        g = pl.gust_draw() if pl.gust else 0.0          # this shot's gust (decided before it: the plan is steady)
         if lay_up:
             prev_lie = lie
             if dist - reach <= 70 and par == 4:
@@ -622,6 +747,9 @@ def play_hole(pl, hole, hidx, rng, st, pressure=0.0, state=None, pin=None):
                 target = min(reach, max(dist - 100, dist * 0.55))
             sigma = pl.sigma * 0.55 * disp * (2.0 if mis else 1.0)
             go = target * (1 + rng.gauss(0, 0.05)) * (0.7 if mis else 1.0)
+            if g:
+                sigma *= _gusted(pl, wind_f, g)
+                go *= 1 - (1 - dfac) * g / dfac
             lat = rng.gauss(0, sigma)
             dist = max(15.0, dist - go)
             half = hole.fairway_width / 2
@@ -647,13 +775,15 @@ def play_hole(pl, hole, hidx, rng, st, pressure=0.0, state=None, pin=None):
         elif lie == 'fairway':
             lie_m = 1.0
         elif lie == 'rough':
-            lie_m = 1 + (0.25 + 0.35 * hole.rough_severity) * pl.rough_skill
+            lie_m = 1 + (0.25 + 0.35 * hole.rough_severity + pl.wet_rough) * pl.rough_skill
         elif lie == 'fairway_bunker':
             lie_m = 1.25 + 0.5 * pl.m_sand
         else:  # recovery shot from the trees
             lie_m = 1 + 1.0 * pl.rough_skill
         # High, soft ball flight (Ball-Flight Control) holds firm greens better.
-        firm_m = 1 + _harder((hole.green_firmness - 0.5) * 0.35 * (de / 150) * (0.4 if lie == 'tee' else 1.0),
+        # A tailwind takes the spin off (harder to hold); a wet green is receptive.
+        firm_m = 1 + _harder((hole.green_firmness - 0.5 + tail_firm - pl.wet_soft) * 0.35 * (de / 150)
+                             * (0.4 if lie == 'tee' else 1.0),
                              (1.4 - 0.8 * pl.bfc) * m ** 1.5)
         mean_ft = (base_ft * m * lie_m * disp * firm_m * (1 - 0.02 * pl.fam)
                    * (1 - 0.015 * pl.c_yard))
@@ -674,8 +804,13 @@ def play_hole(pl, hole, hidx, rng, st, pressure=0.0, state=None, pin=None):
         else:
             # Approach misses are mostly distance (long/short) rather than direction.
             s = mean_ft / 1.2533 / 3
-            bx = pin_x * aim_k + rng.gauss(0, s * 1.2)
-            by = pin_y * aim_k + rng.gauss(0, s * 0.78)
+            # head/tail wind adds to the long/short error, crosswind to the left/right error
+            if g:                   # a gust widens or narrows the miss and carries the ball short or long
+                s *= _gusted(pl, wind_f, g)
+                bx = pin_x * aim_k - dist * (1 - dfac) * g + rng.gauss(0, s * 1.2 * ax)
+            else:
+                bx = pin_x * aim_k + rng.gauss(0, s * 1.2 * ax)
+            by = pin_y * aim_k + rng.gauss(0, s * 0.78 * ay)
         from_centre = math.hypot(bx, by)
         to_pin = math.hypot(bx - pin_x, by - pin_y)
         # Greens are irregular and shed balls near their edges, so they hold less than their area.

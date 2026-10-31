@@ -524,8 +524,9 @@ class WorldGaps(unittest.TestCase):
 
     # ---- 4. Round conditions on the edition's pages ----------------------------------------------------------
     def expect(self, conds, upto=None):
-        return [f'R{i} wind {wind} mph, {"rain" if rain else "dry"}, pin difficulty {pins}'
-                for i, (wind, rain, pins) in enumerate(conds[:upto] if upto else conds, 1)]
+        # (seasonal weather, rules 2026-11-09, also records the wind's direction and gusts: OH.round_wind)
+        return [f'R{i} wind {row[0]} mph{OH.round_wind(row)}, {"rain" if row[1] else "dry"}, pin difficulty {row[2]}'
+                for i, row in enumerate(conds[:upto] if upto else conds, 1)]
 
     def check_edition(self, eid, conds):
         final = self.page(f'/event/{quote(eid)}')

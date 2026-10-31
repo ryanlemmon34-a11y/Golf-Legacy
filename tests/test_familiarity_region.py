@@ -468,7 +468,8 @@ class LocalHostingTests(unittest.TestCase):
 class RuleTextTests(unittest.TestCase):
     def test_rule_and_version(self):
         from golfsim import rules
-        self.assertEqual(rules.RULES_VERSION, '2026-11-08')
+        self.assertIn('2026-11-08', [v for v, _ in rules.VERSIONS])   # (later versions may follow it)
+        self.assertGreaterEqual(rules.RULES_VERSION, '2026-11-08')
         self.assertEqual(rules.VERSIONS[-1][0], rules.RULES_VERSION)
         title, text, since = rules.RULES['course-familiarity']
         self.assertEqual(since, '2026-11-08')

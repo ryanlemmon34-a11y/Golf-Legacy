@@ -66,12 +66,16 @@ def play_event(field, course, rng, cut_top=65, prestige=1.0, cond_by_round=None,
     tied = [g for g in board if totals[id(g)] == best]
     playoff_holes = 0
     playoff_pins = pin_sheet(course, Conditions(), rng)
+    # a playoff is played straight after the final round, in its weather (seasonal model; the classic model
+    # played it in default conditions, kept for worlds that use it)
+    last = (cond_by_round or {}).get(rounds_n)
+    playoff_cond = last if last is not None and last.wind_from is not None else Conditions()
     while len(tied) > 1:
         idx = 17 if playoff_holes % 2 == 0 else 16
         hole = course.holes[idx]
         scores = {}
         for g in tied:
-            pl = Player(g, course, Conditions(), caddies.get(id(g)), rng, rounds_n, forms[id(g)])
+            pl = Player(g, course, playoff_cond, caddies.get(id(g)), rng, rounds_n, forms[id(g)])
             scores[id(g)] = play_hole(pl, hole, idx, rng, RoundStats(), 1.0 * prestige, HoleState(), playoff_pins[idx])
             if on_hole:
                 on_hole(g, idx, scores[id(g)], f'playoff hole {playoff_holes + 1}')
@@ -84,21 +88,23 @@ def play_event(field, course, rng, cut_top=65, prestige=1.0, cond_by_round=None,
     return [(g, totals[id(g)], rounds[id(g)]) for g in board], playoff_holes
 
 
-def play_match(a, b, course, rng, holes=18, pressure=0.5, caddies=None, on_hole=None, stage='match'):
+def play_match(a, b, course, rng, holes=18, pressure=0.5, caddies=None, on_hole=None, stage='match', cond=None):
     """Hole-by-hole match play, every shot simulated. Returns (winner, loser, result text).
 
     Matches stop when decided, so they never count as 18-hole rounds; on_hole(golfer, hole_index,
     strokes, stage) receives every hole actually played (aces, albatrosses, hole records).
+    cond: the day's conditions (default: the classic default conditions).
     """
     caddies = caddies or {}
-    pls = {id(g): Player(g, course, Conditions(), caddies.get(id(g)), rng, 1, WeekForm.draw(rng, g)) for g in (a, b)}
+    cond = cond or Conditions()
+    pls = {id(g): Player(g, course, cond, caddies.get(id(g)), rng, 1, WeekForm.draw(rng, g)) for g in (a, b)}
     states = {id(g): HoleState() for g in (a, b)}
     up, played = 0, 0          # up > 0 means `a` leads
     pins = None
     while True:
         idx = played % 18
         if idx == 0:
-            pins = pin_sheet(course, Conditions(), rng)   # both players play the same hole locations
+            pins = pin_sheet(course, cond, rng)   # both players play the same hole locations
         hole = course.holes[idx]
         remaining = holes - played
         late = pressure * (1.4 if remaining <= 4 else 1.0)
@@ -119,8 +125,17 @@ def play_match(a, b, course, rng, holes=18, pressure=0.5, caddies=None, on_hole=
     return (a, b, text) if up > 0 else (b, a, text)
 
 
+def knockout_days(n, bracket=64):
+    """How many knockout rounds (days) a bracket of `n` qualifiers plays."""
+    size, days = 1, 0
+    while size < min(n, bracket):
+        size *= 2
+        days += 1
+    return days
+
+
 def play_stroke_and_match(field, course, rng, stroke_holes=36, bracket=64, final_holes=36, on_round=None,
-                          on_hole=None, caddies=None, on_match=None):
+                          on_hole=None, caddies=None, on_match=None, cond_by_round=None):
     """Amateur-championship format: stroke-play qualifying, then a seeded knockout.
 
     Returns finishers [(golfer, position)]: 1 champion, 2 runner-up, 3 semi-finalists, 5 quarter-
@@ -128,14 +143,19 @@ def play_stroke_and_match(field, course, rng, stroke_holes=36, bracket=64, final
     If fewer players qualify than the bracket holds, the top seeds get byes into the next round.
     on_round receives the stroke-play rounds; on_hole every match-play hole; on_match(stage, winner, loser,
     result text, holes scheduled) every match played (byes are not matches).
+    cond_by_round: {n: Conditions} for the stroke-play rounds (1, 2...) and then each knockout day (the first
+    knockout day is stroke round count + 1); missing days play the classic default conditions.
     """
     caddies = caddies or {}
+    cond_by_round = cond_by_round or {}
     totals = {id(g): 0 for g in field}
     forms = {id(g): WeekForm.draw(rng, g) for g in field}
-    for rd in range(1, stroke_holes // 18 + 1):
-        pins = pin_sheet(course, Conditions(), rng)       # shared by the whole stroke-play field
+    stroke_rounds = stroke_holes // 18
+    for rd in range(1, stroke_rounds + 1):
+        cond = cond_by_round.get(rd) or Conditions()
+        pins = pin_sheet(course, cond, rng)       # shared by the whole stroke-play field
         for g in field:
-            st = play_round(g, course, rng, Conditions(), caddies.get(id(g)), rd, forms[id(g)], None, pins)
+            st = play_round(g, course, rng, cond, caddies.get(id(g)), rd, forms[id(g)], None, pins)
             if on_round:
                 on_round(g, rd, st)
             totals[id(g)] += st.score
@@ -156,7 +176,9 @@ def play_stroke_and_match(field, course, rng, stroke_holes=36, bracket=64, final
         return slots
     alive = [seeds[s - 1] if s <= len(seeds) else None for s in bracket_order(size)]
     places = []
+    day = 0
     while len(alive) > 1:
+        day += 1
         winners, losers = [], []
         final = len(alive) == 2
         stage = {2: 'final', 4: 'semi-final', 8: 'quarter-final'}.get(len(alive), f'round of {len(alive)}')
@@ -166,7 +188,8 @@ def play_stroke_and_match(field, course, rng, stroke_holes=36, bracket=64, final
                 winners.append(a if b is None else b)
                 continue
             scheduled = final_holes if final else 18
-            w, l, text = play_match(a, b, course, rng, scheduled, caddies=caddies, on_hole=on_hole, stage=stage)
+            w, l, text = play_match(a, b, course, rng, scheduled, caddies=caddies, on_hole=on_hole, stage=stage,
+                                    cond=cond_by_round.get(stroke_rounds + day))
             if on_match:
                 on_match(stage, w, l, text, scheduled)
             winners.append(w)

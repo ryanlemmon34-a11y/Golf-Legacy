@@ -13,6 +13,7 @@ from collections import Counter, defaultdict
 from urllib.parse import quote, urlencode
 
 from golfsim import rules as R
+from golfsim import weather as WX
 
 MAJOR_SERIES = ('TOUR_MASTERS', 'PREMIER_TOUR_CHAMPIONSHIP', 'USA_OPEN', 'BRITANNIA_OPEN')
 LEVELS = {0: 'Majors', 1: 'Premier Tour', 2: 'Challenger tour', 3: 'Regional tour', 4: 'Mini tour', 5: 'College golf',
@@ -1018,23 +1019,39 @@ def playoff_status(full, site, gid):
 
 def round_conditions(full, site):
     """[(wind mph, rain?, pin difficulty)] of each round at a site as recorded, or None when not recorded (an edition
-    played before rules 2026-10-30, a match-play site, or no full record)."""
+    played before rules 2026-10-30, or no full record). Seasonal-weather rows (rules 2026-11-09) also carry the wind's
+    direction and gustiness (see weather.archived; round_wind)."""
     conds = (full or {}).get('conditions')
     c = conds[site] if conds and site < len(conds) else None
-    return [(wind, bool(rain), pins) for wind, rain, pins in c] if c else None
+    return [(row[0], bool(row[1]), row[2]) for row in c] if c else None
+
+
+def round_wind(row):
+    """' from the W, gusts ±20%': a recorded round's wind direction and gustiness (seasonal weather), or ''."""
+    frm = f' from the {WX.compass(row[3])}' if len(row) > 3 and row[3] is not None else ''
+    return frm + (f', gusts ±{round(100 * row[4])}%' if len(row) > 4 and row[4] else '')
 
 
 def conditions_line(full, site, through=None, label='Round conditions'):
-    """HTML: each round's recorded wind, rain and pin difficulty at a site (rounds 1..`through` when given), or
-    "not recorded". Never estimated: a missing round is not filled in from another."""
-    c = round_conditions(full, site)
-    if c is None:
+    """HTML: each round's recorded wind (with its direction and gusts where seasonal weather recorded them), rain
+    and pin difficulty at a site (rounds 1..`through` when given), or "not recorded". A match-play site's knockout
+    days follow its stroke-play rounds. Never estimated: a missing round is not filled in from another."""
+    c = site_conditions(full or {}, site)
+    if not c:
         return (f'<p class="muted">{label}: not recorded (wind, rain and pin positions are kept from rules 2026-10-30, '
                 'for stroke-play rounds).</p>')
-    rounds = c[:through] if through else c
+    rows = c[:through] if through else c
+    stroke = len(c)
+    if full.get('match_play'):                         # stroke-play rounds first, then each knockout day
+        sc = full.get('scores') or []
+        by = sc[site] if site < len(sc) and sc[site] else {}
+        stroke = max((len(v) for v in by.values()), default=2)
+    name = lambda i: f'R{i}' if i <= stroke else f'Knockout day {i - stroke}:'
     return (f'<p class="muted">{label}: ' + ' · '.join(
-        f'R{i} wind {wind} mph, {"rain" if rain else "dry"}, pin difficulty {pins}' for i, (wind, rain, pins)
-        in enumerate(rounds, 1)) + ' (pin difficulty: 0 centre pins to 1 tucked tournament pins).</p>')
+        f'{name(i)} wind {row[0]} mph{_o().esc(round_wind(row))}, {"rain" if row[1] else "dry"}, pin difficulty '
+        f'{row[2]}' for i, row in enumerate(rows, 1))
+        + ' (pin difficulty: 0 centre pins to 1 tucked tournament pins). Weather never cancels, shortens or delays a '
+          'round.</p>')
 
 
 def rounds_view(w, q, e):
@@ -1111,24 +1128,51 @@ def rounds_view(w, q, e):
     return ''.join(out)
 
 
+def site_conditions(full, site):
+    """A site's recorded conditions, one row per round (see weather.archived), or None when not recorded."""
+    conds = full.get('conditions') or []
+    return conds[site] if site < len(conds) and conds[site] else None
+
+
+def conditions_lines(full, site, through=None):
+    """HTML: each round's recorded conditions (through round `through` only, in a replay), or ''."""
+    O = _o()
+    cond = site_conditions(full, site)
+    if not cond:
+        return ''
+    rows = cond[:through] if through else cond
+    stroke = len(rows)
+    if full.get('match_play'):                         # stroke-play rounds first, then each knockout day
+        sc = (full.get('scores') or [])
+        by = sc[site] if site < len(sc) and sc[site] else {}
+        stroke = max((len(v) for v in by.values()), default=2)
+    label = lambda i: f'R{i}' if i <= stroke else f'knockout day {i - stroke}'
+    return ('<p class="muted">Conditions: ' + ' · '.join(f'{label(i)}: {O.esc(WX.describe(c))}'
+                                                          for i, c in enumerate(rows, 1))
+            + '. Weather never cancels, shortens or delays a round.</p>')
+
+
 def scorecard(w, full, gid, base, through=None, n=None):
-    """A major's hole-by-hole card, through round `through` of the replay (no later round is shown)."""
+    """A major's hole-by-hole card, through round `through` of the replay (no later round is shown), with each
+    round's recorded conditions."""
     O = _o()
     site = next((i for i, s in enumerate(full.get('holes') or []) if str(gid) in s), None)
     if site is None:
         return '<p class="muted">No scorecard recorded for this golfer here.</p>'
     holes = full['holes'][site][str(gid)][:through]
     pars = (full.get('pars') or [None])[site] if full.get('pars') else None
-    head = ['Round'] + [str(i) for i in range(1, 19)] + ['Total']
+    cond = site_conditions(full, site)
+    head = ['Round'] + [str(i) for i in range(1, 19)] + ['Total'] + (['Conditions'] if cond else [])
     rows = []
     if pars:
-        rows.append(['Par'] + [str(p) for p in pars] + [str(sum(pars))])
+        rows.append(['Par'] + [str(p) for p in pars] + [str(sum(pars))] + ([''] if cond else []))
     for r, hs in enumerate(holes, 1):
         cells = []
         for i, s in enumerate(hs):
             cls = '' if not pars else ('up' if s < pars[i] else 'down' if s > pars[i] else '')
             cells.append(f'<span class="{cls}">{s}</span>' if cls else str(s))
-        rows.append([f'R{r}'] + cells + [str(sum(hs))])
+        rows.append([f'R{r}'] + cells + [str(sum(hs))]
+                    + ([O.esc(WX.describe(cond[r - 1]) if r - 1 < len(cond) else 'not recorded')] if cond else []))
     back = f'{base}?{urlencode({"view": "rounds", "round": through, "site": site})}' if through else f'{base}?view=rounds'
     shown = (f'<p class="muted">Through round {through} of the replay.</p>'
              if through and n and through < n else '')

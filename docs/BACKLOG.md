@@ -100,7 +100,7 @@ Status is what was built and tested, not what was proposed. Report: `docs/V17_PA
 | S3 Two-way recruitment, motivations | Planned (design note) | -- |
 | G1 Geography, familiarity, course use | Built, unit-tested (rules 2026-11-08): course state/province, regional familiarity baseline, home clubs, local hosting for unused municipal courses (owner decision), top 10 familiar courses on profiles with the value the engine uses; seeded comparison runs pending | `docs/FAMILIARITY_AND_AGGRESSION.md`, `docs/COURSE_LIBRARY.md` |
 | G2 Visible Aggression | Built, unit-tested: shown on profiles, stable, reach/aggression interaction tested; no second risk score | `docs/FAMILIARITY_AND_AGGRESSION.md` |
-| G3 Seasonal weather | Planned | -- |
+| G3 Seasonal weather | Built on branch build/v16-weather (rules 2026-11-09): seasonal climate by city and week, wind direction per hole, skill mitigation, conditions on scorecards and summaries; temperature/firmness open for the owner; season-scale runs pending | `golfsim/weather.py` |
 | Record Book; nation count links | Record Book built; nation counts linked to their exact population **not yet** | -- |
 | B1/B2 Biggest Upsets | Planned | -- |
 | T1-T3 Tournament stories, linked history | Planned | -- |
@@ -800,4 +800,5 @@ competition system, academies, high-school golf). Junior support is a simple bas
   individuals), no sponsor invitations beyond a few amateurs.
 - The US Open final qualifying draws fewer entrants than real life (about 160 instead of ~900).
 - World ranking uses a simplified OWGR formula; amateur ranking a simplified WAGR.
-- Weather: wind and rain per round, no per-wave tee times or seasonal weather patterns.
+- Weather: simulated seasonal climate (weather.py: climate group, hemisphere, coast, style), wind direction per
+  hole, wet rounds; no per-wave tee times, no temperature or seasonal firmness (open decision).

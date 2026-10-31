@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import re
 
-RULES_VERSION = '2026-11-08'
+RULES_VERSION = '2026-11-09'
 RANKING_RULE = 'world-ranking-1'     # the world ranking's formula (unchanged since the world began; named now)
 VERSIONS = (
     ('2026-10-30', 'Winners\' exemptions count whatever a golfer\'s membership (a non-member champion earns a '
@@ -73,6 +73,13 @@ VERSIONS = (
                    'municipal course no event has used yet, and keeps it; established venues are unchanged. Each '
                    'course records its state or province, and each season the starts where the baseline applied. '
                    'Aggression, an existing personality trait, is shown on profiles (unchanged in play).'),
+    ('2026-11-09', 'Seasonal weather: each round\'s wind and wetness come from the course\'s climate and the time of '
+                   'year (opposite seasons in the two hemispheres, coastal exposure, course style), with a wind '
+                   'direction played against each hole\'s line (head, tail or cross) and gusts varying it shot by '
+                   'shot. Wet rounds play differently '
+                   'but are never cancelled, shortened or delayed. A playoff is played in the final round\'s '
+                   'weather. Each round\'s wind direction and gustiness are recorded with its conditions. Worlds started earlier '
+                   'keep the classic weather.'),
 )
 EARLIER = ('Seasons archived before rules versions were recorded were played under earlier rules. The '
            'differences that matter for reading old results: a winner without a Premier card held no '
@@ -460,6 +467,29 @@ RULES = {
         'aggressive the golfer, so an aging attacking golfer still attacks, at what they can still reach. Course '
         'Management sets how well each choice is judged; there is no other risk score.',
         '2026-11-08'),
+    'weather': (
+        'Weather (seasonal-1)',
+        'Simulated seasonal climate, bundled with the game (not a forecast or live weather). Each course reads its '
+        'city\'s climate group (oceanic, continental, temperate, Mediterranean, subtropical, tropical, desert, '
+        'alpine) for the month of the event: a wind factor on the course\'s typical wind (its style, plus 3 mph on '
+        'the coast) and a chance that a round is wet. Southern-hemisphere courses read the month six months on. '
+        'Coastal courses swing more through the year. Each event draws a weather system for its week and each '
+        'round its own wind speed, direction, gustiness and wetness, from the event\'s seed: the same world gives the same '
+        'weather, and what is recorded is exactly what was played. Every hole has a fixed compass line from its '
+        'course\'s routing. Headwinds shorten drives and lengthen approaches, tailwinds lengthen drives and make '
+        'greens harder to hold, crosswinds widen the lateral spread. Gusts: each full shot meets the wind at its '
+        'own strength around the round\'s mean (gustier on the coast, in unsettled weeks and windy months; '
+        'bounded, and the round\'s average wind damage is the same as a steady wind of that speed), so carry and '
+        'spread vary shot to shot. Wet rounds shorten the roll, thicken the '
+        'rough, make sand heavier, soften the greens and add grip and concentration errors (less on fast-draining '
+        'links, sandbelt and heathland). Ball-Flight Control, accuracy and distance control, Course Management, '
+        'Recovery Play, Bunker Play, Focus, the caddie\'s yardage, mental support and course knowledge, and '
+        'familiarity with the course all reduce the damage (a low, controlled flight, the caddie\'s yardage and '
+        'good management also feel less of the gusts); none removes it. Who is playing never changes the '
+        'weather or its effect (no country penalty). No round is ever cancelled, shortened or delayed by weather. '
+        'Temperature and seasonal turf firmness are not modelled. Worlds started before rules 2026-11-09 keep the '
+        'classic weather: wind speed only and a flat 8% chance of rain that only shortened the roll.',
+        '2026-11-09'),
     'injuries': (
         'Injuries',
         'A golfer can be hurt playing an event; the chance rises with tiredness, age and the rounds played and falls '
