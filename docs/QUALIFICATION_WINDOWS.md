@@ -21,26 +21,32 @@ Boundary tests: `tests/test_exemption_window.py` (every route below, with the ed
 | M11, P7 Premier winners since the last edition | Wins after last year's edition of this major, up to the cut-off | — | The next edition only |
 | Amateur titles and the annual amateur award | The next edition each title's date allows, while still an amateur | — | Listed per route on the Rules page |
 
-## Decision needed: routes that include the current edition
+## Decided 31 October 2026 (rules 2026-11-03): the N most recent editions
 
 The other majors' champions (P2, U5, B3: "last 5 years") and the Premier Players Championship winners (M3, P3,
-U6, B4: "last 3 years") count the current year's edition when it has already been played, plus N full years
-before it: N + 1 editions. The real-world categories they mirror are the N most recent editions, the current one
-included once played: the 2022 U.S. Open took Masters champions of 2018-22 (five editions) ([PGA TOUR, how the
-2022 U.S. Open field qualified](https://pgatour.com/inside-the-field/2022/06/10/how-the-field-qualified-us-open-the-country-club-brookline.html)),
+U6, B4: "last 3 years") count the **N most recent editions as of the field**: this season's edition is one of the
+N only when the calendar plays it before the field is set (it has then been played), otherwise the N editions
+before this season's. This mirrors the real categories: the 2022 U.S. Open took Masters champions of 2018-22 (five
+editions) ([PGA TOUR, how the 2022 U.S. Open field qualified](https://pgatour.com/inside-the-field/2022/06/10/how-the-field-qualified-us-open-the-country-club-brookline.html)),
 and the Masters invites the last three winners of the Players ([Golf News Net, Masters invitation
 categories](https://thegolfnewsnet.com/ryan_ballengee/2018/04/01/19-ways-how-to-earn-masters-invitation-exemption-109013/)).
+Until 2026-11-03 these routes counted N + 1 editions once the current one was played.
 
-| Route | Editions counted now | A champion of year X holds now | The N-most-recent reading |
-|---|---|---|---|
-| P2 at the Premier Tour Championship (wk 20): Masters champions | 6 (X .. X+5) | X .. X+5 | X .. X+4 |
-| P2: USA Open and Britannia champions (not yet played that season) | 5 | X+1 .. X+5 | X+1 .. X+5 (same) |
-| U5 at the USA Open (wk 25): Masters and Premier Tour Championship champions | 6 | X .. X+5 | X .. X+4 |
-| U5: Britannia champions | 5 | X+1 .. X+5 | same |
-| B3 at the Britannia Open (wk 30): Masters, Premier Tour Championship and USA Open champions | 6 | X .. X+5 | X .. X+4 |
-| M3, P3, U6, B4: Players winners (week 11, always played first) | 4 (X .. X+3) | X .. X+3 | X .. X+2 |
+Whether this season's edition is one of the N is read from the calendar (the series' week against the major's),
+not from whether a result happens to be known, so a place secured at the end of a season (`secured_places`) and
+the field itself use the same window. Only these seven routes changed: U1, M2, lifetime and age-limited past
+champions, the single-edition routes and card durations are as listed above. The classic calendar (v1) keeps its
+rules unchanged (it is browse-only).
 
-Options: **(a)** keep N + 1 editions (today; HAL asked earlier to preserve it), or **(b)** count the N most recent
-editions (the real-world reading). (b) shortens these windows by one edition and changes future fields
-(a simulation change, from the first field set with it); U1 and M2 are unaffected either way. The tests pin
-today's definitions and will be switched with the code if (b) is chosen.
+| Route | Edition of year X counted | A champion of year X holds |
+|---|---|---|
+| P2 at the Premier Tour Championship (wk 20): Masters champions | Masters X counts in X (played week 15) | X .. X+4 (five) |
+| P2: USA Open and Britannia champions (not yet played that season) | from X+1 | X+1 .. X+5 (five) |
+| U5 at the USA Open (wk 25): Masters and Premier Tour Championship champions | in X | X .. X+4 |
+| U5: Britannia champions | from X+1 | X+1 .. X+5 |
+| B3 at the Britannia Open (wk 30): Masters, Premier Tour Championship and USA Open champions | in X | X .. X+4 |
+| M3, P3, U6, B4: Players winners (week 11, always played first) | in X | X .. X+2 (three) |
+
+Boundary tests (`tests/test_exemption_window.py`): the first and last edition held and the first missed for every
+route, a current edition not yet played (the window never reaches back an extra year to make up for it), the
+evidence a place shows, and v1 unchanged.

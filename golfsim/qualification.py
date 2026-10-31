@@ -196,6 +196,34 @@ def winners_of(series_ids, years_back, include_current=True):
     return select
 
 
+def recent_window(ctx, sid, year, n, field_week):
+    """(first, last) season of the `n` most recent editions of `sid` as of a field set in week `field_week` of
+    `year`: this season's edition is one of them when the calendar plays it before that week (it is then
+    already played when the field is set), otherwise the n editions before this season's. Rules 2026-11-03."""
+    wk = ctx.edition_week(sid, year)
+    last = year if wk is not None and wk < field_week else year - 1
+    return last - n + 1, last
+
+
+def recent_winners(series_ids, n, field_week):
+    """Champions of the `n` most recent editions of each listed series as of the field (recent_window): the
+    "last 5 years" major champions (P2, U5, B3) and "last 3 years" Players winners (M3, P3, U6, B4) of the
+    reference calendar. Newest first, each golfer once."""
+    def select(ctx, year):
+        out = []
+        spans = {sid: recent_window(ctx, sid, year, n, field_week) for sid in series_ids}
+        for y in range(year, year - n - 1, -1):
+            for sid in series_ids:
+                lo, hi = spans[sid]
+                if not lo <= y <= hi:
+                    continue
+                w = ctx.winner(sid, y)
+                if w is not None and w not in out:
+                    out.append(w)
+        return out
+    return select
+
+
 def lifetime_winners(series_id):
     def select(ctx, year):
         ys = sorted({y for (sid, y) in ctx.results if sid == series_id and y < year}, reverse=True)
@@ -374,6 +402,14 @@ def _rules(sp):
         (lambda pred, major, through: tour_winners_between(pred, (-1, c[{'TOUR_MASTERS': 'masters_wins_from',
                                                                          'PREMIER_TOUR_CHAMPIONSHIP': 'pga_wins_from'}[major]]),
                                                            (0, through)))
+    def _recent(series, n, major):
+        """select= and source= of a windowed champions' route: under v2 the n most recent editions as of the
+        major's field (rules 2026-11-03); v1 keeps n editions before this season's plus this season's if played."""
+        if v2:
+            wk = sp.majors[major]
+            return dict(select=recent_winners(series, n, wk), source=(('wins', series, n, wk),))
+        return dict(select=winners_of(series, n), source=(('wins', series, n),))
+
     if v2:
         usa_am = (Route('M4', 'USA Amateur champion', 'U.S. Amateur champion', places('USA_AMATEUR', (1,)),
                         amateur_only=True, source=(('USA_AMATEUR', -1),)),
@@ -388,7 +424,7 @@ def _rules(sp):
         Route('M2', 'Major champions, last 5 years', 'US Open, Open and PGA champions (5 years)',
               winners_of(OTHER_MAJORS['TOUR_MASTERS'], 5), source=(('wins', OTHER_MAJORS['TOUR_MASTERS'], 5),)),
         Route('M3', 'Premier Players Championship winners, last 3 years', 'Players Championship winners (3 years)',
-              winners_of(('PT_PREMIER_PLAYERS_CHAMPIONSHIP',), 3), source=(('wins', ('PT_PREMIER_PLAYERS_CHAMPIONSHIP',), 3),)),
+              **_recent(('PT_PREMIER_PLAYERS_CHAMPIONSHIP',), 3, 'TOUR_MASTERS')),
         *usa_am,
         Route('M5', 'Britannia Amateur champion', 'The Amateur Championship winner',
               places('BRITANNIA_AMATEUR', (1,)), amateur_only=True, source=(('BRITANNIA_AMATEUR', -1),)),
@@ -425,10 +461,9 @@ def _rules(sp):
         Route('P1', 'Past Premier Tour Championship champions', 'PGA champions (lifetime)',
               lifetime_winners('PREMIER_TOUR_CHAMPIONSHIP'), source=(('wins', ('PREMIER_TOUR_CHAMPIONSHIP',), 0),)),
         Route('P2', 'Major champions, last 5 years', 'Masters, US Open and Open champions (5 years)',
-              winners_of(OTHER_MAJORS['PREMIER_TOUR_CHAMPIONSHIP'], 5),
-              source=(('wins', OTHER_MAJORS['PREMIER_TOUR_CHAMPIONSHIP'], 5),)),
+              **_recent(OTHER_MAJORS['PREMIER_TOUR_CHAMPIONSHIP'], 5, 'PREMIER_TOUR_CHAMPIONSHIP')),
         Route('P3', 'Premier Players Championship winners, last 3 years', 'Players Championship winners (3 years)',
-              winners_of(('PT_PREMIER_PLAYERS_CHAMPIONSHIP',), 3), source=(('wins', ('PT_PREMIER_PLAYERS_CHAMPIONSHIP',), 3),)),
+              **_recent(('PT_PREMIER_PLAYERS_CHAMPIONSHIP',), 3, 'PREMIER_TOUR_CHAMPIONSHIP')),
         Route('P4', 'Top 15 and ties, last Premier Tour Championship', 'Top 15 and ties, previous PGA',
               top_finishers('PREMIER_TOUR_CHAMPIONSHIP', 15), source=(('PREMIER_TOUR_CHAMPIONSHIP', -1),)),
         Route('P5', 'Top 20, Club Professional Championship', 'Top 20, PGA Professional Championship (ties for the '
@@ -472,9 +507,9 @@ def _rules(sp):
               source=(('wins', ('USA_OPEN',), 10),)),
         *usa_amateurs,
         Route('U5', 'Major champions, last 5 years', 'Masters, Open and PGA champions (5 years)',
-              winners_of(OTHER_MAJORS['USA_OPEN'], 5), source=(('wins', OTHER_MAJORS['USA_OPEN'], 5),)),
+              **_recent(OTHER_MAJORS['USA_OPEN'], 5, 'USA_OPEN')),
         Route('U6', 'Premier Players Championship winners, last 3 years', 'Players Championship winners (3 years)',
-              winners_of(('PT_PREMIER_PLAYERS_CHAMPIONSHIP',), 3), source=(('wins', ('PT_PREMIER_PLAYERS_CHAMPIONSHIP',), 3),)),
+              **_recent(('PT_PREMIER_PLAYERS_CHAMPIONSHIP',), 3, 'USA_OPEN')),
         Route('U7', 'Top 10 and ties, last USA Open', 'Top 10 and ties, previous US Open', top_finishers('USA_OPEN', 10),
               source=(('USA_OPEN', -1),)),
         Route('U8', 'Last season\'s Premier Tour Finals qualifiers', 'Tour Championship qualifiers (previous season)',
@@ -500,9 +535,9 @@ def _rules(sp):
         Route('B2', 'Top 10 and ties, last Britannia Open', 'Top 10 and ties, previous Open', top_finishers('BRITANNIA_OPEN', 10),
               source=(('BRITANNIA_OPEN', -1),)),
         Route('B3', 'Major champions, last 5 years', 'Masters, US Open and PGA champions (5 years)',
-              winners_of(OTHER_MAJORS['BRITANNIA_OPEN'], 5), source=(('wins', OTHER_MAJORS['BRITANNIA_OPEN'], 5),)),
+              **_recent(OTHER_MAJORS['BRITANNIA_OPEN'], 5, 'BRITANNIA_OPEN')),
         Route('B4', 'Premier Players Championship winners, last 3 years', 'Players Championship winners (3 years)',
-              winners_of(('PT_PREMIER_PLAYERS_CHAMPIONSHIP',), 3), source=(('wins', ('PT_PREMIER_PLAYERS_CHAMPIONSHIP',), 3),)),
+              **_recent(('PT_PREMIER_PLAYERS_CHAMPIONSHIP',), 3, 'BRITANNIA_OPEN')),
         Route('B5', 'World top 50', 'OWGR top 50 (late-May ranking)', top(50, c['britannia_ranking']), cutoff=True,
               source=(('ranking', c['britannia_ranking'], 0),)),
         Route('B6', 'Last season\'s Premier Tour Finals qualifiers', 'Tour Championship qualifiers (previous season)',
@@ -751,12 +786,17 @@ def evidence(route, gid, year, ctx, wins=None):
     for src in route.source:
         if src[0] == 'wins':                                 # a win: the latest one the route counts
             series, back = src[1], src[2]
+            field_week = src[3] if len(src) > 3 else None           # the n most recent editions (rules 2026-11-03)
             found = None
             mine = wins.get(gid, ()) if wins is not None else [k for k in ctx.results if ctx.winner(*k) == gid]
             for (sid, y) in mine:
                 if (series is None and not ctx.tour_of.get(sid, '').startswith('PT_')) or \
                         (series is not None and sid not in series) or (back and y < year - back):
                     continue
+                if field_week is not None:
+                    lo, hi = recent_window(ctx, sid, year, back, field_week)
+                    if not lo <= y <= hi:
+                        continue
                 if found is None or (y, ctx.edition_week(sid, y) or 0) > found[1]:
                     found = (f'{y}:{sid} (won)', (y, ctx.edition_week(sid, y) or 0))
             if found:

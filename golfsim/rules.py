@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import re
 
-RULES_VERSION = '2026-11-02'
+RULES_VERSION = '2026-11-03'
 RANKING_RULE = 'world-ranking-1'     # the world ranking's formula (unchanged since the world began; named now)
 VERSIONS = (
     ('2026-10-30', 'Winners\' exemptions count whatever a golfer\'s membership (a non-member champion earns a '
@@ -38,6 +38,9 @@ VERSIONS = (
                    'major-trip guarantee, as earned places and called-up alternates are. Amateur support: amateurs '
                    'who show success have their golf costs (events, a caddie, a coach) paid in kind up to a season '
                    'cap by band. Coaches\' teaching and scouting and every golfer\'s Prestige are recorded.'),
+    ('2026-11-03', 'The other majors\' champions (five) and the Players Championship winners (three) hold the most '
+                   'recent editions as of the field, this season\'s included only when it is played before the field '
+                   '(it had been one edition more).'),
 )
 EARLIER = ('Seasons archived before rules versions were recorded were played under earlier rules. The '
            'differences that matter for reading old results: a winner without a Premier card held no '
@@ -158,8 +161,12 @@ RULES = {
         'are separate '
         'categories; an amateur title feeds the next edition its date allows (the Britannia Amateur, after the '
         'USA Open, feeds next season\'s USA Open and Masters but this season\'s Britannia Open). USA Open champions '
-        'hold their place for the ten editions after their win (U1).',
-        '2026-11-02'),
+        'hold their place for the ten editions after their win (U1). Under the reference calendar the other '
+        'majors\' champions "last 5 years" (P2, U5, B3) and the Players Championship winners "last 3 years" (M3, P3, '
+        'U6, B4) hold the five (three) most recent editions as of the field: this season\'s edition is one of them '
+        'only when it is played before the field (before rules 2026-11-03 it was one more, the current edition and '
+        'five or three before it).',
+        '2026-11-03'),
     'calendar': (
         'The calendar',
         'Each world plays one calendar version, recorded with every season. Classic (v1): majors in weeks 18, 24, '

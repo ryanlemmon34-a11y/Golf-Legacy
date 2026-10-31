@@ -1,8 +1,9 @@
 """The USA Open champions' place (route U1, "USA Open champions, last 10 years"): a champion of year Y is exempt
 from the Y+1 through the Y+10 USA Open and not in Y+11 (unless they win again); the evidence a place shows agrees
 with the place itself; and the routes that count the current year keep their window. Every other windowed route,
-with the editions docs/QUALIFICATION_WINDOWS.md lists for it (today's definitions: the "last N years" routes that
-include the current edition count N + 1 editions once it is played -- a decision pending, see that document).
+with the editions docs/QUALIFICATION_WINDOWS.md lists for it. Since rules 2026-11-03 the reference calendar's "last
+5 years" major champions (P2, U5, B3) and "last 3 years" Players winners (M3, P3, U6, B4) count the N most recent
+editions, this season's included only when it is played before the field; the classic calendar (v1) keeps N + 1.
 
 Run from the project folder:  python -m unittest tests.test_exemption_window -v
 """
@@ -34,7 +35,12 @@ class Ctx:
         return [w] if w is not None else []
 
     def edition_week(self, sid, year):
-        return 25
+        return WEEKS.get(sid, 25)
+
+
+# the reference calendar's weeks (v2): the Players Championship, then the four majors
+WEEKS = {'PT_PREMIER_PLAYERS_CHAMPIONSHIP': 11, 'TOUR_MASTERS': 15, 'PREMIER_TOUR_CHAMPIONSHIP': 20, 'USA_OPEN': 25,
+         'BRITANNIA_OPEN': 30}
 
 
 def route(code, version='v2', major='USA_OPEN'):
@@ -66,13 +72,12 @@ class USAOpenChampions(unittest.TestCase):
         self.assertEqual(Q.evidence(u1, 7, 2050, ctx), [('2040:USA_OPEN (won)', (2040, 25))])   # the tenth year
         self.assertEqual(Q.evidence(u1, 7, 2051, ctx), [])
 
-    def test_routes_that_count_the_current_year_keep_their_window(self):
-        u5 = route('U5')                                                  # other majors' champions, last 5 years
-        sids = sorted(Q.OTHER_MAJORS['USA_OPEN'])
-        ctx = Ctx({(sids[0], 2045): 3, (sids[0], 2040): 4, (sids[0], 2039): 5})
-        got = u5.select(ctx, 2045)
-        self.assertEqual(got, [3, 4])                                     # this year's (already played) back to 2040
-        self.assertNotIn(5, got)
+    def test_routes_that_count_the_current_year_hold_n_editions(self):
+        u5 = route('U5')                                                  # other majors' champions, five editions
+        ctx = Ctx({('TOUR_MASTERS', 2045): 3, ('TOUR_MASTERS', 2041): 4, ('TOUR_MASTERS', 2040): 5})
+        self.assertEqual(u5.select(ctx, 2045), [3, 4])                    # 2041-45: this year's (played) and four before
+        u5v1 = route('U5', 'v1')                                          # the classic calendar: unchanged, 2040-45
+        self.assertEqual(u5v1.select(ctx, 2045), [3, 4, 5])
 
 
 def held(r, x, sid, version='v2', played_this_year=True, years=range(2030, 2060)):
@@ -94,23 +99,49 @@ class Windows(unittest.TestCase):
         for sid in Q.OTHER_MAJORS['TOUR_MASTERS']:                         # none played yet at the Masters
             self.assertEqual(held(m2, 2040, sid, played_this_year=False), list(range(2041, 2046)), sid)
 
-    def test_other_majors_count_the_current_edition_once_played(self):
+    def test_other_majors_five_most_recent_editions(self):
         cases = (('P2', 'PREMIER_TOUR_CHAMPIONSHIP', {'TOUR_MASTERS'}),
                  ('U5', 'USA_OPEN', {'TOUR_MASTERS', 'PREMIER_TOUR_CHAMPIONSHIP'}),
                  ('B3', 'BRITANNIA_OPEN', {'TOUR_MASTERS', 'PREMIER_TOUR_CHAMPIONSHIP', 'USA_OPEN'}))
         for code, major, before in cases:
             r = route(code, major=major)
             for sid in Q.OTHER_MAJORS[major]:
-                if sid in before:                                         # played earlier this season: X .. X+5
-                    self.assertEqual(held(r, 2040, sid), list(range(2040, 2046)), (code, sid))
+                if sid in before:                                         # played earlier this season: X .. X+4
+                    self.assertEqual(held(r, 2040, sid), list(range(2040, 2045)), (code, sid))
                 else:                                                     # later this season: X+1 .. X+5
                     self.assertEqual(held(r, 2040, sid, played_this_year=False), list(range(2041, 2046)), (code, sid))
 
-    def test_players_winners_four_editions(self):
+    def test_players_winners_three_editions(self):
         for code, major in (('M3', 'TOUR_MASTERS'), ('P3', 'PREMIER_TOUR_CHAMPIONSHIP'), ('U6', 'USA_OPEN'),
                             ('B4', 'BRITANNIA_OPEN')):
             r = route(code, major=major)                                   # week 11: always played first
-            self.assertEqual(held(r, 2040, 'PT_PREMIER_PLAYERS_CHAMPIONSHIP'), list(range(2040, 2044)), code)
+            self.assertEqual(held(r, 2040, 'PT_PREMIER_PLAYERS_CHAMPIONSHIP'), list(range(2040, 2043)), code)
+
+    def test_classic_calendar_unchanged(self):
+        for code, major, sid, span in (('P2', 'PREMIER_TOUR_CHAMPIONSHIP', 'USA_OPEN', range(2040, 2046)),
+                                       ('M3', 'TOUR_MASTERS', 'PT_PREMIER_PLAYERS_CHAMPIONSHIP', range(2040, 2044))):
+            self.assertEqual(held(route(code, 'v1', major), 2040, sid), list(span), code)
+
+    def test_boundaries(self):
+        """The first and last editions held, the first missed, and a current edition not yet played."""
+        p2 = route('P2', major='PREMIER_TOUR_CHAMPIONSHIP')
+        ctx = Ctx({('TOUR_MASTERS', 2036): 1, ('TOUR_MASTERS', 2035): 2, ('USA_OPEN', 2035): 3, ('USA_OPEN', 2034): 4,
+                   ('TOUR_MASTERS', 2040): 5})
+        self.assertEqual(p2.select(ctx, 2040), [5, 1, 3])                 # Masters 2036-40, USA Open 2035-39
+        ctx = Ctx({('TOUR_MASTERS', 2036): 1, ('TOUR_MASTERS', 2035): 2})  # this year's Masters not (yet) played:
+        self.assertEqual(p2.select(ctx, 2040), [1])                       # still 2036-40, never reaching back to 2035
+        b4 = route('B4', major='BRITANNIA_OPEN')
+        ctx = Ctx({('PT_PREMIER_PLAYERS_CHAMPIONSHIP', y): y for y in range(2036, 2041)})
+        self.assertEqual(b4.select(ctx, 2040), [2040, 2039, 2038])
+
+    def test_evidence_follows_the_window(self):
+        u5 = route('U5')
+        ctx = Ctx({('TOUR_MASTERS', 2040): 7})
+        self.assertEqual(Q.evidence(u5, 7, 2044, ctx), [('2040:TOUR_MASTERS (won)', (2040, 15))])
+        self.assertEqual(Q.evidence(u5, 7, 2045, ctx), [])                # the sixth edition: gone
+        ctx = Ctx({('BRITANNIA_OPEN', 2040): 7})                          # played after the USA Open
+        self.assertEqual(Q.evidence(u5, 7, 2045, ctx), [('2040:BRITANNIA_OPEN (won)', (2040, 30))])
+        self.assertEqual(Q.evidence(u5, 7, 2046, ctx), [])
 
     def test_previous_edition_routes_hold_one_edition(self):
         for code, major, sid in (('M9', 'TOUR_MASTERS', 'TOUR_MASTERS'), ('P4', 'PREMIER_TOUR_CHAMPIONSHIP',
