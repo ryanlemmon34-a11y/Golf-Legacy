@@ -184,6 +184,26 @@ class WinterDecisions(unittest.TestCase):
                     self.assertIn((gid, r[1]), happened, (gid, r))
 
 
+    def test_models_stood_in_for_record_nothing_and_change_nothing(self):
+        """A test standing in for a model (returning p without filling the evidence) must not break the winter:
+        such an evaluation keeps no row; the decisions are those of the run with recording off."""
+        from unittest import mock
+        out = []
+        for on in (True, False):
+            s = season(seed=43)
+            s.record_decisions = on
+            snap = {g.id: r for g, r in zip(s.world.golfers, (rows_for(g)[g.id % 3] for g in s.world.golfers))}
+            with mock.patch.object(C, 'p_retire', return_value=0.0), mock.patch.object(C, 'p_turn_pro', return_value=0.0):
+                counts = C.decide(s, YEAR, snap)
+            out.append((counts, json.dumps(s.transitions[YEAR], sort_keys=True, default=str), s.career_ev.get(YEAR, {})))
+        (c1, t1, ev1), (c0, t0, _) = out
+        self.assertEqual((c1, t1), (c0, t0))
+        kinds = {r[0] for rows in ev1.values() for r in rows}
+        self.assertNotIn(None, kinds)
+        self.assertFalse(kinds & {'retire_tour', 'retire_job'})        # the stood-in model: nothing kept
+        self.assertIn('turn_pro', kinds)                                # (named by decide; its terms are empty)
+
+
 def stub():
     return SimpleNamespace(plan_ev=defaultdict(dict), career_ev=defaultdict(dict), played={YEAR: {}}, fame={},
                            legacy={})

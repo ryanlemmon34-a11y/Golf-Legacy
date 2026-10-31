@@ -401,8 +401,8 @@ def decide(season, year, snap):
     rec = getattr(season, 'record_decisions', False)       # decision evidence (golfsim.decision_evidence)
 
     def evidence(g, model, p, u, ev):
-        if rec:
-            DE.record_career(season, year, g, model, p, u, ev)
+        if rec and model:                                   # (an evaluation without its model -- a model
+            DE.record_career(season, year, g, model, p, u, ev)   # stood in for, as tests do -- keeps nothing)
 
     for g in sorted(season.world.golfers, key=lambda x: x.id):     # order never matters
         if g.lifestyle == 'retired':
