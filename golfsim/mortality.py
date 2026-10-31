@@ -41,6 +41,8 @@ from __future__ import annotations
 import hashlib
 import math
 
+from . import decision_evidence as DE
+
 Q_BASE, Q_SCALE, Q_RATE, Q_CAP = 0.0005, 0.000041, 0.09, 0.5
 WEEK = 53                                          # the winter after the season
 DECEASED = 'deceased'                              # a staff record's status once the person has died
@@ -97,11 +99,15 @@ def winter(season, year):
     st = season.staff
     when = (year, WEEK)
     out = []
+    book = season.mortality_ev[year] if getattr(season, 'record_decisions', False) else None   # decision evidence
     for pid, rec in sorted(people(season).items()):
         if pid in deaths or not eligible(rec):
             continue
         age = year - rec['born']
-        if draw(season.seed, year, pid) >= annual_risk(age):
+        u, q = draw(season.seed, year, pid), annual_risk(age)
+        if book is not None:
+            DE.record_mortality(book, pid, age, q, u)
+        if u >= q:
             continue
         roles = [k for k in ('golfer', 'coach', 'caddie') if rec[k] is not None]
         entry = {'year': year, 'week': WEEK, 'age': age, 'roles': roles}

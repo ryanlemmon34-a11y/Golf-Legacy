@@ -32,6 +32,7 @@ from dataclasses import dataclass, field, replace
 
 from . import access as ACC
 from . import amateur_support as AS
+from . import decision_evidence as DE
 from . import development as D
 from . import golfstats as GS
 from . import finance as FIN
@@ -490,6 +491,11 @@ class Season:
         self.dev_acc = defaultdict(dict)                     # year -> gid -> development evidence (D.ACC_LEN numbers)
         self.creations = defaultdict(dict)                   # year -> gid -> how a golfer started (hidden facts too)
         self.injury_lasting = defaultdict(dict)              # year -> 'week:gid' -> lasting losses of that injury
+        # decision evidence (recording only, golfsim.decision_evidence): year -> gid -> the monthly plans' inputs,
+        # and year -> gid -> the winter's career evaluations; `record_decisions` False keeps nothing
+        self.record_decisions = True
+        self.plan_ev, self.career_ev = DE.new_tables()
+        self.mortality_ev = DE.new_tables()[0]               # year -> the winter's mortality draws (bounded)
         self.week = 0                                        # the week being played (0 between seasons)
         self.am_support = {}                                 # gid -> this season's amateur support (amateur_support)
         self.am_support_log = defaultdict(list)              # year -> [each payment it made]
@@ -2098,6 +2104,10 @@ class Season:
         state.setdefault('dev_acc', defaultdict(dict))       # development evidence before it was kept: not recorded
         state.setdefault('creations', defaultdict(dict))
         state.setdefault('injury_lasting', defaultdict(dict))   # lasting injury losses before they were kept
+        state.setdefault('record_decisions', True)          # decision evidence: kept from now on (not before)
+        if 'plan_ev' not in state:
+            state['plan_ev'], state['career_ev'] = DE.new_tables()
+        state.setdefault('mortality_ev', DE.new_tables()[0])
         state.setdefault('week', 0)
         state.setdefault('upset_estimates', True)          # saves from before: estimates kept from now on
         state.setdefault('_upset_facts', {})
@@ -2533,6 +2543,7 @@ class Season:
                   self.staff_receipts, self.injuries, self.card_log, self.career_counts, self.transitions,
                   self.assignments, self.staff_year, self.unheld, self.rights, self.earned, self.card_reasons, self.snapshots,
                   self.major_rights, self.travel_grants, self.dev_acc, self.creations, self.injury_lasting,
+                  self.plan_ev, self.career_ev, self.mortality_ev,
                   self.rank_top, self.am_support_log, self.am_support_seasons, self.am_support_held,
                   self.cash_blocked_max, self.work_pathway, self.juniors_added, self.new_pros_added, self.stats, self.moments):
             for y in [y for y in d if isinstance(y, int) and old(y)]:
@@ -2931,10 +2942,16 @@ class Season:
             best_val, best_acts = plan_search(weeks, now, inj_until, slot, playable, costs, base, pace0, major, bar, dp,
                                               inj0, inj_b, inj_c, inj_d, net, load4, rest_rec, work_v, dt, can_work,
                                               f0, played0, money0)
+            fallback = best_acts is None
             if best_acts is None:                            # nothing affordable: work if they can
                 best_acts = ['work' if g.status == 'pro' and g.lifestyle == 'full_time' else 'train'
                              for _ in weeks]
             self.plans[g.id] = {w: (a, cat) for w, a in zip(weeks, best_acts)}
+            if self.record_decisions:                        # evidence only: the figures above, as computed
+                DE.record_plan(self, g, year, week0, target=target, weeks=weeks, avail=avail, acts=best_acts,
+                               inj_until=inj_until, now=now, f0=f0, played0=played0, money0=money0, bar=bar, dp=dp,
+                               dt=dt, work_v=work_v, load4=load4, rest_rec=rest_rec, risk=inj0 * inj_b * inj_c * inj_d,
+                               can_work=can_work, stuck=stuck, major=any(major), fallback=fallback)
 
     def needs_paid_work(self, g, year):
         """A full-time professional whose funds would not cover three months of living costs: they take

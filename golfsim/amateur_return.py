@@ -111,9 +111,10 @@ def results_signal(row, standing):
     return standing + 0.5 * min(2, wins) + 0.25 * min(4, top3) + (0.3 if rose else 0.0), why
 
 
-def chance(season, g, row, year, standing):
+def chance(season, g, row, year, standing, ev=None):
     """(probability, facts) of returning to full-time amateur golf this winter; probability 0 when a condition
-    is not met (facts then say which)."""
+    is not met (facts then say which). `ev` (decision evidence, a dict): given, the logit's terms, the keep-up
+    factor and the funding inputs are kept in it (nothing else changes)."""
     age = g.age(year)
     worked = seasons_in_work(season, g.id, year)
     cost = season_cost(season, g, year, row)
@@ -121,16 +122,28 @@ def chance(season, g, row, year, standing):
     signal, why = results_signal(row, standing)
     facts = {'age': age, 'seasons_in_work': worked, 'cash': round(g.cash), 'family': round(g.backing),
              'season_cost': round(cost), 'results': why}
+    if ev is not None:
+        ev.update(in_age=age, in_seasons_in_work=worked, in_season_cost=cost, in_funds=funds, in_signal=signal)
     if worked is not None and worked < MIN_SEASONS:
+        if ev is not None:
+            ev['in_blocked'] = 'work'
         return 0.0, dict(facts, blocked='not yet a full season in work')
     if g.cash < 0 or funds < cost:
+        if ev is not None:
+            ev['in_blocked'] = 'funds'
         return 0.0, dict(facts, blocked='savings do not cover a full-time amateur season')
     if signal <= 0:
+        if ev is not None:
+            ev['in_blocked'] = 'results'
         return 0.0, dict(facts, blocked='no results to go back for')
     will = (g.personality['work_ethic'] + g.personality['big_stage']) / 200
     x = (BASE + RESULTS * signal + FUNDS * min(2.0, funds / cost) + WILL * (will - 0.5)
          - AGE_SLOPE * max(0, age - AGE_FROM))
     stay = keep_up(season, g, row, year, cost)
+    if ev is not None:                             # p = min(CAP, sig(sum of the terms) x keep_up)
+        ev.update(base=BASE, results=RESULTS * signal, funds=FUNDS * min(2.0, funds / cost),
+                  willingness=WILL * (will - 0.5), age=-AGE_SLOPE * max(0, age - AGE_FROM), in_keep_up=stay,
+                  in_capped=_sig(x) * stay > CAP)
     return min(CAP, _sig(x) * stay), dict(facts, keep_up=round(stay, 3))
 
 

@@ -219,41 +219,97 @@ def careers(r):
 
 
 def development(r):
-    """Run A: what moved Overall, by age and by source; decline by part of the game after 30."""
-    by_age = defaultdict(lambda: [0.0] * 5)
-    n_age = Counter()
-    decline = defaultdict(lambda: [0.0, 0.0, 0.0])             # age band -> physical, technical, mental (aging)
-    n_dec = Counter()
+    """Run A: what moved Overall, by age and by source; decline by part of the game after 30. Golfers of the seeded
+    world (created with the world, already mid-career) and procedural arrivals are reported apart, as careers() does,
+    so the seeded population's starting ages and levels do not mix into the arrivals' development curves."""
     g = r.d['golfers']
-    for y in r.years:
-        dev = r.season(y).get('diagnostics', {}).get('development', {})
-        for gid, v in dev.items():
-            gv = g.get(int(gid))
-            if gv is None:
-                continue
-            age = y - gv['born']
-            band = min(age // 3 * 3, 51)
-            for i in range(5):
-                by_age[band][i] += v[25 + i]
-            n_age[band] += 1
-            if age >= 30:
-                b = min(age // 5 * 5, 55)
-                decline[b][0] += v[4 * 5 + 0]
-                decline[b][1] += sum(v[4 * 5 + c] for c in TECH)
-                decline[b][2] += v[4 * 5 + 4]
-                n_dec[b] += 1
     out = [f'## Development by age and source (run {r.name})', '',
-           'Mean change in Overall per golfer-season, by the source the development evidence records (all golfers, '
-           'all levels; the development evidence of each archived season).', '']
-    rows = [[f'{a}-{a + 2}' if a < 51 else '51+', n_age[a]] + [f(by_age[a][i] / n_age[a], 3) for i in range(5)]
-            + [f(sum(by_age[a]) / n_age[a], 3)] for a in sorted(by_age)]
-    out += table(['Age', 'Golfer-seasons', 'Maturing', 'Training', 'Tournaments', 'Injury', 'Aging', 'Total'], rows)
-    out += ['', 'Aging after 30 by part of the game (mean change per golfer-season, attribute points summed over '
-            'the category\'s attributes):', '']
-    rows = [[f'{b}-{b + 4}' if b < 55 else '55+', n_dec[b]] + [f(decline[b][i] / n_dec[b], 3) for i in range(3)]
-            for b in sorted(decline)]
-    out += table(['Age', 'Golfer-seasons', 'Physical', 'Technical (long, short, putting)', 'Mental'], rows)
-    return out + ['']
+           'Mean change in Overall per golfer-season, by the source the development evidence records (all levels; the '
+           'development evidence of each archived season). The seeded world and procedural arrivals are shown apart.',
+           '']
+    for label, want in (('Procedural arrivals (joined during the run)', False), ('Seeded world (present at the start)', True)):
+        by_age = defaultdict(lambda: [0.0] * 5)
+        n_age = Counter()
+        decline = defaultdict(lambda: [0.0, 0.0, 0.0])          # age band -> physical, technical, mental (aging)
+        n_dec = Counter()
+        for y in r.years:
+            dev = r.season(y).get('diagnostics', {}).get('development', {})
+            for gid, v in dev.items():
+                gv = g.get(int(gid))
+                if gv is None or bool(gv.get('initial')) != want:
+                    continue
+                age = y - gv['born']
+                band = min(age // 3 * 3, 51)
+                for i in range(5):
+                    by_age[band][i] += v[25 + i]
+                n_age[band] += 1
+                if age >= 30:
+                    b = min(age // 5 * 5, 55)
+                    decline[b][0] += v[4 * 5 + 0]
+                    decline[b][1] += sum(v[4 * 5 + c] for c in TECH)
+                    decline[b][2] += v[4 * 5 + 4]
+                    n_dec[b] += 1
+        out += [f'**{label}**', '']
+        rows = [[f'{a}-{a + 2}' if a < 51 else '51+', n_age[a]] + [f(by_age[a][i] / n_age[a], 3) for i in range(5)]
+                + [f(sum(by_age[a]) / n_age[a], 3)] for a in sorted(by_age)]
+        out += table(['Age', 'Golfer-seasons', 'Maturing', 'Training', 'Tournaments', 'Injury', 'Aging', 'Total'], rows)
+        out += ['', 'Aging after 30 by part of the game (mean change per golfer-season, attribute points summed over '
+                'the category\'s attributes):', '']
+        rows = [[f'{b}-{b + 4}' if b < 55 else '55+', n_dec[b]] + [f(decline[b][i] / n_dec[b], 3) for i in range(3)]
+                for b in sorted(decline)]
+        out += table(['Age', 'Golfer-seasons', 'Physical', 'Technical (long, short, putting)', 'Mental'], rows) + ['']
+    return out
+
+
+AGE_BANDS = ((0, 20, 'under 21'), (21, 22, '21-22'), (23, 25, '23-25'), (26, 29, '26-29'), (30, 200, '30+'))
+STANDING = ((1, 50, 'amateur top 50'), (51, 150, '51-150'), (151, 300, '151-300'), (301, 10 ** 6, 'ranked beyond 300'))
+
+
+def age_band(age):
+    return next(label for lo, hi, label in AGE_BANDS if lo <= age <= hi)
+
+
+def standing_band(rank):
+    if rank is None:
+        return 'unranked'
+    return next(label for lo, hi, label in STANDING if lo <= rank <= hi)
+
+
+def breakdowns(b, c):
+    """F1.h: the support comparison and zero-start seasons by age and by amateur standing at the season's end, both
+    arms, from each season's recorded amateur rows (read only)."""
+    out = [f'### By age and by amateur standing (runs {b.name} and {c.name})', '',
+           'Every amateur season of every recorded season, grouped by age and by the amateur ranking at the season\'s '
+           'end; support columns are run ' + b.name + '\'s (run ' + c.name + ' has none by design).', '']
+    for title, key in (('Age', lambda v: age_band(v[0])), ('Amateur standing', lambda v: standing_band(v[3]))):
+        agg = {run.name: defaultdict(list) for run in (b, c)}
+        sup = defaultdict(lambda: [0, 0, 0])                    # group -> supported seasons, drawn, cap exhausted
+        cap = {'A': 25000, 'B': 12000, 'C': 5000}
+        for run in (b, c):
+            for y in run.years:
+                for v in run.amateurs(y).values():
+                    k = key(v)
+                    agg[run.name][k].append(v[4])
+                    if run is b and v[6]:
+                        sup[k][0] += 1
+                        sup[k][1] += v[7]
+                        sup[k][2] += v[7] >= 0.98 * cap[v[6]]
+        order = [label for *_, label in (AGE_BANDS if title == 'Age' else STANDING)] + (['unranked'] if title != 'Age' else [])
+        rows = []
+        for k in order:
+            xb, xc = agg[b.name].get(k, []), agg[c.name].get(k, [])
+            if not xb and not xc:
+                continue
+            s_ = sup[k]
+            rows.append([k, len(xb), f(S.mean(xb) if xb else None), f'{sum(1 for e in xb if e == 0) / len(xb):.1%}' if xb else '—',
+                         f'{s_[0] / len(xb):.0%}' if xb else '—', f'${s_[1] / s_[0]:,.0f}' if s_[0] else '—',
+                         f'{s_[2] / s_[0]:.0%}' if s_[0] else '—',
+                         len(xc), f(S.mean(xc) if xc else None), f'{sum(1 for e in xc if e == 0) / len(xc):.1%}' if xc else '—'])
+        out += [f'**{title}**', '']
+        out += table([title, f'{b.name} amateur-seasons', f'{b.name} events', f'{b.name} no start', f'{b.name} supported',
+                      f'{b.name} mean drawn', f'{b.name} cap used up', f'{c.name} amateur-seasons', f'{c.name} events',
+                      f'{c.name} no start'], rows) + ['']
+    return out
 
 
 def support(b, c):
@@ -333,7 +389,7 @@ def support(b, c):
                      len(xc), f(S.mean(xc) if xc else None), f'{sum(1 for e in xc if e == 0) / len(xc):.1%}' if xc else '—'])
     out += table(['Region', f'{b.name} amateur-seasons', f'{b.name} events', f'{b.name} no start',
                   f'{c.name} amateur-seasons', f'{c.name} events', f'{c.name} no start'], rows)
-    return out + ['']
+    return out + [''] + breakdowns(b, c)
 
 
 def pathway(runs):

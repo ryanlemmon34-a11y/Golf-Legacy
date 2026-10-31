@@ -29,7 +29,9 @@ Layout of an archive directory (JSON, gzip):
                         with net_at_decision, the figure the career decisions saw -- rankings, injuries,
                         where they lived that season), career decisions
                         with their reasons, that winter's moves, staff work, that winter's deaths (since
-                        rules 2026-11-07), and that season's narrative log lines (display text only)
+                        rules 2026-11-07), and that season's narrative log lines (display text only); from
+                        this build also `decision_evidence`, the inputs of each monthly schedule plan and
+                        winter career evaluation (docs/DECISION_EVIDENCE.md)
 
 Facts are stored once and referenced by id (a win is in the edition; a coach's record is derived from
 stints and editions), so the archive grows by one season file a year rather than copying data into
@@ -328,6 +330,13 @@ class ArchiveWriter:
                             'existing': nxt.get('existing', {}),
                             'baseline_shares': {k: {c: round(v, 6) for c, v in s.items()}
                                                 for k, s in pt.base_share.items()}}}
+        # decision evidence (recording only, from this build): each monthly plan's inputs and each winter career
+        # evaluation's terms (golfsim.decision_evidence; its own format and field definitions). A season without
+        # the key was played before it was kept: not recorded, never estimated
+        from . import decision_evidence as DE
+        evidence = DE.season_block(season, year)
+        if evidence is not None:
+            chunk['decision_evidence'] = evidence
         if year == season.first_year and getattr(season, 'wr_seed', None):
             chunk['ranking_seed'] = {str(g): rows for g, rows in season.wr_seed.items()}   # points before the world began
         return chunk
@@ -828,6 +837,12 @@ class Archive:
         row = self.year(year)['careers'].get(pid, {})
         return {'rights': row.get('rights'), 'weeks': row.get('access', {}),
                 'denied': [tuple(x) for x in row.get('denied', [])]}
+
+    def decision_evidence(self, pid, year):
+        """Why a golfer scheduled the season as they did and what went into that winter's career decisions
+        (golfsim.decision_evidence.read): {'recorded': False} for a season played before it was kept."""
+        from . import decision_evidence as DE
+        return DE.read(self.year(year), pid)
 
     def golfer_staff(self, pid):
         """Everyone who coached or caddied for this golfer (and school teams), in order."""
