@@ -17,21 +17,24 @@ weeks counted, with injury and calendar gaps pausing the count.
 
 | Measure (run B, support on) | Value |
 |---|---|
-| Amateur top 50: tracked seasons cash-blocked 1+ week | **0 / 87** (0.0 %); 500 / 500 supported |
-| Ranked beyond 300: tracked seasons cash-blocked 1+ week | **136 / 3,368** (4.0 %) |
-| Ranked beyond 300: count 8+ | 62 / 3,368 (1.8 %) |
-| Ranked beyond 300: no start all season and cash-blocked | 9 / 3,368 (0.3 %) |
-| Ranked beyond 300: supported | 454 / 34,232 amateur seasons (1.3 %); 290 / 454 used the whole cap |
-| Golfer-seasons converted to work by the pathway (age 21+) | **224** (C 247, D 246) |
+| Amateur top 50: tracked golfer-seasons (season-end full-time, not college; pathway conversions excluded) cash-blocked 1+ week | **0 / 87** (0.0 %). Separately, of all 500 top-50 amateur golfer-seasons, 500 were supported |
+| Ranked beyond 300: tracked golfer-seasons cash-blocked 1+ week | **136 / 3,368** (4.0 %) |
+| Ranked beyond 300: tracked, count 8+ | 62 / 3,368 (1.8 %) |
+| Ranked beyond 300: tracked, no start all season and cash-blocked | 9 / 3,368 (0.3 %) |
+| Ranked beyond 300: supported | 454 / 34,232 amateur golfer-seasons, all statuses (1.3 %); 290 / 454 drew 98 % or more of their cap (not necessarily all of it) |
+| Golfer-seasons converted to work by the pathway (age 21+; not in the tracked denominators above) | **224** (C 247, D 246) |
 
 **Assessment, as settled by the reviewer.**
 - At the baseline, financial pressure falls on the **lower-ranked** amateurs, not the elite.
-  - None of the top 50 was cash-blocked.
-  - 4.0 % of tracked seasons ranked beyond 300 were.
+  - None of the 87 tracked top-50 golfer-seasons was cash-blocked. This covers season-end full-time non-college
+    amateurs only, not every top-50 amateur and not the golfers converted to work.
+  - 136 of the 3,368 tracked golfer-seasons ranked beyond 300 (4.0 %) were.
   - The pathway turned 224 golfer-seasons into working amateurs.
-- Turning support off (C) puts pressure on the elite (17 / 72 top-50 seasons blocked) but changes little beyond
-  300 (154 / 3,360, 4.6 %).
-- No group in any run had a season with no start that was *not* cash-blocked.
+- Turning support off (C) puts pressure on the elite (17 / 72 tracked top-50 golfer-seasons blocked) but changes little beyond
+  300 (154 / 3,360 tracked, 4.6 %).
+- In the reported B and C breakdown, every tracked golfer-season with no start was cash-blocked: the "no start, never
+  cash-blocked" column is 0 in every row. The weekly ledger covers only tracked golfers (full-time, not college).
+  Part-time and other untracked amateurs do have no-start seasons, and this statement says nothing about them.
 
 **Before calibration.**
 - This is a description of the baseline, not a calibration verdict. Tolerance bands for F1.i await the owner (CQ3, O5).
