@@ -225,6 +225,35 @@ def _season_file(w, y):
         return None
 
 
+def prestige_parts(w, pid):
+    """(fame, legacy) behind a golfer's Prestige now, as the running world holds them: fame is the last 52 weeks'
+    results (each finish worth its event's prestige cubed), legacy the lasting credit for majors, flagship and Premier
+    wins, fading each year. None when not recorded: the published history keeps each season's Prestige, not its
+    parts, so a past season's (or a history opened without its world) is never split."""
+    lv = w.live.people.get(pid) if w.live is not None else None
+    parts = (lv or {}).get('prestige_parts')
+    return tuple(parts) if parts is not None else None
+
+
+def prestige_parts_html(w, pid):
+    """The Prestige row's two parts, now: each part's points, and the Prestige each alone would give (the engine
+    combines the points before the 0-100 scale -- fame plus half the legacy -- so the two never simply add up)."""
+    from golfsim import prestige as PR
+    parts = prestige_parts(w, pid)
+    if parts is None:
+        return ('<br><span class="muted">Its two parts (the last 52 weeks\' results and the lasting legacy): not '
+                'recorded -- the history keeps each season\'s Prestige, not its parts.</span>')
+    fame, legacy = parts
+    lg = PR.LEGACY
+    return (f'<br>Now: the last 52 weeks\' results {fame:.1f} fame points (alone, Prestige '
+            f'{PR.player_prestige(fame, 0.0):.1f}); legacy {legacy:.1f} points (alone, Prestige '
+            f'{PR.player_prestige(0.0, legacy):.1f}). <span class="muted">Legacy: {lg["major"]:g} points for a major, '
+            f'{lg["flagship"]:g} for a flagship and {lg["premier"]:g} for another Premier Tour win, fading '
+            f'{100 * (1 - PR.LEGACY_DECAY):.0f}% at each season\'s end; it counts half beside fame. In a world\'s first '
+            'year, fame also includes the reputation golfers began with, which drops out during that year. The parts '
+            'combine before the 0-100 scale, so they do not add up to the Prestige.</span>')
+
+
 def decisions(w, pid, y):
     """This golfer's recorded career decisions in the winter after season y (from the season file)."""
     import observer_data as OD
@@ -284,7 +313,7 @@ def status_section(w, pid, p):
     when = 'now' if lv is not None and lv.people[pid].get('prestige') is not None else 'as the published history ends'
     rows.append(('Prestige', (f'{pres} <span class="muted">of 100, {when}: public standing from the last 52 weeks\' '
                               'results plus a slowly fading legacy of majors and other big wins; not a rating of ability'
-                              '</span>') if pres is not None else
+                              '</span>' + prestige_parts_html(w, pid)) if pres is not None else
                  '<span class="muted">not recorded (recorded from rules 2026-11-02)</span>'))
     if gs.get('lifestyle') != 'retired':
         if tour:

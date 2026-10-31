@@ -21,7 +21,10 @@ from urllib.parse import parse_qs, urlparse
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / 'tools'))
+from types import SimpleNamespace as NS                               # noqa: E402
+from golfsim import prestige as PR                                    # noqa: E402
 import observer as O                                                  # noqa: E402
+import observer_history as OH                                         # noqa: E402
 
 
 def text(h):
@@ -63,6 +66,26 @@ class UnitDirectorySort(unittest.TestCase):
         self.assertEqual(self.ids('name', 'desc'), [5, 4, 3, 1, 2])
         self.assertEqual(self.ids('nonsense', 'bogus'), [2, 1, 3, 4, 5])   # (an unknown sort: by name)
         self.assertEqual(self.ids('born', 'asc'), [2, 1, 3, 4, 5])         # nothing recorded: name order
+
+
+class UnitPrestigeParts(unittest.TestCase):
+    """The two parts of a golfer's Prestige: shown from the running world's figures, "not recorded" without them."""
+
+    def test_parts_from_the_running_world(self):
+        fame, legacy = 123.456, 38.8
+        w = NS(live=NS(people={7: {'prestige': round(PR.player_prestige(fame, legacy), 1),
+                                   'prestige_parts': (fame, legacy)}}))
+        self.assertEqual(OH.prestige_parts(w, 7), (fame, legacy))
+        h = OH.prestige_parts_html(w, 7)
+        self.assertIn(f"results {fame:.1f} fame points (alone, Prestige {PR.player_prestige(fame, 0):.1f})", h)
+        self.assertIn(f"legacy {legacy:.1f} points (alone, Prestige {PR.player_prestige(0, legacy):.1f})", h)
+        self.assertIn('40 points for a major', h)
+        self.assertNotIn('not recorded', h)
+
+    def test_not_recorded_without_them(self):
+        for w in (NS(live=None), NS(live=NS(people={})), NS(live=NS(people={7: {'prestige': 50.0}}))):
+            self.assertIsNone(OH.prestige_parts(w, 7))
+            self.assertIn('not recorded', OH.prestige_parts_html(w, 7))
 
 
 class WorldGaps(unittest.TestCase):
@@ -125,6 +148,35 @@ class WorldGaps(unittest.TestCase):
     def test_coaches_and_caddies_prestige_both_ways(self):
         self.check_both_ways('/coaches', 4)
         self.check_both_ways('/caddies', 4)
+
+    # ---- 2. Prestige with its parts ---------------------------------------------------------------------------
+    def test_prestige_parts_on_the_profile(self):
+        season = self.w.session.season
+        lv = self.w.live
+        shown = 0
+        for g in sorted(p for p, x in lv.people.items() if x.get('prestige') is not None)[:40]:
+            fame, legacy = lv.people[g]['prestige_parts']
+            self.assertEqual((fame, legacy), (season.fame.get(g, 0.0), season.legacy.get(g, 0.0)))   # the engine's
+            self.assertEqual(round(PR.player_prestige(fame, legacy), 1), lv.people[g]['prestige'])    # exactly
+            html = self.page(f'/golfer/{g}')
+            row = html.split('<dt>Prestige</dt><dd>', 1)[1].split('</dd>', 1)[0]
+            self.assertTrue(row.startswith(f'{lv.people[g]["prestige"]} '))
+            self.assertIn(f'results {fame:.1f} fame points', row)
+            self.assertIn(f'legacy {legacy:.1f} points', row)
+            shown += 1
+        self.assertTrue(shown)
+        self.assertTrue(any(season.legacy.get(g, 0) > 0 for g in lv.people))   # (some golfer has a legacy)
+
+    def test_prestige_parts_not_recorded_in_the_history_alone(self):
+        arch = O.World(self.path / 'archive', workers=1)                # the published history, no running world
+        try:
+            g = next(p for p, x in arch.a.people.items() if ((x.get('golfer') or {}).get('prestige')) is not None)
+            row = O.render(arch, f'/golfer/{g}', {})[1].split('<dt>Prestige</dt><dd>', 1)[1].split('</dd>', 1)[0]
+            self.assertIn('as the published history ends', row)
+            self.assertIn('not recorded', row)
+            self.assertNotIn('fame points', row)
+        finally:
+            arch.close()
 
 
 if __name__ == '__main__':
