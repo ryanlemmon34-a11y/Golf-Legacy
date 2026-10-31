@@ -121,6 +121,11 @@ it too makes earlier worlds "another engine"; start the next long run on it so i
   golfers; a past season shows its recorded start-of-season Overall, "—" where none was recorded).
 - **Peak Overall** on a profile's Ratings: the highest recorded base Overall, when it was first reached, the age,
   and how much of the career the records cover ("Recorded Peak Overall" when they do not cover all of it).
+- **Rating groups** (v16): a profile's *Ratings over time* offers Physical, Technical and Mental beside Overall
+  and each attribute (levels or changes), and a season's ratings table shows them at its start and end. Physical
+  and Mental are the simulation's groups of those names (four attributes each); Technical is the other thirteen
+  (long game, short game, putting, consistency). A group's value is the plain mean of its attributes' recorded
+  ratings, as the page says; "not recorded" where any of them was not.
 - **Playoffs**: every player in a playoff is listed with "Won playoff" / "Lost playoff (out at extra hole N)",
   the number of players and extra holes, and each extra hole's scores (kept from this build on; older editions
   say the holes were not recorded); each site of a multi-site qualifier keeps its own.

@@ -359,6 +359,39 @@ def recorded_peaks(w, pids):
     return out
 
 
+def _rating_groups():
+    from golfsim.ratings import ATTRIBUTE_GROUPS, ATTRIBUTE_KEYS
+    phys = tuple(k for k in ATTRIBUTE_KEYS if ATTRIBUTE_GROUPS[k] == 'Physical')
+    mental = tuple(k for k in ATTRIBUTE_KEYS if ATTRIBUTE_GROUPS[k] == 'Mental')
+    return {'physical': ('Physical', phys), 'technical': ('Technical', tuple(k for k in ATTRIBUTE_KEYS
+                                                                          if k not in phys + mental)),
+            'mental': ('Mental', mental)}
+
+
+# Group views of the ratings: {key: (label, attribute keys)}. Physical and Mental are golfsim.ratings' groups of those
+# names (the same four attributes each as golfsim.development's physical and mental training categories); Technical
+# is every other attribute (the Long Game, Short Game, Putting and Consistency groups). A group's value is the plain
+# mean of its attributes' recorded ratings -- how the simulation itself sums up a category (golfsim.staff, a coach's
+# speciality) -- not a weighted figure like Overall.
+RATING_GROUPS = _rating_groups()
+GROUP_NOTE = ('Physical, Technical and Mental are the plain mean of their attributes’ recorded ratings: Physical of '
+              'Power, Stamina, Recovery and Injury Resistance; Mental of Composure, Resilience, Course Management and '
+              'Focus; Technical of the other thirteen (the Long Game, Short Game, Putting and Consistency groups). '
+              'Overall is not their mean: it weights each attribute by how much it matters on the course.')
+
+
+def with_groups(d):
+    """A ratings dict {key: value} with the group views added (RATING_GROUPS: the mean of the group's recorded
+    attribute ratings), each None where any of its attributes was not recorded; None stays None."""
+    if d is None:
+        return None
+    out = dict(d)
+    for g, (_, ks) in RATING_GROUPS.items():
+        vals = [d.get(k) for k in ks]
+        out[g] = sum(vals) / len(vals) if all(v is not None for v in vals) else None
+    return out
+
+
 def rating_snapshots(w, pid):
     """{year: [overall, attrs...]}: ratings at the start of each season (recorded when the season before it
     was archived), in the archive's rating_keys order."""

@@ -1162,16 +1162,18 @@ def ratings_series(w, pid, p):
 
 
 def ratings_history(w, q, pid, p):
-    """Fixed-width annual bars, one per season (scrolling sideways when there are many), for Overall or one
-    attribute, as levels or as changes from the season before; unknown seasons are gaps."""
+    """Fixed-width annual bars, one per season (scrolling sideways when there are many), for Overall, a group of
+    attributes (physical, technical, mental: OD.RATING_GROUPS) or one attribute, as levels or as changes from the
+    season before; unknown seasons are gaps."""
     from golfsim.ratings import ATTRIBUTE_KEYS, ATTRIBUTE_LABELS
-    series = ratings_series(w, pid, p)
+    series = [(y, label, OD.with_groups(v)) for y, label, v in ratings_series(w, pid, p)]
     if len(series) < 2:
         return ''
+    labels = {'overall': 'Overall', **{g: label for g, (label, _) in OD.RATING_GROUPS.items()}, **ATTRIBUTE_LABELS}
     key = one(q, 'rh', 'overall')
-    key = key if key in ('overall', *ATTRIBUTE_KEYS) else 'overall'
+    key = key if key in labels else 'overall'
     mode = 'change' if one(q, 'rm') == 'change' else 'level'
-    name = 'Overall' if key == 'overall' else ATTRIBUTE_LABELS[key]
+    name = labels[key]
     vals = [(v or {}).get(key) for _, _, v in series]
     H = 150
     bars = []
@@ -1192,8 +1194,10 @@ def ratings_history(w, q, pid, p):
         final = ' final' if label.startswith('final') else ' now' if label.startswith('now') else ''
         bars.append(f'<div class="rbar{final}" title="{esc(tip)}"><span class="rv">{shown}</span>'
                     f'<span class="rb {cls}" style="height:{h}px"></span><span class="ry">{esc(y)}</span></div>')
-    opts = ''.join(f'<option value="{k}"{" selected" if k == key else ""}>'
-                   f'{esc("Overall" if k == "overall" else ATTRIBUTE_LABELS[k])}</option>' for k in ('overall', *ATTRIBUTE_KEYS))
+    opt = lambda k: f'<option value="{k}"{" selected" if k == key else ""}>{esc(labels[k])}</option>'
+    opts = (opt('overall') + '<optgroup label="Groups (mean of their attributes)">'
+            + ''.join(opt(g) for g in OD.RATING_GROUPS) + '</optgroup><optgroup label="Attributes">'
+            + ''.join(opt(k) for k in ATTRIBUTE_KEYS) + '</optgroup>')
     keep = ''.join(f'<input type="hidden" name="{esc(k)}" value="{esc(v[0])}">' for k, v in q.items()
                    if k not in ('rh', 'rm') and v)
     modes = ''.join(f'<option value="{m}"{" selected" if m == mode else ""}>{t}</option>'
@@ -1205,7 +1209,7 @@ def ratings_history(w, q, pid, p):
             + '<p class="muted">One bar per season: the ratings at its start (recorded when the season before was '
               'archived, after its aging), the current ratings for this season, and for a retired golfer their final '
               'playing ratings at the end of the season they retired after (no aging is added). “—”: not recorded. '
-              'Hover a bar for its date and value.</p>')
+              'Hover a bar for its date and value. ' + esc(OD.GROUP_NOTE) + '</p>')
 
 
 def injuries_section(w, pid, starts):
