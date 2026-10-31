@@ -33,11 +33,12 @@ DEFAULT_BUILD = V18 / 'arms' / 'build_c0d1ea5'
 DEFAULT_ARMS = {k: V18 / 'arms' / k for k in ('a21old', 'a18old', 'a18new', 'seed2')}
 DEFAULT_STORY_ARCHIVE = V18 / 'runs' / 'A' / 'world_360013' / 'archive'
 # what each arm's sections read of the season summaries (the rest is dropped after loading, to keep memory modest)
-KEEP = {'a21old': {'plans', 'careers', 'transitions', 'work_pathway', 'oo', 'open_starts', 't5_starts'},
-        'a18old': {'plans', 'careers', 'transitions', 'work_pathway', 'oo', 'open_starts', 't5_starts'},
-        'a18new': {'careers', 'transitions', 'work_pathway', 'oo', 'open_starts', 't5_starts', 'prestige', 'weather',
-                   'all_starts', 'familiar_base', 'home_floor_starts'},
-        'seed2': {'careers', 'prestige', 'weather', 'all_starts', 'familiar_base', 'home_floor_starts'}}
+_COMMON = {'prestige', 'created', 'arrival_log', 'venue_sites'}
+KEEP = {'a21old': {'plans', 'careers', 'transitions', 'work_pathway', 'oo', 'open_starts', 't5_starts', 'start_weeks'} | _COMMON,
+        'a18old': {'plans', 'careers', 'transitions', 'work_pathway', 'oo', 'open_starts', 't5_starts', 'start_weeks'} | _COMMON,
+        'a18new': {'careers', 'transitions', 'work_pathway', 'oo', 'open_starts', 't5_starts', 'weather',
+                   'all_starts', 'familiar_base', 'home_floor_starts'} | _COMMON,
+        'seed2': {'careers', 'transitions', 'weather', 'all_starts', 'familiar_base', 'home_floor_starts'} | _COMMON}
 REQUESTED = {'a21old': 10, 'a18old': 10, 'a18new': 10, 'seed2': 5}
 
 
@@ -135,30 +136,36 @@ def weeks_timeline(arm):
 
 
 def time_to_job(arm, tl, first, rec):
-    """Walk back from the decision week over the recorded weekly availability, as work_pathway.count does: 'unaff'
-    counts, 'none'/'inelig'/injured pause, anything else resets. Returns (weeks from the first counted week of the
-    run to the job, reconstructed count, recorded count, weeks without a recorded plan inside the run)."""
+    """Plan-based reconstruction (monthly-plan availability, not actual weekly access). Walking back from the decision
+    week as work_pathway.count would read these weeks ('unaff' counts, 'none'/'inelig'/injured pause, anything else
+    resets): (span of the last n compatible counted weeks to the job, counted weeks found before stopping at the
+    recorded n, the recorded n, weeks without a recorded plan inside that span, the full compatible run -- scanning on
+    past n until a reset or the start of the data -- and whether that full scan reached the start of the data)."""
     g, y, wk, n = rec['gid'], rec['year'], rec['week'], rec['weeks_blocked']
     j = (y - first) * 52 + wk
     t = tl.get(g, {})
-    found, firstw, unknown = 0, None, 0
+    found, firstw, unknown, full, hit_start = 0, None, 0, 0, True
     a = j - 1
     lo = (arm['seasons'][0] - first) * 52 + 1
-    while a >= lo and found < n:
+    while a >= lo:
         v = t.get(a)
         if v is None:
-            unknown += 1
+            if found < n:
+                unknown += 1
         else:
             av, inj = v
             if inj or av in ('none', 'inelig'):
                 pass
             elif av == 'unaff':
-                found += 1
-                firstw = a
+                full += 1
+                if found < n:
+                    found += 1
+                    firstw = a
             else:
+                hit_start = False
                 break
         a -= 1
-    return (j - firstw if firstw is not None else None), found, n, unknown
+    return (j - firstw if firstw is not None else None), found, n, unknown, full, hit_start
 
 
 def later_outcome(arm, g, y):
@@ -279,24 +286,122 @@ def cohort_table(arms_out, N, last):
     return table(['outcome (denominator: the fixed cohort, N = ' + f'{N})', *names], rows)
 
 
+STATUS_NOTE = ('Status at the end of {last} is the golfer\'s {last} season row before that winter\'s decisions; a golfer '
+               'with no active row is classified by the exit recorded in an earlier winter (retired, became coach or '
+               'caddie) or a recorded death. Starts and zero-start seasons count every season the golfer had an active '
+               'row, whatever their status that season.')
+
+
+def cohort_block(a21, a18, lines, title, intro, ids, seasons, by_age_year):
+    N, last = len(ids), seasons[-1]
+    lines.append(title)
+    lines.append('')
+    lines.append(intro)
+    lines.append('')
+    lines.append(f'N = {N} (by age in {by_age_year}: ' + ', '.join(f'{a}: {n}' for a, n in sorted(Counter(
+        by_age_year - a21['people'][g]['born'] for g in ids).items())) + f'). Outcomes over seasons {seasons[0]}–{last}; '
+                 'denominator N in both columns (the same people).')
+    lines.append('')
+    if not N:
+        return
+    out = {'a21old': cohort_outcomes(a21, ids, seasons), 'a18old': cohort_outcomes(a18, ids, seasons)}
+    lines.append(cohort_table(out, N, last))
+    lines.append('')
+    lines.append(STATUS_NOTE.format(last=last))
+    lines.append('')
+
+
 def original_cohort(a21, a18, lines):
+    """Three fixed cohorts, never pooled: (b) pretreatment from the shared first season, (c) the next season's arrivals
+    by their creation record, (a) a cohort selected by the control arm's end-of-second-season status."""
     common = [y for y in a21['seasons'] if y in a18['seasons']]
     if len(common) < 2:
-        lines += ['### ORIGINAL COHORT (fixed membership)', '', 'Needs two committed seasons in both arms.', '']
-        return
-    y0 = common[1]
+        lines += ['### Fixed cohorts', '', 'Needs two committed seasons in both arms.', '']
+        return []
     ROW = row_fields()
+    yb, y0 = common[0], common[1]
+    rb21, rb18 = a21['data']['rows'][yb], a18['data']['rows'][yb]
+    base_same = sum(1 for g in rb21 if g in rb18 and list(rb21[g]) == list(rb18[g]))
     r21, r18 = a21['data']['rows'][y0], a18['data']['rows'][y0]
     diff = sorted(g for g in set(r21) & set(r18) if list(r21[g]) != list(r18[g]))
+    lines.append('The three fixed-cohort tables below each describe the same people under each arm\'s rule, as recorded. None of them shows a '
+                 'guaranteed rescue or a causal effect on any individual\'s career; differences between the columns are '
+                 'arm-level differences within the stated group (the worlds diverge from 2028, so other people and '
+                 'events differ too).')
+    lines.append('')
+    seasons = [y for y in common if y >= y0]
+
+    # (b) PRETREATMENT: the shared first season, identical in both arms
+    cb = a21['summ'][yb]['careers']
+    ids_b, exc_b = [], Counter()
+    for g, row in rb21.items():
+        d = dict(zip(ROW, row))
+        p = a21['people'].get(g) or {}
+        if d['status'] != 'amateur' or not p.get('born') or not 17 <= yb - p['born'] <= 20:
+            continue
+        if g not in rb18 or list(rb18[g]) != list(row) or not same_person(a21, a18, g):
+            exc_b['not identical in both arms'] += 1
+            continue
+        c = cb.get(g)
+        if c is None or c['tour'].startswith('CO_'):
+            exc_b['in college' if c else 'no season-file record'] += 1
+            continue
+        if d['lifestyle'] != 'full_time':
+            exc_b['part-time'] += 1
+            continue
+        ids_b.append(g)
+    cohort_block(a21, a18, lines,
+                 f'### PRETREATMENT COHORT: the shared {yb} baseline (fixed membership, the same people in both arms)',
+                 f'The arms are identical through all of {yb} ({base_same}/{len(rb21)} {yb} rows identical), so a '
+                 f'{yb} end-of-season state is pretreatment. Definition: golfers whose {yb} season row (identical in both '
+                 f'arms, same person by id, name, birth year and country) shows an amateur on a non-college tour '
+                 f'({yb} season file `careers.tour`), full-time, aged 17–20 in {yb} ({yb} minus birth year). Left out: '
+                 + (', '.join(f'{k} {v}' for k, v in exc_b.items()) or 'none') + '.',
+                 ids_b, seasons, yb)
+
+    # (c) ARRIVALS for the second season, by their creation record
+    cr21, cr18 = a21['summ'][y0]['created'], a18['summ'][y0]['created']
+    al21, al18 = a21['summ'][y0]['arrival_log'], a18['summ'][y0]['arrival_log']
+    juniors = sorted(g for g, r in cr21.items() if r[0] == 'junior')
+    same_rec = [g for g in juniors if cr18.get(g) == cr21[g] and al18.get(g) == al21.get(g) and same_person(a21, a18, g)]
+    names = {}
+    from golfsim.calendar import TOUR_BY_KEY
+    for k, t in TOUR_BY_KEY.items():
+        names[t.name] = k
+    ids_c, exc_c = [], Counter()
+    for g in same_rec:
+        txt = al21.get(g) or ''
+        tour_name = txt[txt.find('(') + 1:txt.rfind(')')] if '(' in txt else None
+        tk = names.get(tour_name)
+        if tk is None:
+            exc_c['creation tour not recorded'] += 1
+        elif tk.startswith('CO_'):
+            exc_c['in college at creation'] += 1
+        else:
+            ids_c.append(g)
+    ok_c = len(same_rec) == len(juniors) and set(cr18) == set(cr21)
+    intro_c = (f'Golfers who arrived for {y0} (first row in {y0}), defined by their creation record, not their end-of-{y0} '
+               f'row. Fields used: the {y0} season file\'s `diagnostics.created` (written by Season.note_creation at '
+               f'creation, week 0: path, age, Overall, attributes) and the arrival line of their history at week 1 '
+               f'(`log`, written by careers.add_juniors: "Arrived on the scene at 18 (<tour>)", the tour assigned by '
+               f'population.junior_class at creation); lifestyle at creation is the Golfer default, full-time '
+               f'(golfer.py). Verification: {len(juniors)} junior arrivals in a21old, {len(cr18)} creation records in '
+               f'a18old vs {len(cr21)} in a21old; identical creation record, arrival line and identity in both arms for '
+               f'{len(same_rec)}/{len(juniors)} — ' + ('PASSED' if ok_c else 'NOT identical: the cohort keeps only the '
+                                                         'identical ones') + '. Kept: juniors (all aged 18 at creation) '
+               f'whose creation tour is not a college tour. Left out: ' + (', '.join(f'{k} {v}' for k, v in exc_c.items())
+                                                                          or 'none') +
+               '. Late entrants (new professionals, path "late_entrant", aged 21–26) are not amateurs and are not included.')
+    cohort_block(a21, a18, lines, f'### ARRIVAL COHORT: juniors created for {y0} (fixed at creation, the same people in '
+                                  'both arms)', intro_c, ids_c, seasons, y0)
+
+    # (a) SELECTED by the control arm's end-of-second-season status
     c21 = a21['summ'][y0]['careers']
     ids, excluded = [], Counter()
     for g, row in r21.items():
         d = dict(zip(ROW, row))
         p = a21['people'].get(g) or {}
-        if d['status'] != 'amateur' or not p.get('born'):
-            continue
-        age = y0 - p['born']
-        if not 17 <= age <= 20:
+        if d['status'] != 'amateur' or not p.get('born') or not 17 <= y0 - p['born'] <= 20:
             continue
         c = c21.get(g)
         if g not in r18 or not same_person(a21, a18, g):
@@ -312,31 +417,18 @@ def original_cohort(a21, a18, lines):
             excluded['part-time'] += 1
             continue
         ids.append(g)
-    seasons = [y for y in common if y >= y0]
-    N, last = len(ids), seasons[-1]
-    lines.append('### ORIGINAL COHORT (fixed membership: the same people in both arms)')
-    lines.append('')
-    lines.append(f'Membership is fixed before the arms diverge and never changes, so the two columns describe the same '
-                 f'people and the denominator is the cohort size in both arms. Definition: golfers with a {y0} season row '
-                 f'in both arms, the same person in both (id, name, birth year, country), and in {y0} an amateur on a '
-                 f'non-college tour, full-time, aged 17–20 ({y0} minus birth year). The {y0} rows are identical in the '
-                 f'two arms except for {len(diff)} golfer(s) ({", ".join(map(str, diff))}); status and lifestyle are taken '
-                 f'from the a21old row, where no pathway entry below 21 can change a 17–20-year-old\'s lifestyle during '
-                 f'the season (in a18old golfer 5217 is part-time by the end of {y0}, having taken work in week 45; '
-                 f'their full-time status at the start of {y0} is the same in both arms). Amateurs aged 17–20 left '
-                 f'out: ' + (', '.join(f'{k} {v}' for k, v in excluded.items()) or 'none') + '.')
-    lines.append('')
-    lines.append(f'N = {N} (by age in {y0}: ' + ', '.join(f'{a}: {n}' for a, n in sorted(Counter(
-        y0 - a21['people'][g]['born'] for g in ids).items())) + f'). Outcomes over seasons {seasons[0]}–{last}.')
-    lines.append('')
-    out = {'a21old': cohort_outcomes(a21, ids, seasons), 'a18old': cohort_outcomes(a18, ids, seasons)}
-    lines.append(cohort_table(out, N, last))
-    lines.append('')
-    lines.append(f'Status "{last}" is the golfer\'s {last} season row before that winter\'s decisions; a golfer with no '
-                 'active row is classified by the exit recorded in an earlier winter (retired, became coach or caddie) '
-                 'or a recorded death. Starts and zero-start seasons count every season the golfer had an active row, '
-                 'whatever their status that season.')
-    lines.append('')
+    cohort_block(a21, a18, lines,
+                 f'### FIXED COHORT selected by the control arm\'s (a21old) end-{y0} status: the same people in both arms, '
+                 f'chosen after week 45 of {y0}, not pretreatment',
+                 f'Selected by a21old\'s end-of-{y0} row, after the arms diverged in week 45 of {y0}; the group is the '
+                 f'same people in both columns, but its selection used a post-divergence state, so it is not a '
+                 f'pretreatment group. Definition: golfers with a {y0} row in both arms, the same person in both, and in '
+                 f'a21old\'s {y0} row an amateur on a non-college tour, full-time, aged 17–20. The {y0} rows differ '
+                 f'between the arms for {len(diff)} golfers ({", ".join(map(str, diff))}). Left out: '
+                 + (', '.join(f'{k} {v}' for k, v in excluded.items()) or 'none') + '. Read every difference below '
+                 'as a descriptive arm difference within this selected group (for example in retirements), not as the '
+                 'pathway causing it.',
+                 ids, seasons, y0)
     return diff
 
 
@@ -475,12 +567,19 @@ def section1(a21, a18, lines):
     lines.append(table(['arm', 'entries', *[f'age {a}' for a in ages]], rows))
     lines.append('')
     # time to job
-    lines.append('### Time from the first counted blocked week to the job (denominator: each arm\'s entries)')
+    lines.append('### Reconstructed: the last n plan weeks compatible with the recorded count (monthly-plan '
+                 'availability, not actual weekly access); unknown weeks shown')
     lines.append('')
-    lines.append('Reconstructed from the monthly plans\' recorded weekly availability (decision evidence /2, '
-                 '`schedule`: "unaff" counts, "none"/"inelig"/injured pause, anything else resets), walking back from '
-                 'the decision week until the recorded `weeks_blocked` is reached; "agrees" = the walk found exactly '
-                 'the recorded count before a reset. Weeks are calendar weeks (the winter between seasons adds none).')
+    lines.append('The weekly access outcome is not stored week by week. This walks back from each entry\'s decision week '
+                 'over the availability the monthly plans recorded for each week (decision evidence /2, `schedule`), '
+                 'reading it as work_pathway.count reads access ("unaff" counts, "none"/"inelig"/injured pause, anything '
+                 'else resets). "Compatible" means the plan weeks contain the recorded `weeks_blocked` (n) counted weeks '
+                 'before any reset; it shows the plan data do not contradict the stored count, and does not validate it '
+                 'independently (the walk stops at n) nor give the golfer\'s actual weeks. "Span" is the calendar weeks '
+                 'from the earliest of those n plan weeks to the decision (pauses included); it is not a measured time '
+                 'from the first blocked week. "Longer run" scans on past n until a reset: entries whose plan-based '
+                 'compatible run is longer than the stored count. Plan-week availability and the weekly access ledger '
+                 'can differ, so a longer plan-based run is not evidence of a miscount.')
     lines.append('')
     rows = []
     for arm in (a21, a18):
@@ -489,34 +588,45 @@ def section1(a21, a18, lines):
         agree = defaultdict(Counter)
         for y in arm['seasons']:
             for r in arm['summ'][y]['work_pathway']:
-                span, found, n, unknown = time_to_job(arm, tl, first, r)
+                span, found, n, unknown, full, hit_start = time_to_job(arm, tl, first, r)
                 b = band(r['age'])
                 agree[b]['n'] += 1
                 agree[b]['ok'] += found == n
                 agree[b]['unknown'] += unknown > 0
+                agree[b]['unknown_weeks'] += unknown
+                agree[b]['longer'] += full > n
+                agree[b]['start'] += hit_start and full > n
                 if span is not None and found == n:
                     by[b].append(span)
                 by[b + ' recorded count'].append(n)
+                by[b + ' full'].append(full)
         for b in ('18-20', '21+'):
             if agree[b]['n']:
                 rows.append((arm['name'], b, agree[b]['n'], frac(agree[b]['ok'], agree[b]['n']),
-                             dist(by[b]), dist(by[b + ' recorded count'])))
-    lines.append(table(['arm', 'age band', 'entries', 'walk agrees', 'weeks first counted → job (min/q1/med/q3/max)',
-                        'recorded weeks_blocked'], rows))
+                             f'{agree[b]["unknown"]} ({agree[b]["unknown_weeks"]} weeks)',
+                             dist(by[b]), dist(by[b + ' recorded count']),
+                             frac(agree[b]['longer'], agree[b]['n']) + f'; {agree[b]["start"]} reach the data start',
+                             dist(by[b + ' full'])))
+    lines.append(table(['arm', 'age band', 'entries', 'compatible', 'entries with unknown plan weeks in the span',
+                        'span, plan weeks (min/q1/med/q3/max)', 'recorded weeks_blocked',
+                        'longer plan-based run than recorded', 'plan-based run, scanned to a reset'], rows))
     lines.append('')
     # what happened after
     lines.append('### After the job (denominator: each arm\'s pathway entries; the entrants differ between arms)')
     lines.append('')
     lines.append('Event-based groups: who enters depends on the arm, so these are arm-level descriptions, not a '
-                 'comparison of the same people. For each entry in season Y: starts in Y and in Y+1 (season file `careers`), Overall change over Y+1 '
-                 '(ratings as each season ends), and the first career transition from the winter after Y on '
-                 '(within the committed seasons). Entries in the last committed season have no Y+1 yet.')
+                 'comparison of the same people. For each entry in season Y: season starts in Y (including starts made '
+                 'before the job), starts from the decision week on (the weeks of the editions whose finishes list the '
+                 'golfer, from the season file `events`), the weeks from the decision to the first such start, starts in '
+                 'Y+1 (season file `careers`), Overall change over Y+1 (ratings as each season ends), and the first career '
+                 'transition from the winter after Y on (within the committed seasons). Entries in the last committed '
+                 'season have no Y+1.')
     lines.append('')
     rows, outs = [], {}
     for arm in (a21, a18):
         for b in ('18-20', '21+'):
-            st0, st1, dev, oc = [], [], [], Counter()
-            n = 0
+            st0, after, gap, st1, dev, oc = [], [], [], [], [], Counter()
+            n = none_after = 0
             for y in arm['seasons']:
                 for r in arm['summ'][y]['work_pathway']:
                     if band(r['age']) != b:
@@ -524,14 +634,23 @@ def section1(a21, a18, lines):
                     n += 1
                     a0, a1, d, o = follow(arm, r['gid'], y)
                     st0.append(a0)
+                    wks = [w for w in arm['summ'][y]['start_weeks'].get(r['gid'], []) if w >= r['week']]
+                    after.append(len(wks))
+                    if wks:
+                        gap.append(wks[0] - r['week'])
+                    else:
+                        none_after += 1
                     if (y + 1) in arm['summ']:
                         st1.append(a1)
                         dev.append(d)
                     oc[outcome_kind(o)] += 1
             if n:
-                rows.append((arm['name'], b, n, dist(st0), dist(st1), dist(dev, 2)))
+                rows.append((arm['name'], b, n, dist(st0), dist(after), dist(gap),
+                             frac(none_after, n), dist(st1), dist(dev, 2)))
                 outs[(arm['name'], b)] = (n, oc)
-    lines.append(table(['arm', 'band', 'entries', 'starts in Y', 'starts in Y+1', 'Overall change over Y+1'], rows))
+    lines.append(table(['arm', 'band', 'entries', 'season starts in Y (including before the job)',
+                        'starts in Y from the decision week on', 'weeks from the decision to the first start after it',
+                        'no start after the decision in Y', 'starts in Y+1', 'Overall change over Y+1'], rows))
     lines.append('')
     for (nm, b), (n, oc) in outs.items():
         lines.append(f'- {nm} {b}: ' + '; '.join(f'{k} {frac(v, n)}' for k, v in oc.most_common()))
@@ -569,12 +688,10 @@ def section1(a21, a18, lines):
 # ---- section 2: college open access ------------------------------------------------------------------------------
 def college_cohort(old, new, lines, defs, reg2series):
     """ORIGINAL COHORT for the college comparison: membership fixed in the first season, before any week is played."""
-    lines.append('### ORIGINAL COHORT (fixed membership: the same people in both arms)')
-    lines.append('')
     common = [y for y in old['seasons'] if y in new['seasons']]
     if not common:
-        lines += ['Needs a committed season in both arms.', '']
-        return
+        lines += ['### Fixed cohort', '', 'Needs a committed season in both arms.', '']
+        return None
     y0 = common[0]
     OAR = defs['OPEN_AMATEUR_REGIONS']
     co, cn = old['summ'][y0]['careers'], new['summ'][y0]['careers']
@@ -591,14 +708,35 @@ def college_cohort(old, new, lines, defs, reg2series):
             groups['college'][key or 'unplaced'].append(g)
         else:
             groups['members'][c['tour']].append(g)
-    lines.append(f'These two arms differ from week 1 of {y0} (the setting acts from the first week), so no later '
-                 f'season is shared; membership is fixed by the {y0} season record, whose tour (a college tour or an '
-                 f'amateur series) and residence were assigned when the world was created, before any week was played. '
+    # creation check: the residence in the first season's record is the one recorded at creation (week 0 of the first
+    # season) in both arms, for every member kept
+    members = [g for kind in groups for ids in groups[kind].values() for g in ids]
+    bad = []
+    for g in members:
+        for arm in (old, new):
+            fr = (arm['people'].get(g) or {}).get('first_res') or (None, None, None, None)
+            if fr[0] != y0 or fr[1] != 0 or fr[2] != arm['summ'][y0]['careers'][g]['res']:
+                bad.append((arm['name'], g))
+    passed = not bad
+    lines.append('### ' + ('COHORT fixed at creation (pretreatment): ' if passed else
+                           'FIXED COHORT (creation check failed: not labelled pretreatment): ')
+                 + f'{y0} college players and series members, the same people in both arms')
+    lines.append('')
+    lines.append(f'These two arms differ from week 1 of {y0}, so no played season is shared. Membership comes from the '
+                 f'{y0} season record\'s tour and residence, which are the creation values: a golfer\'s tour is '
+                 'assigned at world creation (golfsim/population.py `generate_world`: `_college_or_series` and the '
+                 'amateur series, lines 582, 676, 678) and is changed only after the season\'s snapshot is taken '
+                 '(golfsim/season.py `end_of_season`: snapshot at line 2621, then `apply_cards` 2628, `careers.decide` '
+                 '2647, `residence.review_moves` 2668); the residence is set at creation by `residence.settle(first_year, 0)` '
+                 '(season.py line 559), and the only writer of a move, `residence._record` (residence.py line 278), is '
+                 'called at week 0 or week 53 (settle, review_moves, staff_moves), never during weeks 1–52; the season '
+                 'file\'s `careers.residence` is `residence_at(gid, year, 52)` (archive.py line 213). Data check: for all '
+                 f'{len(members)} members kept, the {y0} residence equals the people table\'s `first_residence` dated '
+                 f'({y0}, week 0) in both arms — ' + ('PASSED' if passed else f'FAILED for {len(bad)}') + '. '
                  f'Kept: amateurs whose {y0} tour and residence are the same in both arms and who are the same person '
                  f'(id, name, birth year, country); {mismatch} differ and are left out. College players are placed by '
-                 f'their {y0} residence, members by their series. Outcomes are cumulative over the seasons both arms '
-                 f'have committed ({common[0]}–{common[-1]}); status at the end of {common[-1]} as in section 1. '
-                 'Denominator: the fixed group\'s size, the same people in both arms.')
+                 f'that residence, members by their series. Denominator: the fixed group\'s size, the same people in '
+                 'both arms.')
     lines.append('')
 
     def outcomes(arm, ids):
@@ -615,21 +753,28 @@ def college_cohort(old, new, lines, defs, reg2series):
         st = Counter(status_at(arm, g, common[-1]) for g in ids)
         return o, st
 
-    rows = []
+    rows, got = [], {}
+    span = f'{common[0]}–{common[-1]}'
     for kind in ('college', 'members'):
         for key in sorted(groups[kind]):
             ids = groups[kind][key]
             N = len(ids)
             oo, so = outcomes(old, ids)
             on, sn = outcomes(new, ids)
+            got[(kind, key)] = (N, oo, on)
             f = lambda o: f'{per(o["open"], N, 1)} / {per(o["t5"], N, 1)} / {per(o["shut"], N, 1)} ({per(o["alt"], N, 1)})'
             top = lambda st: ', '.join(f'{k} {frac(v, N, 0)}' for k, v in st.most_common(3))
             rows.append((kind, key.replace('AM_', ''), N, f(oo), f(on), top(so), top(sn)))
-    lines.append(table(['group', 'series region', 'N (fixed)',
-                        'a18old: open / tier-5 starts / open shut-out weeks (alt) per member of N',
-                        'a18new: same', f'a18old status end {common[-1]} (top 3)', f'a18new status end {common[-1]} (top 3)'],
-                       rows))
+    lines.append(f'Per-head columns are CUMULATIVE {span} values per member of N (the fixed group\'s size): ordinary '
+                 'open starts / tier-5 (college) starts / weeks shut out of a full ordinary open field '
+                 '(in brackets: weeks they played elsewhere instead).')
     lines.append('')
+    lines.append(table(['group', 'series region', 'N (fixed)',
+                        f'a18old: cumulative {span} per member of N — open starts / tier-5 starts / open shut-out weeks (alt)',
+                        f'a18new: cumulative {span} per member of N — same', f'a18old status end {common[-1]} (top 3)',
+                        f'a18new status end {common[-1]} (top 3)'], rows))
+    lines.append('')
+    return {'got': got, 'span': span, 'last': common[-1]}
 
 
 def section2(old, new, lines):
@@ -670,6 +815,7 @@ def section2(old, new, lines):
                     st[k]['col_shut'] += c.get('oo_shut', 0)
                     st[k]['col_alt'] += c.get('oo_alt', 0)
                     st[k]['col_any_open'] += sum(os_.values()) > 0
+                    st[k]['col_zero'] += c['events'] == 0
             elif c['tour'] in OAR:
                 os_ = s['open_starts'].get(g, {})
                 for k in (c['tour'], 'ALL'):
@@ -679,6 +825,11 @@ def section2(old, new, lines):
                     st[k]['mem_shut'] += c.get('oo_shut', 0)
                     st[k]['mem_alt'] += c.get('oo_alt', 0)
                     st[k]['mem_zero'] += c['events'] == 0
+                    if c['lifestyle'] == 'part_time':
+                        st[k]['mem_pt'] += 1
+                        st[k]['mem_pt_events'] += c['events']
+                        st[k]['mem_pt_open'] += sum(os_.values())
+                        st[k]['mem_pt_zero'] += c['events'] == 0
         for e in s['oo'].values():
             for k in (e['tour'], 'ALL'):
                 st[k]['ev'] += 1
@@ -695,7 +846,56 @@ def section2(old, new, lines):
         st = cache.get((a['name'], y))
         return '—' if st is None else f(st[k])
 
-    college_cohort(old, new, lines, defs, reg2series)
+    coh = college_cohort(old, new, lines, defs, reg2series)
+    common = [y for y in old['seasons'] if y in new['seasons']]
+    cap_line = None
+    if coh and common:
+        g = coh['got']
+        ly = common[-1]
+        so, sn = cache[('a18old', ly)], cache[('a18new', ly)]
+        P = []
+        def chg(a, b):
+            return f'{a:.1f} → {b:.1f} ({(b - a) / a * 100:+.0f}%)' if a else f'{a:.1f} → {b:.1f}'
+        na_m, na_c = g.get(('members', 'AM_NORTH_AMERICA')), g.get(('college', 'AM_NORTH_AMERICA'))
+        if na_m:
+            N, a, b = na_m
+            P.append(f'North America members (fixed, N = {N}): cumulative {coh["span"]} open starts per head '
+                     f'{chg(a["open"] / N, b["open"] / N)}, cumulative open shut-out weeks per head '
+                     f'{a["shut"] / N:.1f} → {b["shut"] / N:.1f}')
+        if na_c:
+            N, a, b = na_c
+            P.append(f'North America college players (fixed, N = {N}): cumulative open starts per head '
+                     f'{chg(a["open"] / N, b["open"] / N)}, cumulative open shut-out weeks per head '
+                     f'{a["shut"] / N:.1f} → {b["shut"] / N:.1f}')
+        A_o, A_n = so['ALL'], sn['ALL']
+        NA_o, NA_n = so['AM_NORTH_AMERICA'], sn['AM_NORTH_AMERICA']
+        cap_line = (f'All regions, end-status {ly} (yr {ly - common[0] + 1}): member open starts per member '
+                    f'{per(A_o["mem_open"], A_o["mem"])} → {per(A_n["mem_open"], A_n["mem"])}; member shut-out weeks per '
+                    f'member {per(A_o["mem_shut"], A_o["mem"])} → {per(A_n["mem_shut"], A_n["mem"])}; college open '
+                    f'starts per player {per(A_o["col_open"], A_o["col"])} → {per(A_n["col_open"], A_n["col"])}')
+        P.append(cap_line)
+        P.append(f'North America in {ly} (end-status): series members\' ordinary open starts per member '
+                 f'{per(NA_o["mem_open"], NA_o["mem"])} → {per(NA_n["mem_open"], NA_n["mem"])}; working (part-time) '
+                 f'amateur members, all starts per head {per(NA_o["mem_pt_events"], NA_o["mem_pt"])} → '
+                 f'{per(NA_n["mem_pt_events"], NA_n["mem_pt"])} and ordinary open starts per head '
+                 f'{per(NA_o["mem_pt_open"], NA_o["mem_pt"])} → {per(NA_n["mem_pt_open"], NA_n["mem_pt"])} '
+                 f'(the part-time amateur schedule target is 8 events: season.target_events)')
+        zs = []
+        for lab, k, n in (('college players', 'col_zero', 'col'), ('series members', 'mem_zero', 'mem'),
+                          ('working (part-time) amateur members', 'mem_pt_zero', 'mem_pt')):
+            zs.append(f'{lab} {frac(A_o[k], A_o[n])} → {frac(A_n[k], A_n[n])}')
+        incr = any((A_n[k] / A_n[n] if A_n[n] else 0) > (A_o[k] / A_o[n] if A_o[n] else 0)
+                   for _, k, n in (('', 'col_zero', 'col'), ('', 'mem_zero', 'mem'), ('', 'mem_pt_zero', 'mem_pt')))
+        P.append(f'zero-start seasons in {ly}, all regions (end-status): ' + '; '.join(zs)
+                 + (' — no group\'s zero-start share increased' if not incr else ' — at least one group\'s share increased'))
+        lines.append('**Capacity trade-off.** College players and series members compete for the same ordinary open '
+                     'field capacity. How each group\'s open starts and shut-out weeks moved between the arms, computed '
+                     'from the runs (old → new): ' + '; '.join(P) + '. '
+                     'Design status (reviewer decision, recorded here): the open-access policy is retained; the cost in '
+                     'members\' opportunities is disclosed, not offset by expanding fields.'
+                     + ('' if ly == old['seasons'][-1] == new['seasons'][-1] else
+                        f' (Partial: through {ly}, the last season both arms have committed.)'))
+        lines.append('')
     lines.append('### END-STATUS denominators: all regions, per season (old → new)')
     lines.append('')
     lines.append('**Denominators: each season\'s college players and members at that season\'s end** — membership '
@@ -718,6 +918,9 @@ def section2(old, new, lines):
         rows.append((f'{y} (yr {y - first + 1})', *[f'{cell(old, y, "ALL", f)} → {cell(new, y, "ALL", f)}' for _, f in cols]))
     lines.append(table(['season', *[c for c, _ in cols]], rows))
     lines.append('')
+    if cap_line:
+        lines.append(f'Capacity trade-off (end-status, see the paragraph above the table): {cap_line}.')
+        lines.append('')
     lines.append('### END-STATUS denominators: by series region, per season (old → new)')
     lines.append('')
     rcols = [('college players', lambda c: c['col']),
@@ -746,7 +949,206 @@ def section2(old, new, lines):
 
 
 # ---- section 3: two-seed bounded metrics -------------------------------------------------------------------------
-def section3(arms, lines):
+PATH_KIND = {'junior': 'juniors', 'late_entrant': 'new_pros'}
+
+
+def allocation_check(arms, lines):
+    """Cohort-share allocations (participation / population.entrant_rows) against the actual arrivals."""
+    lines.append('### Entrant allocation check (all arms, all committed seasons)')
+    lines.append('')
+    lines.append('Source mapping: season Y\'s `prestige.nations` holds the entrants of season Y+1 (`entrant_year`): '
+                 '`totals`, `allocated`, `existing` and `shares` per pathway (participation.record, filled by '
+                 'population.entrant_rows). The actual arrivals of Y+1 are the next season file\'s `diagnostics.created` '
+                 '(Season.note_creation: path "junior" from careers.add_juniors, "late_entrant" from '
+                 'careers.add_new_professionals; "initial" is the starting world), joined to the people table\'s country '
+                 '(nationality, never changed). Checks per arm-season and pathway: (1) shares sum to 1 within '
+                 'n_nations × 0.5e-6 (each share rounded to 6 decimals; 57 nations: 2.85e-5); (2) allocations by nation '
+                 'sum to the pathway\'s total; (3) arrivals by nation equal the allocation; (4) the total is the same in '
+                 'arms with the same seed: population.entrant_rows takes it from `existing_rule(kind, year, seed, '
+                 'baseline)` over the nation profiles the world began with (careers._cohort_args: '
+                 '`participation.baseline`), so it depends on the pathway, year and seed only, not on the arm or the '
+                 'world\'s state.')
+    lines.append('')
+    kinds = sorted({k for a in arms for y in a['seasons'] for k in a['summ'][y]['prestige'].get('totals', {})})
+    cells, ok12, fail12 = Counter(), Counter(), []
+    arr_cells = arr_ok = 0
+    mism, terminal, totals_by = [], [], defaultdict(dict)
+    agree_age = Counter()
+    for a in arms:
+        for y in a['seasons']:
+            p = a['summ'][y]['prestige']
+            ey = p.get('entrant_year')
+            for kind in kinds:
+                sh = p['shares'].get(kind, {})
+                al = p['allocated'].get(kind, {})
+                tot = p['totals'].get(kind)
+                cells[kind] += 1
+                tol = len(sh) * 0.5e-6
+                e1 = abs(sum(sh.values()) - 1)
+                good = bool(sh) and e1 <= tol and tot is not None and sum(al.values()) == tot
+                ok12[kind] += good
+                if not good:
+                    fail12.append(f'{a["name"]} {y}→{ey} {kind}: |Σshares−1| = {e1:.2e} (tol {tol:.2e}), '
+                                  f'Σallocated {sum(al.values())} vs total {tot}')
+                totals_by[(kind, ey)][(a['seed'], a['name'])] = tot
+                if ey in a['summ']:
+                    cr = a['summ'][ey]['created']
+                    act = Counter((a['people'].get(g) or {}).get('country', '?') for g, r in cr.items()
+                                  if PATH_KIND.get(r[0]) == kind)
+                    for g, r in (cr.items() if kind == kinds[0] else ()):     # (once per cohort)
+                        if r[0] in PATH_KIND:
+                            agree_age[(r[0], r[1] == 18 if r[0] == 'junior' else 21 <= r[1] <= 26)] += 1
+                    arr_cells += 1
+                    bad = [(c, al.get(c, 0), act.get(c, 0)) for c in sorted(set(al) | set(act)) if al.get(c, 0) != act.get(c, 0)]
+                    if bad:
+                        mism.append((a['name'], ey, kind, bad))
+                    else:
+                        arr_ok += 1
+                else:
+                    terminal.append((a['name'], y, ey, kind, al))
+    lines.append(f'- (1)+(2) allocation cells: ' + '; '.join(f'{k} {ok12[k]}/{cells[k]} pass' for k in kinds)
+                 + ('' if not fail12 else '. Failures: ' + '; '.join(fail12)) + '.')
+    lines.append(f'- (3) arrival cells with a next archive season: {arr_ok}/{arr_cells} match by nation'
+                 + ('' if not mism else '; mismatches (nation: allocated vs actual): ' + '; '.join(
+                     f'{n} {ey} {k}: ' + ', '.join(f'{c} {x} vs {z}' for c, x, z in bad) for n, ey, k, bad in mism)) + '.')
+    lines.append(f'- Terminal cohorts (an arm\'s last season: no next archive season, so no `diagnostics.created`): '
+                 + ', '.join(f'{n} {y}→{ey} {k}' for n, y, ey, k, _ in terminal) + ' — not verified (the checkpoint '
+                 'was not opened).')
+    sup = []
+    for n, y, ey, kind, al in terminal:
+        a = next(x for x in arms if x['name'] == n)
+        ids = [g for g, pp in a['people'].items() if pp.get('created') == ey and not pp.get('initial') and pp.get('born')]
+        act = Counter(a['people'][g]['country'] for g in ids
+                      if (kind == 'juniors' and ey - a['people'][g]['born'] == 18)
+                      or (kind == 'new_pros' and 21 <= ey - a['people'][g]['born'] <= 26))
+        if not ids:
+            sup.append(f'{n} {ey} {kind}: no people-table rows created {ey}')
+            continue
+        bad = [(c, al.get(c, 0), act.get(c, 0)) for c in sorted(set(al) | set(act)) if al.get(c, 0) != act.get(c, 0)]
+        sup.append(f'{n} {ey} {kind}: ' + ('matches' if not bad else 'differs (' + ', '.join(
+            f'{c} {x} vs {z}' for c, x, z in bad[:6]) + (' …' if len(bad) > 6 else '') + ')'))
+    agree = ', '.join(f'{p} {"agrees" if ok else "differs"}: {v}' for (p, ok), v in sorted(agree_age.items()))
+    lines.append('- Supplementary, NOT counted as verified: the terminal cohorts from the people table\'s `created` '
+                 'year and the arrival ages the code defines (juniors 18: population.junior_class; new professionals '
+                 '21–26: population.NEW_PRO_AGES). On the verified cohorts the age rule and the recorded path: '
+                 + agree + '. Terminal: ' + '; '.join(sup) + '.')
+    same = []
+    for (kind, ey), d in sorted(totals_by.items(), key=lambda kv: (kv[0][1] or 0, kv[0][0])):
+        by_seed = defaultdict(dict)
+        for (seed, name), t in d.items():
+            by_seed[seed][name] = t
+        for seed, m in by_seed.items():
+            if len(m) > 1:
+                same.append((kind, ey, seed, m, len(set(m.values())) == 1))
+    nbad = [x for x in same if not x[4]]
+    lines.append(f'- (4) totals across same-seed arms: {len(same) - len(nbad)}/{len(same)} (pathway, entrant year) '
+                 'comparisons identical' + ('' if not nbad else '; differ: ' + '; '.join(
+                     f'{k} {ey} seed {sd}: ' + ', '.join(f'{n} {t}' for n, t in m.items()) for k, ey, sd, m, _ in nbad)) + '.')
+    lines.append('')
+
+
+def venue_section(arms, lines):
+    """Venue moves in the default arms: the rule's stages reconstructed from retained season data."""
+    from golfsim import schedule as SCH, prestige as PR
+    from golfsim.course_library import default_library, event_level
+    lib = default_library(SCH.DEFAULT)
+    cal = lib.calendar
+    mw = cal.major_weeks() if callable(getattr(cal, 'major_weeks', None)) else cal.major_weeks
+    total = sum(1 for a in arms for y in a['seasons'])
+    moves = sum(a['summ'][a['seasons'][-1]]['prestige']['venue_moves_total'] for a in arms if a['seasons'])
+    lines.append('**Venue moves: natural activation not exercised in these runs; calibration of the venue-move rule '
+                 f'unexercised.** {moves} moves were decided over the {total} default-arm seed-seasons ('
+                 + ', '.join(f'{a["name"]} {len(a["seasons"])}' for a in arms) + '). Positive regression evidence that '
+                 'moves do happen under the rule: tests/test_venue_moves.py — '
+                 '`test_sustained_gap_moves_two_seasons_later_and_never_touches_the_plan` (a gap held at three season '
+                 'ends moves the event two seasons later to a physically better eligible course in the same city, '
+                 'leaving the shared plan unchanged), `test_a_second_decision_is_added_not_overwritten` (two moves, '
+                 'decided in 2029 and 2039, both kept and in force by effective year) and '
+                 '`test_save_and_resume_keep_the_history` (two moves survive a save and resume).')
+    lines.append('')
+    lines.append(f'Trigger funnel per season, reconstructed from retained data and the build\'s static course plan '
+                 f'(Season.review_venues; no simulation): eligible = held this season, single-site series, not a major '
+                 f'or qualifying stage; gap = archived event prestige − archived course prestige of the course it was '
+                 f'played on (both as set at the season end, which review_venues reads) ≥ {PR.VENUE_GAP:g}; sustained = '
+                 f'that gap at {PR.VENUE_SUSTAIN} consecutive held season ends (counted from the world\'s first season, as '
+                 f'`venue_watch` starts empty); cooldown = a move in the last {PR.VENUE_MIN_SEASONS} seasons (none were '
+                 f'recorded, so it blocks nothing); candidate = a course in the same city that the event\'s level may '
+                 f'use (course_library.LEVEL_LAYOUTS) and physically better (prestige.COURSE_QUALITY), not elite in a '
+                 f'major week; free = not booked that week in season Y+{PR.VENUE_LAG} and the event still planned at its '
+                 f'current course then (with no moves in force, the world\'s venues equal the library plan '
+                 f'`CourseLibrary.venues`, so this is reconstructable). The edition\'s week in season Y+{PR.VENUE_LAG} '
+                 'comes from the static calendar.')
+    lines.append('')
+    rows = []
+    for a in arms:
+        watch = {}
+        for y in a['seasons']:
+            p = a['summ'][y]['prestige']
+            ev, co, vs = p.get('events', {}), p.get('courses', {}), a['summ'][y]['venue_sites']
+            c = Counter()
+            target = y + PR.VENUE_LAG
+            plan = week_of = busy = None
+            for sid in sorted(ev):
+                s = cal.by_id.get(sid)
+                if s is None or s.kind in ('major', 'qualifying') or s.sites != 1:
+                    continue
+                if sid not in vs:
+                    continue                                 # not held this season: the count waits
+                c['eligible'] += 1
+                cur, lay, city = vs[sid][:3]
+                gap = ev[sid] - (co.get(cur) or 0.0)
+                n = watch[sid] = watch.get(sid, 0) + 1 if gap >= PR.VENUE_GAP else 0
+                c['gap'] += gap >= PR.VENUE_GAP
+                if n < PR.VENUE_SUSTAIN:
+                    continue
+                c['sustained'] += 1
+                if plan is None:
+                    plan = lib.venues(target)
+                    week_of = {ed.event_id: ed.week for ed in cal.editions(target)}
+                    busy = defaultdict(set)
+                    for e2, vv in plan.items():
+                        for v in vv:
+                            busy[week_of.get(e2)].add(v.course_id)
+                e_t = f'{target}:{sid}'
+                pl = plan.get(e_t)
+                if not pl or len(pl) != 1 or pl[0].course_id != cur or pl[0].city != city:
+                    c['blocked: not at this course in Y+2'] += 1
+                    continue
+                wk = week_of[e_t]
+                cur_q = PR.COURSE_QUALITY[(lib.sites[cur]['cls'], lay)]
+                better = free = False
+                for cid in lib.by_city.get(city, ()):
+                    if cid == cur:
+                        continue
+                    ok = lib._eligible(cid, event_level(s))
+                    if not ok:
+                        continue
+                    cls = lib.sites[cid]['cls']
+                    if PR.COURSE_QUALITY[(cls, ok[1])] <= cur_q or (cls == 'elite' and wk in mw):
+                        continue
+                    better = True
+                    free = free or cid not in busy[wk]
+                if not better:
+                    c['blocked: no better eligible course in the city'] += 1
+                elif not free:
+                    c['blocked: better course booked that week'] += 1
+                else:
+                    c['would move'] += 1
+            rows.append((a['name'], y, c['eligible'], c['gap'], c['sustained'], 0,
+                         c['blocked: not at this course in Y+2'], c['blocked: no better eligible course in the city'],
+                         c['blocked: better course booked that week'], c['would move'],
+                         len(p['venue_moves_decided'])))
+    lines.append(table(['arm', 'season', 'eligible events held', f'gap ≥ {PR.VENUE_GAP:g}', f'sustained {PR.VENUE_SUSTAIN} season ends',
+                        'blocked: cooldown', 'blocked: not at this course in Y+2', 'blocked: no better eligible course in the city',
+                        'blocked: better course booked that week', 'reconstructed: would move', 'moves recorded'], rows))
+    lines.append('')
+    lines.append('A nonzero "reconstructed: would move" alongside zero recorded moves would mean this reconstruction '
+                 'differs from the rule as run; the two columns are shown side by side for that check.')
+    lines.append('')
+
+
+
+def section3(arms, lines, all_arms=()):
     lines.append('## 3. Two-seed bounded metrics: a18new (seed 4207) and seed2 (seed 5309), defaults')
     lines.append('')
     lines.append('Seasons: ' + '; '.join(seasons_label(a) for a in arms) + '.')
@@ -802,6 +1204,8 @@ def section3(arms, lines):
     lines.append('')
     lines.append(table(['arm', 'season', 'decided this season', 'all decided so far'], rows))
     lines.append('')
+    venue_section(arms, lines)
+    allocation_check(all_arms, lines)
     # recruitment
     lines.append('### Recruitment (relations table: stints and refusals)')
     lines.append('')
@@ -938,6 +1342,36 @@ def section4(lines, timing_path):
         lines.append('')
         return
     t = json.loads(timing_path.read_text())
+    P = t['passes']
+    sec = lambda k: [r['seconds'] for r in P[k]['rows'] if r.get('found', True)]
+    c1, c2 = sec('1 cold, as first opened'), sec('2 cold facts, story index complete')
+    lf, si = t.get('latest_first') or {}, t.get('side_index') or {}
+    lines.append('**Scope and how it was measured.** This is evidence for indexed story assembly only: the benchmark '
+                 'calls `observer_stories.tell` (facts assembly plus narration) through the observer\'s read-only '
+                 'history; it does not cover full UI page rendering and was not run on the owner\'s hardware. "Cold" '
+                 'means application-cache cold (an empty story cache and no decoded season in the process), not '
+                 'filesystem cold: the season files may have been in the operating system\'s page cache. The sample is '
+                 f'{len(c1)} majors spread over the legacy 473690a 45-season archive (run A), assembled by the candidate '
+                 f'build\'s (c0d1ea5) assembler. Figures from story_timing.json: cold median {S.median(c1):.2f} s, max '
+                 f'{max(c1):.2f} s; with the story index built, median {S.median(c2):.3f} s; the latest edition opened '
+                 f'first: {lf.get("first_s", float("nan")):.2f} s with its facts marked pending, then '
+                 f'{lf.get("indexer_s", float("nan")):.0f} s of background story indexing; the separate one-off read-only '
+                 f'side index: {si.get("seconds", float("nan")):.0f} s, {si.get("bytes", 0) / 1e9:.2f} GB.')
+    lines.append('')
+    lines.append(f'**Memory.** The {t.get("peak_mb", 0) / 1000:.2f} GB RSS is the timing process\'s lifetime high-water '
+                 'mark (ru_maxrss), reached as decoded seasons accumulated up to the archive\'s cache bound; it is not a '
+                 'per-story allocation and does not show the absence of a leak. **Rounding:** a time shown as 0.000 s is '
+                 'below the timer\'s displayed precision, not zero.')
+    lines.append('')
+    lines.append('**Missing estimates.** The missing pre-event win estimates (so no upset is claimed in these stories) '
+                 'are a limit of the legacy archive, which predates them; upset-story behaviour in new worlds is covered '
+                 'separately by the test suite (tests/test_upset_examples.py, e.g. '
+                 '`test_no_upset_is_claimed_and_the_missing_estimate_is_named`; tests/test_stories.py, e.g. '
+                 '`test_upset_only_with_a_recorded_estimate`, `test_upset_text_states_the_estimate`).')
+    lines.append('')
+    lines.append('**Not claimed.** This section does not claim instant cold opens in the UI, and does not claim the '
+                 'local 120 s season target is verified.')
+    lines.append('')
     lines.append(t.get('summary_md', ''))
     lines.append('')
 
@@ -1004,16 +1438,18 @@ def main():
         lines += ['## 2. College access', '', 'Not available yet.', '']
     two = [arms[k] for k in ('a18new', 'seed2') if arms[k]['seasons']]
     if two:
-        section3(two, lines)
+        section3(two, lines, [a for a in arms.values() if a['seasons']])
     else:
         lines += ['## 3. Two-seed bounded metrics', '', 'Not available yet (a18new and seed2 have no committed season).', '']
     section4(lines, HERE / 'story_timing.json')
     lines.append('## What the runs do not record (and the workaround used)')
     lines.append('')
     lines += [
-        '- The weekly access outcome of each week is not kept per week; the time from the first counted blocked week '
-        'to the job is reconstructed from the monthly plans\' recorded weekly availability (decision evidence /2), '
-        'checked against the recorded `weeks_blocked` ("walk agrees").',
+        '- The weekly access outcome of each week is not kept per week: only the last n plan weeks compatible with '
+        'the recorded `weeks_blocked` are reconstructed, from the monthly plans\' recorded availability (decision '
+        'evidence /2), not actual weekly access; no exact time from the first blocked week is claimed.',
+        '- Starts after a pathway job: season starts include starts before the job; starts from the decision week on '
+        'are counted from the editions\' weeks and finishes in the season file.',
         '- Whether the home-club floor (not the regional baseline) set a start\'s familiarity is not recorded per start; '
         'starts at a home club found by country are counted as an upper bound, and the end-state source of each '
         'golfer\'s home-club familiarity is read from the people table.',

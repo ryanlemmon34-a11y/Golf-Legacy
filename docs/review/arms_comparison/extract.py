@@ -25,7 +25,7 @@ sys.dont_write_bytecode = True          # never write __pycache__ into the pinne
 
 HERE = Path(__file__).resolve().parent
 CACHE = HERE / 'cache'
-EXTRACT_VERSION = 3                       # bump when the summary's contents change
+EXTRACT_VERSION = 4                       # bump when the summary's contents change
 
 
 def use_build(build):
@@ -216,7 +216,29 @@ def extract_season(path, year, defs, homeclub_country, lib_sites):
                        'entrant_year': nat.get('entrant_year'), 'allocated': nat.get('allocated', {}),
                        'totals': nat.get('totals', {}),
                        'venue_moves_decided': pr.get('venue_moves_decided', []),
-                       'venue_moves_total': len(pr.get('venue_moves', []))}
+                       'venue_moves_total': len(pr.get('venue_moves', [])),
+                       'events': pr.get('events', {}), 'courses': pr.get('courses', {}),
+                       'existing': nat.get('existing', {})}
+    # arrivals created for this season (diagnostics.created: path junior / late_entrant / initial, age, overall) and
+    # the arrival line of each new golfer's history (season.log at week 1: "Arrived on the scene at 18 (<tour>)")
+    out['created'] = {int(g): (r.get('path'), r.get('age'), r.get('overall'), r.get('week'))
+                      for g, r in (dg.get('created') or {}).items()}
+    out['arrival_log'] = {int(g): next((t for w, t in d.get('log', {}).get(str(g), []) if t.startswith('Arrived')), None)
+                          for g in out['created']}
+    # the venue-move funnel's inputs: each held single-site edition's site (course, layout, city), kind, category
+    out['venue_sites'] = {e['series']: (e['sites'][0][0], e['sites'][0][1], e['sites'][0][2], e['kind'], e['category'],
+                                        e['tier'], e['week'])
+                          for e in d['events'] if len(e.get('sites') or []) == 1}
+    # each pathway entrant's start weeks this season (editions' weeks, from the finishes)
+    took = {r['gid'] for r in d.get('work_pathway', [])}
+    sw = defaultdict(list)
+    if took:
+        for e in d['events']:
+            for site in e.get('finish') or []:
+                for r in site:
+                    if r[0] in took:
+                        sw[r[0]].append(e['week'])
+    out['start_weeks'] = {g: sorted(v) for g, v in sw.items()}
     del d
     return out
 
@@ -266,7 +288,8 @@ def load_arm(folder, build, log=print, keep=None):
         if any(r[3] == 'country' for r in rows):
             hc_country[int(gs)] = [(r[0], r[1], r[2], r[3]) for r in rows]
     from golfsim.course_library import default_library
-    lib_sites = default_library().sites
+    from golfsim import schedule as SCH
+    lib_sites = default_library(SCH.DEFAULT).sites           # the library new worlds use (Season: SCH.DEFAULT)
     cdir = CACHE / folder_key(folder)
     cdir.mkdir(parents=True, exist_ok=True)
     summ = {}
@@ -297,7 +320,12 @@ def load_arm(folder, build, log=print, keep=None):
                              'lifestyle': (p.get('golfer') or {}).get('lifestyle'),
                              'tour': (p.get('golfer') or {}).get('tour'),
                              'staff': bool(p.get('caddie') or p.get('coach')),
-                             'died': (p.get('died') or {}).get('year') if isinstance(p.get('died'), dict) else p.get('died')}
+                             'died': (p.get('died') or {}).get('year') if isinstance(p.get('died'), dict) else p.get('died'),
+                             'initial': p.get('initial'),
+                             'first_res': ((p.get('first_residence') or {}).get('year'),
+                                           (p.get('first_residence') or {}).get('week'),
+                                           ((p.get('first_residence') or {}).get('place') or {}).get('country'),
+                                           ((p.get('first_residence') or {}).get('place') or {}).get('region'))}
                     for g, p in people.items()}
     return {'folder': str(folder), 'name': folder.name, 'man': man, 'seed': seed, 'state_source': src,
             'merged': merged, 'published': published, 'seasons': seasons, 'data': data, 'debug': debug,

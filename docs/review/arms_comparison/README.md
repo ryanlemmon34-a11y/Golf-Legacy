@@ -45,31 +45,53 @@ From the folder that holds `arms/` and `runs/` (the default inputs), in `armsan/
 
 The report keeps two kinds of denominator apart, and never mixes them in one table:
 
-- **ORIGINAL COHORT** tables follow a fixed set of the same people in both arms, chosen before the arms diverge. The
-  denominator is the cohort's size.
-  - Section 1 uses full-time, non-college amateurs aged 17–20 in 2028 (the 2028 rows are identical across the two arms
-    except for two golfers, which the report names).
-  - Section 2 uses the 2027 college players and series members. Those two arms differ from week 1, so membership comes
-    from the 2027 season record, assigned when the world was created.
+- **Fixed cohorts** follow a set of the same people in both arms; the denominator is the cohort's size. Section 1 has
+  three, never pooled:
+  - **PRETREATMENT:** full-time, non-college amateurs aged 17–20 in the shared 2027 baseline. The two arms' 2027 rows are
+    identical.
+  - **ARRIVAL:** juniors created for 2028, defined by their creation record. That is the season file's
+    `diagnostics.created` plus their arrival history line, both verified identical in both arms.
+  - **FIXED COHORT selected by the control arm's (a21old) end-2028 status:** the same people in both arms, but chosen
+    after the divergence in week 45 of 2028, so not pretreatment.
+  - Section 2's cohort is fixed at creation (pretreatment): the 2027 college players and series members. Their tour and
+    residence are the creation values; the report cites the code for this and checks it against the people table's
+    `first_residence`.
 - **END-STATUS** tables re-take membership each season from end-of-season status (or a pathway entry during the
   season). Their makeup therefore differs between arms. They describe arm-level rates, not the same people.
 
-From 2029 on, fewer than 1% of rows are identical between `a21old` and `a18old`. The same id in the other arm is
-therefore not a counterfactual for that person, and the report makes no individual comparisons after 2028.
+No table is a causal claim about an individual. Differences between arms within a fixed group are descriptive, arm-level
+differences: the worlds diverge, so other people and events differ too. From 2029 on, fewer than 1% of rows are
+identical between `a21old` and `a18old`, so the report makes no individual comparisons after 2028.
 
 ## Known limitations
 
-- **Time to the job.** The weekly access outcome is not stored week by week. The time from the first counted blocked
-  week to the job is rebuilt from the weekly availability recorded in the monthly plans (decision evidence /2). It is
-  checked against the recorded `weeks_blocked`, and matched in every entry so far.
+- **Pathway timing.** The weekly access outcome is not stored week by week. The report reconstructs only the last n plan
+  weeks compatible with each entry's recorded `weeks_blocked`. It uses the monthly plans' recorded availability (decision
+  evidence /2), not actual weekly access.
+  - "Compatible" means the plan data do not contradict the stored count. It is not an independent check, because the
+    walk stops at n.
+  - The span is not a measured time from the first blocked week, and no exact timing is claimed.
+  - A plan-based scan past n is reported separately.
+- **Starts after the job.** "Season starts in Y" includes starts made before the job. Starts from the decision week on
+  are counted from the weeks of the editions whose finishes list the golfer.
 - **Home-club floor.** Whether the home-club floor (rather than the regional baseline) set a start's familiarity is not
   recorded per start. Starts at a home club found by country are counted as an upper bound. Each golfer's current
   home-club familiarity source is read from the people table, at the last season only.
 - **Shut-outs.** Shut-outs from full ordinary open fields are golfer-weeks from the access ledger (`careers.denied`),
   not entries per event.
-- **Run A's archive.** Run A was built by 473690a and predates some facts the candidate records. Every sampled story
-  lists the pre-event win estimate as not recorded, so no upset is claimed, and some list results before 2027 as not in
-  the retained history.
-- **Story timing conditions.** The timing was measured with `nice -n 19` while two simulations ran on the same 4-CPU
-  machine, so the times include that contention. The cold passes open the sample oldest first, so each story indexed
-  at most two seasons inline. A latest-first open is timed separately.
+- **Entrant allocations.** For each arm's last season there is no next archive season, so its arrivals are "not
+  verified". A supplementary check from the people table's `created` year and the arrival ages the code defines is
+  shown separately and is not counted as verified.
+- **Venue moves.** None were decided in the default arms, so natural activation and the rule's calibration are not
+  exercised by these runs. The trigger funnel is reconstructed from retained prestige data and the build's static course
+  plan. The positive evidence that moves happen is the regression tests in tests/test_venue_moves.py.
+- **Story timing (section 4)** is evidence for indexed story assembly only.
+  - It calls `observer_stories.tell`, and does not cover full UI rendering or the owner's hardware.
+  - "Cold" means application-cache cold, not filesystem cold.
+  - The sample is 20 majors from the legacy 473690a archive (run A), assembled by the candidate build.
+  - The 2.65 GB RSS is a lifetime high-water mark, not a per-story allocation, and does not show the absence of a leak.
+  - Times shown as 0.000 s are below the timer's displayed precision.
+  - Pre-event upset estimates are missing because the legacy archive predates them; new-world upset stories are covered
+    by tests/test_upset_examples.py and tests/test_stories.py.
+  - The timing was measured with `nice -n 19` while two simulations ran on the same machine.
+  - Neither instant cold UI opens nor the local 120 s season target are claimed.

@@ -1,6 +1,6 @@
 # Arms comparison (pinned build c0d1ea5)
 
-Written 2026-10-31 11:48 UTC by armsan/analyze.py from the run folders as committed at read time (read-only). Same build for every arm; seeds pinned. Partial arms are labelled with the seasons included. No conclusions beyond the data; effects are noted, not tuned.
+Written 2026-10-31 12:02 UTC by armsan/analyze.py from the run folders as committed at read time (read-only). Same build for every arm; seeds pinned. Partial arms are labelled with the seasons included. No conclusions beyond the data; effects are noted, not tuned.
 
 | arm | seed | build | arm recorded | pathway min age in force | seasons | run state read from | archive generation |
 |---|---|---|---|---|---|---|---|
@@ -34,11 +34,60 @@ First pathway entry below 21 in a18old: season 2028, week 45 (golfer 5217, age 2
 First season with any differing row: 2028.
 Rows differing in 2028: 2 (5217 (entered the pathway below 21 in a18old), 5493); rows in one arm only: 0.
 
-### ORIGINAL COHORT (fixed membership: the same people in both arms)
+The three fixed-cohort tables below each describe the same people under each arm's rule, as recorded. None of them shows a guaranteed rescue or a causal effect on any individual's career; differences between the columns are arm-level differences within the stated group (the worlds diverge from 2028, so other people and events differ too).
 
-Membership is fixed before the arms diverge and never changes, so the two columns describe the same people and the denominator is the cohort size in both arms. Definition: golfers with a 2028 season row in both arms, the same person in both (id, name, birth year, country), and in 2028 an amateur on a non-college tour, full-time, aged 17–20 (2028 minus birth year). The 2028 rows are identical in the two arms except for 2 golfer(s) (5217, 5493); status and lifestyle are taken from the a21old row, where no pathway entry below 21 can change a 17–20-year-old's lifestyle during the season (in a18old golfer 5217 is part-time by the end of 2028, having taken work in week 45; their full-time status at the start of 2028 is the same in both arms). Amateurs aged 17–20 left out: in college 645, part-time 2.
+### PRETREATMENT COHORT: the shared 2027 baseline (fixed membership, the same people in both arms)
 
-N = 220 (by age in 2028: 18: 63, 19: 67, 20: 90). Outcomes over seasons 2028–2036.
+The arms are identical through all of 2027 (6409/6409 2027 rows identical), so a 2027 end-of-season state is pretreatment. Definition: golfers whose 2027 season row (identical in both arms, same person by id, name, birth year and country) shows an amateur on a non-college tour (2027 season file `careers.tour`), full-time, aged 17–20 in 2027 (2027 minus birth year). Left out: in college 628.
+
+N = 241 (by age in 2027: 18: 68, 19: 92, 20: 81). Outcomes over seasons 2028–2036; denominator N in both columns (the same people).
+
+| outcome (denominator: the fixed cohort, N = 241) | a21old | a18old |
+|---|---|---|
+| status at the end of 2036: pro, full-time | 11/241 (4.6%) | 18/241 (7.5%) |
+| status at the end of 2036: pro, part-time | 6/241 (2.5%) | 13/241 (5.4%) |
+| status at the end of 2036: club pro | 1/241 (0.4%) | 1/241 (0.4%) |
+| status at the end of 2036: amateur, full-time | 9/241 (3.7%) | 8/241 (3.3%) |
+| status at the end of 2036: amateur, part-time | 183/241 (75.9%) | 171/241 (71.0%) |
+| status at the end of 2036: retired | 27/241 (11.2%) | 29/241 (12.0%) |
+| status at the end of 2036: staff (coach or caddie) | 4/241 (1.7%) | 1/241 (0.4%) |
+| starts, cumulative (min/q1/med/q3/max) | 26 / 94 / 112 / 124 / 233 (n=241) | 20 / 95 / 111 / 124 / 223 (n=241) |
+| starts, total | 26,357 | 26,749 |
+| golfers with any zero-start season | 4/241 (1.7%) | 1/241 (0.4%) |
+| zero-start seasons / seasons with an active row | 4/2068 (0.2%) | 1/2061 (0.0%) |
+| golfers who entered the pathway | 79/241 (32.8%) | 74/241 (30.7%) |
+| pathway entries (ages at entry) | 79 (21: 22, 22: 25, 23: 16, 24: 14, 25: 2) | 75 (20: 11, 21: 15, 22: 21, 23: 15, 24: 9, 25: 2, 26: 2) |
+| Overall at the end of 2036 (golfers with a 2036 row) | 26.2 / 36.8 / 47.5 / 59.4 / 75.5 (n=210) | 26.2 / 36.0 / 46.4 / 59.3 / 75.5 (n=211) |
+
+Status at the end of 2036 is the golfer's 2036 season row before that winter's decisions; a golfer with no active row is classified by the exit recorded in an earlier winter (retired, became coach or caddie) or a recorded death. Starts and zero-start seasons count every season the golfer had an active row, whatever their status that season.
+
+### ARRIVAL COHORT: juniors created for 2028 (fixed at creation, the same people in both arms)
+
+Golfers who arrived for 2028 (first row in 2028), defined by their creation record, not their end-of-2028 row. Fields used: the 2028 season file's `diagnostics.created` (written by Season.note_creation at creation, week 0: path, age, Overall, attributes) and the arrival line of their history at week 1 (`log`, written by careers.add_juniors: "Arrived on the scene at 18 (<tour>)", the tour assigned by population.junior_class at creation); lifestyle at creation is the Golfer default, full-time (golfer.py). Verification: 295 junior arrivals in a21old, 711 creation records in a18old vs 711 in a21old; identical creation record, arrival line and identity in both arms for 295/295 — PASSED. Kept: juniors (all aged 18 at creation) whose creation tour is not a college tour. Left out: in college at creation 232. Late entrants (new professionals, path "late_entrant", aged 21–26) are not amateurs and are not included.
+
+N = 63 (by age in 2028: 18: 63). Outcomes over seasons 2028–2036; denominator N in both columns (the same people).
+
+| outcome (denominator: the fixed cohort, N = 63) | a21old | a18old |
+|---|---|---|
+| status at the end of 2036: pro, full-time | 4/63 (6.3%) | 4/63 (6.3%) |
+| status at the end of 2036: amateur, full-time | 5/63 (7.9%) | 3/63 (4.8%) |
+| status at the end of 2036: amateur, part-time | 53/63 (84.1%) | 49/63 (77.8%) |
+| status at the end of 2036: retired | 1/63 (1.6%) | 7/63 (11.1%) |
+| starts, cumulative (min/q1/med/q3/max) | 65 / 109 / 121 / 134 / 225 (n=63) | 63 / 108 / 123 / 134 / 227 (n=63) |
+| starts, total | 7,691 | 7,600 |
+| golfers with any zero-start season | 1/63 (1.6%) | 0/63 (0.0%) |
+| zero-start seasons / seasons with an active row | 1/566 (0.2%) | 0/550 (0.0%) |
+| golfers who entered the pathway | 26/63 (41.3%) | 28/63 (44.4%) |
+| pathway entries (ages at entry) | 26 (21: 11, 22: 8, 23: 4, 25: 3) | 28 (20: 3, 21: 9, 22: 9, 23: 2, 25: 3, 26: 2) |
+| Overall at the end of 2036 (golfers with a 2036 row) | 28.3 / 37.4 / 47.1 / 56.8 / 79.5 (n=62) | 29.6 / 37.7 / 47.9 / 56.8 / 79.4 (n=56) |
+
+Status at the end of 2036 is the golfer's 2036 season row before that winter's decisions; a golfer with no active row is classified by the exit recorded in an earlier winter (retired, became coach or caddie) or a recorded death. Starts and zero-start seasons count every season the golfer had an active row, whatever their status that season.
+
+### FIXED COHORT selected by the control arm's (a21old) end-2028 status: the same people in both arms, chosen after week 45 of 2028, not pretreatment
+
+Selected by a21old's end-of-2028 row, after the arms diverged in week 45 of 2028; the group is the same people in both columns, but its selection used a post-divergence state, so it is not a pretreatment group. Definition: golfers with a 2028 row in both arms, the same person in both, and in a21old's 2028 row an amateur on a non-college tour, full-time, aged 17–20. The 2028 rows differ between the arms for 2 golfers (5217, 5493). Left out: in college 645, part-time 2. Read every difference below as a descriptive arm difference within this selected group (for example in retirements), not as the pathway causing it.
+
+N = 220 (by age in 2028: 18: 63, 19: 67, 20: 90). Outcomes over seasons 2028–2036; denominator N in both columns (the same people).
 
 | outcome (denominator: the fixed cohort, N = 220) | a21old | a18old |
 |---|---|---|
@@ -57,7 +106,7 @@ N = 220 (by age in 2028: 18: 63, 19: 67, 20: 90). Outcomes over seasons 2028–2
 | pathway entries (ages at entry) | 85 (21: 32, 22: 26, 23: 15, 24: 8, 25: 4) | 86 (20: 14, 21: 23, 22: 24, 23: 13, 24: 4, 25: 4, 26: 4) |
 | Overall at the end of 2036 (golfers with a 2036 row) | 26.6 / 36.7 / 46.3 / 57.6 / 79.5 (n=205) | 26.6 / 36.2 / 46.0 / 57.1 / 79.4 (n=194) |
 
-Status "2036" is the golfer's 2036 season row before that winter's decisions; a golfer with no active row is classified by the exit recorded in an earlier winter (retired, became coach or caddie) or a recorded death. Starts and zero-start seasons count every season the golfer had an active row, whatever their status that season.
+Status at the end of 2036 is the golfer's 2036 season row before that winter's decisions; a golfer with no active row is classified by the exit recorded in an earlier winter (retired, became coach or caddie) or a recorded death. Starts and zero-start seasons count every season the golfer had an active row, whatever their status that season.
 
 ### The first entry below 21 (season 2028), up to the point the worlds diverge
 
@@ -129,25 +178,25 @@ Per season (END-STATUS denominators) — tracked / zero-start / any blocked / co
 | a21old | 242 | 0 | 121 | 62 | 32 | 19 | 7 | 0 | 1 |
 | a18old | 248 | 56 | 73 | 58 | 36 | 14 | 7 | 4 | 0 |
 
-### Time from the first counted blocked week to the job (denominator: each arm's entries)
+### Reconstructed: the last n plan weeks compatible with the recorded count (monthly-plan availability, not actual weekly access); unknown weeks shown
 
-Reconstructed from the monthly plans' recorded weekly availability (decision evidence /2, `schedule`: "unaff" counts, "none"/"inelig"/injured pause, anything else resets), walking back from the decision week until the recorded `weeks_blocked` is reached; "agrees" = the walk found exactly the recorded count before a reset. Weeks are calendar weeks (the winter between seasons adds none).
+The weekly access outcome is not stored week by week. This walks back from each entry's decision week over the availability the monthly plans recorded for each week (decision evidence /2, `schedule`), reading it as work_pathway.count reads access ("unaff" counts, "none"/"inelig"/injured pause, anything else resets). "Compatible" means the plan weeks contain the recorded `weeks_blocked` (n) counted weeks before any reset; it shows the plan data do not contradict the stored count, and does not validate it independently (the walk stops at n) nor give the golfer's actual weeks. "Span" is the calendar weeks from the earliest of those n plan weeks to the decision (pauses included); it is not a measured time from the first blocked week. "Longer run" scans on past n until a reset: entries whose plan-based compatible run is longer than the stored count. Plan-week availability and the weekly access ledger can differ, so a longer plan-based run is not evidence of a miscount.
 
-| arm | age band | entries | walk agrees | weeks first counted → job (min/q1/med/q3/max) | recorded weeks_blocked |
-|---|---|---|---|---|---|
-| a21old | 21+ | 242 | 242/242 (100.0%) | 8 / 9 / 12 / 21 / 72 (n=242) | 8 / 8 / 9 / 11 / 60 (n=242) |
-| a18old | 18-20 | 56 | 56/56 (100.0%) | 8 / 9 / 12 / 12 / 32 (n=56) | 8 / 8 / 9 / 10 / 20 (n=56) |
-| a18old | 21+ | 192 | 192/192 (100.0%) | 8 / 8 / 12 / 13 / 36 (n=192) | 8 / 8 / 8 / 10 / 12 (n=192) |
+| arm | age band | entries | compatible | entries with unknown plan weeks in the span | span, plan weeks (min/q1/med/q3/max) | recorded weeks_blocked | longer plan-based run than recorded | plan-based run, scanned to a reset |
+|---|---|---|---|---|---|---|---|---|
+| a21old | 21+ | 242 | 242/242 (100.0%) | 0 (0 weeks) | 8 / 9 / 12 / 21 / 72 (n=242) | 8 / 8 / 9 / 11 / 60 (n=242) | 2/242 (0.8%); 0 reach the data start | 8 / 8 / 9 / 11 / 60 (n=242) |
+| a18old | 18-20 | 56 | 56/56 (100.0%) | 0 (0 weeks) | 8 / 9 / 12 / 12 / 32 (n=56) | 8 / 8 / 9 / 10 / 20 (n=56) | 1/56 (1.8%); 0 reach the data start | 8 / 8 / 9 / 10 / 20 (n=56) |
+| a18old | 21+ | 192 | 192/192 (100.0%) | 0 (0 weeks) | 8 / 8 / 12 / 13 / 36 (n=192) | 8 / 8 / 8 / 10 / 12 (n=192) | 3/192 (1.6%); 0 reach the data start | 8 / 8 / 8 / 10 / 12 (n=192) |
 
 ### After the job (denominator: each arm's pathway entries; the entrants differ between arms)
 
-Event-based groups: who enters depends on the arm, so these are arm-level descriptions, not a comparison of the same people. For each entry in season Y: starts in Y and in Y+1 (season file `careers`), Overall change over Y+1 (ratings as each season ends), and the first career transition from the winter after Y on (within the committed seasons). Entries in the last committed season have no Y+1 yet.
+Event-based groups: who enters depends on the arm, so these are arm-level descriptions, not a comparison of the same people. For each entry in season Y: season starts in Y (including starts made before the job), starts from the decision week on (the weeks of the editions whose finishes list the golfer, from the season file `events`), the weeks from the decision to the first such start, starts in Y+1 (season file `careers`), Overall change over Y+1 (ratings as each season ends), and the first career transition from the winter after Y on (within the committed seasons). Entries in the last committed season have no Y+1.
 
-| arm | band | entries | starts in Y | starts in Y+1 | Overall change over Y+1 |
-|---|---|---|---|---|---|
-| a21old | 21+ | 242 | 0 / 7 / 9 / 10 / 14 (n=242) | 0 / 6 / 10 / 11 / 17 (n=210) | 0.00 / 0.20 / 0.30 / 0.40 / 0.80 (n=203) |
-| a18old | 18-20 | 56 | 3 / 7 / 10 / 11 / 13 (n=56) | 0 / 6 / 9 / 11 / 16 (n=52) | 0.20 / 0.40 / 0.50 / 0.65 / 1.20 (n=51) |
-| a18old | 21+ | 192 | 1 / 6 / 9 / 10 / 13 (n=192) | 0 / 6 / 10 / 10 / 15 (n=168) | 0.00 / 0.20 / 0.30 / 0.40 / 0.80 (n=162) |
+| arm | band | entries | season starts in Y (including before the job) | starts in Y from the decision week on | weeks from the decision to the first start after it | no start after the decision in Y | starts in Y+1 | Overall change over Y+1 |
+|---|---|---|---|---|---|---|---|---|
+| a21old | 21+ | 242 | 0 / 7 / 9 / 10 / 14 (n=242) | 0 / 1 / 4 / 8 / 13 (n=242) | 1 / 4 / 5 / 7 / 18 (n=202) | 40/242 (16.5%) | 0 / 6 / 10 / 11 / 17 (n=210) | 0.00 / 0.20 / 0.30 / 0.40 / 0.80 (n=203) |
+| a18old | 18-20 | 56 | 3 / 7 / 10 / 11 / 13 (n=56) | 0 / 1 / 3 / 6 / 11 (n=56) | 2 / 4 / 5 / 7 / 13 (n=46) | 10/56 (17.9%) | 0 / 6 / 9 / 11 / 16 (n=52) | 0.20 / 0.40 / 0.50 / 0.65 / 1.20 (n=51) |
+| a18old | 21+ | 192 | 1 / 6 / 9 / 10 / 13 (n=192) | 0 / 1 / 3 / 6 / 12 (n=192) | 0 / 4 / 5 / 7 / 27 (n=159) | 33/192 (17.2%) | 0 / 6 / 10 / 10 / 15 (n=168) | 0.00 / 0.20 / 0.30 / 0.40 / 0.80 (n=162) |
 
 - a21old 21+: no transition: amateur part_time 170/242 (70.2%); amateur returned to full-time golf 43/242 (17.8%); retired 22/242 (9.1%); turned pro 5/242 (2.1%); became coach 1/242 (0.4%); became caddie 1/242 (0.4%)
 - a18old 18-20: no transition: amateur part_time 41/56 (73.2%); amateur returned to full-time golf 10/56 (17.9%); retired 4/56 (7.1%); turned pro 1/56 (1.8%)
@@ -170,11 +219,13 @@ Seasons: a18old: seasons 2027–2036 (10); a18new: seasons 2027–2036 (10).
 
 Definitions as the build has them (golfsim/season.py): an ordinary open amateur event is tier 6, category "regular", amateur eligibility, of a tour in `OPEN_AMATEUR_REGIONS` (AM_NORTH_AMERICA: North America, AM_EUROPE: Europe, AM_ASIA: Asia/Middle East, AM_OCEANIA: Oceania, AM_AFRICA: Africa, AM_LATAM: Latin America); field capacity = field × 1.5 (AMATEUR_OPEN_EXPANSION). College players: amateurs on a college tour (tier 5, `CO_*`), placed in the series region of where they lived that season (season file `careers.residence`, the residence `home_college_amateur` reads). Members: amateurs whose tour is that series. Shut out: weeks recorded in the access ledger (`careers.denied`) whose first choice was an ordinary open event and every acceptable field was full ("shut out"), or they played elsewhere ("alternative"). The two arms differ from the first season (the setting acts from week 1).
 
-### ORIGINAL COHORT (fixed membership: the same people in both arms)
+### COHORT fixed at creation (pretreatment): 2027 college players and series members, the same people in both arms
 
-These two arms differ from week 1 of 2027 (the setting acts from the first week), so no later season is shared; membership is fixed by the 2027 season record, whose tour (a college tour or an amateur series) and residence were assigned when the world was created, before any week was played. Kept: amateurs whose 2027 tour and residence are the same in both arms and who are the same person (id, name, birth year, country); 0 differ and are left out. College players are placed by their 2027 residence, members by their series. Outcomes are cumulative over the seasons both arms have committed (2027–2036); status at the end of 2036 as in section 1. Denominator: the fixed group's size, the same people in both arms.
+These two arms differ from week 1 of 2027, so no played season is shared. Membership comes from the 2027 season record's tour and residence, which are the creation values: a golfer's tour is assigned at world creation (golfsim/population.py `generate_world`: `_college_or_series` and the amateur series, lines 582, 676, 678) and is changed only after the season's snapshot is taken (golfsim/season.py `end_of_season`: snapshot at line 2621, then `apply_cards` 2628, `careers.decide` 2647, `residence.review_moves` 2668); the residence is set at creation by `residence.settle(first_year, 0)` (season.py line 559), and the only writer of a move, `residence._record` (residence.py line 278), is called at week 0 or week 53 (settle, review_moves, staff_moves), never during weeks 1–52; the season file's `careers.residence` is `residence_at(gid, year, 52)` (archive.py line 213). Data check: for all 2663 members kept, the 2027 residence equals the people table's `first_residence` dated (2027, week 0) in both arms — PASSED. Kept: amateurs whose 2027 tour and residence are the same in both arms and who are the same person (id, name, birth year, country); 0 differ and are left out. College players are placed by that residence, members by their series. Denominator: the fixed group's size, the same people in both arms.
 
-| group | series region | N (fixed) | a18old: open / tier-5 starts / open shut-out weeks (alt) per member of N | a18new: same | a18old status end 2036 (top 3) | a18new status end 2036 (top 3) |
+Per-head columns are CUMULATIVE 2027–2036 values per member of N (the fixed group's size): ordinary open starts / tier-5 (college) starts / weeks shut out of a full ordinary open field (in brackets: weeks they played elsewhere instead).
+
+| group | series region | N (fixed) | a18old: cumulative 2027–2036 per member of N — open starts / tier-5 starts / open shut-out weeks (alt) | a18new: cumulative 2027–2036 per member of N — same | a18old status end 2036 (top 3) | a18new status end 2036 (top 3) |
 |---|---|---|---|---|---|---|
 | college | ASIA | 153 | 74.8 / 24.3 / 32.5 (13.0) | 74.8 / 23.9 / 26.2 (8.3) | amateur, part-time 77/153 (50%), pro, part-time 27/153 (18%), pro, full-time 22/153 (14%) | amateur, part-time 82/153 (54%), pro, part-time 25/153 (16%), pro, full-time 21/153 (14%) |
 | college | EUROPE | 188 | 62.7 / 19.3 / 18.3 (12.2) | 68.2 / 18.4 / 12.6 (7.2) | amateur, part-time 82/188 (44%), pro, part-time 45/188 (24%), retired 30/188 (16%) | amateur, part-time 99/188 (53%), retired 33/188 (18%), pro, part-time 25/188 (13%) |
@@ -186,6 +237,8 @@ These two arms differ from week 1 of 2027 (the setting acts from the first week)
 | members | LATAM | 49 | 34.6 / 0.0 / 0.0 (0.0) | 34.7 / 0.0 / 0.0 (0.0) | amateur, part-time 30/49 (61%), retired 15/49 (31%), pro, part-time 2/49 (4%) | amateur, part-time 28/49 (57%), retired 18/49 (37%), pro, part-time 1/49 (2%) |
 | members | NORTH_AMERICA | 479 | 81.8 / 0.0 / 74.6 (23.5) | 72.1 / 0.0 / 136.6 (22.8) | amateur, part-time 265/479 (55%), retired 196/479 (41%), staff (coach or caddie) 6/479 (1%) | amateur, part-time 245/479 (51%), retired 218/479 (46%), staff (coach or caddie) 8/479 (2%) |
 | members | OCEANIA | 109 | 76.4 / 0.0 / 3.0 (0.0) | 76.1 / 0.0 / 11.0 (0.4) | amateur, part-time 56/109 (51%), retired 45/109 (41%), pro, full-time 4/109 (4%) | amateur, part-time 52/109 (48%), retired 46/109 (42%), pro, full-time 5/109 (5%) |
+
+**Capacity trade-off.** College players and series members compete for the same ordinary open field capacity. How each group's open starts and shut-out weeks moved between the arms, computed from the runs (old → new): North America members (fixed, N = 479): cumulative 2027–2036 open starts per head 81.8 → 72.1 (-12%), cumulative open shut-out weeks per head 74.6 → 136.6; North America college players (fixed, N = 672): cumulative open starts per head 58.3 → 57.3 (-2%), cumulative open shut-out weeks per head 84.3 → 92.1; All regions, end-status 2036 (yr 10): member open starts per member 8.80 → 8.08; member shut-out weeks per member 9.49 → 12.54; college open starts per player 6.58 → 9.15; North America in 2036 (end-status): series members' ordinary open starts per member 9.40 → 7.76; working (part-time) amateur members, all starts per head 9.77 → 8.26 and ordinary open starts per head 9.21 → 7.75 (the part-time amateur schedule target is 8 events: season.target_events); zero-start seasons in 2036, all regions (end-status): college players 0/1024 (0.0%) → 0/1028 (0.0%); series members 0/3671 (0.0%) → 0/3608 (0.0%); working (part-time) amateur members 0/3255 (0.0%) → 0/3180 (0.0%) — no group's zero-start share increased. Design status (reviewer decision, recorded here): the open-access policy is retained; the cost in members' opportunities is disclosed, not offset by expanding fields.
 
 ### END-STATUS denominators: all regions, per season (old → new)
 
@@ -203,6 +256,8 @@ These two arms differ from week 1 of 2027 (the setting acts from the first week)
 | 2034 (yr 8) | 1033 → 1032 | 7.72 → 9.43 | 88.8% → 92.6% | 11.16 → 11.04 | 3339 → 3310 | 8.99 → 8.36 | 394 → 396 | 69.5% → 68.1% | 53.8% → 52.0% | 13.59 (3.11) → 7.70 (3.11) | 8.20 (1.19) → 11.21 (1.26) |
 | 2035 (yr 9) | 1037 → 1044 | 7.11 → 9.40 | 88.4% → 93.2% | 11.21 → 11.01 | 3499 → 3457 | 8.88 → 8.13 | 395 → 396 | 70.1% → 69.1% | 53.9% → 53.3% | 14.52 (3.25) → 8.59 (3.34) | 8.86 (1.17) → 11.97 (1.26) |
 | 2036 (yr 10) | 1024 → 1028 | 6.58 → 9.15 | 85.8% → 94.1% | 11.35 → 11.11 | 3671 → 3608 | 8.80 → 8.08 | 396 → 395 | 71.1% → 70.4% | 56.1% → 55.4% | 15.16 (3.39) → 8.86 (3.51) | 9.49 (1.18) → 12.54 (1.27) |
+
+Capacity trade-off (end-status, see the paragraph above the table): All regions, end-status 2036 (yr 10): member open starts per member 8.80 → 8.08; member shut-out weeks per member 9.49 → 12.54; college open starts per player 6.58 → 9.15.
 
 ### END-STATUS denominators: by series region, per season (old → new)
 
@@ -318,6 +373,40 @@ Venue moves (`prestige.venue_moves_decided` at the season's end; `venue_moves`: 
 | seed2 | 2030 | 0 | 0 |
 | seed2 | 2031 | 0 | 0 |
 
+**Venue moves: natural activation not exercised in these runs; calibration of the venue-move rule unexercised.** 0 moves were decided over the 15 default-arm seed-seasons (a18new 10, seed2 5). Positive regression evidence that moves do happen under the rule: tests/test_venue_moves.py — `test_sustained_gap_moves_two_seasons_later_and_never_touches_the_plan` (a gap held at three season ends moves the event two seasons later to a physically better eligible course in the same city, leaving the shared plan unchanged), `test_a_second_decision_is_added_not_overwritten` (two moves, decided in 2029 and 2039, both kept and in force by effective year) and `test_save_and_resume_keep_the_history` (two moves survive a save and resume).
+
+Trigger funnel per season, reconstructed from retained data and the build's static course plan (Season.review_venues; no simulation): eligible = held this season, single-site series, not a major or qualifying stage; gap = archived event prestige − archived course prestige of the course it was played on (both as set at the season end, which review_venues reads) ≥ 5; sustained = that gap at 3 consecutive held season ends (counted from the world's first season, as `venue_watch` starts empty); cooldown = a move in the last 10 seasons (none were recorded, so it blocks nothing); candidate = a course in the same city that the event's level may use (course_library.LEVEL_LAYOUTS) and physically better (prestige.COURSE_QUALITY), not elite in a major week; free = not booked that week in season Y+2 and the event still planned at its current course then (with no moves in force, the world's venues equal the library plan `CourseLibrary.venues`, so this is reconstructable). The edition's week in season Y+2 comes from the static calendar.
+
+| arm | season | eligible events held | gap ≥ 5 | sustained 3 season ends | blocked: cooldown | blocked: not at this course in Y+2 | blocked: no better eligible course in the city | blocked: better course booked that week | reconstructed: would move | moves recorded |
+|---|---|---|---|---|---|---|---|---|---|---|
+| a18new | 2027 | 1434 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| a18new | 2028 | 1432 | 104 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| a18new | 2029 | 1432 | 103 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| a18new | 2030 | 1436 | 103 | 29 | 0 | 23 | 6 | 0 | 0 | 0 |
+| a18new | 2031 | 1437 | 94 | 38 | 0 | 32 | 6 | 0 | 0 | 0 |
+| a18new | 2032 | 1437 | 100 | 47 | 0 | 38 | 9 | 0 | 0 | 0 |
+| a18new | 2033 | 1436 | 93 | 42 | 0 | 34 | 8 | 0 | 0 | 0 |
+| a18new | 2034 | 1437 | 100 | 46 | 0 | 38 | 8 | 0 | 0 | 0 |
+| a18new | 2035 | 1436 | 91 | 49 | 0 | 39 | 10 | 0 | 0 | 0 |
+| a18new | 2036 | 1437 | 102 | 53 | 0 | 43 | 10 | 0 | 0 | 0 |
+| seed2 | 2027 | 1429 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| seed2 | 2028 | 1429 | 102 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| seed2 | 2029 | 1435 | 105 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| seed2 | 2030 | 1434 | 101 | 28 | 0 | 22 | 6 | 0 | 0 | 0 |
+| seed2 | 2031 | 1436 | 85 | 37 | 0 | 31 | 6 | 0 | 0 | 0 |
+
+A nonzero "reconstructed: would move" alongside zero recorded moves would mean this reconstruction differs from the rule as run; the two columns are shown side by side for that check.
+
+### Entrant allocation check (all arms, all committed seasons)
+
+Source mapping: season Y's `prestige.nations` holds the entrants of season Y+1 (`entrant_year`): `totals`, `allocated`, `existing` and `shares` per pathway (participation.record, filled by population.entrant_rows). The actual arrivals of Y+1 are the next season file's `diagnostics.created` (Season.note_creation: path "junior" from careers.add_juniors, "late_entrant" from careers.add_new_professionals; "initial" is the starting world), joined to the people table's country (nationality, never changed). Checks per arm-season and pathway: (1) shares sum to 1 within n_nations × 0.5e-6 (each share rounded to 6 decimals; 57 nations: 2.85e-5); (2) allocations by nation sum to the pathway's total; (3) arrivals by nation equal the allocation; (4) the total is the same in arms with the same seed: population.entrant_rows takes it from `existing_rule(kind, year, seed, baseline)` over the nation profiles the world began with (careers._cohort_args: `participation.baseline`), so it depends on the pathway, year and seed only, not on the arm or the world's state.
+
+- (1)+(2) allocation cells: juniors 35/35 pass; new_pros 35/35 pass.
+- (3) arrival cells with a next archive season: 62/62 match by nation.
+- Terminal cohorts (an arm's last season: no next archive season, so no `diagnostics.created`): a21old 2036→2037 juniors, a21old 2036→2037 new_pros, a18old 2036→2037 juniors, a18old 2036→2037 new_pros, a18new 2036→2037 juniors, a18new 2036→2037 new_pros, seed2 2031→2032 juniors, seed2 2031→2032 new_pros — not verified (the checkpoint was not opened).
+- Supplementary, NOT counted as verified: the terminal cohorts from the people table's `created` year and the arrival ages the code defines (juniors 18: population.junior_class; new professionals 21–26: population.NEW_PRO_AGES). On the verified cohorts the age rule and the recorded path: junior agrees: 8831, late_entrant agrees: 13225. Terminal: a21old 2037 juniors: matches; a21old 2037 new_pros: matches; a18old 2037 juniors: matches; a18old 2037 new_pros: matches; a18new 2037 juniors: matches; a18new 2037 new_pros: matches; seed2 2032 juniors: matches; seed2 2032 new_pros: matches.
+- (4) totals across same-seed arms: 20/20 (pathway, entrant year) comparisons identical.
+
 ### Recruitment (relations table: stints and refusals)
 
 Staff-initiated offers = stints started by a coach or caddie (accepted) + refusals asked by a coach or caddie (turned down), by the year the approach was made, within the committed seasons (the winter after a season is recorded in that season's year, week 53). Coach arrangement "share" = youth scouting (a share of future prize money), "fee" = an approach to an established player. The first year includes the approaches made as the world starts (week 1).
@@ -365,53 +454,53 @@ mean wind (mph), by climate group × local month:
 
 | climate | J | F | M | A | M | J | J | A | S | O | N | D |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| alpine | · | · | · | 8.6 | 6.8 | 6.3 | 7.6 | 6.5 | 8.1 | 10.5 | · | · |
-| continental | · | 12.9 | 6.5 | 9.2 | 7.9 | 7.5 | 6.7 | 6.8 | 7.4 | 7.8 | 10.6 | · |
+| alpine | · | · | · | · | · | 9.0 | 8.3 | 8.8 | 8.6 | · | · | · |
+| continental | · | · | · | 9.1 | 7.8 | 7.5 | 6.5 | 6.6 | 7.3 | 7.5 | · | · |
 | desert | 9.9 | 10.6 | 12.1 | 13.1 | 13.0 | · | 12.3 | 12.5 | · | 8.8 | 10.0 | 9.2 |
-| mediterranean | 12.0 | 12.1 | 11.1 | 10.5 | 10.7 | 10.1 | 10.3 | 9.9 | 9.8 | 8.8 | 10.0 | 10.6 |
-| oceanic | 9.9 | 6.0 | 10.3 | 11.1 | 10.7 | 10.0 | 10.1 | 10.3 | 10.7 | 12.9 | 7.4 | 3.7 |
-| subtropical | 9.8 | 10.2 | 11.8 | 11.4 | 9.2 | 9.0 | 7.8 | 8.6 | 8.8 | 9.1 | 9.6 | 10.6 |
-| temperate | · | · | 10.1 | 10.2 | 8.5 | 8.0 | 7.9 | 7.6 | 8.5 | 8.7 | 8.6 | · |
-| tropical | 11.6 | 12.6 | 12.0 | 11.5 | 9.9 | 11.0 | 11.2 | 10.4 | 10.3 | 9.9 | 9.4 | 10.6 |
+| mediterranean | 12.1 | 12.1 | 10.3 | 10.3 | 10.8 | 10.1 | 10.1 | 10.1 | 9.8 | 8.8 | 10.0 | 10.6 |
+| oceanic | · | · | · | 11.0 | 10.7 | 10.0 | 10.2 | 10.3 | 10.8 | 12.9 | · | · |
+| subtropical | 9.7 | 10.2 | 11.8 | 11.6 | 9.2 | 8.9 | 8.0 | 8.8 | 8.9 | 9.2 | 9.5 | 10.5 |
+| temperate | · | · | 10.1 | 10.2 | 8.5 | 8.0 | 7.8 | 7.4 | 8.4 | 8.7 | 8.5 | · |
+| tropical | 11.7 | 12.9 | 12.0 | 11.2 | 9.9 | 10.7 | 11.4 | 10.3 | 9.9 | 9.6 | 9.6 | 11.2 |
 
 wet rounds (%), by climate group × local month:
 
 | climate | J | F | M | A | M | J | J | A | S | O | N | D |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| alpine | · | · | · | 28 | 25 | 15 | 17 | 21 | 19 | 24 | · | · |
-| continental | · | 22 | 14 | 17 | 21 | 19 | 21 | 17 | 16 | 12 | 6 | · |
+| alpine | · | · | · | · | · | 16 | 23 | 16 | 12 | · | · | · |
+| continental | · | · | · | 18 | 21 | 19 | 21 | 17 | 16 | 11 | · | · |
 | desert | 5 | 6 | 5 | 3 | 1 | · | 3 | 2 | · | 3 | 5 | 9 |
-| mediterranean | 21 | 20 | 17 | 10 | 9 | 4 | 4 | 2 | 6 | 14 | 17 | 19 |
-| oceanic | 29 | 33 | 11 | 19 | 21 | 20 | 16 | 22 | 22 | 26 | 6 | 15 |
-| subtropical | 13 | 11 | 13 | 12 | 16 | 25 | 23 | 21 | 17 | 12 | 10 | 11 |
-| temperate | · | · | 14 | 17 | 17 | 22 | 22 | 21 | 20 | 14 | 11 | · |
-| tropical | 13 | 10 | 9 | 14 | 20 | 30 | 25 | 27 | 28 | 20 | 17 | 8 |
+| mediterranean | 21 | 20 | 17 | 10 | 9 | 4 | 3 | 2 | 6 | 13 | 16 | 19 |
+| oceanic | · | · | · | 20 | 21 | 20 | 17 | 22 | 22 | 26 | · | · |
+| subtropical | 13 | 11 | 13 | 12 | 15 | 25 | 24 | 21 | 17 | 12 | 9 | 11 |
+| temperate | · | · | 13 | 17 | 18 | 22 | 22 | 22 | 20 | 14 | 11 | · |
+| tropical | 8 | 8 | 9 | 13 | 24 | 32 | 26 | 30 | 32 | 22 | 15 | 8 |
 
 mean gustiness, by climate group × local month:
 
 | climate | J | F | M | A | M | J | J | A | S | O | N | D |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| alpine | · | · | · | 0.10 | 0.07 | 0.08 | 0.09 | 0.08 | 0.08 | 0.10 | · | · |
-| continental | · | 0.22 | 0.11 | 0.15 | 0.12 | 0.10 | 0.09 | 0.08 | 0.09 | 0.11 | 0.14 | · |
+| alpine | · | · | · | · | · | 0.08 | 0.08 | 0.08 | 0.08 | · | · | · |
+| continental | · | · | · | 0.15 | 0.12 | 0.10 | 0.09 | 0.08 | 0.09 | 0.10 | · | · |
 | desert | 0.12 | 0.14 | 0.16 | 0.17 | 0.15 | · | 0.18 | 0.15 | · | 0.10 | 0.12 | 0.12 |
-| mediterranean | 0.19 | 0.18 | 0.20 | 0.15 | 0.16 | 0.15 | 0.15 | 0.14 | 0.15 | 0.14 | 0.16 | 0.18 |
-| oceanic | 0.09 | 0.08 | 0.13 | 0.14 | 0.13 | 0.11 | 0.10 | 0.12 | 0.13 | 0.15 | 0.12 | 0.07 |
-| subtropical | 0.14 | 0.15 | 0.18 | 0.17 | 0.13 | 0.12 | 0.10 | 0.12 | 0.12 | 0.13 | 0.14 | 0.14 |
+| mediterranean | 0.19 | 0.18 | 0.18 | 0.15 | 0.16 | 0.15 | 0.15 | 0.14 | 0.15 | 0.14 | 0.16 | 0.18 |
+| oceanic | · | · | · | 0.14 | 0.13 | 0.11 | 0.11 | 0.12 | 0.13 | 0.15 | · | · |
+| subtropical | 0.14 | 0.15 | 0.18 | 0.17 | 0.13 | 0.12 | 0.10 | 0.11 | 0.12 | 0.13 | 0.14 | 0.14 |
 | temperate | · | · | 0.16 | 0.17 | 0.13 | 0.11 | 0.11 | 0.11 | 0.12 | 0.12 | 0.13 | · |
-| tropical | 0.18 | 0.20 | 0.18 | 0.16 | 0.15 | 0.17 | 0.15 | 0.15 | 0.14 | 0.13 | 0.13 | 0.15 |
+| tropical | 0.19 | 0.21 | 0.19 | 0.16 | 0.15 | 0.17 | 0.15 | 0.16 | 0.14 | 0.13 | 0.14 | 0.16 |
 
 rounds, by climate group × local month:
 
 | climate | J | F | M | A | M | J | J | A | S | O | N | D |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| alpine | · | · | · | 47 | 12 | 13 | 18 | 43 | 27 | 33 | · | · |
-| continental | · | 18 | 88 | 761 | 911 | 1041 | 1153 | 965 | 977 | 465 | 18 | · |
+| alpine | · | · | · | · | · | 25 | 44 | 75 | 34 | · | · | · |
+| continental | · | · | · | 706 | 894 | 1017 | 1099 | 931 | 971 | 472 | · | · |
 | desert | 308 | 473 | 226 | 429 | 163 | · | 38 | 138 | · | 306 | 295 | 96 |
-| mediterranean | 211 | 425 | 437 | 333 | 460 | 296 | 594 | 255 | 292 | 534 | 447 | 145 |
-| oceanic | 14 | 12 | 18 | 888 | 697 | 989 | 1309 | 866 | 710 | 696 | 32 | 13 |
-| subtropical | 763 | 1212 | 999 | 980 | 863 | 679 | 1015 | 702 | 793 | 1171 | 983 | 446 |
-| temperate | · | · | 340 | 681 | 583 | 448 | 596 | 363 | 620 | 743 | 409 | · |
-| tropical | 422 | 571 | 377 | 366 | 330 | 287 | 636 | 496 | 386 | 510 | 393 | 235 |
+| mediterranean | 207 | 425 | 517 | 352 | 444 | 296 | 583 | 245 | 275 | 499 | 444 | 145 |
+| oceanic | · | · | · | 925 | 717 | 1017 | 1356 | 871 | 731 | 753 | · | · |
+| subtropical | 770 | 1240 | 1016 | 1010 | 904 | 709 | 1037 | 773 | 804 | 1175 | 1006 | 445 |
+| temperate | · | · | 365 | 710 | 597 | 461 | 611 | 372 | 629 | 787 | 429 | · |
+| tropical | 373 | 541 | 396 | 346 | 307 | 253 | 651 | 455 | 326 | 473 | 396 | 224 |
 
 By calendar month (all courses): J 10.1 mph/15% wet, F 10.8 mph/12% wet, M 10.9 mph/14% wet, A 10.6 mph/14% wet, M 9.3 mph/17% wet, J 8.8 mph/21% wet, J 8.8 mph/19% wet, A 8.9 mph/20% wet, S 9.1 mph/18% wet, O 9.8 mph/15% wet, N 9.6 mph/12% wet, D 10.4 mph/13% wet.
 
@@ -421,53 +510,53 @@ mean wind (mph), by climate group × local month:
 
 | climate | J | F | M | A | M | J | J | A | S | O | N | D |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| alpine | · | · | · | 10.6 | 5.6 | 10.0 | 9.2 | 7.2 | 10.3 | 9.2 | · | · |
-| continental | · | 17.6 | 7.8 | 9.6 | 8.7 | 7.3 | 6.9 | 6.9 | 7.2 | 8.0 | 11.0 | · |
+| alpine | · | · | · | · | · | 7.6 | 6.0 | 6.5 | 11.1 | · | · | · |
+| continental | · | · | · | 9.4 | 8.6 | 7.3 | 6.8 | 6.9 | 7.1 | 7.8 | · | · |
 | desert | 11.1 | 11.1 | 13.3 | 12.1 | 11.0 | · | 14.9 | 11.1 | · | 9.5 | 11.4 | 10.5 |
-| mediterranean | 11.4 | 11.1 | 12.7 | 9.7 | 10.5 | 10.0 | 9.8 | 9.8 | 9.3 | 9.3 | 10.2 | 13.9 |
-| oceanic | 4.2 | 4.9 | 5.8 | 10.7 | 11.3 | 10.9 | 10.1 | 10.4 | 11.1 | 13.1 | 8.0 | 5.6 |
-| subtropical | 10.0 | 9.9 | 11.6 | 11.3 | 9.0 | 8.9 | 8.4 | 8.4 | 9.0 | 9.4 | 9.9 | 10.5 |
-| temperate | · | · | 9.8 | 10.0 | 8.3 | 8.1 | 7.0 | 7.9 | 8.4 | 8.4 | 7.7 | · |
-| tropical | 12.7 | 12.0 | 10.9 | 11.2 | 10.7 | 11.4 | 11.1 | 11.1 | 11.0 | 10.3 | 9.9 | 9.7 |
+| mediterranean | 11.5 | 11.1 | 11.8 | 9.6 | 10.7 | 10.0 | 9.8 | 9.8 | 9.0 | 9.1 | 10.2 | 13.9 |
+| oceanic | · | · | · | 10.7 | 11.4 | 10.9 | 10.1 | 10.4 | 11.4 | 13.1 | · | · |
+| subtropical | 9.9 | 9.9 | 11.5 | 11.2 | 9.2 | 8.8 | 8.5 | 8.4 | 9.0 | 9.5 | 9.9 | 10.4 |
+| temperate | · | · | 9.8 | 9.9 | 8.2 | 8.1 | 7.1 | 8.1 | 8.2 | 8.5 | 7.8 | · |
+| tropical | 13.2 | 12.5 | 11.2 | 11.4 | 10.9 | 11.4 | 11.0 | 11.2 | 10.7 | 10.2 | 9.4 | 10.1 |
 
 wet rounds (%), by climate group × local month:
 
 | climate | J | F | M | A | M | J | J | A | S | O | N | D |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| alpine | · | · | · | 8 | 0 | 0 | 11 | 21 | 25 | 10 | · | · |
-| continental | · | 0 | 9 | 20 | 19 | 14 | 17 | 16 | 18 | 15 | 10 | · |
+| alpine | · | · | · | · | · | 33 | 10 | 8 | 23 | · | · | · |
+| continental | · | · | · | 21 | 19 | 14 | 17 | 16 | 18 | 15 | · | · |
 | desert | 4 | 4 | 5 | 2 | 2 | · | 11 | 1 | · | 3 | 3 | 7 |
-| mediterranean | 22 | 20 | 18 | 13 | 5 | 3 | 3 | 4 | 6 | 14 | 16 | 15 |
-| oceanic | 0 | 40 | 22 | 22 | 18 | 18 | 19 | 19 | 23 | 29 | 5 | 0 |
-| subtropical | 8 | 12 | 14 | 10 | 13 | 23 | 21 | 19 | 18 | 11 | 8 | 8 |
-| temperate | · | · | 13 | 13 | 22 | 16 | 19 | 10 | 17 | 15 | 12 | · |
-| tropical | 9 | 6 | 10 | 15 | 22 | 24 | 24 | 26 | 21 | 20 | 15 | 12 |
+| mediterranean | 21 | 20 | 17 | 13 | 5 | 3 | 1 | 2 | 6 | 12 | 17 | 15 |
+| oceanic | · | · | · | 21 | 18 | 18 | 19 | 20 | 23 | 29 | · | · |
+| subtropical | 8 | 12 | 14 | 10 | 12 | 21 | 22 | 20 | 18 | 12 | 9 | 7 |
+| temperate | · | · | 13 | 13 | 22 | 16 | 19 | 12 | 17 | 14 | 12 | · |
+| tropical | 5 | 4 | 9 | 16 | 25 | 26 | 25 | 27 | 23 | 19 | 14 | 12 |
 
 mean gustiness, by climate group × local month:
 
 | climate | J | F | M | A | M | J | J | A | S | O | N | D |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| alpine | · | · | · | 0.11 | 0.09 | 0.10 | 0.06 | 0.07 | 0.09 | 0.09 | · | · |
-| continental | · | 0.19 | 0.11 | 0.15 | 0.12 | 0.10 | 0.08 | 0.08 | 0.10 | 0.12 | 0.18 | · |
+| alpine | · | · | · | · | · | 0.11 | 0.07 | 0.07 | 0.10 | · | · | · |
+| continental | · | · | · | 0.15 | 0.12 | 0.09 | 0.08 | 0.08 | 0.09 | 0.12 | · | · |
 | desert | 0.12 | 0.13 | 0.16 | 0.17 | 0.16 | · | 0.20 | 0.15 | · | 0.10 | 0.12 | 0.15 |
-| mediterranean | 0.21 | 0.18 | 0.19 | 0.16 | 0.14 | 0.15 | 0.15 | 0.14 | 0.15 | 0.15 | 0.16 | 0.20 |
-| oceanic | 0.06 | 0.08 | 0.13 | 0.14 | 0.12 | 0.11 | 0.10 | 0.11 | 0.13 | 0.16 | 0.08 | 0.06 |
+| mediterranean | 0.21 | 0.18 | 0.18 | 0.16 | 0.14 | 0.15 | 0.15 | 0.14 | 0.15 | 0.14 | 0.16 | 0.20 |
+| oceanic | · | · | · | 0.14 | 0.13 | 0.11 | 0.10 | 0.11 | 0.13 | 0.15 | · | · |
 | subtropical | 0.14 | 0.15 | 0.18 | 0.17 | 0.13 | 0.11 | 0.10 | 0.11 | 0.12 | 0.12 | 0.13 | 0.14 |
 | temperate | · | · | 0.16 | 0.17 | 0.13 | 0.11 | 0.10 | 0.10 | 0.12 | 0.12 | 0.13 | · |
-| tropical | 0.18 | 0.19 | 0.18 | 0.17 | 0.14 | 0.16 | 0.16 | 0.15 | 0.15 | 0.14 | 0.13 | 0.15 |
+| tropical | 0.19 | 0.20 | 0.19 | 0.17 | 0.14 | 0.17 | 0.16 | 0.15 | 0.13 | 0.13 | 0.13 | 0.16 |
 
 rounds, by climate group × local month:
 
 | climate | J | F | M | A | M | J | J | A | S | O | N | D |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| alpine | · | · | · | 26 | 5 | 5 | 9 | 19 | 12 | 20 | · | · |
-| continental | · | 6 | 44 | 374 | 453 | 529 | 576 | 490 | 492 | 220 | 10 | · |
+| alpine | · | · | · | · | · | 12 | 20 | 40 | 13 | · | · | · |
+| continental | · | · | · | 347 | 440 | 517 | 549 | 473 | 488 | 221 | · | · |
 | desert | 159 | 234 | 111 | 207 | 81 | · | 19 | 69 | · | 152 | 140 | 46 |
-| mediterranean | 106 | 208 | 217 | 161 | 214 | 143 | 297 | 129 | 145 | 263 | 220 | 71 |
-| oceanic | 7 | 5 | 9 | 448 | 344 | 481 | 658 | 424 | 365 | 348 | 19 | 5 |
-| subtropical | 378 | 615 | 513 | 496 | 443 | 342 | 499 | 354 | 392 | 583 | 495 | 221 |
-| temperate | · | · | 174 | 345 | 295 | 226 | 296 | 184 | 299 | 376 | 196 | · |
-| tropical | 211 | 282 | 174 | 176 | 167 | 142 | 324 | 252 | 198 | 265 | 198 | 127 |
+| mediterranean | 104 | 208 | 257 | 171 | 208 | 143 | 292 | 124 | 138 | 245 | 218 | 71 |
+| oceanic | · | · | · | 468 | 356 | 498 | 675 | 429 | 375 | 381 | · | · |
+| subtropical | 383 | 627 | 519 | 507 | 466 | 359 | 511 | 379 | 401 | 580 | 513 | 217 |
+| temperate | · | · | 189 | 363 | 302 | 230 | 305 | 187 | 304 | 403 | 204 | · |
+| tropical | 187 | 270 | 184 | 167 | 154 | 125 | 335 | 231 | 166 | 248 | 198 | 120 |
 
 By calendar month (all courses): J 10.5 mph/12% wet, F 10.5 mph/11% wet, M 11.1 mph/14% wet, A 10.5 mph/14% wet, M 9.7 mph/16% wet, J 9.1 mph/16% wet, J 8.8 mph/17% wet, A 9.0 mph/18% wet, S 9.2 mph/18% wet, O 10.0 mph/16% wet, N 9.7 mph/12% wet, D 10.6 mph/13% wet.
 
@@ -497,6 +586,14 @@ Baseline starts = season file `familiar_base` (starts where the regional baselin
 - seed2 (people table people.g000005.json.gz): golfers with a home club recorded (retired included) 10,132; found by country 14/10132 (0.1%); current home-club familiarity from: region 7171, played 2958, home club 3
 
 ## 4. Story timing on the pinned long archive (run A, 45 seasons, build 473690a)
+
+**Scope and how it was measured.** This is evidence for indexed story assembly only: the benchmark calls `observer_stories.tell` (facts assembly plus narration) through the observer's read-only history; it does not cover full UI page rendering and was not run on the owner's hardware. "Cold" means application-cache cold (an empty story cache and no decoded season in the process), not filesystem cold: the season files may have been in the operating system's page cache. The sample is 20 majors spread over the legacy 473690a 45-season archive (run A), assembled by the candidate build's (c0d1ea5) assembler. Figures from story_timing.json: cold median 7.44 s, max 11.85 s; with the story index built, median 0.103 s; the latest edition opened first: 3.08 s with its facts marked pending, then 102 s of background story indexing; the separate one-off read-only side index: 218 s, 1.05 GB.
+
+**Memory.** The 2.65 GB RSS is the timing process's lifetime high-water mark (ru_maxrss), reached as decoded seasons accumulated up to the archive's cache bound; it is not a per-story allocation and does not show the absence of a leak. **Rounding:** a time shown as 0.000 s is below the timer's displayed precision, not zero.
+
+**Missing estimates.** The missing pre-event win estimates (so no upset is claimed in these stories) are a limit of the legacy archive, which predates them; upset-story behaviour in new worlds is covered separately by the test suite (tests/test_upset_examples.py, e.g. `test_no_upset_is_claimed_and_the_missing_estimate_is_named`; tests/test_stories.py, e.g. `test_upset_only_with_a_recorded_estimate`, `test_upset_text_states_the_estimate`).
+
+**Not claimed.** This section does not claim instant cold opens in the UI, and does not claim the local 120 s season target is verified.
 
 Archive: `runs/A/world_360013/archive` (seasons 2027–2071, 45 seasons, archive build 473690a); story code: the candidate build `arms/build_c0d1ea5`. Read through a mirror of its MANIFEST and links to the files it names (`armsan/story_mirror/60e05d28ff57/archive`); its own index.sqlite was never opened. Measured 2026-10-31 11:03:14–2026-10-31 11:11:10 UTC with `nice -n 19` while two simulations ran on the same 4-CPU machine (times include that contention).
 
@@ -547,9 +644,10 @@ Facts the sampled stories list as not recorded (`missing`, pass 2; editions of t
 
 ## What the runs do not record (and the workaround used)
 
-- The weekly access outcome of each week is not kept per week; the time from the first counted blocked week to the job is reconstructed from the monthly plans' recorded weekly availability (decision evidence /2), checked against the recorded `weeks_blocked` ("walk agrees").
+- The weekly access outcome of each week is not kept per week: only the last n plan weeks compatible with the recorded `weeks_blocked` are reconstructed, from the monthly plans' recorded availability (decision evidence /2), not actual weekly access; no exact time from the first blocked week is claimed.
+- Starts after a pathway job: season starts include starts before the job; starts from the decision week on are counted from the editions' weeks and finishes in the season file.
 - Whether the home-club floor (not the regional baseline) set a start's familiarity is not recorded per start; starts at a home club found by country are counted as an upper bound, and the end-state source of each golfer's home-club familiarity is read from the people table.
 - Per-week entrants who were refused by a full ordinary open field are recorded only as the golfer's week (`careers.denied`: first choice and what they played instead); counts above are golfer-weeks, not entries per event.
 - The run state (seed rows, extras) is checkpointed every season in seed_<s>.state.pkl; seed_<s>.json.gz only every 5 seasons. The report reads whichever lists more seasons, and only seasons also published in the archive.
 
-_Analysis time: 30 s._
+_Analysis time: 20 s._
