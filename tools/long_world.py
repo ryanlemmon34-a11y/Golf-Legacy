@@ -316,6 +316,21 @@ def safeguards(data, y, ch, total, out, start_active):
         print(f'FLAG {data["flags"][y]}', flush=True)
 
 
+ARM_SETTINGS = {'work_pathway_min_age': 'work_pathway_min_age', 'college_open_access': 'college_open_access'}
+
+
+def apply_arm(data, season, arm):
+    """A controlled comparison arm (session mode, new worlds): set the named per-world rule settings on the world
+    before it plays, and keep them in the run state; a resume must ask for the same arm (refused otherwise, as the
+    support setting is). Settings not named keep the build's defaults for a new world."""
+    asked = {k: v for k, v in arm.items() if v is not None}
+    if 'arm' in data and data['arm'] != asked:
+        raise SystemExit(f'this run was made as arm {data["arm"]}; resume it with the same settings, not {asked}')
+    for k, v in asked.items():
+        setattr(season, ARM_SETTINGS[k], v)
+    data['arm'] = asked
+
+
 def record_world_rules(data, season):
     """Per-world rule settings the report reads, recorded after a world is created or resumed (either mode): the
     work pathway's minimum age in force (rules 2026-11-10: 18 in new worlds; 21 in a world started earlier, which
@@ -323,7 +338,8 @@ def record_world_rules(data, season):
     data['work_pathway_min_age'] = getattr(season, 'work_pathway_min_age', 21)
 
 
-def run_world_session(seed, years, workers, out, resume=False, scale=1.0, amateur_support=True, keep_after=None):
+def run_world_session(seed, years, workers, out, resume=False, scale=1.0, amateur_support=True, keep_after=None,
+                      arm=None):
     """Run (or resume) one world through the persistent weekly session and the observer, exactly as a
     player skips to the end of each season: the session's checkpoint generations are the resumable saves
     and its archive (world_<seed>/archive) the history. Each season is timed part by part (simulate, save,
@@ -358,6 +374,7 @@ def run_world_session(seed, years, workers, out, resume=False, scale=1.0, amateu
         s.close()
     w = observer.World(d)
     check_support(getattr(w.session.season, 'amateur_support_on', True), amateur_support, f'seed {seed} (its world)')
+    apply_arm(data, w.session.season, arm or {})
     record_world_rules(data, w.session.season)
     first = data['first']
     if pending_path.exists():                       # a season captured but not yet merged when the run stopped
@@ -1008,6 +1025,11 @@ def main():
                     'timing every season skip (the long test)')
     ap.add_argument('--no-amateur-support', action='store_true', help='the comparison arm: the same build and rules '
                     'with amateur support switched off (session mode, new worlds only)')
+    ap.add_argument('--pathway-min-age', type=int, default=None, help='comparison arm (session mode, new worlds): '
+                    'the work pathway\'s minimum age in this world (default: the build\'s, 18 from rules 2026-11-10)')
+    ap.add_argument('--college-open-access', choices=('on', 'off'), default=None, help='comparison arm (session mode, '
+                    'new worlds): college golfers\' home-region access to ordinary open amateur events (rules '
+                    '2026-11-11; default: the build\'s, on)')
     ap.add_argument('--keep-after', type=int, default=None, help='copy the world after this many seasons and record '
                     'the next season\'s digests, for a determinism replay (tools/determinism_replay.py)')
     a = ap.parse_args()
@@ -1029,13 +1051,16 @@ def main():
         man.update({'format': FORMAT, 'commit': commit, 'engine': _eid(), 'dirty': dirty, 'python': platform.python_version(),
                     'machine': machine(),
                     'started': time.strftime('%Y-%m-%d %H:%M:%S'), 'years_requested': a.years,
-                    'config': config(), 'mature': a.mature, 'amateur_support': not a.no_amateur_support})
+                    'config': config(), 'mature': a.mature, 'amateur_support': not a.no_amateur_support,
+                    'arm': {'pathway_min_age': a.pathway_min_age, 'college_open_access': a.college_open_access}})
         man.setdefault('seeds', {})
         (out / 'manifest.json').write_text(json.dumps(man, indent=1, default=str))
         for seed in a.seeds:
             if a.session:
+                arm = {'work_pathway_min_age': a.pathway_min_age,
+                       'college_open_access': None if a.college_open_access is None else a.college_open_access == 'on'}
                 run_world_session(seed, a.years, a.workers, out, a.resume, a.scale, not a.no_amateur_support,
-                                  a.keep_after)
+                                  a.keep_after, arm)
             else:
                 run_world(seed, a.years, a.workers, out, a.resume, a.save_every)
     man = load_manifest(out)

@@ -118,5 +118,34 @@ class WorldRulesRecorded(unittest.TestCase):
         self.assertEqual(data['work_pathway_min_age'], 18)
 
 
+class ComparisonArms(unittest.TestCase):
+    """A controlled comparison arm sets the named per-world settings before the world plays and keeps them in the
+    run state; a resume asking for another arm is refused; unnamed settings keep the build's defaults."""
+
+    def test_settings_applied_and_kept(self):
+        from types import SimpleNamespace as NS
+        season, data = NS(work_pathway_min_age=18, college_open_access=True), {}
+        LW.apply_arm(data, season, {'work_pathway_min_age': 21, 'college_open_access': False})
+        self.assertEqual((season.work_pathway_min_age, season.college_open_access), (21, False))
+        self.assertEqual(data['arm'], {'work_pathway_min_age': 21, 'college_open_access': False})
+        LW.record_world_rules(data, season)
+        self.assertEqual(data['work_pathway_min_age'], 21)              # the report reads the arm's age
+
+    def test_unnamed_settings_keep_the_defaults(self):
+        from types import SimpleNamespace as NS
+        season, data = NS(work_pathway_min_age=18, college_open_access=True), {}
+        LW.apply_arm(data, season, {'work_pathway_min_age': None, 'college_open_access': None})
+        self.assertEqual((season.work_pathway_min_age, season.college_open_access), (18, True))
+        self.assertEqual(data['arm'], {})
+
+    def test_a_resume_must_ask_for_the_same_arm(self):
+        from types import SimpleNamespace as NS
+        season, data = NS(work_pathway_min_age=18, college_open_access=True), {'arm': {'work_pathway_min_age': 21}}
+        with self.assertRaisesRegex(SystemExit, 'same settings'):
+            LW.apply_arm(data, season, {'work_pathway_min_age': 18})
+        LW.apply_arm(data, season, {'work_pathway_min_age': 21})         # the same arm: fine
+        self.assertEqual(season.work_pathway_min_age, 21)
+
+
 if __name__ == '__main__':
     unittest.main()
