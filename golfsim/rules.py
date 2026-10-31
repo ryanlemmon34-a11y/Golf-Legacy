@@ -48,7 +48,10 @@ VERSIONS = (
                    'look for different players, and coaches of established players and caddies without a bag make '
                    'offers themselves; golfers, coaches and caddies may each turn an approach down; a '
                    'working partnership\'s loyalty (rapport, fit, results together) weighs against a better-known '
-                   'offer. Approach, acceptance, refusal and departure reasons are recorded.'),
+                   'offer. Approach, acceptance, refusal and departure reasons are recorded. A caddie\'s reputation '
+                   '(and so their fee) follows the season of the bag they carry as the season ends, before the '
+                   'winter\'s career decisions (it had moved after them), so a golfer judged able to pay their own '
+                   'way is judged on next season\'s caddie fee; every such decision keeps the figures it used.'),
 )
 EARLIER = ('Seasons archived before rules versions were recorded were played under earlier rules. The '
            'differences that matter for reading old results: a winner without a Premier card held no '

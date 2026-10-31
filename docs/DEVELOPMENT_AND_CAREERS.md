@@ -105,7 +105,8 @@ ends when the golfer pays their own way — judged without the support being wit
 winnings arrive, and then either their winnings *proven at that level* (eight or more events there,
 counted cautiously) and sponsors cover a season, or their sponsor contract alone does, or their own savings
 (not family money, not the backers', not credit) cover three seasons of losses with no winnings counted
-at a level they have not proven; the history says which. A new card raises the golfer's desire to
+at a level they have not proven; the history says which, and the figures the decision used are kept
+with it (the costs are next season's: a caddie's fee has already followed the season). A new card raises the golfer's desire to
 continue and their opportunities, but is not yet an income. A professional
 without backers can attract them with a breakthrough season (a win, promotion or a big ranking jump; the
 younger, the likelier), or once they need them: with less than a season of their own money, odds grow

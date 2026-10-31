@@ -2300,6 +2300,9 @@ class Season:
             row['demoted'] = new_tier > row['tier'] and row['tier'] <= 4
         for gid, frm, to, why in self.card_log[year]:
             self.log(gid, year, 53, f'{TOUR_BY_KEY[frm].name if frm in TOUR_BY_KEY else "—"} → {TOUR_BY_KEY[to].name} ({why})')
+        # caddies' reputations, and with them their fees, follow the season before anyone decides on the next:
+        # the costs the winter's decisions weigh (backers stepping aside among them) are next season's
+        ST.caddie_reputations(self, year, snap)
         if self.development:
             from . import careers
             self.note_peaks(year, 52)                        # the season's ratings, before retirements and aging

@@ -201,7 +201,7 @@ def decision_text(t):
         parts.append('places already secured: ' + '; '.join(t['secured']))
     if t.get('forecast'):                              # the figures a "paying their own way" decision used
         f = t['forecast']
-        parts.append(f'savings {O.money(f["cash"])} against next season\'s forecast costs {O.money(f["costs"])} and '
+        parts.append(f'cash {O.money(f["cash"])} against next season\'s forecast costs {O.money(f["costs"])} and '
                      f'income {O.money(f["income"])}')
     if t.get('net') is not None:
         parts.append(f'season net {O.money(t["net"])}')
