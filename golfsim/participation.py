@@ -28,6 +28,11 @@ Participation multiplier and shares
     (population.expected_shares), fixed when the world began. Entrants of season Y+1 use the prestige of the
     seasons through Y (decided at Y's end).
 
+Rounding (rules 2026-11-13): each year's total is split by the shares with every nation's fraction carried
+forward (population.allocate_with_carry), so a small nation's quota of 0.2 a year becomes a golfer about one year
+in five instead of never; the total is unchanged and no nation is ever more than about one place ahead of, or
+behind, its exact cumulative quota. Worlds started earlier keep the year-by-year rounding (allocate).
+
 Long-term bounds: a nation's multiplier stays within 0.25-4 of its starting value, and moves at most 10 % a
 year, so going from 1 to 4 (or 0.25) takes at least 15 years of sustained prestige 100 (or 0). Because shares
 are normalised, a small nation's share relative to its start can reach up to 4 / (the world's average
@@ -99,6 +104,25 @@ class Participation:
         self.success = {}                    # season -> {country: [actual fame, expected fame]}
         self.history = {}                    # entrant season -> what decided its shares, and its allocations
         self.closed = None                   # the last season whose prestige was settled
+        self.carry_on = True                 # rules 2026-11-13: fractions carried forward (allocate_with_carry)
+        self.carry = {k: {} for k in PATHWAYS}   # pathway -> {country: fraction carried into the next allocation}
+        self.carry_settled = {}              # pathway -> (entrant season, carry before it): a repeat uses the same
+
+    def __setstate__(self, state):
+        state.setdefault('carry_on', False)          # worlds saved before rules 2026-11-13: year-by-year rounding
+        state.setdefault('carry', {k: {} for k in PATHWAYS})
+        state.setdefault('carry_settled', {})
+        self.__dict__.update(state)
+
+    def carry_for(self, kind, year):
+        """The carry an allocation for entrant season `year` starts from (None: the year-by-year rounding). A
+        pathway settled again for the same season (a repeat) starts from the same carry, so it allocates the same."""
+        if not self.carry_on:
+            return None
+        done = self.carry_settled.get(kind)
+        if done is not None and done[0] == year:
+            return dict(done[1])
+        return dict(self.carry.get(kind, {}))
 
     # -- evidence ---------------------------------------------------------------------------------------------
     def note_site(self, year, rows):
@@ -146,11 +170,15 @@ class Participation:
         return normalised({c: base[c] * self.multiplier[c] for c in base})
 
     def record(self, year, kind, report):
-        """What a pathway created for season `year` (population.entrant_rows' report)."""
+        """What a pathway created for season `year` (population.entrant_rows' report), and the carry after it."""
         h = self.history.setdefault(year, {'decided': None, 'totals': {}, 'allocated': {}, 'existing': {}})
         h['totals'][kind] = report['total']
         h['allocated'][kind] = dict(report['allocated'])
         h['existing'][kind] = dict(report['existing'])
+        if 'carry_after' in report:
+            self.carry_settled[kind] = (year, dict(report['carry_before']))
+            self.carry[kind] = dict(report['carry_after'])
+            h.setdefault('carry', {})[kind] = {c: round(v, 6) for c, v in report['carry_after'].items()}
 
     def starting_table(self):
         """[(country, juniors share, new professionals share, expected juniors, expected new professionals)],

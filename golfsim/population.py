@@ -406,18 +406,52 @@ def allocate(total, shares):
     return out
 
 
+def allocate_with_carry(total, shares, carry):
+    """`allocate` with each nation's fraction carried forward (rules 2026-11-13): (allocation, carry after).
+
+    A nation's entitlement this year is its exact quota (total x share) plus the carry: what earlier years' whole
+    places left over (positive: still owed) or advanced (negative: a place given ahead of its quota). Each nation
+    gets the whole part of its entitlement, then the places still left go to the largest remaining fractions, as
+    `allocate` (ties: the larger quota, then the nation's name). The carry after is entitlement minus places. So
+    the total is exactly the year's total, the carries always sum to what they summed to before (0 from a world's
+    start), and a nation whose quota is 0.2 a year gets a place about one year in five instead of never.
+
+    Bounded both ways: a nation is never more than one place behind its exact cumulative quota (carry < 1, or
+    < 2 in the rare year places must be taken back, below) and never more than one place ahead (carry > -1), so
+    no nation can borrow future places beyond one. A negative entitlement (a small nation given a place ahead of a
+    tiny quota) counts as none. If the whole parts then exceed the total (possible only after such a year), places
+    are taken back from the nations most ahead (smallest fraction left, ties: the smaller quota, then the name).
+    No minimum per nation, no extra golfers, nothing about talent: only how the fixed total is rounded."""
+    shares = normalised(shares)
+    quota = {c: total * s for c, s in shares.items()}
+    owed = {c: quota[c] + carry.get(c, 0.0) for c in quota}
+    out = {c: max(0, int(math.floor(o))) for c, o in owed.items()}
+    left = total - sum(out.values())
+    if left > 0:
+        order = sorted(owed, key=lambda c: (-(owed[c] - out[c]), -quota[c], c))
+        for c in order[:left]:
+            out[c] += 1
+    elif left < 0:
+        order = sorted((c for c in owed if out[c] > 0), key=lambda c: (owed[c] - out[c], quota[c], c))
+        for c in order[:-left]:
+            out[c] -= 1
+    return out, {c: owed[c] - out[c] for c in owed}
+
+
 def normalised(weights):
     tot = sum(weights.values())
     return {c: (w / tot if tot > 0 else 0.0) for c, w in weights.items()}
 
 
-def entrant_rows(kind, year, seed, profiles, baseline=None, shares=None, report=None):
+def entrant_rows(kind, year, seed, profiles, baseline=None, shares=None, report=None, carry=None):
     """This year's entrant rows for a pathway under the cohort-share rule (see the block comment above).
     profiles: the nations now (each nation's own distribution); baseline: the profiles the world began with
     (the total; default `profiles`); shares: {country: share} (default: the expected shares of the existing
     rule, expected_shares). Every nation gets exactly its allocation and the rows number exactly the total.
-    `report` (a dict) receives 'total', 'existing' (the existing rule's count per nation), 'allocated' and
-    'draws'."""
+    `carry` ({country: fraction carried from earlier years}, rules 2026-11-13): the allocation carries each
+    nation's fraction forward (allocate_with_carry) instead of dropping it every year (allocate); None: the
+    earlier rounding. `report` (a dict) receives 'total', 'existing' (the existing rule's count per nation),
+    'allocated', 'draws' and, with a carry, 'carry_before' and 'carry_after'."""
     baseline = baseline or profiles
     if set(baseline) != set(profiles):
         raise ValueError('the baseline and current nation profiles must name the same nations')
@@ -426,7 +460,10 @@ def entrant_rows(kind, year, seed, profiles, baseline=None, shares=None, report=
     shares = shares if shares is not None else expected_shares(kind, baseline)
     if set(shares) != set(profiles):
         raise ValueError('a share is needed for every nation')
-    alloc = allocate(total, shares)
+    if carry is None:
+        alloc, after = allocate(total, shares), None
+    else:
+        alloc, after = allocate_with_carry(total, shares, carry)
     rows = []
     draws = {}
     for country, prof in profiles.items():
@@ -445,6 +482,8 @@ def entrant_rows(kind, year, seed, profiles, baseline=None, shares=None, report=
         draws[country] = st.draws
     if report is not None:
         report.update(total=total, existing={c: len(r) for c, (r, _) in base.items()}, allocated=alloc, draws=draws)
+        if after is not None:
+            report.update(carry_before=dict(carry), carry_after=after)
     return rows
 
 
@@ -568,11 +607,12 @@ def expected_shares(kind, profiles):
     return normalised(expected_counts(kind, profiles))
 
 
-def junior_class(year, seed, profiles, start_id, taken, in_use=None, baseline=None, shares=None, report=None):
+def junior_class(year, seed, profiles, start_id, taken, in_use=None, baseline=None, shares=None, report=None,
+                 carry=None):
     """This year's 18-year-olds from every nation (amateurs: college or amateur golf), by the cohort-share
     rule (entrant_rows: the total from the baseline profiles, split by `shares`). Names: see
     names.make_name (`taken`: every name used so far; `in_use`: those of people active now)."""
-    rows = entrant_rows('juniors', year, seed, profiles, baseline, shares, report)
+    rows = entrant_rows('juniors', year, seed, profiles, baseline, shares, report, carry)
     rows.sort(key=lambda r: -r[4])
     golfers = [_make_golfer(start_id + i, row, year, f'{seed}:j{year}', profiles, taken, in_use)
                for i, row in enumerate(rows)]
@@ -587,7 +627,8 @@ NEW_PRO_SCALE = 5.5               # aspiring professionals a year, in birth coho
 NEW_PRO_AGES = (21, 22, 23, 24, 25, 26)
 
 
-def new_professionals(year, seed, profiles, start_id, taken, in_use=None, baseline=None, shares=None, report=None):
+def new_professionals(year, seed, profiles, start_id, taken, in_use=None, baseline=None, shares=None, report=None,
+                      carry=None):
     """This year's new professionals from outside the tracked amateur game.
 
     The junior class follows one route into professional golf in detail (college and national amateur
@@ -602,7 +643,7 @@ def new_professionals(year, seed, profiles, start_id, taken, in_use=None, baseli
     depends on how many golfers the tours hold now: it is a steady flow, not a top-up.
     Since rules 2026-11-05 that flow's yearly total is split between nations by the cohort-share rule
     (entrant_rows), like the junior class."""
-    rows = entrant_rows('new_pros', year, seed, profiles, baseline, shares, report)
+    rows = entrant_rows('new_pros', year, seed, profiles, baseline, shares, report, carry)
     rows.sort(key=lambda r: -r[4])
     golfers = [_make_golfer(start_id + i, row, year, f'{seed}:p{year}', profiles, taken, in_use)
                for i, row in enumerate(rows)]

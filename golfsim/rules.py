@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import re
 
-RULES_VERSION = '2026-11-11'
+RULES_VERSION = '2026-11-13'
 RANKING_RULE = 'world-ranking-1'     # the world ranking's formula (unchanged since the world began; named now)
 VERSIONS = (
     ('2026-10-30', 'Winners\' exemptions count whatever a golfer\'s membership (a non-member champion earns a '
@@ -99,6 +99,12 @@ VERSIONS = (
                    'eligibility, field sizes (up to 1.5 times the usual field) and the calendar; no place is '
                    'reserved or guaranteed, and members can lose places in full fields. Worlds started earlier keep '
                    'the previous order.'),
+    ('2026-11-13', 'Nations\' shares of the new golfers are rounded fairly over time: each year\'s fixed total is split '
+                   'by the shares as before, but every nation\'s unrounded fraction is carried forward to the next year '
+                   'instead of being dropped, so a small nation whose share is worth a fifth of a golfer a year gets one '
+                   'about every fifth year. The total each year is unchanged, nobody is given a minimum place, no '
+                   'nation gets more than about one golfer ahead of its share, and talent is untouched. Worlds started '
+                   'earlier keep the year-by-year rounding.'),
 )
 EARLIER = ('Seasons archived before rules versions were recorded were played under earlier rules. The '
            'differences that matter for reading old results: a winner without a Premier card held no '
@@ -393,7 +399,8 @@ RULES = {
         'The number of new juniors (18) and new professionals (21-26) each year is what the existing rule '
         'creates from the nations as the world began, with the same random draws: prestige never adds or removes '
         'a golfer. That number is split between nations by share (largest remainders; ties by the larger quota, '
-        'then the name), and each nation draws candidates from its own unchanged talent distribution until '
+        'then the name; since rules 2026-11-13 each nation\'s unrounded fraction is carried forward to the next '
+        'year, so small shares are met over time), and each nation draws candidates from its own unchanged talent distribution until '
         'exactly its number has passed the pathway\'s usual filter; nobody\'s nationality ever changes. A '
         'nation\'s share is its starting share (its expected share under the existing rule) times its '
         'participation multiplier, normalised to 100%. The multiplier follows national prestige: in every event '
@@ -403,7 +410,7 @@ RULES = {
         'R = (actual + 150) / (expected + 150), prestige = 50 + 25 x log2 R within 0-100, and the multiplier '
         'moves toward 4 ^ ((prestige - 50) / 50) -- between 0.25 and 4 -- by at most 10% a year. Set at each '
         'season\'s end for the next season\'s entrants.',
-        '2026-11-05'),
+        '2026-11-13'),
     'amateur-return': (
         'Returning from work to full-time amateur golf',
         'Each winter a working (part-time) amateur outside college who did not turn professional may return to '

@@ -567,11 +567,12 @@ def names_in_use(season):
             | {p.name for p in list(st.coaches.values()) + list(st.caddies.values()) if p.status == 'active'})
 
 
-def _cohort_args(season, kind):
+def _cohort_args(season, kind, year):
     """The cohort-share rule's inputs for a pathway (population.entrant_rows, participation.py): the total from
-    the nation profiles the world began with, split by each nation's share now (the report is filled in)."""
+    the nation profiles the world began with, split by each nation's share now, each nation's fraction carried
+    from earlier years (rules 2026-11-13; None in worlds started before) (the report is filled in)."""
     pt = season.participation
-    return {'baseline': pt.baseline, 'shares': pt.shares(kind), 'report': {}}
+    return {'baseline': pt.baseline, 'shares': pt.shares(kind), 'report': {}, 'carry': pt.carry_for(kind, year)}
 
 
 def add_new_professionals(season, year):
@@ -580,7 +581,7 @@ def add_new_professionals(season, year):
     from .population import new_professionals
     start = season.world.next_id
     taken = {g.name for g in season.world.golfers} | season.staff.taken
-    args = _cohort_args(season, 'new_pros')
+    args = _cohort_args(season, 'new_pros', year)
     arrivals = new_professionals(year, season.seed, season.world.nations, start, taken, names_in_use(season), **args)
     season.participation.record(year, 'new_pros', args['report'])
     season.world.next_id = start + len(arrivals)
@@ -610,7 +611,7 @@ def add_juniors(season, year):
     from .population import junior_class
     start = season.world.next_id                     # ids come from the world's single person registry
     taken = {g.name for g in season.world.golfers} | season.staff.taken
-    args = _cohort_args(season, 'juniors')
+    args = _cohort_args(season, 'juniors', year)
     juniors = junior_class(year, season.seed, season.world.nations, start, taken, names_in_use(season), **args)
     season.participation.record(year, 'juniors', args['report'])
     season.world.next_id = start + len(juniors)
