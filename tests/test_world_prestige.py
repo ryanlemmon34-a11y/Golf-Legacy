@@ -135,8 +135,14 @@ class InASession(unittest.TestCase):
         _, html = O.tournaments(w, {})
         self.assertIn('>Prestige</th>', html)
         _, html = O.tournaments(w, {'sort': ['prestige']})
-        sid = max(self.end, key=self.end.get)
-        self.assertIn(f'/series/{sid}', html.split('</tr>')[1])             # the most prestigious first
+        # the most prestigious first; tied leaders (the majors can tie exactly) in the list's own order: tier, then name
+        import observer_prestige as OP
+        pres = OP.latest(w)['events']
+        info = {**w.a.world['series'], **w.live.series}
+        top = max(pres.values())
+        sid = min((k for k, v in pres.items() if v == top and k in info),
+                  key=lambda k: (info[k].get('tier', 9), info[k].get('name', '')))
+        self.assertIn(f'/series/{sid}"', html.split('</tr>')[1])
         _, html = O.series(w, {}, sid)
         self.assertIn('Prestige over time', html)
         self.assertIn('<span class="ry">2027</span>', html)

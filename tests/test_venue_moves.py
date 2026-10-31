@@ -7,6 +7,7 @@ Run from the project folder:  python -m unittest tests.test_venue_moves -v
 """
 from __future__ import annotations
 
+import pickle
 import sys
 import unittest
 from collections import defaultdict
@@ -16,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from golfsim import prestige as PR                                     # noqa: E402
 from golfsim import schedule as SCH                                    # noqa: E402
 from golfsim.course_library import default_library, event_level        # noqa: E402
-from golfsim.season import EventResult, Season                         # noqa: E402
+from golfsim.season import EventResult, Season, all_moves, migrate_venue_moves, move_in_force   # noqa: E402
 
 LIB = default_library(SCH.DEFAULT)
 YEARS = range(2027, 2042)
@@ -116,7 +117,7 @@ class VenueMoves(unittest.TestCase):
         st = Stand()
         for y in range(2027, 2030):
             st.play(y, SID, 90.0, 50.0)
-        (key, m), = st.venue_moves.items()
+        (key, (m,)), = st.venue_moves.items()
         y = 2033
         week = LIB.calendar.by_id[SID].week
         rival = next((e for e in LIB.calendar.editions(y) if e.week == week and e.series.series_id != SID
@@ -125,8 +126,8 @@ class VenueMoves(unittest.TestCase):
             self.skipTest('no other single-site event that week')
         # a second move sends a different event of the same week to the same course
         rival_planned = LIB.venues(y)[rival.event_id][0]
-        st.venue_moves[(rival.series.series_id, rival_planned.course_id)] = dict(
-            m, series=rival.series.series_id, **{'from': 2027})
+        st.venue_moves[(rival.series.series_id, rival_planned.course_id)] = [dict(
+            m, series=rival.series.series_id, **{'from': 2027})]
         st._venue_cache = {}
         vs = st.venues(y)
         got = {vs[rival.event_id][0].course_id, vs[f'{y}:{SID}'][0].course_id}
@@ -134,6 +135,85 @@ class VenueMoves(unittest.TestCase):
         self.assertIn(m['course'], got)
         self.assertTrue(got & {rival_planned.course_id, self.planned[y].course_id})
         self.assertEqual(len(got), 2)
+
+    # ---- repeated moves: an effective-dated history per (series, planned course) (review of ace3b2e) ---------------
+    def free_in_city(self):
+        """Courses in the event's city free in its week in every year of the plan, other than the planned one:
+        [(course id, layout its level may use or None, physical quality or None)]."""
+        a = self.planned[2027]
+        s = LIB.calendar.by_id[SID]
+        out = []
+        for cid in sorted(LIB.by_city[a.city]):
+            if cid == a.course_id or any(cid in {v.course_id for e in LIB.calendar.editions(y) if e.week == s.week
+                                                 for v in LIB.venues(y)[e.event_id]} for y in YEARS):
+                continue
+            ok = LIB._eligible(cid, event_level(s))
+            out.append((cid, ok[1] if ok else None,
+                        PR.COURSE_QUALITY[(LIB.sites[cid]['cls'], ok[1])] if ok else None))
+        return out
+
+    def move(self, to, layout, decided, effective, replaces):
+        return {'series': SID, 'course': to, 'layout': layout, 'city': self.planned[2027].city, 'from': effective,
+                'decided': decided, 'planned': self.planned[2027].course_id, 'replaces': replaces,
+                'replaces_layout': '', 'event_prestige': 90.0, 'course_prestige_before': 50.0}
+
+    def test_repeated_moves_keep_every_move_by_effective_year(self):
+        """A -> B decided 2029 (from 2031), then B -> C decided 2039 (from 2041)."""
+        free = self.free_in_city()
+        if len(free) < 2:
+            self.skipTest('fewer than two free courses in the city')
+        (b, lb, _), (c, lc, _) = free[0], free[1]
+        a = self.planned[2027].course_id
+        st = Stand()
+        st.venue_moves[(SID, a)] = [self.move(b, lb or 'Championship', 2029, 2031, a)]
+        st.venue_moves[(SID, a)].append(self.move(c, lc or 'Championship', 2039, 2041, b))
+        got = lambda y: st.venues(y)[f'{y}:{SID}'][0].course_id
+        self.assertEqual([got(y) for y in (2029, 2030)], [a, a])                   # not before its effective year
+        self.assertEqual([got(y) for y in (2031, 2035, 2040)], [b, b, b])          # the first move keeps its years
+        self.assertEqual([got(y) for y in (2041,)], [c])
+        for y in (2031, 2040, 2041):                                                # no double-booking
+            per_week = defaultdict(list)
+            for e in LIB.calendar.editions(y):
+                for v in st.venues(y)[e.event_id]:
+                    per_week[e.week].append(v.course_id)
+            self.assertTrue(all(len(cs) == len(set(cs)) for cs in per_week.values()), y)
+        # saves keep the history (a Season pickles venue_moves as it is; SeasonSave checks a real Season)
+        again = Stand()
+        again.venue_moves = pickle.loads(pickle.dumps(st.venue_moves))
+        self.assertEqual([again.venues(y)[f'{y}:{SID}'][0].course_id for y in (2030, 2031, 2040, 2041)], [a, b, b, c])
+        self.assertEqual(len(all_moves(again.venue_moves)), 2)
+
+    def test_a_second_decision_is_added_not_overwritten(self):
+        free = [f for f in self.free_in_city() if f[1] is not None]
+        if len(free) < 2:
+            self.skipTest('fewer than two free courses its level may use in the city')
+        free.sort(key=lambda f: (f[2], f[0]))
+        b, lb, qb = free[0]                                            # first to the weakest free course ...
+        if not any(q > qb for _, _, q in free):
+            self.skipTest('no physically better course than the first move\'s')
+        a = self.planned[2027].course_id
+        st = Stand()
+        st.venue_moves[(SID, a)] = [self.move(b, lb, 2029, 2031, a)]
+        st.venue_moved[SID] = 2029
+        for y in range(2031, 2040):                                    # ... then, ten seasons on, a better one
+            moved = st.play(y, SID, 99.0, 50.0)
+            self.assertEqual(st.results[f'{y}:{SID}'].sites[0][0], b)  # the venue actually played
+            self.assertEqual(len(moved), 1 if y == 2039 else 0, y)     # (tradition: not before 2039)
+        hist = st.venue_moves[(SID, a)]
+        self.assertEqual([(m['decided'], m['from']) for m in hist], [(2029, 2031), (2039, 2041)])
+        c = hist[1]['course']
+        self.assertEqual(hist[1]['replaces'], b)
+        got = lambda y: st.venues(y)[f'{y}:{SID}'][0].course_id
+        self.assertEqual([got(y) for y in (2030, 2031, 2040, 2041, 2045)], [a, b, b, c, c])
+
+    def test_saves_from_ace3b2e_migrate(self):
+        m = self.move('x', 'Championship', 2029, 2031, 'a')
+        self.assertEqual(migrate_venue_moves({(SID, 'a'): m}), {(SID, 'a'): [m]})
+        later = self.move('y', 'Championship', 2039, 2041, 'x')
+        self.assertEqual(migrate_venue_moves({(SID, 'a'): [later, m]}), {(SID, 'a'): [m, later]})
+        self.assertEqual(move_in_force([m, later], 2040), m)
+        self.assertEqual(move_in_force([m, later], 2041), later)
+        self.assertIsNone(move_in_force([m, later], 2030))
 
     def test_majors_and_qualifying_never_move(self):
         st = Stand()
@@ -144,6 +224,34 @@ class VenueMoves(unittest.TestCase):
                     if vs and len(vs) == 1:
                         st.play(y, s.series_id, 99.0, 0.0)
         self.assertEqual(st.venue_moves, {})
+
+
+@unittest.skipIf(SID is None, 'no series in the course plan with a free, better course in its city')
+class SeasonSave(unittest.TestCase):
+    """A real Season (built, never simulated): a save keeps the whole move history and resolves the same venues."""
+
+    def test_save_and_resume_keep_the_history(self):
+        from golfsim.population import generate_world
+        s = Season(generate_world(seed=41, scale=0.05), seed=41, workers=1)
+        a = LIB.venues(2027)[f'2027:{SID}'][0]
+        free = [cid for cid in sorted(LIB.by_city[a.city]) if cid != a.course_id
+                and all(cid not in {v.course_id for e in LIB.calendar.editions(y) if e.week == LIB.calendar.by_id[SID].week
+                                    for v in LIB.venues(y)[e.event_id]} for y in YEARS)]
+        if len(free) < 2:
+            self.skipTest('fewer than two free courses in the city')
+        mk = lambda to, d, f, rep: {'series': SID, 'course': to, 'layout': 'Championship', 'city': a.city, 'from': f,
+                                    'decided': d, 'planned': a.course_id, 'replaces': rep}
+        s.venue_moves[(SID, a.course_id)] = [mk(free[0], 2029, 2031, a.course_id), mk(free[1], 2039, 2041, free[0])]
+        s._venue_cache = {}
+        got = lambda season: [season.venues(y)[f'{y}:{SID}'][0].course_id for y in (2030, 2031, 2040, 2041)]
+        before = got(s)
+        self.assertEqual(before, [a.course_id, free[0], free[0], free[1]])
+        self.assertNotIn('_venue_cache', s.__getstate__())                       # (derived: not saved)
+        again = pickle.loads(pickle.dumps(s))
+        self.assertEqual(got(again), before)
+        self.assertEqual(again.venue_moves, s.venue_moves)
+        self.assertEqual(len(again.prestige_view()['venue_moves']), 2)
+        s.close()
 
 
 if __name__ == '__main__':

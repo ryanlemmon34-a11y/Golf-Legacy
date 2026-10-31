@@ -274,8 +274,32 @@ They cover:
 * a course booked that week keeps the planned venue;
 * majors and qualifying stages never move.
 
-Not yet run for venue moves: a whole simulated world long enough for a move to happen (at least five seasons);
-`InASession` covers only one season, before any move can take effect.
+Review fix (after ace3b2e): a second move of an event used to overwrite the first in `venue_moves`, so earlier
+seasons lost their moved venue. Each (series, planned course) now keeps an ordered, effective-dated history,
+and `venues(year)` applies the latest move whose effective season is not after `year`. The season file's
+`venue_moves` keeps every move, and each edition still records the venue actually played. Saves from ace3b2e
+migrate (`migrate_venue_moves`). Regression tests, run and passing at `nice -n 19`:
+
+```
+python -m unittest tests.test_venue_moves.VenueMoves -v      # 7 tests, about 2 s, no season simulated
+```
+
+They cover:
+* A->B decided 2029 (from 2031), then B->C decided 2039 (from 2041): `venues()` gives A in 2029-2030, B in
+  2031, 2035 and 2040, and C in 2041;
+* no double-booking in 2031, 2040 and 2041;
+* the history survives pickling;
+* a second decision made by `review_venues` is appended, not overwritten, and the venue actually played each
+  season is recorded;
+* the migration and `move_in_force`.
+
+Not run yet: `tests.test_venue_moves.SeasonSave` (builds a real Season, without simulating it, and checks that
+a save and resume keep the two-move history), and a simulated world long enough for a move to happen (at least
+five seasons). `InASession` covers only one season, before any move can take effect.
+
+The `InASession` observer test also used to assume a single most-prestigious tournament. In the fixture the
+four majors tie exactly, and the list correctly orders tied events by tier, then name. The test now expects
+that documented order; the product's ordering is unchanged.
 
 **Not run yet** (they need cohort draws or season simulation; to run once the hold is lifted):
 

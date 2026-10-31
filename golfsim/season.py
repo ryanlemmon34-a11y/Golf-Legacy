@@ -169,6 +169,29 @@ def allocate_places(total, weights, key, caps=None):
 ARRIVAL_LOGS = ('Arrived on the scene', 'Turned professional at ')   # history lines written on arrival
 
 
+def move_in_force(history, year):
+    """The venue move that applies in `year`: the latest (by effective season, then decision) whose effective
+    season is not after `year`; None before the first takes effect."""
+    m = None
+    for x in history:
+        if x['from'] <= year:
+            m = x
+        else:
+            break
+    return m
+
+
+def migrate_venue_moves(venue_moves):
+    """Saves written at ace3b2e kept one move per (series, planned course): each becomes a history of one."""
+    return {k: (sorted(v, key=lambda x: (x['from'], x['decided'])) if isinstance(v, list) else [v])
+            for k, v in venue_moves.items()}
+
+
+def all_moves(venue_moves):
+    """Every venue move ever decided, as plain records (series id, planned course, then effective order)."""
+    return [dict(m) for _, history in sorted(venue_moves.items()) for m in history]
+
+
 def _migrate_event_years(state):
     """Saves from before rules 2026-11-05 kept each event's factors as a list (the four assumed starting
     editions, then one per edition played): the played editions take their years from the prestige history,
@@ -365,7 +388,8 @@ class Season:
         self.course_hosted = {}                              # course_id -> {season: best prestige hosted}
         self.course_prestige = {}                            # course_id -> prestige this season
         # this world's venue moves (review_venues): an overlay on the shared course plan, read by venues()
-        self.venue_moves = {}                                # (series_id, planned course_id) -> the better course
+        self.venue_moves = {}                                # (series_id, planned course_id) -> [every move, in
+                                                             # effective order]: the latest in force applies
         self.venue_watch = {}                                # series_id -> consecutive season ends above the gap
         self.venue_moved = {}                                # series_id -> season end its last move was decided
         self.venue_log = defaultdict(list)                   # season -> [moves decided at its end]
@@ -561,7 +585,11 @@ class Season:
         if cache is not None and year in cache:
             return cache[year]
         base = self.lib.venues(year)
-        moves = sorted((k, m) for k, m in self.__dict__.get('venue_moves', {}).items() if m['from'] <= year)
+        moves = []
+        for k, history in sorted(self.__dict__.get('venue_moves', {}).items()):
+            m = move_in_force(history, year)
+            if m is not None:
+                moves.append((k, m))
         out = base
         if moves:
             week_of = {ed.event_id: ed.week for ed in self.cal.editions(year)}
@@ -647,7 +675,9 @@ class Season:
             m = {'series': sid, 'course': cid, 'layout': layout, 'city': city, 'from': target, 'decided': year,
                  'planned': planned[0].course_id, 'replaces': cur, 'replaces_layout': cur_layout, 'event_prestige': round(self.event_prestige[sid], 2),
                  'course_prestige_before': round(self.course_prestige.get(cur) or 0.0, 2)}
-            self.venue_moves[(sid, planned[0].course_id)] = m
+            history = self.venue_moves.setdefault((sid, planned[0].course_id), [])
+            history.append(m)                                # every move kept: earlier seasons keep theirs
+            history.sort(key=lambda x: (x['from'], x['decided']))
             self.venue_moved[sid] = year
             self.venue_watch[sid] = 0
             busy[wk].discard(cur)
@@ -2057,6 +2087,7 @@ class Season:
         state.setdefault('course_hosted', {})                # courses: rated from the first season-end after loading
         state.setdefault('course_prestige', {})
         state.setdefault('venue_moves', {})                  # saves from before venue moves: the course plan as it is
+        state['venue_moves'] = migrate_venue_moves(state['venue_moves'])
         state.setdefault('venue_watch', {})
         state.setdefault('venue_moved', {})
         state.setdefault('venue_log', defaultdict(list))
@@ -2526,7 +2557,7 @@ class Season:
         courses (this season's), nations (as last settled) with the cohort shares."""
         return {'events': {sid: round(v, 2) for sid, v in self.event_prestige.items()},
                 'courses': {cid: round(v, 2) for cid, v in self.course_prestige.items()},
-                'venue_moves': [dict(m) for _, m in sorted(self.venue_moves.items())],
+                'venue_moves': all_moves(self.venue_moves),
                 'nations': self.participation.view()}
 
     def record_college(self, year, snap):
