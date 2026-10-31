@@ -223,6 +223,8 @@ Run (on this branch's code, final proposed constants; HEAD after the review fix 
   Loyalty, Hidden (all three), ObserverRefusal and Initiative tests -- 19 tests, OK, with `nice -n 19` (tiny
   worlds, the market only).
 
+> **Update, 31 October 2026.** Recruitment has since been measured descriptively on the candidate `c0d1ea5` (seeds 4207 and 5309, read only): offers, acceptances, refusals and their reasons by year, in `docs/review/arms_comparison/` on branch `build/v16-report`. The constants are kept as the playtest baseline (D21). The list below is kept as written.
+
 NOT yet run (blocked by the CPU hold):
 - Any measurement with item 6 (both seeds' after arms need re-running).
 - Measurement, seed 3031, after arm:

@@ -132,6 +132,21 @@ A mature full world's season file is about 13.5 MB for about 13,200 golfers (abo
 (about 11-13%; the reviewer decides whether that is acceptable). Most of it is the per-plan columns (fatigue, funds, plan codes, the bar and development
 values); the career rows are about a quarter.
 
+**Measured on the full world (31 October 2026; candidate `c0d1ea5`, seed 4207, a fresh full population played
+through the persistent session, evidence on against off).** Kept per D15. This replaces the estimate above for a
+new world's first seasons:
+
+| season | season file with evidence | without | growth | evidence (gzip) | share of the file | checkpoint with / without |
+|---|---|---|---|---|---|---|
+| 2027 (6,409 golfers scheduled) | 13,039,656 B | 12,208,596 B | +6.8% | 830,379 B | 6.4% | 38,109,556 B / 36,363,871 B |
+| 2028 (6,878 scheduled) | 12,567,224 B | -- | -- | 901,302 B | 7.2% | 55,410,492 B / -- |
+
+- Outcomes: every outcome part was identical with the evidence on and off.
+- Bounds held in both seasons: at most 13 plans a golfer, none over, at most 3 career rows.
+- Season time was 201.5 s and 197.2 s with the evidence on, and 177.6 s without it (2027). That is one pair of
+  total runtimes on a shared 4-CPU machine, not an isolated measurement of the recording's cost.
+- A mature world (about 13,000 golfers) has not been measured. The estimate above remains the guide there.
+
 ## Not recorded (remaining gaps)
 
 - The weekly entry choice: which event a golfer entered among those on offer, the per-event values

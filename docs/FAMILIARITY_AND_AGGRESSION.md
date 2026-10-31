@@ -107,6 +107,8 @@ writes a trait, no risk score, profile text and rule text).
 
 ## To run after the CPU hold
 
+> **Update, 31 October 2026.** The same-seed season with the baseline on and off has since been run on the candidate `c0d1ea5`, read only, with results in `docs/review/arms_comparison/` on branch `build/v16-report` (`G1E_FAMILIARITY.md`). The baseline set 6,799 of 124,224 starts (5.5 %), 3,899 golfers; none when switched off. The week-1 comparison is field-matched and exploratory only (a shared random stream, naive standard errors, later rounds depend on the cut); later weeks are descriptive. The plan below is kept as written.
+
 - Full test suite; observer/archive integration tests.
 - A seeded season with and without the baseline (same seed; `Season.familiar_base_on = False` for the second arm): starts affected (`familiar_base`), the change in
   scoring average for local golfers at regional events (expected a few hundredths of a stroke), timings.

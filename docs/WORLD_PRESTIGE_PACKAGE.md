@@ -247,6 +247,14 @@ maximum multiplier 4 has about 0.2 %, about one every two years; the USA at 0.25
 
 ## 5. Measurement (small scale)
 
+> **Update, 31 October 2026.** Measured since on the candidate `c0d1ea5`, two seeds (4207 for 10 seasons, 5309 for 5 seasons), read only, in `docs/review/arms_comparison/` on branch `build/v16-report`:
+> - Nation multipliers stayed within 0.25-4, with yearly steps within x1.1.
+> - Shares and allocations were consistent in 35/35 season-pathways; arrivals matched their quotas in 62/62 cells, and 8 terminal cells are not verified.
+> - There were 0 venue moves in 15 default seed-seasons, so the rule's natural activation is unexercised; its regression tests stand.
+> - The constants are kept as the playtest baseline (D21).
+>
+> The text below is kept as written.
+
 **Not run yet.** A machine-wide CPU hold stopped all simulations and measurements while this package was
 written. The script is ready (it reports, per season on two seeds at `scale=0.05`: cohort totals, event prestige
 moves and how many hit the 6-point limit, majors' prestige, mean course prestige, the top shares and the
