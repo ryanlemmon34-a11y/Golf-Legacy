@@ -36,6 +36,7 @@ from dataclasses import dataclass, field
 
 from . import ratings as R
 from .baseline import expected as baseline
+from .familiarity import SCALE as FAM_SCALE
 from .golfer import neutral_caddie
 
 TOUR_DRIVE = 298.0          # tour-average driver distance, the club-selection reference
@@ -151,8 +152,8 @@ class Player:
         self.c_yard = (cad.skills['yardage'] - 50) / 50 * comm
         self.c_strat = (cad.skills['strategy'] - 50) / 50 * comm
         self.c_mental = (cad.skills['mental_support'] - 50) / 50 * comm
-        fam = 1 - math.exp(-golfer.familiarity.get(course.familiarity_key, 0) / 15.0)
-        cfam = 1 - math.exp(-cad.familiarity.get(course.familiarity_key, 0) / 15.0)
+        fam = 1 - math.exp(-golfer.familiarity.get(course.familiarity_key, 0) / FAM_SCALE)
+        cfam = 1 - math.exp(-cad.familiarity.get(course.familiarity_key, 0) / FAM_SCALE)
         cfam *= R.norm(cad.skills['course_knowledge']) * comm
         self.fam = fam + (1 - fam) * 0.5 * cfam
 
@@ -324,6 +325,35 @@ def _attack_pin(pl, hole, mean_ft, rng):
     value = (0.85 - ratio) * 2.2 - (1.1 if hole.green_water else 0) - (0.4 if hole.greenside_bunkers > 0.7 else 0)
     value += 0.6 * pl.aggr + rng.gauss(0, pl.noise * 3)
     return value > 0
+
+
+def _reach(pl, lie, dfac=1.0):
+    """The longest full shot this golfer can hit from this lie today (yards): a 3-wood from the fairway, less
+    from rough or a fairway bunker. It follows their physical distance (Power, age, season fatigue), never
+    Aggression. `dfac` scales that distance for the conditions of the shot (1.0 = calm; a caller with wind or
+    other conditions passes its effective-distance factor, so reach is always the physical reach that day)."""
+    reach = pl.reach_fw * dfac * (0.88 if lie == 'rough' else 0.78 if lie == 'fairway_bunker' else 1.0)
+    if lie == 'fairway_bunker':
+        reach = min(reach, 210 * pl.drive * dfac / TOUR_DRIVE)
+    return reach
+
+
+def _go_or_lay_up(pl, hole, par, strokes, lie, dist, de, rng, dfac=1.0):
+    """(lay up?, reach) for a full shot from `dist` yards. Out of reach is always a lay-up, however aggressive
+    the golfer; a par 5's second shot within reach (over 200 yards) is weighed: going for the green against
+    laying up to a wedge, with Aggression tilting the choice and Course Management's noise blurring it.
+    `dfac`: the shot's effective-distance factor for the conditions (see _reach; 1.0 = calm)."""
+    reach = _reach(pl, lie, dfac)
+    lay_up = dist > reach
+    if not lay_up and par == 5 and strokes == 2 and dist > 200:
+        # Go for the green in two, or lay up to a wedge? Weigh it up.
+        m = pl.approach_mult(de)
+        water_risk = 0.45 if hole.green_water else 0.0
+        ev_go = baseline('fairway', dist) + 0.35 * (m - 1) + water_risk * min(1, m * dist / 450)
+        ev_lay = 1 + baseline('fairway', 95) + 0.25 * (pl.m_wedge - 1)
+        ev_go -= 0.15 * pl.aggr
+        lay_up = ev_go + rng.gauss(0, pl.noise) > ev_lay
+    return lay_up, reach
 
 
 # ---------------------------------------------------------------------------
@@ -582,18 +612,7 @@ def play_hole(pl, hole, hidx, rng, st, pressure=0.0, state=None, pin=None):
             lie = 'trees'
             before = baseline('trees', dist)
         de = dist * (TOUR_DRIVE / pl.drive) ** 0.5
-        reach = pl.reach_fw * (0.88 if lie == 'rough' else 0.78 if lie == 'fairway_bunker' else 1.0)
-        if lie == 'fairway_bunker':
-            reach = min(reach, 210 * pl.drive / TOUR_DRIVE)
-        lay_up = dist > reach
-        if not lay_up and par == 5 and strokes == 2 and dist > 200:
-            # Go for the green in two, or lay up to a wedge? Weigh it up.
-            m = pl.approach_mult(de)
-            water_risk = 0.45 if hole.green_water else 0.0
-            ev_go = baseline('fairway', dist) + 0.35 * (m - 1) + water_risk * min(1, m * dist / 450)
-            ev_lay = 1 + baseline('fairway', 95) + 0.25 * (pl.m_wedge - 1)
-            ev_go -= 0.15 * pl.aggr
-            lay_up = ev_go + rng.gauss(0, pl.noise) > ev_lay
+        lay_up, reach = _go_or_lay_up(pl, hole, par, strokes, lie, dist, de, rng)
         if lay_up:
             prev_lie = lie
             if dist - reach <= 70 and par == 4:

@@ -113,7 +113,8 @@ class Curve(unittest.TestCase):
         self.assertNotEqual(M.draw(3, YEAR, 42), M.draw(4, YEAR, 42))
 
     def test_rules_text(self):
-        self.assertEqual(R.RULES_VERSION, '2026-11-07')
+        self.assertIn('2026-11-07', [v for v, _ in R.VERSIONS])        # (later versions may follow it)
+        self.assertGreaterEqual(R.RULES_VERSION, '2026-11-07')
         self.assertEqual(R.VERSIONS[-1][0], R.RULES_VERSION)
         title, text, since = R.RULES['mortality']
         self.assertEqual(since, '2026-11-07')

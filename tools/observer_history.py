@@ -664,6 +664,136 @@ def residence_section(w, pid, p, geo):
               'other moves are their own choice, at most one each winter.</p>')
 
 
+def aggression_style(value):
+    """The words for an Aggression value (rules 'aggression'): cautious below 35, balanced 35-65, attacking above."""
+    return 'cautious' if value < 35 else 'attacking' if value > 65 else 'balanced'
+
+
+AGGRESSION_NOTE = ('A playing style, not an ability: higher is not better. Attacking golfers lean to driver, aim at more '
+                   'flags, go for more par 5s in two and try more recovery shots from the trees; cautious golfers take '
+                   'the safer option more often. Only what is within reach is attempted: distance (Power, which age, '
+                   'injury and fatigue reduce) decides what can be reached from each lie, and Course Management how well '
+                   'the choice is judged. The trait itself does not change with age.')
+
+
+def aggression_section(w, pid, p):
+    """The golfer's Aggression (0-100) with what it means (rules 2026-11-08): the snapshot's, else the history's."""
+    O = _o()
+    lp = w.live.people.get(pid) if w.live else None
+    v = lp.get('aggression') if lp else None
+    if v is None:
+        v = ((p or {}).get('golfer') or {}).get('aggression')
+    if v is None:
+        return ''
+    return (f'<h2>Playing style</h2><p>Aggression <b>{O.esc(v)}</b> / 100 · {O.esc(aggression_style(v))}</p>'
+            f'<p class="muted">{O.esc(AGGRESSION_NOTE)} <a href="/rules#aggression">rule</a></p>')
+
+
+def familiar_courses(w, pid, p):
+    """(rows [(course, rounds)], as of) of a golfer's ten most familiar courses: the snapshot's, else the history's
+    as it ended; ([], None) where neither recorded them (histories written before rules 2026-11-08)."""
+    lp = w.live.people.get(pid) if w.live else None
+    if lp is not None and lp.get('familiar') is not None:
+        return [tuple(r) for r in lp['familiar']], 'now'
+    rows = ((p or {}).get('golfer') or {}).get('familiar')
+    if rows is not None:
+        return [tuple(r) for r in rows], 'as the history ends'
+    return [], None
+
+
+def home_club_familiarity(w, pid, p):
+    """The golfer's familiarity at their current home club as the season recorded it ({'course', 'rounds',
+    'engine_rounds', 'value', 'from'}), from the snapshot, else the history; None where not recorded."""
+    lp = w.live.people.get(pid) if w.live else None
+    if lp is not None and 'home_club_familiarity' in lp:
+        return lp['home_club_familiarity']
+    return ((p or {}).get('golfer') or {}).get('home_club_familiarity')
+
+
+def home_club_rows(w, pid, p):
+    """A golfer's dated home clubs ([year, week, course or None, basis, place], oldest first): the snapshot's, else
+    the history's as it ended; None where neither recorded them (histories before rules 2026-11-08)."""
+    lp = w.live.people.get(pid) if w.live else None
+    if lp is not None and lp.get('home_club') is not None:
+        return lp['home_club']
+    return ((p or {}).get('golfer') or {}).get('home_club')
+
+
+_FROM = {'played': 'rounds played', 'region': 'regional baseline (own state / province)',
+         'country': 'regional baseline (own country; state / province unknown)',
+         'home club': 'home-club floor (club found by country)'}
+
+
+def familiar_section(w, pid, p, geo):
+    """The ten courses a golfer has played most: the competitive rounds actually played, and -- separately -- the
+    golfer's familiarity value the engine plays with there, which is the larger of those rounds and the regional
+    baseline (own state / province, or the home club) (rules 2026-11-08), with where it comes from and a link to
+    each course; then their home club. Caddies' familiarity is their own and is not shown here."""
+    O = _o()
+    if 'golfer' not in (p or {}).get('roles', ('golfer',)):
+        return ''
+    from golfsim import familiarity as FAM
+    from golfsim.course_library import course_place
+    rows, as_of = familiar_courses(w, pid, p)
+    if as_of is None:
+        return ('<h2>Familiar courses</h2><p class="muted">Not recorded for this history (kept from rules '
+                '2026-11-08).</p>')
+    cs = w.courses()
+    places = []
+    for key in ('birthplace', 'residence'):
+        x = (geo or {}).get(key)
+        if x:
+            places.append((x.get('country'), x.get('region')))
+    clubs = home_club_rows(w, pid, p) or []
+    club = clubs[-1] if clubs and clubs[-1][2] else None
+
+    def engine(cid, rounds):
+        c = cs.get(cid)
+        base = FAM.baseline(course_place(c), places) if c else (0.0, None)
+        return FAM.engine_rounds(rounds, FAM.home_floor(base, bool(club) and club[2] == cid))
+
+    body = []
+    for i, (cid, rounds) in enumerate(rows, 1):
+        eff, src = engine(cid, rounds)
+        body.append([str(i), O.course_link(w, cid) + (' <span class="tag">home club</span>' if club and club[2] == cid else ''),
+                     f'{rounds:g}', f'{100 * FAM.value(eff):.1f}%', O.esc(_FROM[src])])
+    out = ['<h2>Familiar courses</h2>']
+    if body:
+        out.append(O.table(['#', 'Course', 'Rounds played (actual)', 'Familiarity the engine uses', 'From'], body,
+                           numeric=(0, 2, 3)))
+    else:
+        out.append('<p class="muted">No competitive rounds yet.</p>')
+    if club:
+        line = (f'Home club: {O.course_link(w, club[2])} since {O.esc(club[0])} '
+                f'({"in their state / province" if club[3] == "region" else "found by country: none in their state / province"})')
+        # the club's own recorded figures; never inferred from the top-ten list (a club outside it may have
+        # many rounds): without a record, no familiarity figure is claimed
+        hf = home_club_familiarity(w, pid, p)
+        if hf and hf.get('course') == club[2]:
+            line += (f'; rounds played there {hf["rounds"]:g}; familiarity the engine uses there '
+                     f'{100 * hf["value"]:.1f}% ({O.esc(_FROM.get(hf["from"], hf["from"]))})')
+        out.append(f'<p>{line}.</p>')
+        if len(clubs) > 1:
+            out.append('<p class="muted">Earlier home clubs: ' + '; '.join(
+                f'{O.course_link(w, r[2]) if r[2] else "none"} from {O.esc(r[0])}' for r in clubs[:-1]) + '.</p>')
+    regions = []
+    for x in places:
+        text = O.where({'country': x[0], 'region': x[1]})
+        if text not in regions:
+            regions.append(text)
+    rule = '(<a href="/rules#course-familiarity">rule</a>)'
+    if regions:
+        out.append(f'<p class="muted">Ranked by competitive rounds actually played ({O.esc(as_of)}). The engine uses '
+                   f'1 - exp(-rounds / {FAM.SCALE:g}) of the larger of those rounds and the regional baseline: courses '
+                   f'in {O.esc(" and ".join(regions))} and their home club count as at least {FAM.REGION_ROUNDS:g} '
+                   f'rounds ({100 * FAM.value(FAM.REGION_ROUNDS):.1f}%; {FAM.COUNTRY_ROUNDS:g} by country where the state '
+                   f'or province is unknown) -- a floor, never added to rounds played, counted once {rule}.</p>')
+    else:
+        out.append(f'<p class="muted">Ranked by competitive rounds actually played ({O.esc(as_of)}). Birthplace and '
+                   f'residence unknown: no regional baseline, so the engine uses the rounds played {rule}.</p>')
+    return ''.join(out)
+
+
 # ---- tournaments and courses --------------------------------------------------------------------------------------
 def series_summary(w, sid):
     """A tournament's history in brief: editions, most-used courses, most wins, most starts, youngest and
@@ -724,6 +854,44 @@ def series_summary(w, sid):
             + '<p class="muted">Counted over every edition played (series-wide), each edition once; a course hosting '
               'several sites of one edition counts once per site. Wins and starts link to the golfer\'s results in this '
               f'tournament. * {O.AGE_NOTE}</p>')
+
+
+_ORIGIN = {'calendar': 'built because an event needed a course here when the library was sized',
+           'club': 'added as an extra club where golf is busiest',
+           'hand-built': 'one of the hand-built reference courses'}
+
+
+def home_club_count(w, cid):
+    """(golfers whose home club this course is, as of) -- the snapshot's people now, else the history's as it
+    ended; (0, None) where home clubs were not recorded."""
+    if w.live is not None and any('home_club' in lp for lp in w.live.people.values()):
+        return sum(1 for lp in w.live.people.values() if lp.get('home_club') and lp['home_club'][-1][2] == cid), 'now'
+    if w.a is not None and any('home_club' in (q.get('golfer') or {}) for q in w.a.people.values()):
+        return sum(1 for q in w.a.people.values() if (q.get('golfer') or {}).get('home_club')
+                   and q['golfer']['home_club'][-1][2] == cid), 'as the history ends'
+    return 0, None
+
+
+def course_place_section(w, cid, c, hosted):
+    """A course's state / province (normalised from its city; 'unknown' when the geography lacks it) and its
+    role: an event venue, or a local club no event has chosen, with the venue policy's reason
+    (course_library.venue_role)."""
+    O = _o()
+    from golfsim.course_library import course_place, venue_role
+    sub = c['subdivision'] if 'subdivision' in c else course_place(c)[1]
+    local = (w.a.world.get('local_hosting', False) if w.a else getattr(w.live, 'local_hosting', False))
+    role, why = venue_role(w.courses(), cid, hosted, local_first=bool(local))
+    origin = _ORIGIN.get(c.get('origin'))
+    out = [f'<p>State / province: {O.esc(sub) if sub else "<span class=\'muted\'>unknown</span>"} · '
+           f'role: <b>{O.esc(role)}</b>' + (f' · {O.esc(origin)}' if origin else '') + '</p>']
+    n, as_of = home_club_count(w, cid)
+    if as_of is not None:
+        out.append(f'<p>Home club of {n:,} golfer{"" if n == 1 else "s"} ({O.esc(as_of)}).</p>')
+    if why:
+        out.append(f'<p class="muted">{"" if hosted else "No event has been played here yet. "}{O.esc(why)} Local '
+                   f'golfers know it: a course in a golfer\'s own state or province, and their home club, start partly '
+                   f'familiar (<a href="/rules#course-familiarity">rule</a>).</p>')
+    return ''.join(out)
 
 
 def course_use(w, cid):

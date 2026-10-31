@@ -1135,6 +1135,7 @@ def golfer(w, q, pid):
     if tab == 'playing':
         out.append(_playing(w, q, pid, p))
         out.append(OH.residence_section(w, pid, p, geo))
+        out.append(OH.familiar_section(w, pid, p, geo))
     elif tab == 'season':
         out.append(OH.season_view(w, q, pid, p))
     elif tab == 'results':
@@ -1551,7 +1552,8 @@ def ST_person_seasons(db, pid):
 def _playing(w, q, pid, p):
     rows = OD.results(w, pid)
     active = (p.get('golfer') or {}).get('lifestyle') not in (None, 'retired')
-    out = [OH.status_section(w, pid, p), _ratings(w, pid, p), ratings_history(w, q, pid, p), injuries_section(w, pid, rows),
+    out = [OH.status_section(w, pid, p), _ratings(w, pid, p), OH.aggression_section(w, pid, p),
+           ratings_history(w, q, pid, p), injuries_section(w, pid, rows),
            _honors(w, pid, rows, active),
            OH.grand_slam_line(w, pid), _season_history(w, q, pid, p, rows),
            OG.golf_section(w, pid, one(q, 'scope'))]
@@ -1987,10 +1989,13 @@ def courses_page(w, q):
     by_prestige = (f'<p class="muted"><a href="/courses?{esc(urlencode({**keep, "sort": "prestige"}))}">List by '
                    'prestige</a> (this season’s course prestige, from the events hosted in the five completed seasons '
                    'before; separate from the class, which is physical quality)</p>')
-    return 'Courses', f + by_prestige + table(['Course', 'City', 'Country', 'Class', 'Layouts', 'Prestige', 'Editions hosted'], [
-        [course_link(w, cid), esc(c.get('city')), nation_link(c.get('country')), esc(c.get('class')),
-         esc(', '.join(c.get('layouts', {}))), OP.cell(pres.get(cid)), str(hosted.get(cid, 0))] for cid, c in chunk],
-        numeric=(5, 6)) + pager
+    from golfsim.course_library import course_place
+    sub = lambda c: (c['subdivision'] if 'subdivision' in c else course_place(c)[1]) or 'unknown'
+    return 'Courses', f + by_prestige + table(['Course', 'City', 'State / province', 'Country', 'Class', 'Layouts',
+                                               'Prestige', 'Editions hosted'], [
+        [course_link(w, cid), esc(c.get('city')), esc(sub(c)), nation_link(c.get('country')), esc(c.get('class')),
+         esc(', '.join(c.get('layouts', {}))), OP.cell(pres.get(cid)), str(hosted.get(cid, 0)) if hosted.get(cid) else
+         '0 <span class="muted">(local club)</span>'] for cid, c in chunk], numeric=(6, 7)) + pager
 
 
 def course(w, q, cid):
@@ -2000,6 +2005,8 @@ def course(w, q, cid):
         return cid, '<p class="muted">No such course.</p>'
     out = [f'<p>{esc(c.get("city"))}, {nation_link(c.get("country"))} · {esc(c.get("class"))} · architect '
            f'{esc(c.get("architect"))} · opened {esc(c.get("opened"))}{shortlist_button(w, "course", cid)}</p>']
+    eds = sorted(w.course_editions(cid), key=lambda e: (e['year'], e['event']), reverse=True)
+    out.append(OH.course_place_section(w, cid, c, len(eds)))
     out.append('<h2>Layouts</h2>' + table(['Layout', 'Par', 'Yards'], [
         [esc(k), esc(l.get('par')), f'{l.get("yards") or 0:,}'] for k, l in c.get('layouts', {}).items()], numeric=(1, 2)))
     recs = {lid: r for lid, r in w.records_table().items() if lid.split(':')[0] == cid}
@@ -2018,7 +2025,6 @@ def course(w, q, cid):
                        + '</p>')
     out.append(OH.course_use(w, cid))
     out.append(OP.course_section(w, cid))
-    eds = sorted(w.course_editions(cid), key=lambda e: (e['year'], e['event']), reverse=True)
     chunk, pager = paged(eds, q, f'/course/{quote(cid)}')
     out.append('<h2>Editions hosted</h2>' + (table(['Edition', 'Layout', 'Winner'], [
         [event_link(w, e['event']), esc(e['layout']), w.person_link(e['winner'])]

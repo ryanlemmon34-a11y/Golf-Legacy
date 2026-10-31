@@ -47,6 +47,9 @@ from pathlib import Path
 
 from .calendar import TOUR_BY_KEY
 from .history import Relations
+from .course_library import course_place
+from . import familiarity as FAM
+from . import home_clubs as HC
 
 FORMAT = 'golf-legacy-archive/1'
 
@@ -151,7 +154,12 @@ class ArchiveWriter:
                  'tours': {k: {'name': t.name, 'tier': t.tier} for k, t in TOUR_BY_KEY.items()},
                  'series': {s.series_id: {'name': s.name, 'tour': s.tour, 'tier': s.tier, 'kind': s.kind,
                                           'category': s.category} for s in cal.series},
+                 # venues follow local hosting (course_library; worlds from rules 2026-11-08)
+                 'local_hosting': bool(getattr(lib, 'local_first', False)),
                  'courses': {cid: {'name': site['name'], 'city': site['city'], 'country': site['country'],
+                                   # state / province or equivalent (None = unknown) and how the course came to
+                                   # be built (rules 2026-11-08)
+                                   'subdivision': course_place(site)[1], 'origin': site.get('origin'),
                                    'class': site['cls'], 'architect': site.get('architect'), 'opened': site.get('opened'),
                                    'layouts': {k: {'par': c.par, 'yards': c.yards} for k, c in site['layouts'].items()}}
                              for cid, site in lib.sites.items()}}
@@ -279,6 +287,9 @@ class ArchiveWriter:
         # the records they had (golfer, coach, caddie: one person). Absent from seasons played before the rule.
         if getattr(season, 'mortality_on', False):
             chunk['deaths'] = season_deaths(season, year)
+        # the regional familiarity baseline (rules 2026-11-08): each golfer's starts this season where the baseline
+        # for a course in their own state / province (or country) was more than their rounds played there
+        chunk['familiar_base'] = {str(g): n for g, n in sorted(getattr(season, 'familiar_base', {}).get(year, {}).items())}
         # development evidence -- diagnostics only (hidden facts included; never shown to the player): how each
         # golfer arriving this season started, and what each source moved this season (development.SOURCES)
         from . import development as D
@@ -334,7 +345,18 @@ class ArchiveWriter:
                             'golfer': {'status': g.status, 'lifestyle': g.lifestyle, 'tour': g.tour,
                                        'turned_pro': g.turned_pro,
                                        # public standing as this history ends (from rules 2026-11-02)
-                                       'prestige': round(season.player_prestige(g.id), 1)}}
+                                       'prestige': round(season.player_prestige(g.id), 1),
+                                       # the ten courses played most as this history ends: [course, rounds]
+                                       # (from rules 2026-11-08)
+                                       'familiar': [[k, round(r, 1)] for k, r in FAM.top_courses(g.familiarity)],
+                                       # the Aggression personality trait (0-100), shown from rules 2026-11-08
+                                       'aggression': round(g.personality['aggression']),
+                                       # home clubs where they lived, dated: [year, week, course or None, basis,
+                                       # place] (from rules 2026-11-08)
+                                       'home_club': [list(r) for r in getattr(season, 'home_clubs', {}).get(g.id, ())],
+                                       # their familiarity at the current home club, explicitly: rounds played
+                                       # there and the value the engine uses (home_clubs.familiarity_at_club)
+                                       'home_club_familiarity': HC.familiarity_at_club(season, g)}}
         for c in st.coaches.values():
             p = people.setdefault(c.id, {'name': c.name, 'country': c.country, 'born': c.born, 'hometown': None})
             p['coach'] = {'speciality': c.speciality, 'youth': c.youth, 'reputation': c.reputation, 'clients': c.clients,

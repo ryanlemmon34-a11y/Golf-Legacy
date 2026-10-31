@@ -40,10 +40,12 @@ from . import participation as PT
 from . import prestige as PR
 from . import qualification as Q
 from . import residence as RES
+from . import familiarity as FAM
+from . import home_clubs as HC
 from .calendar import TOUR_BY_KEY, _in_window
 from . import schedule as SCH
 from . import work_pathway as WP
-from .course_library import Venue, default_library, event_level, library_version
+from .course_library import Venue, course_place, default_library, event_level, library_version
 from .engine import Conditions
 from .golfer import Caddie
 from .geography import CITY_BY_NAME, COUNTRIES
@@ -273,14 +275,17 @@ def _dd_counter():
 # ---------------------------------------------------------------------------------------------
 # Worker: plays one event site. Top-level so it can run in another process.
 # ---------------------------------------------------------------------------------------------
-def _for_course(x, fk):
+def _for_course(x, fk, base=0.0):
     """What a worker needs of a golfer or caddie to play one course: the same person with only that
     course's familiarity (and no hidden ceilings), so what is sent to the worker stays small however
-    long the career."""
+    long the career. `base`: a golfer's regional baseline for this course in rounds (familiarity.baseline;
+    rules 2026-11-08): the engine is given max(rounds played, base), a floor, never a sum. The golfer's own
+    record of rounds played is not changed."""
     fam = x.familiarity.get(fk)
     if isinstance(x, Caddie):
         return x if not x.familiarity else Caddie(x.name, x.skills, {fk: fam} if fam else {})
-    return replace(x, familiarity={fk: fam} if fam else {}, ceilings={})
+    eff = FAM.effective_rounds(fam, base)
+    return replace(x, familiarity={fk: eff} if eff else {}, ceilings={})
 
 def play_site(task):
     rng = random.Random(task['seed'])
@@ -437,6 +442,9 @@ class Season:
         self.places = RES.Places()                           # birthplace, residence and moves of every person
         self.move_log = {}                                   # year -> [moves recorded that winter]
         self.move_blocked = {}                               # year -> career moves not made for lack of money
+        self.familiar_base = defaultdict(Counter)            # year -> gid -> starts the regional familiarity
+                                                             #   baseline raised (rules 2026-11-08)
+        self.familiar_base_on = True                         # off only for a diagnostic comparison arm
         self.staff_receipts = defaultdict(Counter)            # year -> ('coach'|'caddie', id) -> $ received
         self.overall_start = {}                              # year -> gid -> overall on 1 January
         self._teams = {}                                     # event id -> {gid: (coach, caddie)} this week
@@ -504,6 +512,8 @@ class Season:
         self.wr_seed = {}                                    # gid -> [[abs week, points]]: pre-history (archived once)
         self._seed_world()
         RES.settle(self, self.first_year, 0)                 # everyone's birthplace and where they live
+        self.home_clubs = {}                                 # gid -> [[year, week, course, basis, place]] (HC)
+        HC.assign(self, self.first_year, 0)                  # each golfer's home club where they live
         self.major_rights = defaultdict(dict)                # year -> major -> gid -> right (note_right)
         self.peak_overall = {}                               # gid -> (highest Overall, year, week): note_peaks
         self.peak_since = self.first_year
@@ -1996,8 +2006,15 @@ class Season:
                 v = venues[ed.event_id][min(site, len(venues[ed.event_id]) - 1)]
                 course = self.lib.course(v)
                 fk = course.familiarity_key
+                golfers = []
+                for gid in ids:
+                    g = self.g[gid]
+                    base = self.course_baseline(gid, v.course_id)[0]
+                    if base > g.familiarity.get(fk, 0.0):
+                        self.familiar_base[year][gid] += 1   # the baseline, not experience, set this start's value
+                    golfers.append(_for_course(g, fk, base))
                 tasks.append({'event_id': ed.event_id, 'site': site, 'course': course,
-                              'golfers': [_for_course(self.g[gid], fk) for gid in ids], 'match_play': s.match_play,
+                              'golfers': golfers, 'match_play': s.match_play,
                               'caddies': [_for_course(self.staff.bag(self.g[gid], year), fk) for gid in ids],
                               'rounds': s.rounds, 'cut_top': s.cut_top,
                               'prestige': self.event_prestige[s.series_id],
@@ -2037,6 +2054,9 @@ class Season:
     def __setstate__(self, state):
         D.restore_self_views(state.pop('_self_view', None))  # (derived values: saved only to spare re-deriving)
         state.setdefault('new_pros_added', {})              # saves from before new professionals arrived
+        state.setdefault('familiar_base', defaultdict(Counter))  # saves from before the regional baseline: none
+        state.setdefault('familiar_base_on', True)
+        state.setdefault('home_clubs', {})                   # saves from before home clubs: given at the next winter
         state.setdefault('club_trips', defaultdict(Counter))   # saves from before payers were told apart
         state.setdefault('backer_flows', defaultdict(Counter))
         state.setdefault('support_start', {})
@@ -2461,7 +2481,7 @@ class Season:
             del self.prior_rounds[gid]                       # their first season is over
         for d in (self.earnings, self.level_earnings, self.played, self.pstats, self.ledgers, self.season_rounds, self.entry_wants,
                   self.entry_misses, self.entry_stats, self.declined, self.school_trips, self.club_trips,
-                  self.backer_flows, self.move_log, self.move_blocked, self.activity_counts,
+                  self.backer_flows, self.move_log, self.move_blocked, self.familiar_base, self.activity_counts,
                   self.block_flags, self.cash_start, self.support_start, self.overall_start, self.rank_start, self.am_start,
                   self.staff_receipts, self.injuries, self.card_log, self.career_counts, self.transitions,
                   self.assignments, self.staff_year, self.unheld, self.rights, self.earned, self.card_reasons, self.snapshots,
@@ -2549,6 +2569,7 @@ class Season:
             RES.review_moves(self, year, snap)               # career moves (and staying put, or going home)
             RES.staff_moves(self, year)
         RES.settle(self, year, 53)                           # arrivals' places; college bases (school-paid)
+        HC.assign(self, year, 53)                            # home clubs: arrivals, and anyone who moved
         self._active = None
         if self.development:                                 # after aging (it can raise the mental game) and arrivals
             self.note_peaks(year + 1, 0, [g for g in self.world.golfers if g.lifestyle != 'retired'])
@@ -3049,6 +3070,19 @@ class Season:
 
     def home_region(self, g):
         return COUNTRIES[self.home_country(g)].region
+
+    def course_baseline(self, gid, course_id):
+        """(rounds, basis) of a person's regional familiarity baseline for a library course (familiarity.baseline):
+        from their birthplace and their residence now (Places), each matched once, and the same regional floor
+        for their home club (home_clubs; it matters only for a club found by country). None for people whose
+        places were never recorded (legacy), for courses outside the library, and in a comparison arm played
+        with the baseline switched off (`familiar_base_on`)."""
+        P = self.places
+        site = self.lib.sites.get(course_id)
+        if not getattr(self, 'familiar_base_on', True) or site is None or gid in P.legacy or not P.known(gid):
+            return 0.0, None
+        base = FAM.baseline(course_place(site), (P.birth.get(gid), P.home.get(gid)))
+        return FAM.home_floor(base, HC.current(self, gid) == course_id)   # the same floor, once
 
     def money_unit(self, g, year):
         return FIN.money_unit(max(0.0, self.funds(g, year)))

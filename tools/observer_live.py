@@ -77,6 +77,8 @@ def capture(session):
     archived = set(session._history_years())
     people = {}
     from golfsim.ratings import ATTRIBUTE_KEYS
+    from golfsim import familiarity as FAM
+    from golfsim import home_clubs as HC
     peaks = getattr(s, 'peak_overall', {})
     initial = set((session.state.get('archive') or {}).get('initial') or ())   # golfers who were there at the start
     for g in s.world.golfers:
@@ -93,6 +95,11 @@ def capture(session):
         # its two parts as the engine holds them now (golfsim.prestige.player_prestige): fame from the last 52 weeks'
         # results, and the slowly fading legacy of big wins (.get: reading never adds a golfer to either table)
         people[g.id]['prestige_parts'] = (s.fame.get(g.id, 0.0), s.legacy.get(g.id, 0.0))
+        # the ten courses they have played most (course, competitive rounds), most first (rules 2026-11-08)
+        people[g.id]['familiar'] = [(k, round(r, 1)) for k, r in FAM.top_courses(g.familiarity)]
+        people[g.id]['aggression'] = round(g.personality['aggression'])   # a style, not a grade (rules 2026-11-08)
+        people[g.id]['home_club'] = [list(r) for r in getattr(s, 'home_clubs', {}).get(g.id, ())]   # dated
+        people[g.id]['home_club_familiarity'] = HC.familiarity_at_club(s, g)   # rounds there, engine's value
     for kind, table in (('coach', st.coaches), ('caddie', st.caddies)):
         for c in table.values():
             p = people.setdefault(c.id, {'name': c.name, 'country': c.country, 'born': c.born, 'roles': []})
@@ -136,7 +143,9 @@ def capture(session):
     pl = s.places
     meta = _generation_meta(session)
     from golfsim.calendar import TOUR_BY_KEY
+    from golfsim.course_library import course_place
     courses = {cid: {'name': site['name'], 'city': site['city'], 'country': site['country'], 'class': site['cls'],
+                     'subdivision': course_place(site)[1], 'origin': site.get('origin'),
                      'architect': site.get('architect'), 'opened': site.get('opened'),
                      'layouts': {k: {'par': c.par, 'yards': c.yards} for k, c in site['layouts'].items()}}
                for cid, site in s.lib.sites.items()}
@@ -153,6 +162,7 @@ def capture(session):
         rank_top={w_: list(rows) for w_, rows in getattr(s, 'rank_top', {}).get(year, {}).items()},
         wr_seed=dict(getattr(s, 'wr_seed', {})),          # (seeded points: the world's first two seasons only)
         editions=editions, by_person=dict(by_person), schedule=schedule, series=series,
+        local_hosting=bool(getattr(s.lib, 'local_first', False)),
         coach_of=dict(st.coach_of), caddie_of=dict(st.caddie_of), am_support=am_support,
         stints=_stints(st.rel, archived, s.first_year),
         refusals=_refusals(st.rel, archived, s.first_year),

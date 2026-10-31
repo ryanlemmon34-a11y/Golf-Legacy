@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import re
 
-RULES_VERSION = '2026-11-07'
+RULES_VERSION = '2026-11-08'
 RANKING_RULE = 'world-ranking-1'     # the world ranking's formula (unchanged since the world began; named now)
 VERSIONS = (
     ('2026-10-30', 'Winners\' exemptions count whatever a golfer\'s membership (a non-member champion earns a '
@@ -65,6 +65,14 @@ VERSIONS = (
                    'or caddie -- may die, at an annual risk rising with age (a provisional game calibration). A '
                    'working coach\'s or caddie\'s partnerships end then, with the reason recorded; results, records '
                    'and relationships are kept. Worlds started earlier never process deaths.'),
+    ('2026-11-08', 'Course familiarity has a regional baseline: a golfer plays a course in the state or province where '
+                   'they were born or live (the country, where the state or province is unknown) as if they had played '
+                   'a few rounds there, unless they have played more; it is a floor, never added to experience, and '
+                   'counted once. Every golfer has a recorded home club where they live, which counts the same way. '
+                   'Local hosting: a low- or entry-level event playing in a city for the first time takes a free '
+                   'municipal course no event has used yet, and keeps it; established venues are unchanged. Each '
+                   'course records its state or province, and each season the starts where the baseline applied. '
+                   'Aggression, an existing personality trait, is shown on profiles (unchanged in play).'),
 )
 EARLIER = ('Seasons archived before rules versions were recorded were played under earlier rules. The '
            'differences that matter for reading old results: a winner without a Premier card held no '
@@ -412,6 +420,46 @@ RULES = {
         'Departures follow the existing winter odds (progress, rapport, fit, money) and retirement. The weights '
         'are proposed starting values.',
         '2026-11-04'),
+    'course-familiarity': (
+        'Course familiarity',
+        'Familiarity with a course is the competitive rounds a golfer has played on it, any layout (rounds of an '
+        'event, and match-play and playoff holes in rounds\' worth). The engine uses 1 - exp(-rounds / 15): small, '
+        'bounded help with decisions, approach distance control and reading greens. Regional baseline: on a '
+        'course in the same state or province as the golfer\'s birthplace or where they live at the time, the '
+        'engine is given at least 3 rounds; where the state or province is unknown for the golfer or the course, '
+        'the same country gives at least 1.5. It is a floor: the engine uses the larger of rounds played and the '
+        'baseline, never their sum, and birthplace and residence count once even when they differ (the larger '
+        'match). Home club: every golfer whose residence is recorded has one, recorded with its date: a municipal '
+        'course in the state or province they live in (else another course there that is not an elite venue; '
+        'where there is none, the same choice within their country), a stable draw per golfer and place, changed '
+        'only when they move. Their home club counts as at least 3 rounds too -- the same floor, which adds nothing '
+        'where the club is in their own state or province, never on top of another baseline. No other home '
+        'advantage exists. People whose places were never recorded get no baseline and no home club. The rounds a '
+        'golfer has actually played are recorded unchanged; profiles show them and, separately, the value the '
+        'engine uses. A caddie\'s familiarity is rounds caddied there only.',
+        '2026-11-08'),
+    'local-hosting': (
+        'Venues: home courses and local hosting',
+        'An event in a city returns to the course it last used there (its home course) whenever that course is '
+        'free; otherwise it takes the free course whose layouts rank highest for its level in that city, or moves '
+        'to another city in its pool. Local hosting: when a low-level event (mini events, small-college golf, 54-72 '
+        'hole amateur and club-professional events) or an entry-level event (18-36 hole regional amateur events) '
+        'plays in a city for the first time, it takes a free municipal course there that no event has used yet, if '
+        'there is one, and keeps it as its home. Established home courses never change because of this, no course '
+        'hosts two events in a week, and no event is rotated between courses.',
+        '2026-11-08'),
+    'aggression': (
+        'Aggression (playing style)',
+        'A personality trait from 0 (cautious) to 100 (attacking), set when a golfer enters the world and never '
+        'changed afterwards: not by age, injury, results or anything else. It is a style, not an ability: higher '
+        'is not better. Shown as cautious (below 35), balanced (35-65) or attacking (above 65). It tilts four '
+        'choices: the club off the tee (an attacking golfer leans to driver), aiming at the flag or the safe part '
+        'of the green, going for a par 5 in two, and attempting the recovery shot from the trees rather than '
+        'punching out. It tilts only choices that are possible: a shot out of reach (beyond the longest club from '
+        'that lie, which follows Power, so age, injury and season fatigue shorten it) is always a lay-up, however '
+        'aggressive the golfer, so an aging attacking golfer still attacks, at what they can still reach. Course '
+        'Management sets how well each choice is judged; there is no other risk score.',
+        '2026-11-08'),
     'injuries': (
         'Injuries',
         'A golfer can be hurt playing an event; the chance rises with tiredness, age and the rounds played and falls '
