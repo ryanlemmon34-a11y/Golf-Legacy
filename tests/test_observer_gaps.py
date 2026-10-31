@@ -11,6 +11,7 @@ Run from the project folder:  python -m unittest tests.test_observer_gaps -v
 from __future__ import annotations
 
 import re
+from collections import defaultdict
 import shutil
 import sys
 import tempfile
@@ -24,7 +25,10 @@ sys.path.insert(0, str(ROOT / 'tools'))
 from types import SimpleNamespace as NS                               # noqa: E402
 from golfsim import prestige as PR                                    # noqa: E402
 import observer as O                                                  # noqa: E402
+import observer_data as OD                                            # noqa: E402
 import observer_history as OH                                         # noqa: E402
+import observer_myworld as MW                                         # noqa: E402
+from unittest import mock                                             # noqa: E402
 
 
 def text(h):
@@ -86,6 +90,136 @@ class UnitPrestigeParts(unittest.TestCase):
         for w in (NS(live=None), NS(live=NS(people={})), NS(live=NS(people={7: {'prestige': 50.0}}))):
             self.assertIsNone(OH.prestige_parts(w, 7))
             self.assertIn('not recorded', OH.prestige_parts_html(w, 7))
+
+
+class FakeWorld:
+    """Just enough of observer.World for My World's team items: results with the team each recorded, stints (the
+    history's relations table and the snapshot's), roles and the snapshot's career decisions."""
+
+    def __init__(self, results=(), stints=(), roles=None, transitions=None, years=(2030,), first_year=2030):
+        self._results = defaultdict(list)
+        for r in results:
+            self._results[r['golfer']].append(r)
+        self.roles = roles or {}
+        rel = [NS(**d) for d in stints if d.get('archived')]
+        self.a = NS(years=list(years), people={},
+                    rel=NS(of_golfer=lambda g: [x for x in rel if x.golfer == g],
+                           of_staff=lambda st: [x for x in rel if x.staff == st]))
+        self.live = NS(first_year=first_year, stints=[dict(d) for d in stints if not d.get('archived')],
+                       transitions=transitions or {}, people={})
+
+    def results(self, pid):
+        return sorted(self._results[pid], key=lambda r: (r['year'], r['week']))
+
+    def person(self, pid):
+        return {'roles': self.roles.get(pid, ['golfer'])}
+
+    def person_link(self, pid):
+        return f'<a href="/golfer/{pid}">P{pid}</a>'
+
+    def name(self, pid):
+        return f'P{pid}'
+
+    def series_name(self, sid):
+        return sid
+
+
+def win(golfer, year, week, eid, coach=0, caddie=0, pos=1):
+    return {'golfer': golfer, 'year': year, 'week': week, 'event': eid, 'series': eid.split(':')[1], 'pos': pos,
+            'coach': coach, 'caddie': caddie, 'route': None}
+
+
+def stint(i, kind, staff, golfer, start, end=None, archived=True):
+    return {'id': i, 'kind': kind, 'staff': staff, 'golfer': golfer, 'start': start, 'end': end, 'arrangement': 'fee',
+            'started_by': 'golfer', 'reason_start': '', 'reason_end': '', 'ended_by': None, 'terms': 0.0,
+            'archived': archived}
+
+
+MAJORS = {'2031:MAJ_A', '2031:MAJ_B', '2032:MAJ_A'}
+
+
+def collect(fn, w, pid, start, *extra):
+    out = []
+    fn(w, pid, start, lambda y, wk, kind, html, eid=None, key=None: out.append((y, wk, kind, text(html), key)),
+       *extra)
+    return out
+
+
+class UnitTeamNews(unittest.TestCase):
+    """My World's first shared major and retirement into a staff role, from recorded facts only."""
+
+    def world(self):
+        results = [win(1, 2031, 15, '2031:MAJ_A', coach=10, caddie=20),
+                   win(1, 2031, 20, '2031:OPEN', coach=11, caddie=20),              # not a major
+                   win(1, 2031, 28, '2031:MAJ_B', coach=10, caddie=21),             # a second major with coach 10
+                   win(1, 2031, 30, '2031:MAJ_C', coach=10, pos=2),                 # (not a win)
+                   win(2, 2032, 15, '2032:MAJ_A', coach=12, caddie=20)]             # caddie 20's other client
+        stints = [stint(1, 'coach', 10, 1, (2030, 1)), stint(2, 'caddie', 20, 1, (2029, 40), (2031, 53)),
+                  stint(3, 'caddie', 21, 1, (2031, 22), archived=False), stint(4, 'caddie', 20, 2, (2032, 1),
+                                                                                   archived=False),
+                  stint(5, 'coach', 11, 1, (2031, 18), (2031, 25))]
+        return FakeWorld(results, stints, roles={10: ['coach'], 20: ['caddie'], 21: ['caddie']},
+                         years=(2030, 2031))
+
+    def majors(self, w, pid, start=(2030, 0)):
+        return collect(MW._shared_majors, w, pid, start, lambda eid: eid in MAJORS)
+
+    def test_a_golfers_first_major_with_each_coach_and_caddie(self):
+        got = self.majors(self.world(), 1)
+        self.assertEqual(sorted(x[4] for x in got), sorted([('first-major', 1, 10, 'coach'),
+                                                           ('first-major', 1, 20, 'caddie'),
+                                                           ('first-major', 1, 21, 'caddie')]))
+        by = {x[4][2]: x for x in got}
+        self.assertEqual(by[10][:3], (2031, 15, 'shared major'))       # the first, never the second with coach 10
+        self.assertEqual(by[21][:2], (2031, 28))
+        self.assertIn('P1 won the 2031 MAJ_A with P10 as coach: their first major together', by[10][3])
+        self.assertNotIn('records began', by[10][3])
+        self.assertIn('since the records began', by[20][3])             # together since before the first season
+        self.assertFalse(any(x[4][2] == 11 for x in got))               # coach 11 won no major with them
+
+    def test_the_same_item_whoever_is_followed(self):
+        w = self.world()
+        golfer = {x[4]: x for x in self.majors(w, 1)}
+        coach = self.majors(w, 10)
+        self.assertEqual(coach, [golfer[('first-major', 1, 10, 'coach')]])
+        caddie = {x[4]: x for x in self.majors(w, 20)}
+        self.assertEqual(set(caddie), {('first-major', 1, 20, 'caddie'), ('first-major', 2, 20, 'caddie')})
+        self.assertEqual(caddie[('first-major', 1, 20, 'caddie')], golfer[('first-major', 1, 20, 'caddie')])
+
+    def test_only_inside_the_window(self):
+        got = self.majors(self.world(), 1, (2031, 15))
+        self.assertEqual([x[4] for x in got], [('first-major', 1, 21, 'caddie')])
+        self.assertEqual(self.majors(self.world(), 1, (2032, 0)), [])
+
+    def test_retirement_into_a_staff_role_from_the_snapshot(self):
+        t = {'gid': 5, 'kind': 'became coach', 'age': 41, 'via': 'stopped chasing'}
+        w = FakeWorld(roles={5: ['golfer', 'coach']}, transitions={2031: [t]}, years=(2030,))
+        got = collect(MW._staff_role, w, 5, (2030, 0))
+        self.assertEqual(len(got), 1)
+        y, wk, kind, html, key = got[0]
+        self.assertEqual((y, wk, kind, key), (2032, 1, 'staff role', ('staff-role', 5, 2031)))
+        self.assertIn('P5 retired from playing after the 2031 season and became a coach at 41 (they stopped '
+                      'chasing a playing career)', html)
+        raw = []
+        MW._staff_role(w, 5, (2030, 0), lambda *a, **k: raw.append(a[3]))
+        self.assertIn('href="/golfer/5?tab=coaching"', raw[0])
+        self.assertEqual(collect(MW._staff_role, w, 5, (2032, 1)), [])  # read since: not again
+        nobody = FakeWorld(roles={5: ['golfer']}, transitions={2031: [t]})
+        self.assertEqual(collect(MW._staff_role, nobody, 5, (2030, 0)), [])   # no staff career: nothing read
+
+    def test_retirement_into_a_staff_role_archived_once(self):
+        t = {'gid': 5, 'kind': 'became caddie', 'age': 30, 'via': 'retirement'}
+        w = FakeWorld(roles={5: ['golfer', 'caddie']}, transitions={2030: [t], 2031: [{**t, 'gid': 6}]},
+                      years=(2029, 2030))
+        with mock.patch.object(OD, 'career_rows', lambda w_, pid: [(2029, {}), (2030, {'decisions': [t]})]):
+            got = collect(MW._staff_role, w, 5, (2029, 0))
+        self.assertEqual([(x[0], x[1], x[4]) for x in got], [(2031, 1, ('staff-role', 5, 2030))])
+        self.assertIn('became a caddie at 30', got[0][3])
+        self.assertNotIn('stopped chasing', got[0][3])
+        plain = {'gid': 5, 'kind': 'retired', 'age': 30}
+        with mock.patch.object(OD, 'career_rows', lambda w_, pid: [(2030, {'decisions': [plain]})]), \
+                mock.patch.object(OH, 'decisions', lambda w_, pid, y: [plain]):
+            self.assertEqual(collect(MW._staff_role, FakeWorld(roles={5: ['golfer', 'caddie']}), 5, (2029, 0)), [])
 
 
 class WorldGaps(unittest.TestCase):
@@ -177,6 +311,76 @@ class WorldGaps(unittest.TestCase):
             self.assertNotIn('fame points', row)
         finally:
             arch.close()
+
+    # ---- 3. My World: first shared major, retirement into a staff role ---------------------------------------
+    def major_wins(self):
+        """[(year, week, event, winner, coach, caddie)] of every major played, from the editions' recorded teams
+        (the season files and the running world), oldest first."""
+        w, out = self.w, []
+        for eid, y, wk in w.a.index.db.execute("SELECT event_id, year, week FROM editions WHERE category = 'major' "
+                                               "OR tour = 'MAJORS'"):
+            e = w.edition(eid)
+            for r in e['rows']:
+                if r['pos'] == 1:
+                    out.append((y, wk, eid, r['person']) + tuple(w.a.team_at(r['person'], eid)))
+        for eid, e in w.live.editions.items():
+            if e.get('category') == 'major' or e.get('tour') == 'MAJORS':
+                for gid, pos, _ in (e['finish'][0] if e['finish'] else ()):
+                    if pos == 1:
+                        team = e['team'].get(gid) or e['team'].get(str(gid)) or (0, 0)
+                        out.append((int(eid.split(':')[0]), e['week'], eid, gid) + tuple(team))
+        return sorted(out)
+
+    def follow(self, people):
+        return [('person', p, '', None) for p in dict.fromkeys(people)]
+
+    def test_first_shared_majors_each_once(self):
+        wins = self.major_wins()
+        want = {}
+        for y, wk, eid, g, coach, caddie in wins:
+            for st, role in ((coach, 'coach'), (caddie, 'caddie')):
+                if st:
+                    want.setdefault((g, st, role), (y, wk, eid))
+        if not want:
+            self.skipTest('no major won with a coach or caddie in this small world')
+        people = [x for g, st, _ in want for x in (g, st)]
+        got = [x for x in MW.digest(self.w, self.follow(people), (self.w.a.years[0] - 1, 0)) if x[2] == 'shared major']
+        self.assertEqual(len(got), len(want))                           # one item per pair, both sides followed
+        for (g, st, role), (y, wk, eid) in want.items():
+            mine = [x for x in got if f'/golfer/{g}"' in x[3] and f'/golfer/{st}"' in x[3] and f' as {role}:' in x[3]]
+            self.assertEqual(len(mine), 1, (g, st, role))
+            self.assertEqual(mine[0][:2], (y, wk))
+            self.assertIn(f'/event/{eid.replace(":", "%3A")}"', mine[0][3])
+        with mock.patch.object(O, 'shortlist', lambda w: self.follow(people)), \
+                mock.patch.object(O, 'shortlist_seen', lambda w: None):
+            page = O.render(self.w, '/my-world', parse_qs(f'since={self.w.a.years[0] - 1}.0'))[1]
+        self.assertIn('their first major together', page)
+
+    def test_retirement_into_a_staff_role_each_once(self):
+        want = {}
+        for y in self.w.a.years:
+            for t in self.w.a.year(y)['transitions']:
+                if t['kind'] in ('became coach', 'became caddie'):
+                    want[t['gid']] = (y, t['kind'].split()[1])
+        season = self.w.session.season
+        for y, ts in season.transitions.items():
+            if y not in self.w.a.years:
+                for t in ts:
+                    if t['kind'] in ('became coach', 'became caddie'):
+                        want[t['gid']] = (y, t['kind'].split()[1])
+        if not want:
+            self.skipTest('no golfer became a coach or caddie in this small world')
+        got = [x for x in MW.digest(self.w, self.follow(want), (self.w.a.years[0] - 1, 0)) if x[2] == 'staff role']
+        self.assertEqual(len(got), len(want))
+        for g, (y, role) in want.items():
+            mine = [x for x in got if x[3].startswith(f'<a href="/golfer/{g}">')]
+            self.assertEqual(len(mine), 1, g)
+            self.assertEqual(mine[0][:2], (y + 1, 1))
+            self.assertIn(f'after the {y} season and became a {role}', text(mine[0][3]))
+            self.assertIn(f'href="/golfer/{g}?tab={"coaching" if role == "coach" else "caddying"}"', mine[0][3])
+        not_staff = [('person', g, '', None) for g, p in self.w.live.people.items()
+                     if p.get('lifestyle') == 'retired' and g not in want][:20]
+        self.assertFalse([x for x in MW.digest(self.w, not_staff, (self.w.a.years[0] - 1, 0)) if x[2] == 'staff role'])
 
 
 if __name__ == '__main__':

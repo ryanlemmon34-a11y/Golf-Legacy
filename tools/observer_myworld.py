@@ -15,6 +15,11 @@ worded, since you last marked it read (or over a window you choose):
   when the same pair had worked together before) and each one ended, with who ended it and why as recorded.
   Stints come from the history's relations table and, for seasons not archived yet, the snapshot; a stint keeps its
   id, so one available from both is one item. A stint ended at a season's end is dated that season's week 52.
+* a followed golfer's, coach's or caddie's first major won together: the first major a golfer won with that coach or
+  caddie on their team as the event recorded it (the team kept with each result, not a guess from the dates);
+* a followed golfer's retirement into a staff role: the recorded career decision "became coach" or "became caddie"
+  (season files, and the snapshot for a season not archived yet), dated like the retirement (the next season's
+  week 1), with a link to the new career;
 * a followed tournament's or tour's editions played (with their winners); a course's editions and course records
   set there; a nation's golfers' wins in majors and Premier events; a followed edition once played.
 
@@ -117,6 +122,8 @@ def digest(w, items, start, until=None):
         _status_changes(w, pid, start, add)
         _injuries(w, pid, start, add)
         _partnerships(w, pid, start, add)
+        _shared_majors(w, pid, start, add, lambda eid: major(_ed_info(w, eid, cache)))
+        _staff_role(w, pid, start, add)
         if w.a and w.a.index is not None:
             for m in w.a.index.moments(person=pid):
                 if _after(start, m['year'], m['week']):
@@ -243,6 +250,81 @@ def _partnerships(w, pid, start, add):
         if s.end is not None and _after(start, *_dated(s.end)):
             add(*_dated(s.end), 'departure', f'{g} and {st} parted ({s.kind}; together from {O.when(s.start)} to '
                 f'{O.when(s.end)}): ended by {O._ended(s)}', key=('stint', s.id, 'end'))
+
+
+def _shared_majors(w, pid, start, add, is_major):
+    """The first major each golfer won with a given coach or caddie on their team, for a followed golfer (with each of
+    their coaches and caddies) or a followed coach or caddie (with each of their clients). Only the team each result
+    recorded counts -- a stint's dates or a later assignment never credit a win -- and a win is never counted for the
+    staff member as their own. Keyed by (golfer, staff, role), so it is one item whichever of the pair is followed."""
+    O = _o()
+    golfers = {pid}
+    golfers |= {s.golfer for s in stints_of(w, pid) if s.staff == pid}
+    first_year = (w.live.first_year if w.live is not None else (min(w.a.years) if w.a and w.a.years else None))
+    for g in sorted(golfers):
+        firsts = {}
+        for r in w.results(g):                         # (oldest first)
+            if r['pos'] != 1 or not is_major(r['event']):
+                continue
+            for role in ('coach', 'caddie'):
+                st = r.get(role)
+                if st and (g == pid or st == pid) and (st, role) not in firsts:
+                    firsts[(st, role)] = r
+        for (st, role), r in firsts.items():
+            if not _after(start, r['year'], r['week']):
+                continue
+            began = min((x.start for x in stints_of(w, g) if (x.kind, x.staff) == (role, st)), default=None)
+            early = (began is not None and first_year is not None and tuple(began) < (first_year, 1))
+            add(r['year'], r['week'], 'shared major',
+                f'{w.person_link(g)} won the {O.event_link(w, r["event"])} with {w.person_link(st)} as {role}: '
+                f'their first major together' + (' since the records began (they worked together before then)'
+                                                  if early else ''),
+                r['event'], key=('first-major', g, st, role))
+
+
+def staff_transitions(w, pid):
+    """[(season, transition)] of a golfer's recorded career decisions to become a coach or a caddie: the season files
+    (the decision is recorded in the winter after their last season) and, for seasons not archived yet, the
+    snapshot. Only for people who have a coaching or caddying career (otherwise nothing is read)."""
+    roles = set((w.person(pid) or {}).get('roles') or ())
+    if not roles & {'coach', 'caddie'}:
+        return []
+    import observer_data as OD
+    import observer_history as OH
+    got = {}
+    rows = OD.career_rows(w, pid)
+    for y, row in rows:
+        for t in row.get('decisions') or ():
+            if str(t.get('kind', '')).startswith('became '):
+                got.setdefault(y, t)
+    if rows and rows[-1][0] not in got:
+        for t in OH.decisions(w, pid, rows[-1][0]):    # (an index without full rows: that season's file)
+            if str(t.get('kind', '')).startswith('became '):
+                got.setdefault(rows[-1][0], t)
+    archived = set(w.a.years) if w.a else set()
+    for y, ts in ((getattr(w.live, 'transitions', None) or {}) if w.live is not None else {}).items():
+        if int(y) in archived:
+            continue
+        for t in ts:
+            if t.get('gid') == pid and str(t.get('kind', '')).startswith('became '):
+                got.setdefault(int(y), t)
+    return sorted(got.items())
+
+
+def _staff_role(w, pid, start, add):
+    """A followed golfer's retirement into coaching or caddying, as the career decision recorded it: dated like the
+    retirement (the next season's week 1), once per decision."""
+    O = _o()
+    for y, t in staff_transitions(w, pid):
+        role = t['kind'].split(' ', 1)[1]
+        if role not in ('coach', 'caddie') or not _after(start, y + 1, 1):
+            continue
+        how = ' (they stopped chasing a playing career)' if t.get('via') == 'stopped chasing' else ''
+        age = f' at {t["age"]}' if t.get('age') is not None else ''
+        tab = 'coaching' if role == 'coach' else 'caddying'
+        add(y + 1, 1, 'staff role', f'{w.person_link(pid)} retired from playing after the {y} season and became a '
+            f'{role}{age}{how}: <a href="/golfer/{pid}?tab={tab}">their {O.esc(role)} career</a>',
+            key=('staff-role', pid, y))
 
 
 def _status_changes(w, pid, start, add):
@@ -463,7 +545,9 @@ def page(w, q):
         '100); injuries and returns (the first appearance once a golfer could enter again, and the first main event '
         'back when that was a qualifying stage); partnerships with coaches and caddies begun, resumed (the same pair '
         'together again) and ended, with who ended them and why; followed tournaments’, tours’ and courses’ '
-        'editions; a nation’s wins in majors and Premier events. '
+        'editions; a nation’s wins in majors and Premier events; a golfer\'s first major won with a coach or caddie '
+        '(that coach or caddie on their team as the event recorded it); a retirement into coaching or caddying '
+        '(the recorded career decision). '
         'Kept with this world in the shortlist file; never read by the simulation.</p>')
 
 

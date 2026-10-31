@@ -157,6 +157,7 @@ def capture(session):
         prize={gid: led.prize for gid, led in s.ledgers.get(year, {}).items()},
         injuries=dict(s.injury_episodes(year)) if hasattr(s, 'injury_episodes') else {},   # this season's, by golfer
         injured_now=sorted(getattr(s, 'injured', {})),
+        transitions={y: [dict(t) for t in ts] for y, ts in getattr(s, 'transitions', {}).items() if y not in archived},
         qual=_qual(s, year, session.cursor),
         **_status(s, year),
         captured=time.time())
