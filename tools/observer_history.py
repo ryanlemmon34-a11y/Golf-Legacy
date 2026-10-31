@@ -637,8 +637,10 @@ def team_history(w, pid):
                                                   f'Rapport (end of {through})' if through else 'Rapport',
                                                   'Starts together', 'Wins together', 'How it began', 'Why it ended'],
                                                  table_rows, numeric=(4, 5, 6, 7)))
-    out.append(f'<p class="muted">Stints as recorded at the end of {through}, and this season\'s as the running world '
-               'records them (marked "this season"); starts and wins together are this golfer\'s '
+    out.append('<p class="muted">Stints as recorded at the end of '
+               + (f'{through}, and this season\'s as the running world records them (marked "this season")' if through
+                  else 'nothing yet (no season archived): the current season\'s as the running world records them')
+               + '; starts and wins together are this golfer\'s '
                'results with that person recorded on their team that week (their achievements, not the coach\'s or '
                'caddie\'s own wins). How it began: who approached whom and why, and why the other side said yes '
                '(recorded from rules 2026-11-04). ' + O.PAIR_NOTE + ' Changes since then show under “Now” and in each '

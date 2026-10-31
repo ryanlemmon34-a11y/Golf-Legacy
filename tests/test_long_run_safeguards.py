@@ -88,5 +88,35 @@ class ResumedSupportSetting(unittest.TestCase):
         self.assertFalse(json.loads((out / 'manifest.json').read_text())['amateur_support'])   # left as it was
 
 
+class WorldRulesRecorded(unittest.TestCase):
+    """Both run modes record the world's work-pathway minimum age for the report, after creating or resuming the
+    world; a world without the setting (started before rules 2026-11-10) records 21, the report's own fallback."""
+
+    def test_the_age_in_force_is_recorded(self):
+        from types import SimpleNamespace as NS
+        for season, want in ((NS(work_pathway_min_age=18), 18), (NS(work_pathway_min_age=21), 21), (NS(), 21)):
+            data = {}
+            LW.record_world_rules(data, season)
+            self.assertEqual(data['work_pathway_min_age'], want)
+
+    def test_both_modes_record_it(self):
+        import inspect
+        for fn in (LW.run_world, LW.run_world_session):           # (the default mode and --session)
+            src = inspect.getsource(fn)
+            self.assertIn('record_world_rules(data, ', src, fn.__name__)
+            self.assertLess(src.index("first = data['first']") if fn is LW.run_world else src.index('check_support('),
+                            src.index('record_world_rules(data, '), fn.__name__)   # after create or resume
+            loop = 'for y in range(' if fn is LW.run_world else "while data['years'] < years"
+            self.assertLess(src.index('record_world_rules(data, '), src.index(loop), fn.__name__)   # before play
+
+    def test_a_new_world_records_18(self):
+        from golfsim.population import generate_world
+        from golfsim.season import Season
+        s = Season(generate_world(seed=5, scale=0.01), seed=5, development=True, workers=1)
+        data = {}
+        LW.record_world_rules(data, s)
+        self.assertEqual(data['work_pathway_min_age'], 18)
+
+
 if __name__ == '__main__':
     unittest.main()

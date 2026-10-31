@@ -378,6 +378,14 @@ class LivePartnerships(unittest.TestCase):
         self.assertIn('reason 1', html)
         self.assertIn('accepted 1', html)
         self.assertNotIn('No coaches or caddies recorded', html)
+        self.assertNotIn('end of None', html)
+        w.a = None                                                      # no season archived yet
+        with mock.patch.object(O, 'refusals_section', lambda w_, pid: ''), \
+                mock.patch.object(OD, 'results', lambda w_, pid: []):
+            html = OH.team_history(w, g)
+        self.assertNotIn('None', html)
+        self.assertIn('nothing yet (no season archived)', html)
+        self.assertIn('reason 1', html)
 
 
 if __name__ == '__main__':

@@ -316,6 +316,13 @@ def safeguards(data, y, ch, total, out, start_active):
         print(f'FLAG {data["flags"][y]}', flush=True)
 
 
+def record_world_rules(data, season):
+    """Per-world rule settings the report reads, recorded after a world is created or resumed (either mode): the
+    work pathway's minimum age in force (rules 2026-11-10: 18 in new worlds; 21 in a world started earlier, which
+    is also what the report assumes for a run that never recorded it)."""
+    data['work_pathway_min_age'] = getattr(season, 'work_pathway_min_age', 21)
+
+
 def run_world_session(seed, years, workers, out, resume=False, scale=1.0, amateur_support=True, keep_after=None):
     """Run (or resume) one world through the persistent weekly session and the observer, exactly as a
     player skips to the end of each season: the session's checkpoint generations are the resumable saves
@@ -351,8 +358,7 @@ def run_world_session(seed, years, workers, out, resume=False, scale=1.0, amateu
         s.close()
     w = observer.World(d)
     check_support(getattr(w.session.season, 'amateur_support_on', True), amateur_support, f'seed {seed} (its world)')
-    # the work pathway's minimum age in force in this world (rules 2026-11-10: 18; earlier worlds 21), for the report
-    data['work_pathway_min_age'] = getattr(w.session.season, 'work_pathway_min_age', 21)
+    record_world_rules(data, w.session.season)
     first = data['first']
     if pending_path.exists():                       # a season captured but not yet merged when the run stopped
         with open(pending_path, 'rb') as f:
@@ -486,6 +492,7 @@ def run_world(seed, years, workers, out, resume=False, save_every=1):
         debug = {'format': FORMAT, 'seed': seed, 'rows': {}}
         arch_created = None
     first = data['first']
+    record_world_rules(data, s)
     archive = ArchiveWriter(out / f'archive_{seed}', s)
     if arch_created:
         archive.created, archive.initial = arch_created, initial
