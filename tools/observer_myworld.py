@@ -117,6 +117,9 @@ def digest(w, items, start, until=None):
         _status_changes(w, pid, start, add)
         _injuries(w, pid, start, add)
         _partnerships(w, pid, start, add)
+        d = (w.person(pid) or {}).get('died')
+        if d and _after(start, d['year'], d['week']):   # (rules 2026-11-07: the recorded fact, on its date)
+            add(d['year'], d['week'], 'status', f'{link}: died in the winter after season {d["year"]}, aged {d["age"]}')
         if w.a and w.a.index is not None:
             for m in w.a.index.moments(person=pid):
                 if _after(start, m['year'], m['week']):
@@ -450,7 +453,8 @@ def page(w, q):
     out.append('<h2>Digest</h2>' + _hidden_period_notice(w, seen) + tabs + f'<p>{len(got):,} recorded item{"s" if len(got) != 1 else ""} {O.esc(label)} '
                f'(after {start[0]} week {start[1]}; up to {y} week {wk}){mark}</p>')
     if got:
-        out.append(O.table(['Season', 'Week', 'What'], [[str(a), str(b) if b else '—', h] for a, b, _, h in got[:LIMIT]],
+        out.append(O.table(['Season', 'Week', 'What'], [[str(a), 'winter' if b == 53 else str(b) if b else '—', h]
+                                                   for a, b, _, h in got[:LIMIT]],
                            numeric=(0, 1))
                    + (f'<p class="muted">{len(got) - LIMIT:,} older items not shown: choose a shorter window.</p>'
                       if len(got) > LIMIT else ''))
@@ -459,11 +463,11 @@ def page(w, q):
     out.append('<h2>What you follow</h2>' + _groups_html(w, groups))
     return 'My World', ''.join(out) + (
         '<p class="muted">Only recorded facts: wins; top-10s in majors and Premier events; missed cuts in majors; '
-        'season-end changes of tour or status; recorded moments; world-ranking band changes (No. 1, top 10, 50, '
-        '100); injuries and returns (the first appearance once a golfer could enter again, and the first main event '
-        'back when that was a qualifying stage); partnerships with coaches and caddies begun, resumed (the same pair '
-        'together again) and ended, with who ended them and why; followed tournaments’, tours’ and courses’ '
-        'editions; a nation’s wins in majors and Premier events. '
+        'season-end changes of tour or status; deaths (in the winter after a season); recorded moments; world-ranking '
+        'band changes (No. 1, top 10, 50, 100); injuries and returns (the first appearance once a golfer could enter '
+        'again, and the first main event back when that was a qualifying stage); partnerships with coaches and caddies '
+        'begun, resumed (the same pair together again) and ended, with who ended them and why; followed tournaments’, '
+        'tours’ and courses’ editions; a nation’s wins in majors and Premier events. '
         'Kept with this world in the shortlist file; never read by the simulation.</p>')
 
 
@@ -515,6 +519,8 @@ def _line(w, kind, i):
         p = w.person(int(i)) or {}
         g = p.get('golfer') or {}
         bits = []
+        if p.get('died'):                              # (rules 2026-11-07: the recorded fact only)
+            bits.append(f'died in the winter after season {p["died"]["year"]}, aged {p["died"]["age"]}')
         if g:
             if g.get('lifestyle') == 'retired':
                 bits.append('retired')

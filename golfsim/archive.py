@@ -14,8 +14,9 @@ Layout of an archive directory (JSON, gzip):
     people.json.gz      every person ever (golfers and staff share one person-id space): name, country
                         (nationality, fixed for life), birth year, hometown, birthplace and residence
                         (country and state / province; None when unknown), every dated move (from, to,
-                        reason), when they appeared, and their roles (playing career, coaching career,
-                        caddying career)
+                        reason), when they appeared, their roles (playing career, coaching career,
+                        caddying career), and their death if they died (rules 2026-11-07: `died`, the
+                        winter after season `year`, week 53, with the age then)
     relations.json.gz   every coaching, caddying and school-team stint, and each pair's working
                         relationship
     records.json.gz     course records per layout; every mark carries golfer id and event id
@@ -26,8 +27,8 @@ Layout of an archive directory (JSON, gzip):
                         wins, money -- net, income and costs as finally settled after winter expenses,
                         with net_at_decision, the figure the career decisions saw -- rankings, injuries,
                         where they lived that season), career decisions
-                        with their reasons, that winter's moves, staff work, and that season's narrative
-                        log lines (display text only)
+                        with their reasons, that winter's moves, staff work, that winter's deaths (since
+                        rules 2026-11-07), and that season's narrative log lines (display text only)
 
 Facts are stored once and referenced by id (a win is in the edition; a coach's record is derived from
 stints and editions), so the archive grows by one season file a year rather than copying data into
@@ -274,6 +275,10 @@ class ArchiveWriter:
         chunk['work_pathway'] = [dict(t) for t in getattr(season, 'work_pathway', {}).get(year, [])]
         chunk['cash_blocked_max'] = {str(g): n for g, n in sorted(getattr(season, 'cash_blocked_max', {}).get(year, {}).items())}
         chunk['amateur_support_on'] = getattr(season, 'amateur_support_on', True)
+        # deaths in the winter after this season (rules 2026-11-07; mortality.py): who, the age then (frozen), and
+        # the records they had (golfer, coach, caddie: one person). Absent from seasons played before the rule.
+        if getattr(season, 'mortality_on', False):
+            chunk['deaths'] = season_deaths(season, year)
         # development evidence -- diagnostics only (hidden facts included; never shown to the player): how each
         # golfer arriving this season started, and what each source moved this season (development.SOURCES)
         from . import development as D
@@ -322,6 +327,9 @@ class ArchiveWriter:
             if getattr(k, 'skills', None):              # their working skills as they stand (recorded from 2026-11-01)
                 p['caddie']['skills'] = {s: round(v, 1) for s, v in k.skills.items()}
         places = getattr(season, 'places', None)
+        for pid, d in getattr(season, 'deaths', {}).items():   # a death: once per person, whatever their roles
+            if pid in people:
+                people[pid]['died'] = {'year': d['year'], 'week': d['week'], 'age': d['age']}
         for pid, p in people.items():                 # one geography per person, whatever their roles
             p['nationality'] = p['country']
             p.update(places.export(pid) if places else {'birthplace': None, 'residence': None,
@@ -331,6 +339,12 @@ class ArchiveWriter:
 
 
 STATE_FILES = ('people.json.gz', 'relations.json.gz', 'records.json.gz')
+
+
+def season_deaths(season, year):
+    """The deaths recorded in the winter after season `year` (a season file's `deaths`): [{person, year, week,
+    age, roles}], by person id."""
+    return [{'person': pid, **d} for pid, d in sorted(getattr(season, 'deaths', {}).items()) if d['year'] == year]
 
 
 def edition_record(season, r):
@@ -689,6 +703,11 @@ class Archive:
     def roles(self, pid):
         p = self.people[pid]
         return [r for r in ('golfer', 'coach', 'caddie') if r in p]
+
+    def died(self, pid):
+        """{'year', 'week', 'age'}: the person died in the winter after season `year`, aged `age` (rules
+        2026-11-07); None if they had not died when the history was published."""
+        return (self.people.get(pid) or {}).get('died')
 
     def playing_career(self, pid):
         """Season by season: [(year, row)] for every season they competed (the index says which seasons,

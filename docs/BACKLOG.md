@@ -105,7 +105,7 @@ Status is what was built and tested, not what was proposed. Report: `docs/V17_PA
 | B1/B2 Biggest Upsets | Planned | -- |
 | T1-T3 Tournament stories, linked history | Planned | -- |
 | C1 Calibration | Waiting for the long runs (`docs/LONG_RUN_PLAN.md`, for approval) | -- |
-| C2 Death after retirement | Planned, after the identity foundations | -- |
+| C2 Death after retirement | Built per D6 (rules 2026-11-07): winter processing at (Y, 53), never an active competitive golfer, provisional curve; awaiting review and the small-world runs | `golfsim/mortality.py` |
 | Qualification windows | Decided 31 October: the N most recent editions for P2, U5, B3 and M3, P3, U6, B4 (rules 2026-11-03); others unchanged; boundary tests | `docs/QUALIFICATION_WINDOWS.md` |
 | Long histories | Index validated/rebuilt, side index for read-only histories, exports include it; benchmarked | this pass |
 | Mobile and small screens | Deferred | -- |

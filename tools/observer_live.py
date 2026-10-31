@@ -100,6 +100,9 @@ def capture(session):
                                youth=c.youth, clients=c.clients)
             elif getattr(c, 'skills', None):
                 p[kind]['skills'] = {k: round(v, 1) for k, v in c.skills.items()}
+    for pid, d in getattr(s, 'deaths', {}).items():   # (rules 2026-11-07: one death per person, every role)
+        if pid in people:
+            people[pid]['died'] = {'year': d['year'], 'week': d['week'], 'age': d['age']}
     am_support = {gid: {'band': c['band'], 'cap': c['cap'], 'drawn': round(c['drawn'], 2), 'basis': list(c['basis'])}
                   for gid, c in getattr(s, 'am_support', {}).items()}
     editions, by_person = {}, defaultdict(list)

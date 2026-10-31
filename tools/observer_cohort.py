@@ -26,7 +26,7 @@ FEATURED = ('COLLEGE_NATIONAL_CHAMPIONSHIP', 'SMALL_COLLEGE_CHAMPIONSHIP', 'INTL
             'USA_AMATEUR', 'EUROPEAN_AMATEUR', 'ASIA_PACIFIC_AMATEUR')
 NOW_KINDS = (('premier', 'On a Premier tour'), ('tour', 'On another professional tour'),
              ('amateur', 'Amateur or college'), ('club', 'Club professional'), ('retired', 'Retired'),
-             ('gone', 'No longer recorded'))
+             ('died', 'Died'), ('gone', 'No longer recorded'))
 SORTS = ('then', 'name', 'age', 'now', 'last', 'seasons', 'wins', 'majors', 'best_wr', 'level', 'prize', 'peak')
 MORE_FIRST = ('last', 'seasons', 'wins', 'majors', 'prize', 'peak')
 
@@ -206,6 +206,10 @@ def _now(w, pid, live, last_played):
     status, lifestyle, tour = src.get('status'), src.get('lifestyle'), src.get('tour')
     tname = tours.get(tour, {}).get('name', tour.replace('_', ' ').title() if tour else '')
     as_of = '' if live is not None else f' (as of {w.a.years[-1]})'
+    d = (w.person(pid) or {}).get('died')
+    if d:                                              # (rules 2026-11-07: the recorded fact only)
+        return 'died', (f'Died in the winter after season {d["year"]}, aged {d["age"]}'
+                        + (f' (last played {last_played})' if last_played else ''))
     if lifestyle == 'retired' or status == 'retired':
         return 'retired', 'Retired' + (f' (last played {last_played})' if last_played else '') + as_of
     if status == 'club_pro':

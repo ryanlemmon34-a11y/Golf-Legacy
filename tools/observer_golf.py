@@ -538,8 +538,9 @@ def _min(q, default, floor):
 
 
 def _age(w, pid, y):
-    born = (w.person(pid) or {}).get('born')
-    return str(y - born) if born else '—'
+    import observer_data as OD
+    a = OD.age_at(w.person(pid), y)                   # (frozen at a recorded death)
+    return str(a) if a is not None else '—'
 
 
 def _venue(w, eid):
