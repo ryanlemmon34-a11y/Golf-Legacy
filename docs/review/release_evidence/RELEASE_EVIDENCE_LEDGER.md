@@ -179,7 +179,7 @@ All serialized test commands run from a clean detached worktree of the named com
 ## 8. FINAL exact-head gates on c0d1ea5 (c0d1ea598bc784611e7e26cc414f754671965530, clean checkout)
 - G1 full suite: `python -m unittest discover -s tests` (nice 19), 11:48:11 -> 13:55:14 UTC: **Ran 998 tests in 7524.9 s, OK (skipped=4)**, exit 0, 0 ERROR/FAIL lines. Log: queue/final2_suite.log.
 - G2 full-population smoke: `python3 smoke/full_pop_smoke.py <wt_final2 @ c0d1ea5> smoke/final_c0d1ea5 4207 2`, 13:55:14 -> 14:05:27 UTC, exit 0 (613 s).
-  - World created: 6,409 golfers, 7,120 after season 1 and 7,802 after season 2.
+  - World created with 6,409 golfers. Everyone in the world, retired included: 7,120 after season 1 and 7,802 after season 2 (active and scheduled: 6,409 in 2027, 6,878 in 2028).
   - Evidence on, 2027: season 201.5 s; season file 13,039,656 B; evidence 830,379 B gzip (3,981,616 B JSON). That is 6.4 % of the file, and the file is +6.8 % over the evidence-off file (12,208,596 B). Checkpoint 38,109,556 B (off: 36,363,871 B).
   - Evidence on, 2028: season 197.2 s; file 12,567,224 B; evidence 901,302 B gzip (7.2 %); checkpoint 55,410,492 B.
   - Bounds held in both seasons: max 13 plans, 0 over, max 3 career rows. 6,409 then 6,878 golfers scheduled; 7 then 5 deaths recorded.
