@@ -44,9 +44,9 @@ All commands ran from the checkout root, one job at a time. Scratch paths are re
 
 | | Golfers | Season time | Season file | Evidence (gzip) | Checkpoint |
 |---|---|---|---|---|---|
-| G2 2027, evidence on | 6,409 created; 6,409 scheduled; 7,120 at season end | 201.5 s | 13,039,656 B | 830,379 B (6.4 %) | 38,109,556 B |
-| G2 2028, evidence on | 6,878 scheduled; 7,802 at season end | 197.2 s | 12,567,224 B | 901,302 B (7.2 %) | 55,410,492 B |
-| G2 2027, evidence off | 7,120 at season end | 177.6 s | 12,208,596 B | -- | 36,363,871 B |
+| G2 2027, evidence on | 6,409 created and scheduled; 7,120 in the world after the season (retired included) | 201.5 s | 13,039,656 B | 830,379 B (6.4 %) | 38,109,556 B |
+| G2 2028, evidence on | 6,878 active and scheduled; 7,802 in the world after the season (retired included) | 197.2 s | 12,567,224 B | 901,302 B (7.2 %) | 55,410,492 B |
+| G2 2027, evidence off | 7,120 in the world after the season (retired included) | 177.6 s | 12,208,596 B | -- | 36,363,871 B |
 | Determinism run | 6,878 then 7,300 active | 204 s, 430 s cumulative | -- | -- | -- |
 
 - Bounds held in G2: at most 13 plans a golfer, 0 over, at most 3 career rows.
