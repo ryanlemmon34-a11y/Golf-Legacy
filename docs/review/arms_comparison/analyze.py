@@ -1512,20 +1512,33 @@ def section_return_jobs(arms, lines):
     lines.append('**What the rule discounts.** The return chance is `min(CAP, sig(x) × keep_up)` '
                  '(golfsim/amateur_return.py lines 142 and 147), where `keep_up` (lines 150–160) is `1 − '
                  'careers.p_amateur_job(season, g, row, year + 1)` evaluated in the return winter Y, after the turn-pro '
-                 'draw and before the golfer\'s lifestyle changes, with cash reduced by the full-time season cost '
-                 '(savings first, then family money: line 155) and restored afterwards. So it discounts the same '
-                 'decision function the next winter applies (careers.py lines 355–365: `x = −1.2 + 0.8 (age − 22) − '
-                 '0.4 min(runway, 5) + 1[cash < 0]`, at age Y+1) — the same kind of event, a full-time amateur '
-                 'taking a job in the winter after Y+1 (careers.decide lines 449–458) — but evaluated on PROJECTED '
-                 'inputs, so it is a proxy, not that exact future draw: (i) the golfer is still part-time when '
-                 'it is computed, so `runway_years` (careers.py 81–96, called with row None) costs the season with a '
-                 'working amateur\'s committed costs (season.committed_weekly: living 40,000 less salary 52,000, i.e. '
-                 'none, plus any coach fee) where the actual decision costs it as a full-time amateur (no living cost); '
-                 '(ii) events = max(8, events of season Y, as a part-timer) rather than of Y+1; (iii) cash is the '
-                 'savings after paying the season cost, with no other money in or out during Y+1, so the debt term is '
-                 'never on at the prediction; (iv) `season.funds(g, Y+2)` has no Y+1 ledger yet, so the credit line is '
-                 'the base limit. The actual decision (careers.py 449–454) uses the golfer\'s real end-of-Y+1 cash, '
-                 'row and credit, and is reached only if the golfer did not retire (line 415) or turn professional '
+                 'draw and before the golfer\'s lifestyle changes (careers.py line 468), with cash and family money '
+                 'reduced by the full-time season cost (savings first, then family money: line 155) and restored '
+                 'afterwards. So it discounts the same decision function the next winter applies (careers.py lines '
+                 '355–365: `x = −1.2 + 0.8 (age − 22) − 0.4 min(runway, 5) + 1[cash < 0]`, at age Y+1) — the same kind '
+                 'of event, a full-time amateur taking a job in the winter after Y+1 (careers.decide lines 449–458) — '
+                 'evaluated on projected rather than actual inputs, so it is a proxy for that draw, not the draw itself. '
+                 'The runway is `runway_years` (careers.py 81–96, called with own_money False): funds `season.funds(g, '
+                 'Y+2)` = cash + family money (backing) + backers\' funds + a credit line (season.py 3109–3113) over the '
+                 'season\'s shortfall (`season_forecast`, season.py 3313–3338: events × trip cost + 52 × committed '
+                 'weekly cost − income; amateurs take no prize money and have no sponsor income). The committed weekly '
+                 'cost is `max(0, living − salary)` plus any coach fee (season.py 3123–3127; finance.weekly_living, '
+                 'finance.py 197–203): zero living cost for a part-time amateur (living 40,000, salary 52,000) and for a '
+                 'full-time amateur alike, so being part-time at the prediction makes no difference to committed costs. '
+                 'Where the projected inputs can differ from the actual ones, per the code: (a) events = max(8, the '
+                 'starts of season Y) at the prediction against max(8, the starts of Y+1) at the decision — this can '
+                 'move p through the shortfall and so the runway (only while the runway is under the cap of 5); (b) '
+                 'cash and family money at the prediction are the projected balances after the season cost with no other '
+                 'money in or out, so the debt term cannot be on, while the decision uses the actual balances — this can '
+                 'move p through the runway funds and the debt term; (c) the credit line: `season.funds(g, Y+2)` reads '
+                 'the Y+1 ledger\'s earnings, which do not exist yet at the prediction (base limit); at the decision it '
+                 'is the base limit plus a share of Y+1 earnings net of support — it can move p only if the golfer had '
+                 'such earnings in Y+1, which was not extracted per golfer; (d) the trip cost is computed from where the '
+                 'golfer lives and their caddie at each point (season.py 3297–3305), and residence moves and staff changes '
+                 'in the winter after the return come after this decision (season.py 2647 then 2668) — this can move p '
+                 'where they changed. The logged inputs do not separate these: the prediction\'s runway, funds and '
+                 'shortfall are not logged (only `keep_up`), so the drift below is not attributed to any one of them. '
+                 'The actual decision is reached only if the golfer did not retire (line 415) or turn professional '
                  '(line 433) first and is a full-time non-college amateur aged 19+. The other route to work in Y+1, '
                  'the mid-season work pathway, had 0 re-entries (above).')
     lines.append('')
@@ -1535,16 +1548,26 @@ def section_return_jobs(arms, lines):
                  'its draw u, outcome, and inputs age, runway, cash), read as stored. Population: the observed '
                  'returns (season Y+1 archived; censored excluded). Episodes and unique (arm, golfer) pairs are shown '
                  'side by side: a golfer who returned twice contributes two episodes, which are not independent. '
-                 'Drift medians compare the prediction\'s projected funds (`funds_k − season_cost_k`, savings plus '
-                 'family money after the season) with the decision\'s `cash_k` (savings only: family money is not an '
-                 'input of p_amateur_job), Overall and amateur rank at the end of Y and Y+1 (season file `careers`), '
-                 'and the age used at each point.')
+                 'Denominators: "ALL" columns use every observed return (N); "MATCHED" columns use only the golfers '
+                 'evaluated for a job in the winter after Y+1 (n; the others turned professional first, before any job '
+                 'draw), so predicted and evaluated p are compared over the same people. '
+                 'Money: two different recorded figures, not a measured change in one balance. The prediction\'s '
+                 'logged figure is the projected funds (`funds_k − season_cost_k`: savings plus family money after the '
+                 'season), shown for all N and for the matched n; the decision\'s stored `cash_k` is savings only, '
+                 'logged only for the matched n. Family money enters p_amateur_job at the decision through the runway '
+                 'funds, which are not logged. So comparing the two figures sets a funds projection against a '
+                 'savings-only log, and it does not show the input the function actually used at the decision. Also shown: Overall and amateur rank at the end of Y and Y+1 '
+                 '(season file `careers`), the age used at each point, and how often the debt term was on at the '
+                 'decision.')
     lines.append('')
-    head = ['arm', 'band', 'episodes (unique people)', 'with a next-winter job evaluation', 'not evaluated (why)',
-            'predicted mean p at return', 'evaluated mean p next winter', 'realised: took a job',
-            'Σ predicted p vs observed', 'Σ evaluated p vs observed (evaluated only)', 'projected funds → cash at decision, $k (medians)',
-            'Overall change (median)', 'amateur rank end Y → end Y+1 (medians)', 'age used by the prediction (age at Y + 1) / at the decision',
-            'debt term on at the decision']
+    head = ['arm', 'band', 'episodes (unique people)', 'not evaluated next winter (why)',
+            'ALL observed returns (denominator N): predicted mean p', 'ALL: Σ predicted p vs took a job (n/N)',
+            'MATCHED, evaluated next winter (denominator n): predicted mean p', 'MATCHED: Σ predicted p',
+            'MATCHED: evaluated mean p', 'MATCHED: Σ evaluated p', 'MATCHED: took a job (n)',
+            'money, two recorded figures (medians, $k): projected funds at prediction — all N / matched n; '
+            'savings-only cash_k at decision — matched n',
+            'Overall change, end Y → end Y+1 (median, all N)', 'amateur rank end Y; end Y+1 (medians, all N)',
+            'age used by the prediction (age at Y + 1) / at the decision', 'debt term on at the decision (matched n)']
     rows, pool = [], defaultdict(lambda: defaultdict(list))
     for a in arms:
         if not a['seasons'] or 'aj_ev' not in a['summ'][a['seasons'][0]]:
@@ -1593,7 +1616,8 @@ def section_return_jobs(arms, lines):
                  'enters those); "returns / eligible" counts only p > 0, where the chance is already multiplied by the '
                  'anticipated keep-up factor (and capped at 0.6), so the discount lowers the eligible-rate numerator '
                  'directly and the all-evaluations rate only through the eligible ones. Differences between predicted '
-                 'and evaluated p are described only by the recorded inputs above; no tuning is proposed.')
+                 'and evaluated p are described only by the recorded inputs above, which cannot separate their causes; '
+                 'no tuning is recommended.')
     lines.append('')
 
 
@@ -1601,17 +1625,21 @@ def row51(name, b, R):
     md = lambda xs: f'{S.median(xs):.1f}' if xs else '—'
     pred = [r['pred'] for r in R if r['pred'] is not None]
     ev = [r for r in R if 'act' in r]
+    evp = [r['pred'] for r in ev if r['pred'] is not None]
     why = Counter(r['why'] for r in R if 'act' not in r)
     took = sum(r['took'] for r in R)
     took_ev = sum(r['out'] for r in ev)
-    return (name, b, f'{len(R)} ({len({r["gid"] for r in R})})', frac(len(ev), len(R)),
+    return (name, b, f'{len(R)} ({len({r["gid"] for r in R})})',
             '; '.join(f'{k} {v}' for k, v in why.most_common()) or '—',
-            f'{S.mean(pred):.3f} (n={len(pred)})' if pred else '—',
-            f'{S.mean([r["act"] for r in ev]):.3f}' if ev else '—', frac(took, len(R)),
-            f'{sum(pred):.1f} vs {took}', f'{sum(r["act"] for r in ev):.1f} vs {took_ev}',
-            f'{md([r["proj"] for r in R if r.get("proj") is not None])} → {md([r["cash"] for r in ev if r.get("cash") is not None])}',
+            f'{S.mean(pred):.3f}' if pred else '—', f'{sum(pred):.1f} vs {frac(took, len(R))}',
+            f'{S.mean(evp):.3f}' if evp else '—', f'{sum(evp):.1f}',
+            f'{S.mean([r["act"] for r in ev]):.3f}' if ev else '—', f'{sum(r["act"] for r in ev):.1f}',
+            frac(took_ev, len(ev)),
+            f'{md([r["proj"] for r in R if r.get("proj") is not None])} / '
+            f'{md([r["proj"] for r in ev if r.get("proj") is not None])}; '
+            f'{md([r["cash"] for r in ev if r.get("cash") is not None])}',
             f'{S.median([r["dov"] for r in R if "dov" in r]):+.1f}' if any('dov' in r for r in R) else '—',
-            f'{md([r["r0"] for r in R if r["r0"]])} → {md([r["r1"] for r in R if r["r1"]])}',
+            f'{md([r["r0"] for r in R if r["r0"]])}; {md([r["r1"] for r in R if r["r1"]])}',
             f'{md([r["age0"] for r in R if r.get("age0") is not None])} / {md([r["age1"] for r in ev if r.get("age1") is not None])}',
             frac(sum(r.get('debt', False) for r in ev), len(ev)))
 
@@ -1666,7 +1694,7 @@ def section_upsets(lines, path):
     rows = [(c['arm'], c['year'], c['editions'], f'{c["equal"]}/{c["editions"]}', f'{c["max_abs_diff"]:g}', c['cpu_total_s'],
              c['cpu_per_edition_ms'], c['cpu_median_ms'], c['cpu_max_ms']) for c in u['cpu']]
     lines.append(table(['arm', 'season', 'estimated records recomputed', 'reproduced = stored (top 5, favourite, winner)',
-                        'largest |difference|', 'CPU per season (s)', 'CPU per edition, mean (ms)', 'median (ms)',
+                        'largest absolute difference', 'CPU per season (s)', 'CPU per edition, mean (ms)', 'median (ms)',
                         'max (ms)'], rows))
     lines.append('')
 
