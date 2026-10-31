@@ -162,6 +162,7 @@ def capture(session):
         injured_now=sorted(getattr(s, 'injured', {})),
         transitions={y: [dict(t) for t in ts] for y, ts in getattr(s, 'transitions', {}).items() if y not in archived},
         qual=_qual(s, year, session.cursor),
+        prestige=s.prestige_view() if hasattr(s, 'prestige_view') else None,   # events, courses, nations now
         **_status(s, year),
         captured=time.time())
     view.capture_seconds = round(time.perf_counter() - t0, 2)

@@ -44,9 +44,11 @@ Every event has a prestige from 0 to 100, recomputed after each edition:
 | Prize money | 20% | Purse on a log scale ($10k = 0, $25M = 100) |
 | Course | 15% | Elite course 100; championship course's Championship tees 80; standard course 62 (Club tees 45, Forward 32); municipal 25 |
 
-Prestige is the weighted **rolling average of the last 4 editions** of every factor (owner: 3–5 years),
-so an event's reputation moves slowly: one great or poor field shifts it by only a quarter of the change.
-Before an event has history, its expected values fill the window.
+Prestige is the weighted average of every factor over the **last five calendar years** (rules 2026-11-05;
+weights 1.0, 0.9, 0.8, 0.7, 0.6 by age; it had been the last 4 editions), so an event's reputation moves
+slowly: one great or poor field shifts it by a quarter of the change, and at most 6 points in a year. A year
+without an edition is left out. Before an event has history, its expected values fill the four years before
+the world began. See docs/WORLD_PRESTIGE_PACKAGE.md (also course and national prestige).
 **Every event is on the same week every year** (only rotating host cities change), so an opportunity
 event is the same event every season and builds its own identity.
 

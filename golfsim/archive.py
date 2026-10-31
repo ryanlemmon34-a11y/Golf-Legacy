@@ -294,6 +294,28 @@ class ArchiveWriter:
                 'development': {str(g): [(int(r) if r == int(r) else r) for r in (round(x, n) for x, n in
                                                                                     zip(v, D.DECIMALS))]
                                 for g, v in dev.items()}}
+        # five-year prestige (rules 2026-11-05) as the season ended: each event's prestige (carried into the next
+        # season), each course's prestige for the next season, and national prestige with the participation
+        # multipliers, cohort shares and allocations of the next season's entrants (participation.py)
+        pt = getattr(season, 'participation', None)
+        if pt is not None:
+            nxt = pt.history.get(year + 1) or {}
+            chunk['prestige'] = {
+                'format': 'golf-legacy-prestige/1',
+                'events': {sid: round(v, 2) for sid, v in season.event_prestige.items()},
+                'courses': {cid: round(v, 2) for cid, v in getattr(season, 'course_prestige', {}).items()},
+                # venue moves (rules 'venue-moves'): those decided at this season's end, and every move ever decided,
+                # each with the season it takes effect (an edition's actual venue is always its own `sites`)
+                'venue_moves_decided': [dict(m) for m in getattr(season, 'venue_log', {}).get(year, [])],
+                'venue_moves': [dict(m) for _, history in sorted(getattr(season, 'venue_moves', {}).items())
+                                for m in history],          # every move, in effective order (none dropped)
+                'nations': {'prestige': nxt.get('prestige', {}), 'ratio': nxt.get('ratio', {}),
+                            'multiplier': nxt.get('multiplier', {}), 'shares': nxt.get('shares', {}),
+                            'season': nxt.get('season', {}), 'entrant_year': year + 1,
+                            'totals': nxt.get('totals', {}), 'allocated': nxt.get('allocated', {}),
+                            'existing': nxt.get('existing', {}),
+                            'baseline_shares': {k: {c: round(v, 6) for c, v in s.items()}
+                                                for k, s in pt.base_share.items()}}}
         if year == season.first_year and getattr(season, 'wr_seed', None):
             chunk['ranking_seed'] = {str(g): rows for g, rows in season.wr_seed.items()}   # points before the world began
         return chunk

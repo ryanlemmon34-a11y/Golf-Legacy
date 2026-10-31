@@ -69,16 +69,18 @@ class PrestigeTests(unittest.TestCase):
 
 
     def test_event_prestige_is_a_rolling_average(self):
+        """Five calendar years, recency-weighted (rules 2026-11-05; tests/test_world_prestige.py for the rest)."""
         from golfsim.calendar import WorldCalendar
         ser = WorldCalendar().by_id['PT_GULF_COAST_CLASSIC']
-        hist = [PR.factors(ser, 70, 80)] * PR.WINDOW
-        before = PR.prestige_from(hist)
-        hist.append(PR.factors(ser, 100, 80))                 # one great field
-        after = PR.prestige_from(hist)
-        self.assertAlmostEqual(after - before, PR.WEIGHTS['field'] * 30 / PR.WINDOW)
-        for _ in range(PR.WINDOW):
-            hist.append(PR.factors(ser, 100, 80))
-        self.assertAlmostEqual(PR.prestige_from(hist) - before, PR.WEIGHTS['field'] * 30)
+        by = PR.seeded_years(PR.factors(ser, 70, 80), 2027)
+        before = PR.combine(PR.window_factors(by, 2026))
+        by[2027] = [PR.factors(ser, 100, 80)]                 # one great field: a quarter of the weight
+        after = PR.combine(PR.window_factors(by, 2027))
+        self.assertAlmostEqual(after - before, PR.WEIGHTS['field'] * 30 * PR.YEAR_WEIGHTS[0] / sum(PR.YEAR_WEIGHTS))
+        for y in range(2028, 2027 + PR.EVENT_YEARS):
+            by[y] = [PR.factors(ser, 100, 80)]
+        self.assertAlmostEqual(PR.combine(PR.window_factors(by, 2026 + PR.EVENT_YEARS)) - before,
+                               PR.WEIGHTS['field'] * 30)
 
     def test_player_fame_is_last_52_weeks(self):
         s = SEASON
