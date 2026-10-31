@@ -6,16 +6,16 @@ archive are unchanged and nothing here writes simulation state):
 
 1. **Facts** (`assemble`): a structured record of one edition, from what the history recorded -- the field, each
    round's scores and leaders, the winner's path, any playoff, the world ranking the week before, the winner's
-   earlier results, the tournament's earlier editions, the moments recorded during the event and, when the season
-   recorded one, the pre-event win estimate. Every fact carries its source references ([label, href]): an edition
-   page, a round of the replay, a profile's results, the ranking of that week, a course page, or the story's own
-   inspection view for a recorded value no other page shows. Facts are taken **as of the event**: earlier results
+   earlier results, the tournament's earlier editions, the moments recorded during the event and, when the edition
+   recorded one, the pre-event win estimate (its own `upset` record, golfsim/upsets.py). Every fact carries its
+   source references ([label, href]): an edition page, a round of the replay, a profile's results, the ranking of
+   that week, a course page, or the story's own inspection view for a recorded value no other page shows. Facts are taken **as of the event**: earlier results
    only, the ranking published the week before, the tournament's earlier editions. A story written later, after
    more seasons, says what it said when the season was archived. What was not recorded is listed in `missing`
    and left out of the prose (no shot paths, putt lengths, form draws or dates are ever made up; career counts of
    golfers who were already playing when the world began say "in the retained history").
-2. **Pattern** (`patterns`): the story's shape from the facts -- playoff, upset (only with a recorded pre-event
-   estimate), comeback, runaway, wire-to-wire, first win, close finish, match play or a standard recap -- each with
+2. **Pattern** (`patterns`): the story's shape from the facts -- playoff, upset (only when the edition's recorded
+   pre-event estimate gave the winner under UPSET_P), comeback, runaway, wire-to-wire, first win, close finish, match play or a standard recap -- each with
    its own order of sections, so an upset opens with the odds and a runaway with the margin.
 3. **Narrative** (`narrate`): sentences built from those facts with phrasing chosen deterministically by the
    edition (and perspective) -- never at random when viewed -- so a story reads the same every time it is opened,
@@ -48,7 +48,7 @@ from collections import OrderedDict
 from pathlib import Path
 from urllib.parse import quote, urlencode
 
-FACT_VERSION = 1
+FACT_VERSION = 2
 NARRATIVE_VERSION = 1
 
 # pattern thresholds (strokes, or a probability), documented on the story page
@@ -282,28 +282,6 @@ class WorldSource:
                         'ORDER BY rowid', (y, eid))]
         return [m for m in (w.a.year(y).get('moments') or []) if m.get('event') == eid]
 
-    def pre_event(self, eid):
-        w = self.w
-        y = int(eid.split(':')[0])
-        if w.live is not None and eid in w.live.editions:
-            for key in PRE_EVENT_KEYS:
-                got = _pre_event_entry(getattr(w.live, key, None), eid)
-                if got is not None:
-                    return got
-            return None
-        if not (w.a and y in w.a.years):
-            return None
-        ext = self.season(y)
-        if ext is not None and eid in ext['events']:
-            return ext['pre'].get(eid)
-        import observer_history as OH
-        d = OH._season_file(w, y) or {}
-        for key in PRE_EVENT_KEYS:
-            got = _pre_event_entry(d.get(key), eid)
-            if got is not None:
-                return got
-        return None
-
     def stamp(self, eid):
         """What identifies the facts' inputs: an archived edition's own and earlier seasons as published (later
         seasons never change it), or the snapshot's generation for the current season."""
@@ -323,17 +301,17 @@ class WorldSource:
 
 
 # ---- the story index of a season (compact, built once per published season) ----------------------------------------
-EXTRACT_VERSION = 1
+EXTRACT_VERSION = 2
 EXTRACT_KEYS = ('id', 'series', 'week', 'name', 'tour', 'tier', 'category', 'kind', 'rounds', 'match_play', 'sites',
-                'finish', 'scores', 'playoff', 'playoffs', 'matches', 'prestige', 'field_size')
+                'finish', 'scores', 'playoff', 'playoffs', 'matches', 'prestige', 'field_size', 'upset')
 
 
 def season_extract(d):
     """What stories read of one season file, for its story editions only (`story_level`): each edition's
     classification, sites, finish, round scores, playoffs and matches and the winners' teams (no hole-by-hole
-    cards, statistics, prizes or routes); the world ranking (top 200 order) of each week before one of them and
-    of week 52 (the next season's week-1 events), the amateur ranking likewise; and each edition's recorded
-    pre-event estimate. A few hundred kilobytes a season before compression, against the whole season file."""
+    cards, statistics, prizes or routes) and its recorded pre-event estimate (`upset`); the world ranking (top 200
+    order) of each week before one of them and of week 52 (the next season's week-1 events), the amateur ranking
+    likewise. A few hundred kilobytes a season before compression, against the whole season file."""
     evs, weeks, am_weeks = {}, {52}, {52}
     for e in d.get('events', []):
         if not story_level(e):
@@ -354,99 +332,51 @@ def season_extract(d):
     for wk in sorted(am_weeks):
         if (rk.get('amateur') or {}).get(str(wk)):
             amateur[str(wk)] = {'order': list(rk['amateur'][str(wk)]), 'points': False}
-    pre = {}
-    for eid in evs:
-        for key in PRE_EVENT_KEYS:
-            got = _pre_event_entry(d.get(key), eid)
-            if got is not None:
-                pre[eid] = json_safe(got)
-                break
-    return {'version': EXTRACT_VERSION, 'events': evs, 'world': world, 'amateur': amateur, 'pre': pre}
+    return {'version': EXTRACT_VERSION, 'events': evs, 'world': world, 'amateur': amateur}
 
 
 def json_safe(x):
     return json.loads(json.dumps(x, default=list))
 
 
-# The pre-event win estimate (roadmap B1/B2, a parallel package) is read wherever a season records it: the season
-# file (or the snapshot) under one of these keys, either {event id: entry} or [entry with 'event'/'id'], an entry
-# holding the winner's estimate directly ('winner_p', 'p', 'win_prob', 'probability') or every golfer's
-# ('probs', 'probabilities', 'win_probs', 'field': {golfer: p}). Without one, the story makes no upset claim.
-PRE_EVENT_KEYS = ('pre_event', 'upsets', 'pre_event_odds', 'win_probabilities')
-_P_ONE = ('winner_p', 'win_p', 'win_prob', 'win_probability', 'probability', 'p')
-_P_ALL = ('probs', 'probabilities', 'win_probs', 'field_probs', 'field')
+# The pre-event win estimate (roadmap B1/B2, golfsim/upsets.py): an edition's `upset` record, exactly as
+# upsets.record writes it -- {'model', 'estimated', 'site', 'field', 'rounds', 'top': [[golfer, chance]],
+# 'favourite', 'favourite_p', 'favourite_overall', 'favourite_facts', 'winner', 'p', 'rank', 'overall_rank',
+# 'overall', 'winner_facts'} with facts {'status', 'age', 'wr', 'ar'} as at the event; or {'model', 'estimated':
+# False, 'why'}. Worked out before the first shot; the story reads it and never works one out afterwards.
+UPSET_MODELS = ('upset-model-1',)
 
 
-def _pre_event_entry(book, eid):
-    if not book:
-        return None
-    if isinstance(book, dict):
-        if eid in book:
-            return book[eid]
-        if book.get('event') == eid or book.get('id') == eid:
-            return book
-        for v in book.values():                              # e.g. {'events': [...]} or {'by_event': {...}}
-            if isinstance(v, (list, dict)) and v is not book:
-                got = _pre_event_entry(v, eid) if isinstance(v, list) or eid in v else None
-                if got is not None:
-                    return got
-        return None
-    if isinstance(book, list):
-        for x in book:
-            if isinstance(x, dict) and eid in (x.get('event'), x.get('id'), x.get('event_id'), x.get('eid')):
-                return x
-    return None
+def upset_fact(rec, winner, site):
+    """(the upset fact, None) from an edition's recorded estimate, or (None, what is missing and why)."""
+    if not rec:
+        return None, ('a pre-event win estimate (not recorded: played before estimates were kept, and none is worked '
+                      'out afterwards), so no upset is claimed')
+    if not rec.get('estimated'):
+        return None, f'a pre-event win estimate (not estimated: {rec.get("why") or "no reason recorded"})'
+    if rec.get('model') not in UPSET_MODELS:
+        return None, f'a pre-event win estimate this build can read (model {rec.get("model")})'
+    if site != rec.get('site', 0):
+        return None, 'a pre-event win estimate for this site (the estimate covers the first site only)'
+    if rec.get('winner') is None or rec['winner'] != winner or rec.get('p') is None:
+        return None, 'the winner\'s pre-event chance (the estimate names no winner matching the result)'
+    return {'model': rec['model'], 'field': rec.get('field'), 'rounds': rec.get('rounds'),
+            'winner_p': rec['p'], 'winner_rank': rec.get('rank'), 'overall_rank': rec.get('overall_rank'),
+            'overall': rec.get('overall'), 'winner_facts': rec.get('winner_facts') or {},
+            'favourite': rec.get('favourite'), 'favourite_p': rec.get('favourite_p'),
+            'favourite_overall': rec.get('favourite_overall'), 'favourite_facts': rec.get('favourite_facts') or {},
+            'top': [list(x) for x in rec.get('top') or []]}, None
 
 
-def normalise_pre_event(raw, winner, field):
-    """{'winner_p', 'winner_rank', 'favourite', 'favourite_p', 'n', 'method'} from a recorded entry (None when it
-    holds no usable estimate for the winner)."""
-    if not isinstance(raw, dict):
-        return None
-    probs = None
-    for k in _P_ALL:
-        v = raw.get(k)
-        if isinstance(v, dict) and v:
-            try:
-                probs = {int(g): float(p) for g, p in v.items()}
-            except (TypeError, ValueError):
-                probs = None
-            if probs:
-                break
-        if isinstance(v, list) and v and all(isinstance(r, (list, tuple)) and len(r) >= 2 for r in v):
-            probs = {int(r[0]): float(r[1]) for r in v}
-            break
-    wp = None
-    for k in _P_ONE:
-        if isinstance(raw.get(k), (int, float)):
-            wp = float(raw[k])
-            break
-    if probs and wp is None:
-        wp = probs.get(winner)
-    if wp is None:
-        return None
-    if wp > 1.0:                                              # a percentage
-        wp /= 100.0
-        if probs:
-            probs = {g: p / 100.0 for g, p in probs.items()}
-    out = {'winner_p': wp, 'method': raw.get('method') or raw.get('model'), 'winner_rank': None, 'favourite': None,
-           'favourite_p': None, 'n': None}
-    if probs:
-        order = sorted(probs.items(), key=lambda x: (-x[1], x[0]))
-        out['favourite'], out['favourite_p'] = order[0]
-        out['winner_rank'] = 1 + sum(1 for g, p in order if p > wp)
-        out['n'] = len(order)
-    else:
-        fav = raw.get('favourite', raw.get('favorite'))
-        if isinstance(fav, (int, str)) and str(fav).lstrip('-').isdigit():
-            out['favourite'] = int(fav)
-        for k in ('favourite_p', 'favorite_p'):
-            if isinstance(raw.get(k), (int, float)):
-                out['favourite_p'] = float(raw[k]) / (100.0 if raw[k] > 1 else 1.0)
-        rk = raw.get('winner_rank', raw.get('rank'))
-        out['winner_rank'] = int(rk) if isinstance(rk, (int, float)) else None
-        out['n'] = raw.get('n') or raw.get('field_size')
-    return out
+def odds_text(p):
+    """A chance as the Biggest Upsets page words it (golfsim.upsets.odds_text): '12.3%', or '1 in 2,350' under 1%."""
+    if p is None:
+        return 'not recorded'
+    if p >= 0.01:
+        return f'{100 * p:.1f}%'
+    if p <= 0:
+        return 'below 1 in 10^300'
+    return f'1 in {float(f"{1 / p:.3g}"):,.0f}'
 
 
 # ---- facts ----------------------------------------------------------------------------------------------------------
@@ -575,16 +505,17 @@ def assemble(src, eid, perspective=None, site=None):
             'top50_in_field': sum(1 for r, _ in top if r <= 50),
             'best_in_field': [[r, g, in_field[g][0]] for r, g in top[:3]],
             'src': [ref(f'ranking after {rk["year"]} week {rk["week"]}', rk['href'])]}
-    # ---- the pre-event estimate (an upset is claimed only from a recorded one)
-    raw = src.pre_event(eid)
-    pre = normalise_pre_event(raw, winner, finish) if raw is not None else None
+    # ---- the pre-event estimate (an upset is claimed only from the edition's recorded one)
+    pre, why = upset_fact(e.get('upset'), winner, site)
     if pre is None:
-        missing.append('a pre-event win estimate (no upset is claimed without one)')
+        missing.append(why)
     else:
         fav = pre.get('favourite')
         pre['favourite_pos'] = next((p for g, p, _ in finish if g == fav), None) if fav is not None else None
-        pre['favourite_played'] = fav is not None and any(g == fav for g, _, _ in finish)
-        pre['src'] = [ref('pre-event estimate (as recorded)', story_href(eid, facts=True) + '#f-upset')]
+        pre['favourite_tied'] = (pre['favourite_pos'] is not None
+                                 and sum(1 for g, p, _ in finish if p == pre['favourite_pos']) > 1)
+        pre['src'] = [ref('pre-event estimate', _event_href(eid)),
+                      ref('recorded values', story_href(eid, facts=True) + '#f-upset')]
         facts['upset'] = pre
     # ---- comparisons with the tournament's earlier editions
     hist = src.series_results(sid)
@@ -1086,17 +1017,16 @@ def _lead(w, primary, tags):
     M = strokes(margin) if margin else 'a share of first'
     if primary == 'upset':
         up = f['upset']
-        Pp = _pct(up['winner_p'])
-        if up.get('winner_rank') and up.get('n'):
-            tpl = w.pick('lead', ['{W} won the {E} at {T} after a pre-event estimate that gave the winner {P}, '
-                                  'the {R}-best chance in the field.',
-                                  'Rated {R} of {N} before the {E}, with a {P} chance to win, {W} won it at {T}.'])
-            w.say(tpl, ['result', 'upset'], W=W, W2=w.names(res['winner']), E=E, T=T, P=Pp,
-                  R=ordinal(up['winner_rank']), N=f'{up["n"]:,}')
+        if up.get('winner_rank') and up.get('field'):
+            tpl = w.pick('lead', ['{W} won the {E} at {T} with a pre-event chance of {P}, {R} of {N} in the field.',
+                                  'Rated {R} of {N} before the {E}, at {P} to win, {W} won it at {T}.',
+                                  '{W} won the {E} at {T}, an outcome the pre-event estimate put at {P} ({R} of {N}).'])
+            w.say(tpl, ['result', 'upset'], W=W, E=E, T=T, P=odds_text(up['winner_p']),
+                  R=ordinal(up['winner_rank']), N=f'{up["field"]:,}')
         else:
-            w.say(w.pick('lead', ['{W} won the {E} at {T}; the pre-event estimate had given the winner {P}.',
+            w.say(w.pick('lead', ['{W} won the {E} at {T} with a pre-event chance of {P}.',
                                   'Given {P} to win before it started, {W} won the {E} at {T}.']),
-                  ['result', 'upset'], W=W, W2=w.names(res['winner']), E=E, T=T, P=Pp)
+                  ['result', 'upset'], W=W, E=E, T=T, P=odds_text(up['winner_p']))
         return
     if primary == 'comeback':
         r = f['rounds']
@@ -1156,14 +1086,6 @@ def _splice(parts, insert):
             return
 
 
-def _pct(p):
-    if p < 0.001:
-        return 'less than 0.1%'
-    if p < 0.1:
-        return f'{p * 100:.1f}%'
-    return f'{p * 100:.0f}%'
-
-
 def _stakes(w, primary, tags):
     f = w.f
     ev = f['event']
@@ -1188,6 +1110,10 @@ def _stakes(w, primary, tags):
         elif d['played']:
             w.say(w.pick('def', ['The defending champion, {D}, {F}.', '{D}, champion in {Y}, {F} this time.']),
                   ['defending'], D=D, Y=d['year'], F=finish_text(d['pos']))
+    up = f.get('upset')
+    if up and primary != 'upset' and up.get('favourite') == f['result']['winner']:
+        w.say('{W} went in as the favourite, at {P} by the pre-event estimate.', ['upset'],
+              W=w.who(f['result']['winner']), P=odds_text(up['winner_p']))
     rk = f.get('ranking')
     if rk and (ev['major'] or ev['tier'] == 1):
         R = [f'the {rk["kind"]} ranking of the week before', rk['src'][0][1]]
@@ -1213,16 +1139,26 @@ def _upset(w, primary, tags):
     up = w.f.get('upset')
     if not up:
         return
+    win = w.f['result']['winner']
+    W = w.who(win)
+    if up.get('overall') is not None and up.get('overall_rank') and up.get('field'):
+        w.say(w.pick('uov', ['By Overall at the event, {W} ({O}) was {R} of {N}.',
+                             '{W}\'s Overall at the event was {O}, {R} of {N} in the field.']),
+              ['upset'], W=W, O=up['overall'], R=ordinal(up['overall_rank']), N=f'{up["field"]:,}')
     fav = up.get('favourite')
-    if fav is not None and fav != w.f['result']['winner']:
-        F = w.who(fav)
-        if up.get('favourite_p') is not None:
-            how = finish_text(up['favourite_pos']) if up.get('favourite_played') else 'was not in the field'
-            w.say('The favourite by the same estimate was {F} at {P}, who {H}.', ['upset'], F=F,
-                  P=_pct(up['favourite_p']), H=how)
-    if up.get('method'):
-        w.say('The estimate is the one recorded before the first round ({M}); the result was not used to make it.',
-              ['upset'], M=str(up['method']))
+    if fav is not None and fav != win and up.get('favourite_p') is not None:
+        fo = up.get('favourite_overall')
+        w.say(w.pick('ufav', ['The favourite was {F} at {P}{O}, who {H}.',
+                              '{F}, the favourite at {P}{O}, {H}.']),
+              ['upset'], F=w.who(fav), P=odds_text(up['favourite_p']), O=f' (Overall {fo})' if fo is not None else '',
+              H=finish_text(up['favourite_pos'], up.get('favourite_tied')))
+    wf = up.get('winner_facts') or {}
+    if 'ranking' not in w.f and wf.get('wr'):              # the ranking recorded with the estimate
+        w.say('{W} went in at world No. {K}.', ['upset'], W=W, K=wf['wr'])
+    if wf.get('status') == 'amateur':
+        w.say('{W} played as an amateur.', ['upset'], W=W)
+    w.say('The estimate ({M}) was worked out from the field before the first shot; the result plays no part in it.',
+          ['upset'], M=str(up['model']))
 
 
 def _comeback(w, primary, tags):
@@ -1792,13 +1728,16 @@ def headline(w, eid):
 
 
 def upset_explanation(w, eid):
-    """For the Biggest Upsets list: the story's lead and its upset sentences, as HTML ('' without a story)."""
+    """For the Biggest Upsets list and an edition's estimate panel: the story's upset sentences (its lead when the
+    story is not an upset story), each claim linked, as HTML, followed by a link to the whole story; '' when the
+    edition is not in the history. Called as observer_stories.upset_explanation(w, event_id)."""
     import observer as O
     rec, st = tell(WorldSource(w, cache_for(w)), eid, None, None, cache_for(w), names=lambda g: plain_name(w, g))
     if not st:
         return ''
     keep = [s for s in st['sentences'] if 'upset' in s['facts']] or st['sentences'][:1]
-    return ' '.join(render_sentence(s, O.esc) for s in keep)
+    return (' '.join(render_sentence(s, O.esc) for s in keep)
+            + f' <a href="{O.esc(story_href(eid))}">The story</a>')
 
 
 def profile_section(w, pid, rows):

@@ -34,7 +34,7 @@ class FakeSource:
     """A history in plain data, with the WorldSource interface."""
 
     def __init__(self, first_year=2027):
-        self.eds, self.people, self.rank, self.mom, self.pre, self.extra_starts = {}, {}, {}, {}, {}, []
+        self.eds, self.people, self.rank, self.mom, self.extra_starts = {}, {}, {}, {}, []
         self.fy = first_year
         self.no_index = False
         self.stamps = {}
@@ -131,14 +131,22 @@ class FakeSource:
     def moments(self, eid):
         return list(self.mom.get(eid, []))
 
-    def pre_event(self, eid):
-        return self.pre.get(eid)
-
     def stamp(self, eid):
         return self.stamps.get(eid, 'archive:fixed')
 
     def cacheable(self, eid):
         return True
+
+
+def upset_record(winner=5, p=0.00291, rank=6, field=6, favourite=2, favourite_p=0.3, overall=71.4, overall_rank=5,
+                 status='pro', wr=88):
+    """An edition's `upset` record in exactly the format golfsim/upsets.record archives (upset-model-1)."""
+    top = sorted({favourite: favourite_p, 1: 0.2, 3: 0.1, 4: 0.09, 6: 0.05, winner: p}.items(), key=lambda x: (-x[1], x[0]))
+    return {'model': 'upset-model-1', 'estimated': True, 'site': 0, 'field': field, 'rounds': 4,
+            'top': [[g, q] for g, q in top[:5]], 'favourite': favourite, 'favourite_p': favourite_p,
+            'favourite_overall': 84.2, 'favourite_facts': {'status': 'pro', 'age': 31, 'wr': 1, 'ar': None},
+            'winner': winner, 'p': p, 'rank': rank, 'overall_rank': overall_rank, 'overall': overall,
+            'winner_facts': {'status': status, 'age': 26, 'wr': wr, 'ar': 3 if status == 'amateur' else None}}
 
 
 def runaway(src, eid='2030:TOUR_MASTERS', week=20):
@@ -240,19 +248,33 @@ class StoryFactTests(unittest.TestCase):
             self.assertNotIn(invented, text)
         self.assertNotIn('upset', st['patterns'])
 
-    def test_pre_event_record_shapes(self):
-        win = 3
-        for raw in ({'winner_p': 0.012, 'favourite': 1, 'favourite_p': 0.21},
-                    {'probs': {'1': 0.21, '2': 0.1, '3': 0.012}},
-                    {'probabilities': {1: 21.0, 2: 10.0, 3: 1.2}}):
-            got = S.normalise_pre_event(raw, win, [])
-            self.assertAlmostEqual(got['winner_p'], 0.012, places=6)
-            self.assertEqual(got['favourite'], 1)
-        self.assertIsNone(S.normalise_pre_event({'note': 'nothing'}, win, []))
-        self.assertEqual(S._pre_event_entry({'2030:X': {'p': 0.1}}, '2030:X'), {'p': 0.1})
-        self.assertEqual(S._pre_event_entry([{'event': '2030:X', 'p': 0.1}], '2030:X'), {'event': '2030:X', 'p': 0.1})
-        self.assertEqual(S._pre_event_entry({'events': [{'id': '2030:X', 'p': 0.2}]}, '2030:X')['p'], 0.2)
-        self.assertIsNone(S._pre_event_entry({'2030:Y': {}}, '2030:X'))
+    def test_upset_record_read_exactly(self):
+        """The edition's `upset` record (golfsim/upsets.record, upset-model-1) is read as recorded; anything else is
+        an honest omission, and no upset is claimed."""
+        src = FakeSource()
+        e = comeback(src)
+        eid = '2031:TOUR_MASTERS'
+        rec = S.assemble(src, eid)                                    # absent: played before estimates were kept
+        self.assertNotIn('upset', rec['facts'])
+        self.assertTrue(any('not recorded' in m and 'pre-event win estimate' in m for m in rec['missing']))
+        e['upset'] = {'model': 'upset-model-1', 'estimated': False, 'why': 'match play (model 1 covers stroke play only)'}
+        rec = S.assemble(src, eid)
+        self.assertNotIn('upset', rec['facts'])
+        self.assertTrue(any('not estimated: match play' in m for m in rec['missing']), rec['missing'])
+        e['upset'] = dict(upset_record(), model='upset-model-9')       # a model this build does not know
+        self.assertNotIn('upset', S.assemble(src, eid)['facts'])
+        e['upset'] = upset_record(winner=3)                           # names someone else as the winner
+        self.assertNotIn('upset', S.assemble(src, eid)['facts'])
+        e['upset'] = upset_record()
+        f = S.assemble(src, eid)['facts']['upset']
+        self.assertEqual((f['model'], f['winner_p'], f['winner_rank'], f['field'], f['overall'], f['overall_rank']),
+                         ('upset-model-1', 0.00291, 6, 6, 71.4, 5))
+        self.assertEqual((f['favourite'], f['favourite_p'], f['favourite_overall'], f['favourite_pos']), (2, 0.3, 84.2, 2))
+        self.assertEqual(f['winner_facts']['wr'], 88)
+        self.assertEqual(len(f['top']), 5)
+        self.assertEqual(f['src'][0][1], '/event/2031%3ATOUR_MASTERS')
+        self.assertEqual((S.odds_text(0.00291), S.odds_text(0.123), S.odds_text(None)),
+                         ('1 in 344', '12.3%', 'not recorded'))
 
     def test_story_levels(self):
         self.assertEqual(S.story_level({'kind': 'major', 'tier': 0}), 'major')
@@ -294,12 +316,14 @@ class StoryPatternTests(unittest.TestCase):
         src = FakeSource()
         comeback(src)
         self.assertNotIn('upset', self.primary(src, '2031:TOUR_MASTERS')[1])
-        src.pre['2031:TOUR_MASTERS'] = {'probs': {'2': 0.3, '1': 0.2, '3': 0.1, '4': 0.1, '5': 0.01}}
+        src.eds['2031:TOUR_MASTERS']['upset'] = upset_record(p=0.00291)
         p, tags = self.primary(src, '2031:TOUR_MASTERS')
-        self.assertEqual(p, 'upset')
+        self.assertEqual(p, 'upset')                                  # the winner's recorded chance, under 3 %
         self.assertIn('comeback', tags)
-        src.pre['2031:TOUR_MASTERS'] = {'probs': {'2': 0.3, '5': 0.25}}
+        src.eds['2031:TOUR_MASTERS']['upset'] = upset_record(p=0.031, rank=3)
         self.assertNotIn('upset', self.primary(src, '2031:TOUR_MASTERS')[1])
+        src.eds['2031:TOUR_MASTERS']['upset'] = upset_record(p=0.0299, rank=4)
+        self.assertEqual(self.primary(src, '2031:TOUR_MASTERS')[0], 'upset')
 
     def test_first_win(self):
         src = FakeSource()
@@ -366,10 +390,23 @@ class StoryTextTests(unittest.TestCase):
     def test_upset_text_states_the_estimate(self):
         src = FakeSource()
         comeback(src)
-        src.pre['2031:TOUR_MASTERS'] = {'probs': {'2': 0.3, '1': 0.2, '3': 0.1, '4': 0.1, '5': 0.01}}
+        src.eds['2031:TOUR_MASTERS']['upset'] = upset_record()
         t = ' '.join(self.text(src, '2031:TOUR_MASTERS'))
-        self.assertIn('1.0%', t)
+        self.assertIn('1 in 344', t)                                  # worded as the Biggest Upsets page words it
+        self.assertIn('6th of 6', t)
+        self.assertIn('Overall', t)
         self.assertIn('Bo Park', t)                                   # the favourite, and how they finished
+        self.assertIn('30.0%', t)
+        self.assertIn('upset-model-1', t)
+        self.assertIn('world No. 88', t)                              # no ranking table: the one recorded with it
+
+    def test_favourite_who_won(self):
+        src = FakeSource()
+        runaway(src)
+        src.eds['2030:TOUR_MASTERS']['upset'] = upset_record(winner=1, p=0.4, rank=1, favourite=1, favourite_p=0.4)
+        st = S.narrate(S.assemble(src, '2030:TOUR_MASTERS'), NAMES.get)
+        self.assertNotIn('upset', st['patterns'])
+        self.assertTrue(any('as the favourite, at 40.0%' in s.text() for s in st['sentences']))
 
     def test_perspective(self):
         src = FakeSource()
@@ -527,12 +564,11 @@ class StoryArchiveIndexTests(unittest.TestCase):
                 category='regular', kind='regular', name='Small Open', week=30)        # no story index entry
         src.rank[(2030, 19)] = [2, 1, 3]
         src.rank[(2030, 11)] = [1, 5]
-        src.pre['2030:PT_OPEN'] = {'probs': {'2': 0.3, '5': 0.01, '1': 0.2}}
+        src.eds['2030:PT_OPEN']['upset'] = upset_record()
         season = {'events': [{**{k: v for k, v in e.items() if k not in ('year', 'origin')},
                               'team': {}, 'holes': [{'1': [[4] * 18] * 4}], 'golf': [{}]} for e in src.eds.values()],
                   'ranking_points': {'19': [[2, 9.0, 40], [1, 8.0, 40], [3, 7.0, 40]], '11': [[1, 9.0, 40], [5, 1.0, 40]]},
-                  'rankings': {'world': {}, 'amateur': {}},
-                  'pre_event': {'2030:PT_OPEN': {'probs': {'2': 0.3, '5': 0.01, '1': 0.2}}}}
+                  'rankings': {'world': {}, 'amateur': {}}}
         test = self
 
         class Arch:
@@ -601,7 +637,7 @@ class StoryArchiveIndexTests(unittest.TestCase):
         # the same words as from the season's own record
         self.assertEqual(a, [s.text() for s in S.narrate(S.assemble(self.src, '2030:TOUR_MASTERS'), NAMES.get)['sentences']])
         self.assertEqual(b, [s.text() for s in S.narrate(S.assemble(self.src, '2030:PT_OPEN'), NAMES.get)['sentences']])
-        self.assertTrue(any('1.0%' in t for t in b))                  # the pre-event estimate, through the index
+        self.assertTrue(any('1 in 344' in t for t in b))              # the pre-event estimate, through the index
         # a resume: a new cache over the same file; a new perspective needs new facts, and no decode
         c2 = S.StoryCache(path)
         p = self.texts(self.source(c2), '2030:PT_OPEN', c2, perspective=2)
@@ -627,7 +663,8 @@ class StoryArchiveIndexTests(unittest.TestCase):
             self.assertNotIn('holes', e)
             self.assertNotIn('golf', e)
         self.assertEqual(sorted(ext['world']), ['11', '19'])
-        self.assertIn('2030:PT_OPEN', ext['pre'])
+        self.assertEqual(ext['events']['2030:PT_OPEN']['upset'], upset_record())
+        self.assertNotIn('upset', ext['events']['2030:TOUR_MASTERS'])
 
 
 class StoryLiveViewTests(unittest.TestCase):
