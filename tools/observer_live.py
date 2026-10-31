@@ -172,6 +172,7 @@ def capture(session):
         injuries=dict(s.injury_episodes(year)) if hasattr(s, 'injury_episodes') else {},   # this season's, by golfer
         injured_now=sorted(getattr(s, 'injured', {})),
         transitions={y: [dict(t) for t in ts] for y, ts in getattr(s, 'transitions', {}).items() if y not in archived},
+        moments=[dict(m) for m in getattr(s, 'moments', {}).get(year, [])],   # this season's (aces, records: stories)
         qual=_qual(s, year, session.cursor),
         prestige=s.prestige_view() if hasattr(s, 'prestige_view') else None,   # events, courses, nations now
         **_status(s, year),

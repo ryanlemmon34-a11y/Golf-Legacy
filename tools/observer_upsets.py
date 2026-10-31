@@ -15,6 +15,8 @@ from urllib.parse import quote, urlencode
 from golfsim import scopes as SC
 from golfsim import upsets as UP
 
+import observer_stories as STORY                                    # the edition's story page (story_href)
+
 PATH = '/upsets'
 PAGE = 50
 LEVELS = (('0', 'Major'), ('1', 'Premier'), ('2', 'Challenger'), ('3', 'Regional'), ('4', 'Mini tour'),
@@ -198,6 +200,15 @@ def explanation(w, r):
             f'Overall; the model put them {ordinal(d.get("rank"))} of {r["field"]} at {UP.odds_text(r["p"])}; {favtxt}.')
 
 
+def story_link(r):
+    """' · story': the link from an upset's row to its edition's tournament story (observer_stories: the Story tab
+    of the edition page, which any edition in the history has), or '' for a row without an edition id."""
+    eid = r.get('event_id')
+    if not eid:
+        return ''
+    return f' · <a href="{_o().esc(STORY.story_href(eid))}" title="the tournament story">story</a>'
+
+
 def page(w, q):
     O = _o()
     title = 'Biggest Upsets'
@@ -253,7 +264,7 @@ def page(w, q):
             f'{rank}' + (' <span class="tag" title="the same pre-event chance as the row beside it">tied</span>'
                          if tied else ''), w.person_link(r['winner']) + ' · ' + O.results_link(r['winner'], 'results', year=r['year']),
             f'{O.esc(r["age"]) if r["age"] is not None else "—"}* · {O.esc(status)}',
-            O.event_link(w, r['event_id']) + f' <span class="muted">{r["year"]} wk {r["week"]}</span>',
+            O.event_link(w, r['event_id']) + f' <span class="muted">{r["year"]} wk {r["week"]}</span>' + story_link(r),
             O.esc(dict(LEVELS).get(str(r['tier']), r['tier'])), O.esc(ranking_text(f_)),
             f'<strong>{UP.odds_text(r["p"])}</strong>', str(r['field']),
             O.esc(', '.join(tags(w, r, first))) or '<span class="muted">—</span>', O.esc(drama(r)),

@@ -50,6 +50,7 @@ import observer_goat as GOAT                                          # noqa: E4
 import observer_qual as OQ                                            # noqa: E402
 import observer_prestige as OP                                        # noqa: E402
 import observer_upsets as OU                                          # noqa: E402
+import observer_stories as STORY                                      # noqa: E402
 
 PAGE_SIZE = 100
 
@@ -320,6 +321,8 @@ class World:
             self._builder.stop()
         if self._indexer is not None:
             self._indexer.stop()
+        if self.__dict__.get('_story_cache') is not None:
+            self._story_cache.stop_indexer()            # (stories' season index: built again when next needed)
         if self._stats_db is not None:
             self._stats_db.close()
             self._stats_db = None
@@ -882,6 +885,22 @@ def rankings(w, q):
                                                         ('amateur', 'Amateur'))) + '</div>')
     if kind == 'points':
         return 'World ranking points', tabs + OG.rankings_points_page(w, q)
+    title = 'World ranking' if kind == 'world' else 'Amateur ranking'
+    y_, wk_ = one(q, 'year', '') or '', one(q, 'week', '') or ''
+    if y_.isdigit() and wk_.isdigit():                 # a past week, as recorded (the top 100's order)
+        y_, wk_ = int(y_), int(wk_)
+        order = w.a.ranking(y_, wk_, amateur=kind == 'amateur') if w.a and y_ in w.a.years else []
+        if not order:
+            return title, tabs + (f'<p class="muted">No {"amateur" if kind == "amateur" else "world"} ranking is recorded '
+                                  f'for {y_} week {wk_} in the published history (the current season\'s weeks are kept '
+                                  'when it is archived; the world ranking\'s points: <a href="/rankings?kind=points">'
+                                  'points by week</a>).</p>')
+        chunk, pager = paged([(i + 1, g) for i, g in enumerate(order)], q, '/rankings')
+        return f'{title}: {y_} week {wk_}', tabs + (
+            f'<p>The top {len(order)} as recorded after {y_} week {wk_} (positions then; the tour shown is today\'s).</p>'
+            + table(['#', 'Golfer', 'Tour now'], [
+                [str(p), w.person_link(g), tour_link(w, (w.person(g) or {}).get('golfer', {}).get('tour'))]
+                for p, g in chunk], numeric=(0,)) + pager)
     if w.live:
         table_ = w.live.wr if kind == 'world' else w.live.am
         rows = sorted(((p, g) for g, p in table_.items()), key=lambda x: x[0])
@@ -891,7 +910,6 @@ def rankings(w, q):
     else:
         rows = []
     chunk, pager = paged(rows, q, '/rankings')
-    title = 'World ranking' if kind == 'world' else 'Amateur ranking'
     return title, tabs + table(['#', 'Golfer', 'Tour'], [
         [str(p), w.person_link(g), tour_link(w, (w.person(g) or {}).get('golfer', {}).get('tour'))] for p, g in chunk],
         numeric=(0,)) + pager
@@ -1562,6 +1580,7 @@ def _playing(w, q, pid, p):
     if wins:
         out.append(f'<h2>Wins ({len(wins)})</h2>' + table(['Season', 'Event', 'Tour then'], [
             [esc(r['year']), event_link(w, r['event']), tour_link(w, r['tour'])] for r in reversed(wins)]))
+    out.append(STORY.profile_section(w, pid, rows))
     out.append(OG.ranking_section(w, pid))
     return ''.join(out)
 
@@ -1849,11 +1868,16 @@ def event(w, q, eid):
     base = f'/event/{quote(eid)}'
     out.append('<div class="tabs">' + ''.join(f'<a href="{base}?view={k}" class="{"on" if k == view else ""}">{esc(t)}</a>'
                                               for k, t in (('final', 'Final result'), ('rounds', 'Rounds & replay'),
-                                                           ('stats', 'Statistics')))
+                                                           ('stats', 'Statistics'), ('story', 'Story')))
                + '</div>')
-    if view in ('rounds', 'stats'):
-        out.append(OH.rounds_view(w, q, e) if view == 'rounds' else OG.edition_stats(w, e))
+    if view in ('rounds', 'stats', 'story'):
+        out.append(OH.rounds_view(w, q, e) if view == 'rounds' else OG.edition_stats(w, e) if view == 'stats'
+                   else STORY.story_view(w, q, e))
         return f'{eid.split(":")[0]} {e.get("name") or w.series_name(sid)}', ''.join(out)
+    if STORY.story_level(e):                          # majors and prestigious events: the story's first line
+        lead = STORY.headline(w, eid)
+        if lead:
+            out.append(f'<p class="story-lead">{lead} <a href="{esc(STORY.story_href(eid))}">Read the story</a></p>')
     prizes = {}
     if any(r.get('prize') is not None for r in rows):
         prizes = {(r['person'], r['site']): r['prize'] for r in rows if r.get('prize') is not None}
