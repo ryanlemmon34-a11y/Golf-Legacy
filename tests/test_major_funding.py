@@ -48,9 +48,11 @@ class MoneyFacts(unittest.TestCase):
                     continue                                            # (decided by injury, retirement, status)
                 m = r.get('money')
                 self.assertIsNotNone(m, (major, gid, r['result']))
-                self.assertLessEqual(abs(m['funds'] - m['set_aside'] - m['spendable']), 1)   # (each rounded)
+                self.assertLessEqual(abs(m['funds'] - m['set_aside'] + m.get('support', 0) - m['spendable']), 2)   # (each
+                #                                         rounded; an amateur's support counts for golf, rules 2026-11-02)
                 self.assertGreater(m['trip'], 0)
-                self.assertIn(m['paid_by'], ('golfer', 'organizer', 'school', 'club'))
+                self.assertIn(m['paid_by'], ('golfer', 'organizer', 'school', 'club', 'amateur support',
+                                             'golfer and amateur support'))
                 if r['result'] == 'declined: could not pay the trip':
                     self.assertLess(m['spendable'], m['trip'])          # the reason, in numbers
 
