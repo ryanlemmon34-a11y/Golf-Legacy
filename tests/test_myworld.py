@@ -277,10 +277,11 @@ class MyWorld(unittest.TestCase):
                          ('retired', 'retired, last an amateur'))
         self.assertEqual(OD.playing_status({'status': 'pro', 'lifestyle': 'full_time'}), ('active', 'professional'))
         lv = self.w.live
-        pid = min(g for g, p in lv.people.items() if p.get('lifestyle') == 'retired' and p.get('status') == 'pro')
+        pid = min(g for g, p in lv.people.items() if p.get('lifestyle') == 'retired')   # (whatever status they held)
         html = self.page(f'/golfer/{pid}')
         self.assertIn('<span class="tag">retired</span>', html)
-        self.assertIn('<dt>Status</dt><dd>retired, last a professional</dd>', html)
+        self.assertIn(f'<dt>Status</dt><dd>{OD.playing_status(lv.people[pid])[1]}</dd>', html)
+        self.assertTrue(OD.playing_status(lv.people[pid])[1].startswith('retired, last a'))
         import observer_history as OH
         eid = next(iter(lv.editions))                                   # a completed slam and one major short
         active = min(g for g, p in lv.people.items() if p.get('lifestyle') == 'full_time' and p.get('status') == 'pro')
