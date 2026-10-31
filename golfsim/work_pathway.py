@@ -5,8 +5,9 @@ an employment-and-golf pathway, not sponsorship, retirement or a promise of succ
 cost is waived, and the golfer stays an amateur with the part-time salary, living costs and schedule that every
 working amateur already has.
 
-Who: a full-time amateur outside college, aged 21 or over, outside the amateur ranking's top 300 (or unranked),
-holding no amateur support this season and with no family money left.
+Who: a full-time amateur outside college, aged 18 or over (since rules 2026-11-10; 21 or over before, and still in
+worlds started before that version: Season.work_pathway_min_age), outside the amateur ranking's top 300 (or
+unranked), holding no amateur support this season and with no family money left.
 
 The evidence, counted week by week from the weekly access ledger (Season.record_access), for every full-time
 non-college amateur (so the groups the pathway leaves out can be measured too):
@@ -34,7 +35,8 @@ from collections import Counter, defaultdict
 
 from . import amateur_return as AR
 
-MIN_AGE = 21
+MIN_AGE = 18                    # since rules 2026-11-10 (new worlds)
+MIN_AGE_BEFORE = 21             # rules 2026-11-03 to 2026-11-09: kept by worlds started before 2026-11-10
 OUTSIDE_TOP = 300
 WEEKS = 8                       # counted weeks (pauses not counted, nothing in between resets them)
 
@@ -48,11 +50,18 @@ def tracked(g):
     return g.status == 'amateur' and g.lifestyle == 'full_time' and not g.tour.startswith('CO_')
 
 
+def min_age(season):
+    """The minimum age in force in this world: MIN_AGE, or MIN_AGE_BEFORE for a world started before rules
+    2026-11-10 (Season.__setstate__ records it on the season, so a resumed older world is unchanged)."""
+    return getattr(season, 'work_pathway_min_age', MIN_AGE)
+
+
 def why_not(season, g, year):
     """The reasons a tracked golfer is outside the pathway (empty: a candidate)."""
     out = []
-    if g.age(year) < MIN_AGE:
-        out.append(f'under {MIN_AGE}')
+    age = min_age(season)
+    if g.age(year) < age:
+        out.append(f'under {age}')
     rank = season.am_pos.get(g.id)
     if rank is not None and rank <= OUTSIDE_TOP:
         out.append(f'amateur ranking {rank}')
@@ -98,6 +107,7 @@ def decide(season, year, week):
 
 
 def init(season):
+    season.work_pathway_min_age = MIN_AGE           # the minimum age in force (older saves: MIN_AGE_BEFORE)
     season.cash_blocked = Counter()                 # gid -> blocked weeks counted (see the module note)
     season.cash_blocked_max = defaultdict(Counter)  # year -> gid -> the highest count reached that season
     season.work_pathway = defaultdict(list)         # year -> [transitions with their facts]

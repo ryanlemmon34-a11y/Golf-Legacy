@@ -1,14 +1,23 @@
 # Persistently cash-blocked adult amateurs: the work / part-time pathway
 
 Status: **implemented as an initial calibration (rules 2026-11-03, `golfsim/work_pathway.py`)**, approved by the
-owner on 31 October 2026 with the thresholds below. It does not sponsor anyone: amateur support
+owner on 31 October 2026 with the thresholds below. **Minimum age lowered from 21 to 18 in rules 2026-11-10**
+(approved by the reviewer under the owner's delegation); nothing else in the pathway changed, and worlds started
+before 2026-11-10 keep the minimum age of 21. It does not sponsor anyone: amateur support
 (`docs/AMATEUR_SPONSORSHIP_PROPOSAL.md`) is for amateurs who show success; this is for the ones who cannot afford
 to play at all. It is an employment-and-golf pathway, not sponsorship, forced retirement or guaranteed success.
 
 ## As implemented
 
-**Who**: a full-time amateur outside college, aged 21 or over, outside the amateur ranking's top 300 (or
-unranked), holding no amateur support this season, with no family money left.
+**Who**: a full-time amateur outside college, aged 18 or over (since rules 2026-11-10; 21 or over before), outside
+the amateur ranking's top 300 (or unranked), holding no amateur support this season, with no family money left.
+
+**Minimum age (rules 2026-11-10)**: 18, lowered from 21 (`work_pathway.MIN_AGE`). Only the age changed: the eight
+counted cash-blocked weeks, the counts, pauses and resets, no family money left, no amateur support held, the
+top-300 rule, full-time non-college amateurs only, and the decision at the monthly plan are as before. Nobody is
+given money and no start is guaranteed. The minimum in force is recorded on the season
+(`Season.work_pathway_min_age`): new worlds have 18, and a save from before 2026-11-10 is resumed with 21
+(`Season.__setstate__`), so an older world plays on unchanged. Tests: `tests.test_work_pathway.Age18Tests`.
 
 **Counting the evidence** (every full-time non-college amateur is counted, so the groups left out can be measured
 too), from the weekly access ledger the observer already shows:
@@ -87,7 +96,7 @@ ledger) or simply choosing not to play; nobody's costs are waived and nobody is 
 
 | Threshold | Proposed | Why |
 |---|---|---|
-| Minimum age | 21 | Median age of the stuck seasons is 23; younger golfers mostly have family money or college |
+| Minimum age | 21 (18 since rules 2026-11-10) | Median age of the stuck seasons is 23; younger golfers mostly have family money or college |
 | Standing | outside the amateur top 300, no amateur support | The supported and ranked are excluded by construction |
 | Weeks cash-blocked | 8 in a row | Two monthly plans: one bad month is not enough |
 | Funds test | below the cheapest eligible event, no family money left | The ledger's own definition of unaffordable |

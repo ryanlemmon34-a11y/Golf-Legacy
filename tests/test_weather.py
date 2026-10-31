@@ -397,11 +397,12 @@ class RecordTests(unittest.TestCase):
         self.assertEqual(WX.describe(None), 'not recorded')
 
     def test_rule_recorded(self):
-        self.assertEqual(RULES_VERSION, '2026-11-09')
-        self.assertEqual(RULES['weather'][2], RULES_VERSION)
-        self.assertIn(RULES_VERSION, [v for v, _ in VERSIONS])
+        self.assertGreaterEqual(RULES_VERSION, '2026-11-09')                 # later versions may follow
+        self.assertEqual(VERSIONS[-1][0], RULES_VERSION)
+        self.assertEqual(RULES['weather'][2], '2026-11-09')
+        self.assertIn('2026-11-09', [v for v, _ in VERSIONS])
         self.assertIn('No round is ever cancelled, shortened or delayed by weather', RULES['weather'][1])
-        self.assertIn('never cancelled, shortened or delayed', dict(VERSIONS)[RULES_VERSION])
+        self.assertIn('never cancelled, shortened or delayed', dict(VERSIONS)['2026-11-09'])
 
 
 if __name__ == '__main__':

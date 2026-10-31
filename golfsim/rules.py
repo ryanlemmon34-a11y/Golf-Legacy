@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import re
 
-RULES_VERSION = '2026-11-09'
+RULES_VERSION = '2026-11-10'
 RANKING_RULE = 'world-ranking-1'     # the world ranking's formula (unchanged since the world began; named now)
 VERSIONS = (
     ('2026-10-30', 'Winners\' exemptions count whatever a golfer\'s membership (a non-member champion earns a '
@@ -83,6 +83,12 @@ VERSIONS = (
                    'but are never cancelled, shortened or delayed. A playoff is played in the final round\'s '
                    'weather. Each round\'s wind direction and gustiness are recorded with its conditions. Worlds started earlier '
                    'keep the classic weather.'),
+    ('2026-11-10', 'The work pathway\'s minimum age is 18 (it had been 21). Nothing else in the pathway changes: '
+                   'a full-time amateur outside college, outside the amateur top 300 (or unranked), holding no '
+                   'amateur support and with no family money left, who could not afford any eligible event for '
+                   'eight counted weeks takes a job at the next monthly plan and keeps playing as a working amateur; '
+                   'nobody is given money and no start is guaranteed. Worlds started earlier keep the minimum age '
+                   'of 21.'),
 )
 EARLIER = ('Seasons archived before rules versions were recorded were played under earlier rules. The '
            'differences that matter for reading old results: a winner without a Premier card held no '
@@ -302,7 +308,8 @@ RULES = {
         '2026-11-02'),
     'work-pathway': (
         'Work pathway for cash-blocked amateurs',
-        'A full-time amateur outside college, aged 21 or over, outside the amateur ranking\'s top 300 (or unranked), '
+        'A full-time amateur outside college, aged 18 or over (21 or over in worlds started before rules '
+        '2026-11-10), outside the amateur ranking\'s top 300 (or unranked), '
         'with no amateur support and no family money left, who could not afford any event they were eligible for '
         'in 8 counted weeks takes a job at the next monthly plan and keeps playing as an amateur alongside it (the '
         'salary, living costs and schedule of every working amateur). A week counts when there was an eligible '
@@ -310,7 +317,7 @@ RULES = {
         'were eligible for neither count nor reset; any week they could pay for an event starts the count again. '
         'Nobody is given money and no cost is waived; the way back to full-time golf is turning professional, as '
         'for every working amateur.',
-        '2026-11-03'),
+        '2026-11-10'),
     'mortality': (
         'Death after retirement',
         'An active competitive golfer never dies. Everyone else -- a golfer retired from competition (whether or '
