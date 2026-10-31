@@ -1565,6 +1565,7 @@ def _staff(w, pid, role):
               'achievements, association not proof of cause. Starts together count the archived seasons.</p>')
         out.append(_staff_seasons(w, pid, role, stints))
     if w.a and pid in w.a.people:
+        out.append(refusals_section(w, pid))
         hist = (w.a.people[pid].get(role) or {}).get('history') or []
         if hist:
             out.append('<h2>Staff career</h2><ul>' + ''.join(f'<li>{esc(y)}: {esc(t)}</li>' for y, t in hist) + '</ul>')
@@ -1627,7 +1628,26 @@ def pair_cells(w, s):
 def _began(s):
     who = {'golfer': 'the player', 'coach': 'the coach (an approach)', 'caddie': 'the caddie', 'school': 'the school'}
     text = who.get(s.started_by, s.started_by or 'not recorded')
-    return esc(text + (f': {s.reason_start}' if s.reason_start else ''))
+    return esc(text + (f': {s.reason_start}' if s.reason_start else '')
+               + (f'; accepted: {s.reason_accept}' if getattr(s, 'reason_accept', '') else ''))
+
+
+def refusals_section(w, pid):
+    """Approaches this person made or received that were turned down (recorded from rules 2026-11-04), each with
+    both people, both reasons and who said no. Empty when there are none."""
+    rel = w.a.rel if w.a is not None else None
+    rows = [r for r in getattr(rel, 'refusals', ()) if pid in (r[1], r[2])]
+    if not rows:
+        return ''
+    rows.sort(key=lambda r: (r[3], r[4], r[1], r[2]))
+    asked = {'golfer': 'the player', 'coach': 'the coach'}
+    said_no = {'golfer': 'the player', 'coach': 'the coach', 'caddie': 'the caddie'}
+    return (f'<h2>Approaches turned down ({len(rows)})</h2>' + table(
+        ['When', 'Kind', 'Player', 'Coach or caddie', 'Who asked, and why', 'Who said no, and why'],
+        [[when((r[3], r[4])), esc(r[0]), w.person_link(r[2]), w.person_link(r[1]),
+          esc(f'{asked.get(r[5], r[5])}: {r[7]}'), esc(f'{said_no.get(r[6], r[6])}: {r[8]}')] for r in rows[-40:]])
+        + '<p class="muted">As recorded when the approach was turned down (the latest 40); no partnership began. A '
+          'player who said no out of loyalty stayed in the partnership they had.</p>')
 
 
 def _ended(s):

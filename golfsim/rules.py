@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import re
 
-RULES_VERSION = '2026-11-03'
+RULES_VERSION = '2026-11-04'
 RANKING_RULE = 'world-ranking-1'     # the world ranking's formula (unchanged since the world began; named now)
 VERSIONS = (
     ('2026-10-30', 'Winners\' exemptions count whatever a golfer\'s membership (a non-member champion earns a '
@@ -43,6 +43,11 @@ VERSIONS = (
                    '(it had been one edition more). The work pathway: a full-time adult amateur outside the top 300, '
                    'without support or family money, who cannot afford any eligible event for eight counted weeks '
                    'takes a job at the next monthly plan and keeps playing as a working amateur.'),
+    ('2026-11-04', 'Recruitment of coaches and caddies is two-way: a scout\'s assessment of a young player firms up '
+                   'with the seasons they have watched them; development coaches and coaches of established players '
+                   'look for different players; golfers, coaches and caddies may each turn an approach down; a '
+                   'working partnership\'s loyalty (rapport, fit, results together) weighs against a better-known '
+                   'offer. Approach, acceptance, refusal and departure reasons are recorded.'),
 )
 EARLIER = ('Seasons archived before rules versions were recorded were played under earlier rules. The '
            'differences that matter for reading old results: a winner without a Premier card held no '
@@ -271,6 +276,30 @@ RULES = {
         'Nobody is given money and no cost is waived; the way back to full-time golf is turning professional, as '
         'for every working amateur.',
         '2026-11-03'),
+    'staff-recruitment': (
+        'Coaches and caddies: recruitment',
+        'Before each season. Scouting: each coach with room for a share deal looks at up to 60 players aged 23 and '
+        'under near them -- up to 20 promising players they watched in earlier winters, the rest new -- and judges '
+        'what each can become from what can be watched (the level seen with error, the growth typical for the age, '
+        'last year\'s improvement) through an error set by their scouting skill that shrinks with the seasons they '
+        'have watched that player (x 1/sqrt(1 + 0.5 x (seasons - 1)), at most six seasons); never hidden potential. '
+        'Among players they believe can reach their bar, development coaches (youth specialists) prefer the room to '
+        'grow and last year\'s rise; the others prefer established results (Prestige and a world or amateur '
+        'ranking), a known fit from working together before, and earned major places. They approach at most two. '
+        'A golfer without a coach accepts a share deal less often while a college team coaches them or when last '
+        'season\'s prize money makes a share costly, more often from a better-known coach; a golfer with a coach '
+        'weighs the newcomer\'s extra reputation against the partnership\'s loyalty (rapport, fit, results together), '
+        'so a better-known offer alone rarely ends a good partnership. Hiring: a golfer who wants a paying coach '
+        'asks those they can afford and who have room, best-looking first; a coach rarely refuses while their book '
+        'has room and, as it fills, keeps places for the players they look for (or refuses a known poor fit). '
+        'Caddies: a tour professional offers the bag to caddies they worked well with first, then to the '
+        'best-looking ones they can afford; a caddie weighs the golfer\'s results (last season\'s prize money or '
+        'Prestige, against what the caddie\'s own reputation earns), a known fit and a Premier card, and grows readier '
+        'to accept after each bag turned down that winter. Every approach records why it was made and why it was '
+        'accepted or refused; a golfer who stays out of loyalty has that recorded on the partnership they kept. '
+        'Departures follow the existing winter odds (progress, rapport, fit, money) and retirement. The weights '
+        'are proposed starting values.',
+        '2026-11-04'),
     'injuries': (
         'Injuries',
         'A golfer can be hurt playing an event; the chance rises with tiredness, age and the rounds played and falls '

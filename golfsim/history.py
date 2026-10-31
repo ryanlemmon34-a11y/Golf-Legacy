@@ -18,6 +18,11 @@ the staff member's own skill — so a familiar average coach never outperforms a
 for ever. Nothing about a relationship changes a golfer's attributes directly.
 
 Current assignments (who coaches whom now) are an index maintained only by opening and closing stints.
+
+Recruitment (rules 2026-11-04) is two-way: a stint records why it was proposed (`reason_start`, by whoever
+approached) and why the other side said yes (`reason_accept`). An approach that is turned down opens no stint:
+it is kept in `refusals` with both person ids and both reasons, and when the golfer said no out of loyalty to
+the partner they already had, also on that partnership's stint (`declined`).
 """
 from __future__ import annotations
 
@@ -47,6 +52,9 @@ class Stint:
     work: float = 0.0            # coaching weeks / rounds actually worked together during this stint
     terms: float = 0.0           # an agreed yearly fee (paying coaching clients), fixed for the stint
     seasons: list = field(default_factory=list)   # [(year, observed progress, weight of evidence)]
+    reason_accept: str = ''      # why the approached side said yes (rules 2026-11-04; '' before)
+    declined: list = field(default_factory=list)  # [(year, week, other person, reason)]: approaches turned down
+                                                  # while this partnership held (the golfer stayed)
 
     def active_in(self, year, week=26):
         return self.start <= (year, week) and (self.end is None or (year, week) < self.end)
@@ -94,13 +102,15 @@ class Relations:
         self.by_golfer = {}                      # golfer -> [stint ids]
         self.by_staff = {}                       # staff person -> [stint ids]
         self.pairs = {}                          # (kind, staff, golfer) -> Pair
+        self.refusals = []                       # approaches turned down: see refuse()
 
     # -- recording ------------------------------------------------------------------------------
-    def begin(self, kind, staff, golfer, when, arrangement, started_by, reason='', terms=0.0):
+    def begin(self, kind, staff, golfer, when, arrangement, started_by, reason='', terms=0.0, accept=''):
         assert kind in KINDS
         if (kind, golfer) in self.open:
             raise ValueError(f'golfer {golfer} already has an open {kind} stint')
-        s = Stint(len(self.stints), kind, staff, golfer, tuple(when), arrangement, started_by, reason, terms=terms)
+        s = Stint(len(self.stints), kind, staff, golfer, tuple(when), arrangement, started_by, reason, terms=terms,
+                  reason_accept=accept)
         self.stints.append(s)
         self.open[(kind, golfer)] = s.id
         self.by_golfer.setdefault(golfer, []).append(s.id)
@@ -116,6 +126,16 @@ class Relations:
         s = self.stints[sid]
         s.end, s.reason_end, s.ended_by = tuple(when), reason, ended_by
         return s
+
+    def refuse(self, kind, staff, golfer, when, asked_by, refused_by, reason_asked, reason):
+        """An approach turned down: [kind, staff, golfer, year, week, who asked ('golfer', 'coach'), who said no
+        ('golfer', 'coach', 'caddie'), why they asked, why the answer was no, the stint the golfer kept (-1 if
+        none)]. A golfer who said no while in a partnership of that kind records it on that stint too."""
+        kept = self.current(kind, golfer) if refused_by == 'golfer' else None
+        if kept is not None and kept.staff:
+            kept.declined.append((when[0], when[1], staff, reason))
+        self.refusals.append([kind, staff, golfer, when[0], when[1], asked_by, refused_by, reason_asked, reason,
+                              kept.id if kept is not None and kept.staff else -1])
 
     def current(self, kind, golfer):
         sid = self.open.get((kind, golfer))
@@ -174,7 +194,8 @@ class Relations:
     def export(self):
         names = _stint_fields()                     # what asdict gives, built directly (faster)
         return {'stints': [{n: _copy(getattr(s, n)) for n in names} for s in self.stints],
-                'pairs': [[k, st, g, p.work, p.last_year, p.fit] for (k, st, g), p in self.pairs.items()]}
+                'pairs': [[k, st, g, p.work, p.last_year, p.fit] for (k, st, g), p in self.pairs.items()],
+                'refusals': [list(r) for r in self.refusals]}
 
     @classmethod
     def load(cls, data, seed=0):
@@ -190,4 +211,5 @@ class Relations:
                 r.open[(s.kind, s.golfer)] = s.id
         for k, st, g, work, last, fit in data['pairs']:
             r.pairs[(k, st, g)] = Pair(work, last, fit)
+        r.refusals = [list(x) for x in data.get('refusals', ())]   # (none recorded before rules 2026-11-04)
         return r
