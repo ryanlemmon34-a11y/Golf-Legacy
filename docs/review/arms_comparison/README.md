@@ -30,6 +30,32 @@ From the folder that holds `arms/` and `runs/` (the default inputs), in `armsan/
 
       nice -n 19 ionice -c3 python3 -B upset_cost.py
 
+## G1.e: familiarity baseline on and off (`G1E_FAMILIARITY.md`)
+
+`g1e.py` compares two fresh worlds, seed 4207, build c0d1ea5, decision evidence off, one season (2027) each:
+
+- **ON:** `smoke/final_c0d1ea5/world_off`, with the baseline on.
+- **OFF:** `fam/out_c0d1ea5/world_famoff`, with `familiar_base_on = False`.
+
+It also reads `fam/out_c0d1ea5/fam_off.json`. It reads only the archive files each MANIFEST names. Run it with:
+
+    nice -n 19 ionice -c3 python3 -B g1e.py
+
+Then refresh this folder without re-reading the arm runs:
+
+    nice -n 19 ionice -c3 python3 -B analyze.py --publish-only
+
+Limitations:
+
+- **Comparable editions.** Only the week-1 editions (identical fields) are like-for-like.
+- **Pairs are noisy.** The engine's random draws are not isolated per golfer, so not-applied starts differ too and
+  serve as the reference.
+- **Which week-1 starts the baseline applied to.** This is reconstructed with the build's own familiarity functions,
+  from the recorded places and home clubs. Creation familiarity is recorded empty, so the reconstruction is exact for
+  week 1.
+- **Later weeks.** These are descriptive across diverged worlds.
+- **Season times.** They are one pair of total runtimes, with no overhead claim.
+
 ## Read-only method
 
 - **Arm folders.** The scripts only read `manifest.json`, the run state (`seed_<s>.state.pkl`, saved every season, or

@@ -1752,7 +1752,12 @@ def main():
     ap.add_argument('--story-archive', default=str(DEFAULT_STORY_ARCHIVE))
     ap.add_argument('--story-args', default='', help='extra arguments for stories_timing.py')
     ap.add_argument('--publish', action='store_true', help='also refresh armsan/publish/ (scripts, report, timing)')
+    ap.add_argument('--publish-only', action='store_true', help='refresh armsan/publish/ from the existing report '
+                    'files without re-reading any run')
     a = ap.parse_args()
+    if a.publish_only:
+        publish(Path(a.out))
+        return
     folders = dict(DEFAULT_ARMS)
     for kv in a.arms:
         k, v = kv.split('=', 1)
@@ -1848,9 +1853,11 @@ def publish(report):
     import shutil
     out = HERE / 'publish'
     out.mkdir(exist_ok=True)
-    for f in ('analyze.py', 'extract.py', 'stories_timing.py', 'upset_cost.py'):
+    for f in ('analyze.py', 'extract.py', 'stories_timing.py', 'upset_cost.py', 'g1e.py'):
         shutil.copyfile(HERE / f, out / f)
     shutil.copyfile(report, out / 'ARMS_COMPARISON.md')
+    if (HERE / 'G1E_FAMILIARITY.md').exists():
+        (out / 'G1E_FAMILIARITY.md').write_text(sanitize((HERE / 'G1E_FAMILIARITY.md').read_text()))
     for name in ('story_timing.json', 'upset_cost.json'):
         st = HERE / name
         if st.exists():
