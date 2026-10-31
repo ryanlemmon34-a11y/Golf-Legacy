@@ -900,29 +900,61 @@ def search(w, q):
 ROLE_TITLES = {None: 'People', 'golfer': 'Golfers', 'coach': 'Coaches', 'caddie': 'Caddies'}
 
 
-def directory(w, q, role='golfer'):
-    """People, filtered: name, nation, role, tour, status; sorted by name, birth year or world ranking."""
+def major_champions(w):
+    """{pid}: everyone with a major win in the archived seasons (the records' statistics; none without a history)."""
+    st = w.stats
+    return {pid for pid, ss in st.starts.items() if any(s[5] == 'major' and s[6] == 1 for s in ss)} if st else set()
+
+
+def people_filter(w, q, role):
+    """The directory's filters as one test: f(pid, person) -> the status shown, or False when the person is not
+    listed. The Nations page counts with this same test, so each count is exactly the list it links to."""
     term = (one(q, 'q', '') or '').strip().lower()
     nation = one(q, 'nation', '') or ''
     tour = one(q, 'tour', '') or ''
     status = one(q, 'status', '') or ''
+    active = one(q, 'active') == '1'                     # a golfer not retired now
+    top = int(one(q, 'top')) if (one(q, 'top') or '').isdigit() else None   # in the world ranking's top N now
+    champs = major_champions(w) if one(q, 'champion') == 'major' else None
+    wr = w.live.wr if w.live else {}
+
+    def keep(pid, p):
+        if p is None or (role and role not in p['roles']):
+            return False
+        if term and term not in p['name'].lower():
+            return False
+        if nation and p.get('country') != nation:
+            return False
+        gs = p.get('golfer') or {}
+        if tour and gs.get('tour') != tour:
+            return False
+        if active and (not gs or gs.get('lifestyle') in (None, 'retired')):
+            return False
+        if top is not None and not (pid in wr and wr[pid] <= top):
+            return False
+        if champs is not None and pid not in champs:
+            return False
+        st = (p.get(role, {}).get('status') if role in ('coach', 'caddie') else gs.get('lifestyle') or gs.get('status'))
+        if status and st != status:
+            return False
+        return st
+    return keep
+
+
+def directory(w, q, role='golfer'):
+    """People, filtered: name, nation, role, tour, status, active now, world ranking now, major champions; sorted by
+    name, birth year or world ranking."""
+    nation = one(q, 'nation', '') or ''
+    status = one(q, 'status', '') or ''
+    term = (one(q, 'q', '') or '').strip().lower()
     sort = one(q, 'sort', 'rank' if role == 'golfer' else 'name')
+    keep = people_filter(w, q, role)
     rows = []
     for pid in w.all_people():
         p = w.person(pid)
-        if p is None or (role and role not in p['roles']):
-            continue
-        if term and term not in p['name'].lower():
-            continue
-        if nation and p.get('country') != nation:
-            continue
-        gs = p.get('golfer', {})
-        if tour and gs.get('tour') != tour:
-            continue
-        st = (p.get(role, {}).get('status') if role in ('coach', 'caddie') else gs.get('lifestyle') or gs.get('status'))
-        if status and st != status:
-            continue
-        rows.append((pid, p, st))
+        st = keep(pid, p)
+        if st is not False:
+            rows.append((pid, p, st))
     wr = w.live.wr if w.live else {}
     clients = {}
     if w.live and role in ('coach', 'caddie'):
@@ -935,12 +967,16 @@ def directory(w, q, role='golfer'):
            'clients': lambda r: (-clients.get(r[0], 0), r[1]['name'], r[0])}.get(sort, lambda r: (r[1]['name'], r[0]))
     rows.sort(key=key)
     nations = sorted({p.get('country') for _, p, _ in rows} | ({nation} if nation else set()) - {None})
-    path = {None: '/golfers', 'golfer': '/golfers', 'coach': '/coaches', 'caddie': '/caddies'}[role]
+    path = {None: '/search', 'golfer': '/golfers', 'coach': '/coaches', 'caddie': '/caddies'}[role]
     statuses = sorted({s for _, _, s in rows if s} | ({status} if status else set()))
     fields = [('q', 'Name contains', None), ('nation', 'Nation', [('', 'any')] + [(n, n) for n in nations])]
     if role == 'golfer':
         fields.append(('tour', 'Tour now', [('', 'any')] + sorted(((k, t.get('name', k)) for k, t in w.tours().items()),
                                                                  key=lambda x: x[1])))
+        fields.append(('active', 'Playing now', [('', 'any'), ('1', 'active (not retired)')]))
+        fields.append(('top', 'World ranking now', [('', 'any'), ('1', 'No. 1'), ('10', 'top 10'), ('50', 'top 50'),
+                                                    ('100', 'top 100')]))
+        fields.append(('champion', 'Honors', [('', 'any'), ('major', 'major champion (archived seasons)')]))
     fields.append(('status', 'Status now', [('', 'any')] + [(s, s) for s in statuses]))
     fields.append(('sort', 'Sort', [(k, t) for k, t in (('rank', 'world ranking'), ('name', 'name'), ('born', 'youngest first'),
                                                        ('reputation', 'Prestige'), ('clients', 'clients now'))
@@ -1162,16 +1198,18 @@ def ratings_series(w, pid, p):
 
 
 def ratings_history(w, q, pid, p):
-    """Fixed-width annual bars, one per season (scrolling sideways when there are many), for Overall or one
-    attribute, as levels or as changes from the season before; unknown seasons are gaps."""
+    """Fixed-width annual bars, one per season (scrolling sideways when there are many), for Overall, a group of
+    attributes (physical, technical, mental: OD.RATING_GROUPS) or one attribute, as levels or as changes from the
+    season before; unknown seasons are gaps."""
     from golfsim.ratings import ATTRIBUTE_KEYS, ATTRIBUTE_LABELS
-    series = ratings_series(w, pid, p)
+    series = [(y, label, OD.with_groups(v)) for y, label, v in ratings_series(w, pid, p)]
     if len(series) < 2:
         return ''
+    labels = {'overall': 'Overall', **{g: label for g, (label, _) in OD.RATING_GROUPS.items()}, **ATTRIBUTE_LABELS}
     key = one(q, 'rh', 'overall')
-    key = key if key in ('overall', *ATTRIBUTE_KEYS) else 'overall'
+    key = key if key in labels else 'overall'
     mode = 'change' if one(q, 'rm') == 'change' else 'level'
-    name = 'Overall' if key == 'overall' else ATTRIBUTE_LABELS[key]
+    name = labels[key]
     vals = [(v or {}).get(key) for _, _, v in series]
     H = 150
     bars = []
@@ -1192,8 +1230,10 @@ def ratings_history(w, q, pid, p):
         final = ' final' if label.startswith('final') else ' now' if label.startswith('now') else ''
         bars.append(f'<div class="rbar{final}" title="{esc(tip)}"><span class="rv">{shown}</span>'
                     f'<span class="rb {cls}" style="height:{h}px"></span><span class="ry">{esc(y)}</span></div>')
-    opts = ''.join(f'<option value="{k}"{" selected" if k == key else ""}>'
-                   f'{esc("Overall" if k == "overall" else ATTRIBUTE_LABELS[k])}</option>' for k in ('overall', *ATTRIBUTE_KEYS))
+    opt = lambda k: f'<option value="{k}"{" selected" if k == key else ""}>{esc(labels[k])}</option>'
+    opts = (opt('overall') + '<optgroup label="Groups (mean of their attributes)">'
+            + ''.join(opt(g) for g in OD.RATING_GROUPS) + '</optgroup><optgroup label="Attributes">'
+            + ''.join(opt(k) for k in ATTRIBUTE_KEYS) + '</optgroup>')
     keep = ''.join(f'<input type="hidden" name="{esc(k)}" value="{esc(v[0])}">' for k, v in q.items()
                    if k not in ('rh', 'rm') and v)
     modes = ''.join(f'<option value="{m}"{" selected" if m == mode else ""}>{t}</option>'
@@ -1205,7 +1245,7 @@ def ratings_history(w, q, pid, p):
             + '<p class="muted">One bar per season: the ratings at its start (recorded when the season before was '
               'archived, after its aging), the current ratings for this season, and for a retired golfer their final '
               'playing ratings at the end of the season they retired after (no aging is added). “—”: not recorded. '
-              'Hover a bar for its date and value.</p>')
+              'Hover a bar for its date and value. ' + esc(OD.GROUP_NOTE) + '</p>')
 
 
 def injuries_section(w, pid, starts):
@@ -1215,19 +1255,12 @@ def injuries_section(w, pid, starts):
     qualifying stage, their first main event, and any lasting losses. Seasons archived before episodes were
     recorded show their announced injury weeks only ("episodes not recorded")."""
     from golfsim.ratings import ATTRIBUTE_LABELS
-    eps, legacy = [], []
-    for y, r in OD.career_rows(w, pid):
-        if r.get('injuries'):
-            eps += [(y, e) for e in r['injuries']]
-        elif r.get('injury_weeks'):
-            legacy.append((y, r['injury_weeks']))
+    eps, legacy = injury_episodes(w, pid)
     lv = w.live
-    if lv is not None:
-        eps += [(lv.cursor['year'], e) for e in (getattr(lv, 'injuries', None) or {}).get(pid, [])]
     now_hurt = lv is not None and pid in set(getattr(lv, 'injured_now', None) or ())
     if not eps and not legacy and not now_hurt:
         return ''
-    played = sorted(((r['year'], r['week']), OD.is_qualifying(r), r['event']) for r in starts)
+    played = appearances(starts)
     out = ['<h2>Injuries</h2>']
     if now_hurt:
         cur = eps[-1][1] if eps else None
@@ -1238,8 +1271,7 @@ def injuries_section(w, pid, starts):
     rows = []
     for y, e in sorted(eps, key=lambda x: (x[0], x[1]['week']), reverse=True):
         back = tuple(e['available'])
-        ret = next((x for x in played if x[0] >= back), None)            # any appearance, qualifying included
-        main = next((x for x in played if x[0] >= back and not x[1]), None)
+        ret, main = injury_return(played, e)
         future = lv is not None and back > (lv.cursor['year'], lv.cursor['week'])
         lost = ', '.join(f'{esc(ATTRIBUTE_LABELS.get(k, k))} −{v}' for k, v in (e.get('lasting') or {}).items())
         rows.append([f'{y} week {e["week"]}', esc(e['kind']), f'{e["announced"]}', f'{e["out"]}',
@@ -1261,6 +1293,37 @@ def injuries_section(w, pid, starts):
                'golfer plays at once. Lasting effects are the ratings a serious injury took for good. Seasons played '
                'before episodes were recorded show only their injury weeks.</p>')
     return ''.join(out)
+
+
+def injury_episodes(w, pid):
+    """([(year, episode)], [(year, injury weeks)]): a golfer's injury episodes as recorded (archived seasons, then the
+    current season's from the snapshot, each season read from one place only), and the season totals of seasons
+    archived before episodes were recorded."""
+    eps, legacy = [], []
+    for y, r in OD.career_rows(w, pid):
+        if r.get('injuries'):
+            eps += [(y, e) for e in r['injuries']]
+        elif r.get('injury_weeks'):
+            legacy.append((y, r['injury_weeks']))
+    lv = w.live
+    if lv is not None and not (w.a and lv.cursor['year'] in w.a.years):
+        eps += [(lv.cursor['year'], e) for e in (getattr(lv, 'injuries', None) or {}).get(pid, [])]
+    return eps, legacy
+
+
+def appearances(starts):
+    """[((year, week), qualifying?, event id)] of a golfer's starts (OD.results rows), in date order."""
+    return sorted(((r['year'], r['week']), OD.is_qualifying(r), r['event']) for r in starts)
+
+
+def injury_return(played, e):
+    """(first appearance back, first main event back) after an injury episode, from `appearances`: the first
+    appearance once they could enter again (a qualifying stage counts: it is competing again) and the first that was
+    not a qualifying stage (the same appearance unless that one was); None where there is none yet."""
+    back = tuple(e['available'])
+    ret = next((x for x in played if x[0] >= back), None)
+    main = next((x for x in played if x[0] >= back and not x[1]), None)
+    return ret, main
 
 
 def _return_cell(w, x):
@@ -1874,27 +1937,43 @@ def course(w, q, cid):
     return c.get('name', cid), ''.join(out)
 
 
+# The Nations page's counts by nationality: (label, the directory that lists them, its role, its filters). Each count
+# is made with that directory's own test (people_filter), so a count's link lists exactly the people counted.
+NATION_COUNTS = (('People', '/search', None, {}),
+                 ('Active golfers', '/golfers', 'golfer', {'active': '1'}),
+                 ('In world top 100 now', '/golfers', 'golfer', {'top': '100'}),
+                 ('Major champions (archived)', '/golfers', 'golfer', {'champion': 'major'}))
+NATION_NOTE = ('By nationality (fixed for life); each count links to the list of exactly those people. People: '
+               'everyone of that nationality in the published history and the current world, any role, retired '
+               'included. Active golfers: golfers not retired now. In world top 100 now: the current world ranking. '
+               'Major champions: golfers with a major win in the archived seasons (the current season’s are added '
+               'when it is archived).')
+
+
+def nation_counts(w):
+    """{nation: [count for each of NATION_COUNTS]} over everyone in the history and the current world."""
+    people = [(pid, w.person(pid)) for pid in w.all_people()]
+    out = {}
+    for i, (_, _, role, f) in enumerate(NATION_COUNTS):
+        keep = people_filter(w, {k: [v] for k, v in f.items()}, role)
+        for pid, p in people:
+            if keep(pid, p) is not False and p.get('country'):
+                out.setdefault(p['country'], [0] * len(NATION_COUNTS))[i] += 1
+    return out
+
+
+def nation_count_link(code, i, n):
+    """A nation's count as a link to the list of exactly those people."""
+    _, path, _, f = NATION_COUNTS[i]
+    return f'<a href="{path}?{urlencode({"nation": code, **f})}">{n:,}</a>'
+
+
 def nations(w, q):
-    counts = {}
-    for pid in w.all_people():
-        p = w.person(pid)
-        n = p.get('country')
-        row = counts.setdefault(n, [0, 0, 0, 0])
-        row[0] += 1
-        gs = p.get('golfer') or {}
-        if gs and gs.get('lifestyle') not in (None, 'retired'):
-            row[1] += 1
-        if w.live and pid in w.live.wr and w.live.wr[pid] <= 100:
-            row[2] += 1
-    if w.stats:
-        for pid, ss in w.stats.starts.items():
-            if any(s[5] == 'major' and s[6] == 1 for s in ss):
-                n = (w.person(pid) or {}).get('country')
-                counts.setdefault(n, [0, 0, 0, 0])[3] += 1
+    counts = nation_counts(w)
     rows = sorted(counts.items(), key=lambda x: (-x[1][2], -x[1][1], str(x[0])))
-    return 'Nations', ('<p class="muted">Nationality is fixed for life (birthplace); where people live can change.</p>' +
-                       table(['Nation', 'People', 'Active golfers', 'In world top 100 now', 'Major champions (archived)'], [
-                           [nation_link(n), str(r[0]), str(r[1]), str(r[2]), str(r[3])] for n, r in rows if n],
+    return 'Nations', (f'<p class="muted">{esc(NATION_NOTE)} Where people live can change.</p>' +
+                       table(['Nation', *(label for label, *_ in NATION_COUNTS)], [
+                           [nation_link(n)] + [nation_count_link(n, i, x) for i, x in enumerate(r)] for n, r in rows],
                            numeric=(1, 2, 3, 4)))
 
 
@@ -1903,6 +1982,11 @@ def nation(w, q, code):
     out = [f'<p><a href="/golfers?nation={quote(code)}">All golfers</a> · <a href="/coaches?nation={quote(code)}">coaches</a> · '
            f'<a href="/caddies?nation={quote(code)}">caddies</a> · <a href="/courses?country={quote(code)}">courses</a>'
            f'{shortlist_button(w, "nation", code)}</p>']
+    got = nation_counts(w).get(code)
+    if got:
+        out.append('<p>' + ' · '.join(f'{esc(label)} {nation_count_link(code, i, got[i])}'
+                                      for i, (label, *_) in enumerate(NATION_COUNTS)) + '</p>'
+                   + f'<p class="muted">{esc(NATION_NOTE)}</p>')
     if w.live:
         top = sorted((p, g) for g, p in w.live.wr.items() if (w.live.people.get(g) or {}).get('country') == code)[:25]
         out.append('<h2>Highest ranked now</h2>' + (table(['World', 'Golfer', 'Tour'], [

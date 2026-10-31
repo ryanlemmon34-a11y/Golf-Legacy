@@ -93,8 +93,13 @@ it too makes earlier worlds "another engine"; start the next long run on it so i
   multi-season advance saves and publishes each season as it ends, and the pages move on to it, so stopping
   or closing the window never loses a finished season. One operation at a time.
 - **Explore**: Overview, Calendar (this season, played / scheduled / not held), Rankings (world, amateur),
-  Golfers / Coaches / Caddies directories (filters: name, nation, tour, status; sorting), Courses, Nations,
+  Golfers / Coaches / Caddies directories (filters: name, nation, tour, status; golfers also playing now, world
+  ranking now and major champions; sorting), Courses, Nations,
   Tours, Tournaments (filters: tour, kind), Seasons and season recaps, the Record Book (formerly Records & frivolities), Moments.
+  On Nations and on a nation's page (v16) every count (people, active golfers, world top 100 now, major
+  champions in the archived seasons) links to the list of exactly the people it counts: the list has that many
+  rows, because the count is made with the list's own filter. Counts are by nationality, as of the date in the
+  header.
   Every person, edition, tournament, course, nation and tour links to its page; the browser's Back button
   keeps your filters.
 - **Stats** and **Prize money** (Basketball GM style): a season (the current one so far, or any archived one) or
@@ -121,6 +126,11 @@ it too makes earlier worlds "another engine"; start the next long run on it so i
   golfers; a past season shows its recorded start-of-season Overall, "—" where none was recorded).
 - **Peak Overall** on a profile's Ratings: the highest recorded base Overall, when it was first reached, the age,
   and how much of the career the records cover ("Recorded Peak Overall" when they do not cover all of it).
+- **Rating groups** (v16): a profile's *Ratings over time* offers Physical, Technical and Mental beside Overall
+  and each attribute (levels or changes), and a season's ratings table shows them at its start and end. Physical
+  and Mental are the simulation's groups of those names (four attributes each); Technical is the other thirteen
+  (long game, short game, putting, consistency). A group's value is the plain mean of its attributes' recorded
+  ratings, as the page says; "not recorded" where any of them was not.
 - **Playoffs**: every player in a playoff is listed with "Won playoff" / "Lost playoff (out at extra hole N)",
   the number of players and extra holes, and each extra hole's scores (kept from this build on; older editions
   say the holes were not recorded); each site of a multi-site qualifier keeps its own.
@@ -183,7 +193,13 @@ it too makes earlier worlds "another engine"; start the next long run on it so i
   read (wins, top 10s in majors and Premier events, tour and status changes, moments, ranking bands, followed
   tournaments', tours' and courses' editions); a quiet count in the menu, no pop-ups. A ranking band change
   compares the world ranking published in the window's first week with the one published in its last (nothing
-  is claimed for a week whose ranking was not recorded).
+  is claimed for a week whose ranking was not recorded). For followed golfers, coaches and caddies (v16) it also
+  lists injuries (when, where, what, the weeks announced) and returns (the first appearance once they could
+  enter again, and the first main event back when that was a qualifying stage, as the profile's Injuries
+  section shows them), and partnerships with coaches and caddies: each one begun, a reunion when the same pair
+  worked together before, and each one ended with who ended it and why as recorded. Each fact is one item,
+  linked to the people and events, whichever of the pair you follow and whether its season is current or
+  archived. These are digest lines, not notifications: nothing pops up.
 - **Compare careers** (v15): up to four golfers -- now, current Overall, Peak Overall, totals, season by season
   and at the same age (the Overall snapshot at each season's start), with "not recorded" where it was not.
 - **GOAT Lab** (v15): rank careers by your weights over ten components (or a formula of them), with each
