@@ -159,7 +159,7 @@ The known limitations, each recorded on its traceability row:
 - **Decision-evidence size** is measured on a new world's first two seasons only; a mature world of about 13,000 golfers is not measured.
 - **The familiarity effect** is exploratory evidence from one season and one seed.
 - **Story timing and the 120 s target** are not verified on the owner's hardware.
-- **Windows** behaviour was not run in this container. Ryan's local tests cover it.
+- **Windows** behaviour and local timing are **forthcoming**: nothing ran on Windows or on the owner's machine. All gates here ran on Linux.
 - **Some documents on rc1** read as they did at `c0d1ea5` until the docs-only branch is merged: BACKLOG, the decision log, DECISION_EVIDENCE and the package notes.
 - **The review documents and the evidence ledger** live on `build/v16-report`, not on rc1.
 
@@ -174,7 +174,7 @@ Use the build the reviewer approves: `c0d1ea5`, or `c0d1ea5` plus the docs-only 
    ```
    Install Python 3.11 or newer; nothing else is needed.
 2. **Check it on your machine.** Double-click `RUN_TESTS_WINDOWS.bat`, or run `python -m unittest discover -s tests`.
-   - Expected: 998 tests, OK, with 4 skipped.
+   - On this Linux run: 998 tests, OK, with 4 skipped (2 environment-gated, 2 data-conditional). Windows counts are not promised and may differ; please send the result line.
    - The run takes about 2 hours here; your machine may be faster or slower.
    - `RUN_BENCHMARK_WINDOWS.bat` times a season skip and writes `benchmark_result.txt`. Please send it: it is the first measurement of the 120 s target on your hardware.
 3. **Play through the observer.** Double-click `RUN_OBSERVER_WINDOWS.bat`, or run `python tools/observer.py --open`.

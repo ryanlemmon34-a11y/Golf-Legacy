@@ -5,8 +5,8 @@
 - Every gate below ran on a clean detached checkout of this commit (0 uncommitted files).
 - Main is **held** until the reviewer verifies this evidence.
 
-The docs-only follow-up is `a2d56fb` (branch `build/v16-docs-final`, parent `c0d1ea5`).
-- It changes six `docs/*.md` files only.
+The docs-only follow-up is `afb68f3` (branch `build/v16-docs-final`): exactly two commits on `c0d1ea5`, `a2d56fb` then `afb68f3`.
+- It changes seven `docs/*.md` files only (AMATEUR_WORK_PATHWAY_PROPOSAL, BACKLOG, DECISIONS_2026-10-31, DECISION_EVIDENCE, FAMILIARITY_AND_AGGRESSION, RECRUITMENT_PACKAGE, WORLD_PRESTIGE_PACKAGE).
 - It changes no code, test or config file, and its engine id is identical.
 - The code and test evidence below therefore stays tied to `c0d1ea5`; the full suite was not rerun for prose.
 
@@ -18,6 +18,8 @@ The docs-only follow-up is `a2d56fb` (branch `build/v16-docs-final`, parent `c0d
 | **Current candidate** | `c0d1ea5` | The gates below, plus the four comparison arms and their analysis in `docs/review/arms_comparison/` |
 
 ## Final gates on c0d1ea5
+
+**Platform.** These gates ran on Linux in this container: Python 3.13, 4 logical CPUs. The 4 skips are this Linux run's result, not a promised count on Windows. Windows runs and local timings on the owner's machine are **forthcoming**; none is claimed here.
 
 All commands ran from the checkout root, one job at a time. Scratch paths are relative to the session's work folder `v18/`.
 
