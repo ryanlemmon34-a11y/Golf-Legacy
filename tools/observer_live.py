@@ -90,6 +90,9 @@ def capture(session):
         if pk is not None:                            # highest Overall so far: (value, year, week reached by)
             people[g.id]['peak'] = (round(pk[0], 1), pk[1], pk[2])
         people[g.id]['prestige'] = round(s.player_prestige(g.id), 1)   # public standing now (not ability)
+        # its two parts as the engine holds them now (golfsim.prestige.player_prestige): fame from the last 52 weeks'
+        # results, and the slowly fading legacy of big wins (.get: reading never adds a golfer to either table)
+        people[g.id]['prestige_parts'] = (s.fame.get(g.id, 0.0), s.legacy.get(g.id, 0.0))
     for kind, table in (('coach', st.coaches), ('caddie', st.caddies)):
         for c in table.values():
             p = people.setdefault(c.id, {'name': c.name, 'country': c.country, 'born': c.born, 'roles': []})
@@ -157,6 +160,7 @@ def capture(session):
         prize={gid: led.prize for gid, led in s.ledgers.get(year, {}).items()},
         injuries=dict(s.injury_episodes(year)) if hasattr(s, 'injury_episodes') else {},   # this season's, by golfer
         injured_now=sorted(getattr(s, 'injured', {})),
+        transitions={y: [dict(t) for t in ts] for y, ts in getattr(s, 'transitions', {}).items() if y not in archived},
         qual=_qual(s, year, session.cursor),
         **_status(s, year),
         captured=time.time())

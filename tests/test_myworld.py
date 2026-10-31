@@ -260,14 +260,15 @@ class MyWorld(unittest.TestCase):
         pid = gone[0]
         items = lambda start: [(a, b, re.sub(r'<[^>]+>', '', h)) for a, b, k, h in
                                MW.digest(self.w, [('person', pid, '', '')], start) if k == 'status']
-        once = [(y, 1, f'{self.w.name(pid)}: retired after the {y - 1} season')]
-        self.assertEqual(items((y, 0)), once)
-        self.assertEqual(items((y, 1)), [])                             # read since: not announced again
+        once = [(y - 1, 52, f'{self.w.name(pid)}: retired after the {y - 1} season')]   # dated that winter:
+        self.assertEqual(items((y - 1, 51)), once)                      # the season's end, week 52
+        self.assertEqual(items((y - 1, 52)), [])                        # read since (at week 1, "now" is
+        self.assertEqual(items((y, 1)), [])                             # last season's week 52): not again
         with mock.patch.object(lv, 'cursor', {**lv.cursor, 'year': y + 1, 'week': 5}):
             self.assertEqual(items((y, 30)), [])                        # a season later: still not again
-            self.assertEqual(items((y, 0)), once)                       # the same event, the same date
+            self.assertEqual(items((y - 1, 51)), once)                  # the same event, the same date
         with mock.patch.object(self.w, 'live', None):                   # the history alone shows it too
-            self.assertEqual(items((y, 0)), once)
+            self.assertEqual(items((y - 1, 51)), once)
 
     def test_retired_status_is_shown_one_way(self):
         import observer_data as OD

@@ -225,6 +225,35 @@ def _season_file(w, y):
         return None
 
 
+def prestige_parts(w, pid):
+    """(fame, legacy) behind a golfer's Prestige now, as the running world holds them: fame is the last 52 weeks'
+    results (each finish worth its event's prestige cubed), legacy the lasting credit for majors, flagship and Premier
+    wins, fading each year. None when not recorded: the published history keeps each season's Prestige, not its
+    parts, so a past season's (or a history opened without its world) is never split."""
+    lv = w.live.people.get(pid) if w.live is not None else None
+    parts = (lv or {}).get('prestige_parts')
+    return tuple(parts) if parts is not None else None
+
+
+def prestige_parts_html(w, pid):
+    """The Prestige row's two parts, now: each part's points, and the Prestige each alone would give (the engine
+    combines the points before the 0-100 scale -- fame plus half the legacy -- so the two never simply add up)."""
+    from golfsim import prestige as PR
+    parts = prestige_parts(w, pid)
+    if parts is None:
+        return ('<br><span class="muted">Its two parts (the last 52 weeks\' results and the lasting legacy): not '
+                'recorded -- the history keeps each season\'s Prestige, not its parts.</span>')
+    fame, legacy = parts
+    lg = PR.LEGACY
+    return (f'<br>Now: the last 52 weeks\' results {fame:.1f} fame points (alone, Prestige '
+            f'{PR.player_prestige(fame, 0.0):.1f}); legacy {legacy:.1f} points (alone, Prestige '
+            f'{PR.player_prestige(0.0, legacy):.1f}). <span class="muted">Legacy: {lg["major"]:g} points for a major, '
+            f'{lg["flagship"]:g} for a flagship and {lg["premier"]:g} for another Premier Tour win, fading '
+            f'{100 * (1 - PR.LEGACY_DECAY):.0f}% at each season\'s end; it counts half beside fame. In a world\'s first '
+            'year, fame also includes the reputation golfers began with, which drops out during that year. The parts '
+            'combine before the 0-100 scale, so they do not add up to the Prestige.</span>')
+
+
 def decisions(w, pid, y):
     """This golfer's recorded career decisions in the winter after season y (from the season file)."""
     import observer_data as OD
@@ -284,7 +313,7 @@ def status_section(w, pid, p):
     when = 'now' if lv is not None and lv.people[pid].get('prestige') is not None else 'as the published history ends'
     rows.append(('Prestige', (f'{pres} <span class="muted">of 100, {when}: public standing from the last 52 weeks\' '
                               'results plus a slowly fading legacy of majors and other big wins; not a rating of ability'
-                              '</span>') if pres is not None else
+                              '</span>' + prestige_parts_html(w, pid)) if pres is not None else
                  '<span class="muted">not recorded (recorded from rules 2026-11-02)</span>'))
     if gs.get('lifestyle') != 'retired':
         if tour:
@@ -811,6 +840,27 @@ def playoff_status(full, site, gid):
     return 'Lost playoff' + (f' (out at extra hole {max(out)})' if out else '')
 
 
+def round_conditions(full, site):
+    """[(wind mph, rain?, pin difficulty)] of each round at a site as recorded, or None when not recorded (an edition
+    played before rules 2026-10-30, a match-play site, or no full record)."""
+    conds = (full or {}).get('conditions')
+    c = conds[site] if conds and site < len(conds) else None
+    return [(wind, bool(rain), pins) for wind, rain, pins in c] if c else None
+
+
+def conditions_line(full, site, through=None, label='Round conditions'):
+    """HTML: each round's recorded wind, rain and pin difficulty at a site (rounds 1..`through` when given), or
+    "not recorded". Never estimated: a missing round is not filled in from another."""
+    c = round_conditions(full, site)
+    if c is None:
+        return (f'<p class="muted">{label}: not recorded (wind, rain and pin positions are kept from rules 2026-10-30, '
+                'for stroke-play rounds).</p>')
+    rounds = c[:through] if through else c
+    return (f'<p class="muted">{label}: ' + ' · '.join(
+        f'R{i} wind {wind} mph, {"rain" if rain else "dry"}, pin difficulty {pins}' for i, (wind, rain, pins)
+        in enumerate(rounds, 1)) + ' (pin difficulty: 0 centre pins to 1 tucked tournament pins).</p>')
+
+
 def rounds_view(w, q, e):
     """The replay of an edition's recorded rounds: the leaderboard after each round (nothing after the round shown:
     no later rounds, final places or winner until the final round, which shows any playoff), each round's
@@ -844,7 +894,6 @@ def rounds_view(w, q, e):
     for i, t in enumerate(totals):
         rank.setdefault(t, i + 1)
     count = Counter(totals)
-    cond = (full.get('conditions') or [None] * (site + 1))[site] if full.get('conditions') else None
     final = {r[0]: r for r in (full['finish'][site] if site < len(full['finish']) else [])}
     step = lambda i: f'after round {i}'
     steps = ' · '.join((f'<strong>{step(i)}</strong>' if i == k else f'<a href="{base}?{urlencode({"view": "rounds", "round": i, "site": site})}">{step(i)}</a>')
@@ -855,9 +904,7 @@ def rounds_view(w, q, e):
         out.append('<p>Site: ' + ' · '.join((f'<strong>{i + 1}</strong>' if i == site else
                                              f'<a href="{base}?{urlencode({"view": "rounds", "site": i, "round": k})}">{i + 1}</a>')
                                             for i in range(len(full['sites']))) + '</p>')
-    if cond and k - 1 < len(cond):
-        wind, rain, pins = cond[k - 1]
-        out.append(f'<p class="muted">Round {k}: wind {wind} mph{", rain" if rain else ""}, pin difficulty {pins}.</p>')
+    out.append(conditions_line(full, site, k))         # (rounds 1..k: nothing beyond the round shown)
     has_holes = bool(full.get('holes'))
     rows = []
     for t, g, rs in board:

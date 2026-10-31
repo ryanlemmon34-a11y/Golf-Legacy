@@ -8,6 +8,11 @@ worded, since you last marked it read (or over a window you choose):
   season-end changes of tour or status (from the archived seasons; the current season's status against the last
   archived one), recorded moments (course records and the like), and a change of world-ranking band (No. 1, top
   10, top 50, top 100) between the start of the window and now;
+
+  Winter changes -- a change of tour or status, a retirement, a retirement into coaching or caddying, a partnership
+  ended at a season's end -- are dated when decided, at the end of the season before (its week 52), so they are
+  inside the read marker set in the next season's week 1. A consequence: the "this season" window (from the new
+  season's week 0) does not include last winter's changes; a window reaching back to last season's end does.
 * a followed golfer's injuries (when, where, what and the weeks announced) and returns (their first appearance
   once they could enter again, and their first main event back when that appearance was a qualifying stage), as
   the profile's Injuries section works them out;
@@ -15,6 +20,11 @@ worded, since you last marked it read (or over a window you choose):
   when the same pair had worked together before) and each one ended, with who ended it and why as recorded.
   Stints come from the history's relations table and, for seasons not archived yet, the snapshot; a stint keeps its
   id, so one available from both is one item. A stint ended at a season's end is dated that season's week 52.
+* a followed golfer's, coach's or caddie's first major won together: the first major a golfer won with that coach or
+  caddie on their team as the event recorded it (the team kept with each result, not a guess from the dates);
+* a followed golfer's retirement into a staff role: the recorded career decision "became coach" or "became caddie"
+  (season files, and the snapshot for a season not archived yet), dated like the retirement: the end of the season
+  it followed (week 52, as a partnership ended at a season's end), with a link to the new career;
 * a followed tournament's or tour's editions played (with their winners); a course's editions and course records
   set there; a nation's golfers' wins in majors and Premier events; a followed edition once played.
 
@@ -120,6 +130,8 @@ def digest(w, items, start, until=None):
         d = (w.person(pid) or {}).get('died')
         if d and _after(start, d['year'], d['week']):   # (rules 2026-11-07: the recorded fact, on its date)
             add(d['year'], d['week'], 'status', f'{link}: died in the winter after season {d["year"]}, aged {d["age"]}')
+        _shared_majors(w, pid, start, add, lambda eid: major(_ed_info(w, eid, cache)))
+        _staff_role(w, pid, start, add)
         if w.a and w.a.index is not None:
             for m in w.a.index.moments(person=pid):
                 if _after(start, m['year'], m['week']):
@@ -248,8 +260,88 @@ def _partnerships(w, pid, start, add):
                 f'{O.when(s.end)}): ended by {O._ended(s)}', key=('stint', s.id, 'end'))
 
 
+def _shared_majors(w, pid, start, add, is_major):
+    """The first major each golfer won with a given coach or caddie on their team, for a followed golfer (with each of
+    their coaches and caddies) or a followed coach or caddie (with each of their clients). Only the team each result
+    recorded counts -- a stint's dates or a later assignment never credit a win -- and a win is never counted for the
+    staff member as their own. Keyed by (golfer, staff, role), so it is one item whichever of the pair is followed."""
+    O = _o()
+    golfers = {pid}
+    golfers |= {s.golfer for s in stints_of(w, pid) if s.staff == pid}
+    first_year = (w.live.first_year if w.live is not None else (min(w.a.years) if w.a and w.a.years else None))
+    for g in sorted(golfers):
+        firsts = {}
+        for r in w.results(g):                         # (oldest first)
+            if r['pos'] != 1 or not is_major(r['event']):
+                continue
+            for role in ('coach', 'caddie'):
+                st = r.get(role)
+                if st and (g == pid or st == pid) and (st, role) not in firsts:
+                    firsts[(st, role)] = r
+        for (st, role), r in firsts.items():
+            if not _after(start, r['year'], r['week']):
+                continue
+            began = min((x.start for x in stints_of(w, g) if (x.kind, x.staff) == (role, st)), default=None)
+            early = (began is not None and first_year is not None and tuple(began) < (first_year, 1))
+            add(r['year'], r['week'], 'shared major',
+                f'{w.person_link(g)} won the {O.event_link(w, r["event"])} with {w.person_link(st)} as {role}: '
+                f'their first major together' + (' since the records began (they worked together before then)'
+                                                  if early else ''),
+                r['event'], key=('first-major', g, st, role))
+
+
+def staff_transitions(w, pid):
+    """[(season, transition)] of a golfer's recorded career decisions to become a coach or a caddie: the season files
+    (the decision is recorded in the winter after their last season) and, for seasons not archived yet, the
+    snapshot. Only for people who have a coaching or caddying career (otherwise nothing is read)."""
+    roles = set((w.person(pid) or {}).get('roles') or ())
+    if not roles & {'coach', 'caddie'}:
+        return []
+    import observer_data as OD
+    import observer_history as OH
+    got = {}
+    rows = OD.career_rows(w, pid)
+    for y, row in rows:
+        for t in row.get('decisions') or ():
+            if str(t.get('kind', '')).startswith('became '):
+                got.setdefault(y, t)
+    if rows and rows[-1][0] not in got:
+        for t in OH.decisions(w, pid, rows[-1][0]):    # (an index without full rows: that season's file)
+            if str(t.get('kind', '')).startswith('became '):
+                got.setdefault(rows[-1][0], t)
+    archived = set(w.a.years) if w.a else set()
+    for y, ts in ((getattr(w.live, 'transitions', None) or {}) if w.live is not None else {}).items():
+        if int(y) in archived:
+            continue
+        for t in ts:
+            if t.get('gid') == pid and str(t.get('kind', '')).startswith('became '):
+                got.setdefault(int(y), t)
+    return sorted(got.items())
+
+
+def _staff_role(w, pid, start, add):
+    """A followed golfer's retirement into coaching or caddying, as the career decision recorded it: dated when it
+    was decided, in the winter at the end of that season (season end, week 53, is the digest's week 52, as a
+    partnership ended at a season's end), so marking the digest read once that season is over covers it. Once per
+    decision."""
+    O = _o()
+    for y, t in staff_transitions(w, pid):
+        role = t['kind'].split(' ', 1)[1]
+        if role not in ('coach', 'caddie') or not _after(start, *_dated((y, 53))):
+            continue
+        how = ' (they stopped chasing a playing career)' if t.get('via') == 'stopped chasing' else ''
+        age = f' at {t["age"]}' if t.get('age') is not None else ''
+        tab = 'coaching' if role == 'coach' else 'caddying'
+        add(*_dated((y, 53)), 'staff role', f'{w.person_link(pid)} retired from playing after the {y} season and became a '
+            f'{role}{age}{how}: <a href="/golfer/{pid}?tab={tab}">their {O.esc(role)} career</a>',
+            key=('staff-role', pid, y))
+
+
 def _status_changes(w, pid, start, add):
-    """Season-end changes of tour or status (archived seasons), and the current season's against the last one."""
+    """Season-end changes of tour or status (archived seasons), and the current season's against the last one. Each is
+    dated when it was decided: the end of the season before (week 53, the digest's week 52, as retirements and
+    partnerships ended at a season's end), so marking the digest read in week 1 -- when "now" is last season's week
+    52 -- covers it."""
     O = _o()
     rows = w.a.index.seasons(pid) if (w.a and w.a.index is not None) else []
     tours = w.tours()
@@ -263,21 +355,25 @@ def _status_changes(w, pid, start, add):
             return f'{name(a.get("tour"))} → {name(b.get("tour"))}'
         return None
     for a, b in zip(rows, rows[1:]):
-        if _after(start, b['year'], 1) and (s := say(a, b)):
-            add(b['year'], 1, 'status', f'{w.person_link(pid)}: {O.esc(s)} (season {b["year"]})')
+        if (s := say(a, b)) == 'retired':              # (decided in the winter after a's season: dated then)
+            if _after(start, *_dated((a['year'], 53))):
+                add(*_dated((a['year'], 53)), 'status', f'{w.person_link(pid)}: retired after the {a["year"]} season')
+        elif s and _after(start, *_dated((b['year'] - 1, 53))):    # (decided in the winter before b's season)
+            add(*_dated((b['year'] - 1, 53)), 'status', f'{w.person_link(pid)}: {O.esc(s)} (season {b["year"]})')
     if not rows:
         return
     live = w.live.people.get(pid) if w.live else None
     last = rows[-1]                                    # (a season row: their status before that winter)
     now_ = live or ((w.person(pid) or {}).get('golfer'))
     if now_ and now_.get('lifestyle') == 'retired' and last.get('lifestyle') != 'retired':
-        y = last['year'] + 1                           # one dated event: retired in the winter after their last
-        if _after(start, y, 1):                        # season, whenever (and however often) it is read
-            add(y, 1, 'status', f'{w.person_link(pid)}: retired after the {last["year"]} season')
+        when = _dated((last['year'], 53))              # one dated event: retired in the winter after their last
+        if _after(start, *when):                       # season (its end: week 52), however often it is read
+            add(*when, 'status', f'{w.person_link(pid)}: retired after the {last["year"]} season')
         return
-    if live and w.live.cursor['year'] > last['year'] and _after(start, w.live.cursor['year'], 1):
-        if s := say(last, live):
-            add(w.live.cursor['year'], 1, 'status', f'{w.person_link(pid)}: {O.esc(s)} (season {w.live.cursor["year"]})')
+    cy = w.live.cursor['year'] if live else None
+    if live and cy > last['year'] and _after(start, *_dated((cy - 1, 53))):
+        if s := say(last, live):                       # (the same date as once that season is archived)
+            add(*_dated((cy - 1, 53)), 'status', f'{w.person_link(pid)}: {O.esc(s)} (season {w.live.cursor["year"]})')
 
 
 def _ranking_week(w, y, wk):
@@ -464,10 +560,14 @@ def page(w, q):
     return 'My World', ''.join(out) + (
         '<p class="muted">Only recorded facts: wins; top-10s in majors and Premier events; missed cuts in majors; '
         'season-end changes of tour or status; deaths (in the winter after a season); recorded moments; world-ranking '
-        'band changes (No. 1, top 10, 50, 100); injuries and returns (the first appearance once a golfer could enter '
-        'again, and the first main event back when that was a qualifying stage); partnerships with coaches and caddies '
-        'begun, resumed (the same pair together again) and ended, with who ended them and why; followed tournaments’, '
-        'tours’ and courses’ editions; a nation’s wins in majors and Premier events. '
+        'band changes (No. 1, top 10, 50, 100); injuries and returns (the first appearance once a golfer could enter again, and the first main event '
+        'back when that was a qualifying stage); partnerships with coaches and caddies begun, resumed (the same pair '
+        'together again) and ended, with who ended them and why; followed tournaments’, tours’ and courses’ '
+        'editions; a nation’s wins in majors and Premier events; a golfer\'s first major won with a coach or caddie '
+        '(that coach or caddie on their team as the event recorded it); a retirement into coaching or caddying '
+        '(the recorded career decision). Winter changes (tour or status, retirements, staff roles, partnerships '
+        'ended at a season\'s end) are dated at the end of the season before, so “this season” does not include '
+        'last winter\'s; choose a window reaching back to last season\'s end (the last 13 or 52 weeks) to see them. '
         'Kept with this world in the shortlist file; never read by the simulation.</p>')
 
 
