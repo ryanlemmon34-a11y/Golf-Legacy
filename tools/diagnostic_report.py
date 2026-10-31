@@ -85,16 +85,28 @@ class Run:
 
 
 # ---- sections -----------------------------------------------------------------------------------------
+def ended(r):
+    """How a run ended, from its saved state: a safeguard stop is kept in the state when the run is resumed, so a run
+    that went on to complete every season it was asked for says so, with the earlier stop disclosed."""
+    stop, asked, done = r.d.get('stopped'), r.man.get('years_requested'), len(r.years)
+    if asked and done >= asked:
+        return f'completed after a resume (an earlier segment stopped: {stop})' if stop else 'completed'
+    if stop:
+        return stop
+    return f'not finished ({done} of {asked} seasons when read)' if asked else 'completed'
+
+
 def overview(runs):
     out = ['## The runs', '']
     rows = []
     for r in runs:
         m = r.man
-        stop = r.d.get('stopped')
         rows.append([r.name, r.seed, f'`{str(m.get("commit"))[:10]}`', 'on' if r.d.get('amateur_support', True) else 'off',
                      f'{len(r.years)} ({r.years[0]}-{r.years[-1]})' if r.years else '0',
-                     f'{r.d.get("minutes", 0):.0f} min', stop or 'completed'])
-    out += table(['Run', 'Seed', 'Commit', 'Amateur support', 'Seasons', 'Run time', 'Ended'], rows)
+                     f'{sum(p["skip"] for p in r.d["perf"].values()) / 60:.0f} min', ended(r)])
+    out += table(['Run', 'Seed', 'Commit', 'Amateur support', 'Seasons', 'Season time (sum)', 'Ended'], rows)
+    out += ['', 'Season time is the sum of the recorded season skips, whichever segment played them (a resumed run\'s '
+            'wall clock covers its last segment only).']
     m = runs[0].man.get('machine') or {}
     out += ['', f'Machine: {json.dumps(m)}', '']
     return out
@@ -113,11 +125,17 @@ def performance(runs):
             continue
         ys = sorted(p)
         sk = [p[y]['skip'] for y in ys]
-        rows.append([r.name, f(sk[0], 0), f(med(sk), 0), f(max(sk), 0), f(sk[-1], 0),
+        slow = f(max(sk), 0) + (' (above the guard)' if max(sk) > LW.SEASON_LIMIT else '')
+        rows.append([r.name, f(sk[0], 0), f(med(sk), 0), slow, f(sk[-1], 0),
                      f(med([p[y]['simulate'] for y in ys]), 0), f(med([p[y]['save'] + p[y]['publish'] for y in ys]), 1),
                      f(p[ys[-1]]['archive_mb'], 0), f(p[ys[-1]]['checkpoint_mb'], 0)])
     out += table(['Run', 'First season s', 'Median s', 'Slowest s', 'Last s', 'Median simulate s', 'Median save+publish s',
                   'Archive MB at end', 'Checkpoint MB'], rows)
+    over = [f'{r.name} {y} ({r.d["perf"][y]["skip"]:.0f} s)' for r in runs for y in sorted(r.d['perf'])
+            if r.d['perf'][y]['skip'] > LW.SEASON_LIMIT]
+    if over:
+        out += ['', f'Seasons above the {LW.SEASON_LIMIT:.0f} s guard: {", ".join(over)}. The guard stopped the run '
+                'there; what the machine was doing at the time is recorded under Provenance, when given.']
     return out + ['']
 
 
@@ -428,6 +446,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--run', action='append', required=True, help='NAME=<folder>:<seed>')
     ap.add_argument('--out', required=True)
+    ap.add_argument('--provenance', help='a Markdown file of the runs\' segments (start, end, how each ended), '
+                    'included verbatim')
     a = ap.parse_args()
     runs = []
     for spec in a.run:
@@ -441,6 +461,9 @@ def main():
     if 'B' in by and 'C' in by:
         out += support(by['B'], by['C'])
     out += pathway(runs)
+    if a.provenance:
+        text = Path(a.provenance).read_text().strip().splitlines()
+        out += ['## Provenance', ''] + [('#' + x if x.startswith('# ') else x) for x in text] + ['']
     Path(a.out).write_text('\n'.join(out) + '\n')
     print('wrote', a.out)
 
