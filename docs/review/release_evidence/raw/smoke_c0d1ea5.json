@@ -1,0 +1,96 @@
+{
+ "on": [
+  {
+   "year": 2027,
+   "season_s": 201.5,
+   "season_file_bytes": 13039656,
+   "checkpoint_bytes": 38109556,
+   "archive_bytes": 33034923,
+   "golfers": 7120,
+   "evidence": {
+    "format": "golf-legacy-decision-evidence/2",
+    "gzip_bytes": 830379,
+    "json_bytes": 3981616,
+    "golfers_scheduled": 6409,
+    "max_plans": 13,
+    "over": 0,
+    "mortality_deaths": 7,
+    "career_people": 5552,
+    "max_career_rows": 3
+   },
+   "parts": {
+    "results": "f12f014be4b3ae1b",
+    "performance": "18ccdce42385d31e",
+    "rounds_and_holes": "2856e87f50294845",
+    "development": "77905e686eedaffb",
+    "familiarity": "21dac46161c3db08",
+    "finances": "a1e7d00c8b42c440",
+    "staff": "489d992b089872cf",
+    "fatigue_injuries": "201e22242ff7d3af",
+    "rankings": "f651c7eaf0525ad7",
+    "records": "c61966be01f456ef",
+    "moments": "19f120ecfa711691",
+    "history": "59c12f5e8a6068b9",
+    "cursor": "8e36551496437f5e",
+    "diagnostics": "221f57b6eb45f457",
+    "decision_evidence": "a8014c238da825e3",
+    "published": "f2276777862a8d75"
+   }
+  },
+  {
+   "year": 2028,
+   "season_s": 197.2,
+   "season_file_bytes": 12567224,
+   "checkpoint_bytes": 55410492,
+   "archive_bytes": 64450737,
+   "golfers": 7802,
+   "evidence": {
+    "format": "golf-legacy-decision-evidence/2",
+    "gzip_bytes": 901302,
+    "json_bytes": 4304116,
+    "golfers_scheduled": 6878,
+    "max_plans": 13,
+    "over": 0,
+    "mortality_deaths": 5,
+    "career_people": 6020,
+    "max_career_rows": 3
+   }
+  }
+ ],
+ "off": [
+  {
+   "year": 2027,
+   "season_s": 177.6,
+   "season_file_bytes": 12208596,
+   "checkpoint_bytes": 36363871,
+   "archive_bytes": 32203863,
+   "golfers": 7120,
+   "evidence": {
+    "recorded": false
+   },
+   "parts": {
+    "results": "f12f014be4b3ae1b",
+    "performance": "18ccdce42385d31e",
+    "rounds_and_holes": "2856e87f50294845",
+    "development": "77905e686eedaffb",
+    "familiarity": "21dac46161c3db08",
+    "finances": "a1e7d00c8b42c440",
+    "staff": "489d992b089872cf",
+    "fatigue_injuries": "201e22242ff7d3af",
+    "rankings": "f651c7eaf0525ad7",
+    "records": "c61966be01f456ef",
+    "moments": "19f120ecfa711691",
+    "history": "59c12f5e8a6068b9",
+    "cursor": "8e36551496437f5e",
+    "diagnostics": "221f57b6eb45f457",
+    "decision_evidence": "1222162bb51ff167",
+    "published": "f2276777862a8d75"
+   }
+  }
+ ],
+ "parts_differing_except_evidence": [],
+ "evidence_part_on_vs_off": [
+  "a8014c238da825e3",
+  "1222162bb51ff167"
+ ]
+}

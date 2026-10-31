@@ -1,0 +1,1602 @@
+[
+ {
+  "width": 1920,
+  "path": "/",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Overview — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/calendar",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "2029 calendar — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/rankings",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "World ranking — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/qualification",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Qualification: 2029 Tour Masters — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/stats",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Stats — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/money",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Prize money — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/golfers",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Golfers — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/coaches",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Coaches — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/caddies",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Caddies — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/courses",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Courses — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/nations",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Nations — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/tours",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Tours — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/tournaments",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Tournaments — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/my-world",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "My World — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/views",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Saved views — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/seasons",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Seasons — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/records",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Record Book — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/upsets",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Biggest Upsets — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/grand-slam",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Career Grand Slam — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/moments",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Moments — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/cohort",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Where are they now — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/compare",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Compare careers — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/goat",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "GOAT Lab — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/rules",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Rules — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/job",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Last operation — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/golfer/2",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Retief Ndlovu (South Africa) — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/tour/PT_AMERICAS",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Premier Tour Americas — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/golfer/3",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Lucas Valdés (Chile) — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/golfer/1",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Blake Martin (USA) — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/golfer/5",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Rhys Gillard (England) — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/golfer/4",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Gustav Strand (Sweden) — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/golfer/6",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Tomás Zamora (Colombia) — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/golfer/15",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Ren Yamazaki (Japan) — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/golfer/9",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Lasse Thomsen (Denmark) — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/golfer/7",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Trent Jones (USA) — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/golfer/8",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Lorenzo Martini (Italy) — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/event/2028%3ATOUR_MASTERS",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "2028 Tour Masters — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/golfer/88",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Michael Ross (USA) — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/event/2028%3APREMIER_TOUR_CHAMPIONSHIP",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "2028 Premier Tour Championship — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/golfer/16",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Joe Sumner (Scotland) — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/event/2028%3AUSA_OPEN",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "2028 USA Open — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/event/2028%3ABRITANNIA_OPEN",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "2028 Britannia Open — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/golfer/1802",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Hamish Clarke (New Zealand) — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/golfer/3546",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Ruan Kotze (South Africa) — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/golfer/4057",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Joe Sowerby (England) — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/golfer/4337",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Ben Phillips (USA) — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/season/2027",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "2027 season — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/season/2028",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "2028 season — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/series/RG_AUSTRALASIA_01",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Australasia Tour Event 1 — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/tour/RG_AUSTRALASIA",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Australasia Tour — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/series/RG_INDIA_01",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "India Tour Event 1 — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/tour/RG_INDIA",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "India Tour — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/series/RG_MENA_01",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Middle East & North Africa Tour Event 1 — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/tour/RG_MENA",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Middle East & North Africa Tour — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/series/RG_SOUTHERN_AFRICA_01",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Southern Africa Tour Event 1 — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/tour/RG_SOUTHERN_AFRICA",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Southern Africa Tour — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/series/MN_SOUTHERN_CONE_01",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Southern Cone Pro Series Event 1 — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/tour/MN_SOUTHERN_CONE",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Southern Cone Pro Series — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/series/MN_US_DESERT_01",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Desert Mini Tour Event 1 — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/tour/MN_US_DESERT",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Desert Mini Tour — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/series/MN_US_DESERT_02",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Desert Mini Tour Event 2 — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/series/MN_US_SUNBELT_01",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Sunbelt Mini Tour Event 1 — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/tour/MN_US_SUNBELT",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Sunbelt Mini Tour — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/series/MN_US_SUNBELT_02",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Sunbelt Mini Tour Event 2 — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/series/AM_ASIA_001",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Asian Amateur Series Event 1 (Japan) — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/tour/AM_ASIA",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Asian Amateur Series — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/series/AM_NORTH_AMERICA_001",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "North American Amateur Series Event 1 (USA) — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/tour/AM_NORTH_AMERICA",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "North American Amateur Series — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/series/AM_NORTH_AMERICA_002",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "North American Amateur Series Event 2 (USA) — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/series/CP_NORTH_AMERICA_001",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "North American Club Professional Series Event 1 (USA) — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/event/2028%3ATOUR_MASTERS?view=story",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "2028 Tour Masters — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/event/2028%3APREMIER_TOUR_CHAMPIONSHIP?view=story",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "2028 Premier Tour Championship — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/event/2028%3AUSA_OPEN?view=story",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "2028 USA Open — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/event/2028%3ABRITANNIA_OPEN?view=story",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "2028 Britannia Open — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/golfer/2?tab=coaching",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Retief Ndlovu (South Africa) — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/golfer/3?tab=coaching",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Lucas Valdés (Chile) — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/golfer/1?tab=coaching",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Blake Martin (USA) — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/golfer/5?tab=coaching",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Rhys Gillard (England) — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/golfer/4?tab=coaching",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Gustav Strand (Sweden) — Golf Legacy"
+ },
+ {
+  "width": 1920,
+  "path": "/golfer/6?tab=coaching",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Tomás Zamora (Colombia) — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Overview — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/calendar",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "2029 calendar — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/rankings",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "World ranking — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/qualification",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Qualification: 2029 Tour Masters — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/stats",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Stats — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/money",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Prize money — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/golfers",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Golfers — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/coaches",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Coaches — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/caddies",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Caddies — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/courses",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Courses — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/nations",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Nations — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/tours",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Tours — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/tournaments",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Tournaments — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/my-world",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "My World — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/views",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Saved views — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/seasons",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Seasons — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/records",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Record Book — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/upsets",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Biggest Upsets — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/grand-slam",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Career Grand Slam — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/moments",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Moments — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/cohort",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Where are they now — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/compare",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Compare careers — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/goat",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "GOAT Lab — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/rules",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Rules — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/job",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Last operation — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/golfer/2",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Retief Ndlovu (South Africa) — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/tour/PT_AMERICAS",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Premier Tour Americas — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/golfer/3",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Lucas Valdés (Chile) — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/golfer/1",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Blake Martin (USA) — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/golfer/5",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Rhys Gillard (England) — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/golfer/4",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Gustav Strand (Sweden) — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/golfer/6",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Tomás Zamora (Colombia) — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/golfer/15",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Ren Yamazaki (Japan) — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/golfer/9",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Lasse Thomsen (Denmark) — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/golfer/7",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Trent Jones (USA) — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/golfer/8",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Lorenzo Martini (Italy) — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/event/2028%3ATOUR_MASTERS",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "2028 Tour Masters — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/golfer/88",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Michael Ross (USA) — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/event/2028%3APREMIER_TOUR_CHAMPIONSHIP",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "2028 Premier Tour Championship — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/golfer/16",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Joe Sumner (Scotland) — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/event/2028%3AUSA_OPEN",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "2028 USA Open — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/event/2028%3ABRITANNIA_OPEN",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "2028 Britannia Open — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/golfer/1802",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Hamish Clarke (New Zealand) — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/golfer/3546",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Ruan Kotze (South Africa) — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/golfer/4057",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Joe Sowerby (England) — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/golfer/4337",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Ben Phillips (USA) — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/season/2027",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "2027 season — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/season/2028",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "2028 season — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/series/RG_AUSTRALASIA_01",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Australasia Tour Event 1 — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/tour/RG_AUSTRALASIA",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Australasia Tour — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/series/RG_INDIA_01",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "India Tour Event 1 — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/tour/RG_INDIA",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "India Tour — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/series/RG_MENA_01",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Middle East & North Africa Tour Event 1 — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/tour/RG_MENA",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Middle East & North Africa Tour — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/series/RG_SOUTHERN_AFRICA_01",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Southern Africa Tour Event 1 — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/tour/RG_SOUTHERN_AFRICA",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Southern Africa Tour — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/series/MN_SOUTHERN_CONE_01",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Southern Cone Pro Series Event 1 — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/tour/MN_SOUTHERN_CONE",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Southern Cone Pro Series — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/series/MN_US_DESERT_01",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Desert Mini Tour Event 1 — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/tour/MN_US_DESERT",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Desert Mini Tour — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/series/MN_US_DESERT_02",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Desert Mini Tour Event 2 — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/series/MN_US_SUNBELT_01",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Sunbelt Mini Tour Event 1 — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/tour/MN_US_SUNBELT",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Sunbelt Mini Tour — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/series/MN_US_SUNBELT_02",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Sunbelt Mini Tour Event 2 — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/series/AM_ASIA_001",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Asian Amateur Series Event 1 (Japan) — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/tour/AM_ASIA",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Asian Amateur Series — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/series/AM_NORTH_AMERICA_001",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "North American Amateur Series Event 1 (USA) — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/tour/AM_NORTH_AMERICA",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "North American Amateur Series — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/series/AM_NORTH_AMERICA_002",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "North American Amateur Series Event 2 (USA) — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/series/CP_NORTH_AMERICA_001",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "North American Club Professional Series Event 1 (USA) — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/event/2028%3ATOUR_MASTERS?view=story",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "2028 Tour Masters — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/event/2028%3APREMIER_TOUR_CHAMPIONSHIP?view=story",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "2028 Premier Tour Championship — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/event/2028%3AUSA_OPEN?view=story",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "2028 USA Open — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/event/2028%3ABRITANNIA_OPEN?view=story",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "2028 Britannia Open — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/golfer/2?tab=coaching",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Retief Ndlovu (South Africa) — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/golfer/3?tab=coaching",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Lucas Valdés (Chile) — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/golfer/1?tab=coaching",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Blake Martin (USA) — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/golfer/5?tab=coaching",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Rhys Gillard (England) — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/golfer/4?tab=coaching",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Gustav Strand (Sweden) — Golf Legacy"
+ },
+ {
+  "width": 1366,
+  "path": "/golfer/6?tab=coaching",
+  "status": 200,
+  "err": null,
+  "ok": true,
+  "overflow": 0,
+  "traceback": false,
+  "title": "Tomás Zamora (Colombia) — Golf Legacy"
+ }
+]

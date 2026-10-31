@@ -1,0 +1,7 @@
+13:55:14 checkout /tmp/claude-0/-home-user-golf-legacy/dd633163-5093-57b8-a35e-3e668bc4257e/scratchpad/v18/queue/wt_final2 seed 4207 seasons 2; os.nice=0
+13:55:20 created world_on: 6 s, golfers 6409
+13:58:54 {"year": 2027, "season_s": 201.5, "season_file_bytes": 13039656, "checkpoint_bytes": 38109556, "archive_bytes": 33034923, "golfers": 7120, "evidence": {"format": "golf-legacy-decision-evidence/2", "gzip_bytes": 830379, "json_bytes": 3981616, "golfers_scheduled": 6409, "max_plans": 13, "over": 0, "mortality_deaths": 7, "career_people": 5552, "max_career_rows": 3}}
+14:02:13 {"year": 2028, "season_s": 197.2, "season_file_bytes": 12567224, "checkpoint_bytes": 55410492, "archive_bytes": 64450737, "golfers": 7802, "evidence": {"format": "golf-legacy-decision-evidence/2", "gzip_bytes": 901302, "json_bytes": 4304116, "golfers_scheduled": 6878, "max_plans": 13, "over": 0, "mortality_deaths": 5, "career_people": 6020, "max_career_rows": 3}}
+14:02:17 created world_off: 3 s, golfers 6409
+14:05:26 {"year": 2027, "season_s": 177.6, "season_file_bytes": 12208596, "checkpoint_bytes": 36363871, "archive_bytes": 32203863, "golfers": 7120, "evidence": {"recorded": false}}
+14:05:26 outcome parts differing with the evidence off (should be none): none

@@ -1,0 +1,41 @@
+{
+ "seed": 4207,
+ "year": 2027,
+ "season_s_famoff": 203.0,
+ "season_s_famon_smoke_off": 177.6,
+ "created_s": 5.9,
+ "parts_differing": [
+  "development",
+  "diagnostics",
+  "familiarity",
+  "fatigue_injuries",
+  "finances",
+  "history",
+  "moments",
+  "performance",
+  "published",
+  "rankings",
+  "records",
+  "results",
+  "rounds_and_holes",
+  "staff"
+ ],
+ "parts": {
+  "results": "087e368165ada08a",
+  "performance": "86fb0c033712257f",
+  "rounds_and_holes": "d1768c23e330dd48",
+  "development": "3379a4f12e73872f",
+  "familiarity": "60819e493ca22fa1",
+  "finances": "b8264f7141e289ec",
+  "staff": "fd1feb42373e8960",
+  "fatigue_injuries": "55d202389b300b60",
+  "rankings": "becd687ca8db1063",
+  "records": "84eee1e8c396a936",
+  "moments": "5411c924e6af387b",
+  "history": "731de3fea3f42cbf",
+  "cursor": "8e36551496437f5e",
+  "diagnostics": "71bb56f77d4241cc",
+  "decision_evidence": "1222162bb51ff167",
+  "published": "cc412f96119e0aab"
+ }
+}

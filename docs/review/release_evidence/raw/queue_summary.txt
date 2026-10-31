@@ -1,0 +1,64 @@
+05:05:39 return 0c5cdd7 exit 0 40s Ran 39 tests in 39.679s OK 
+05:07:47 upsets 3291666 exit 0 128s Ran 35 tests in 127.314s OK 
+05:07:51 NOTE: queue item 'death' is pre-pointed at the merged commit c29f6b0 (build/v16 + build/v16-death), not fa787d4 (already verified independently); its line below will still print fa787d4
+05:10:18 geography 63ad358 exit 0 151s Ran 73 tests in 150.105s OK 
+05:12:19 weather 1cbf7a4 exit 0 121s Ran 64 tests in 120.185s OK 
+05:13:14 NOTE: queue item 'observer_gaps' is pre-pointed at d04fa5b (the boundary fixes); its line will still print 5f87e42
+05:21:35 death fa787d4 exit 0 556s Ran 51 tests in 549.820s OK 
+05:21:35 QUEUE DONE
+05:23:52 NOTE: queue item 'recruitment' is pre-pointed at b7e835c (the staff-initiated extension); its line will still print a1b3aad
+05:27:52 NOTE: queue item 'upsets2' is pre-pointed at e027e70 (provenance snapshot); its line will still print a36af60
+05:28:13 NOTE: queue item 'geography2' is pre-pointed at 7819114 (home-club familiarity fix); its line will still print 23e288c
+05:35:19 c2merged c29f6b0 exit 0 808s Ran 103 tests in 805.892s OK 
+05:35:19 QUEUE4 DONE
+05:38:16 NOTE: queue item 'stories' is pre-pointed at 2306549 (pending-cache recheck, qualified putting bests); its line will still print 92405d9
+05:55:46 recruitment a1b3aad exit 1 1214s Ran 140 tests in 1207.363s FAILED (failures=1, skipped=1) 
+06:05:05 observer_gaps 5f87e42 exit 0 559s Ran 105 tests in 557.471s OK (skipped=2) 
+06:05:05 QUEUE2 DONE
+06:13:58 prestige d187a56 exit 1 516s Ran 111 tests in 456.265s FAILED (errors=1) 
+06:13:58 QUEUE3 DONE
+06:16:08 return2 5c15e32 exit 0 117s Ran 50 tests in 62.928s OK 
+06:35:10 QUEUE8 START (rerun of items killed by the worker restart; each line prints the commit actually tested)
+06:39:28 weather2 e19fff3 exit 0 258s Ran 113 tests in 192.929s OK 
+06:57:18 geography2 7819114 exit 0 1070s Ran 167 tests in 1067.670s OK 
+07:01:11 upsets2 e027e70 exit 0 233s Ran 57 tests in 232.142s OK (skipped=1) 
+07:01:56 f2b 3e58a7d exit 0 45s Ran 20 tests in 45.094s OK 
+07:04:23 NOTE: queue9 is pre-pointed at rc1 d70a725 (the candidate: 16c83e8 + decision evidence + report); its lines print the commit tested
+07:05:46 stories 2306549 exit 0 229s Ran 102 tests in 227.712s OK 
+07:05:46 QUEUE8 DONE
+07:06:00 QUEUE9 START (rc1 16c83e8 world tests)
+07:20:36 rc1_fixes d70a725 exit 0 876s Ran 113 tests in 866.298s OK 
+07:34:47 rc1_observer d70a725 exit 1 851s Ran 173 tests in 850.687s FAILED (failures=1, skipped=3) 
+07:38:24 rc1_engine d70a725 exit 0 217s Ran 184 tests in 209.028s OK 
+07:42:11 NOTE: queue11 (final gates) re-pointed at 697183c before it started
+07:48:38 NOTE: queue11 (final gates) re-pointed at d39d613 before it started
+08:00:46 rc1_season d70a725 exit 0 1342s Ran 116 tests in 1279.935s OK 
+08:00:46 QUEUE9 DONE
+08:00:54 QUEUE10 START (decision evidence world tests on d70a725; parent 16c83e8)
+08:01:29 evidence_world d70a725 exit 0 35s Ran 5 tests in 35.141s OK (skipped=1) 
+08:01:48 NOTE: queue11 (final gates) re-pointed at 0a05310 before it started
+08:02:22 evidence_parent d70a725 exit 0 53s Ran 1 test in 52.503s OK 
+08:04:29 evidence_callers d70a725 exit 0 127s Ran 87 tests in 120.657s OK 
+08:04:29 QUEUE10 DONE
+08:04:48 QUEUE11 START (final gates on 0a05310)
+10:12:45 final_suite 0a05310 exit 1 7677s Ran 972 tests in 7578.673s FAILED (failures=1, errors=4, skipped=4) 
+10:23:26 smoke 0a05310 exit 0 641s 10:23:26 outcome parts differing with the evidence off (should be none): none
+10:23:26 QUEUE11 DONE
+10:24:21 ui_nav 0a05310 exit 0 pages 140, failing 0
+10:24:21 QUEUE12 DONE
+10:24:24 ARMS START on c0d1ea5
+11:47:54 ARMS DONE
+11:48:11 QUEUE13 START (exact-head final gates on c0d1ea5)
+13:55:14 final_suite c0d1ea5 exit 0 7623s Ran 998 tests in 7524.889s OK (skipped=4) 
+14:05:27 smoke c0d1ea5 exit 0 613s 14:05:26 outcome parts differing with the evidence off (should be none): none
+14:06:05 ui_nav c0d1ea5 exit 0 pages 160, failing 0
+14:06:05 QUEUE13 DONE
+14:06:06 QUEUE14 START on c0d1ea5 dirty=0 free  3296 MB
+14:06:06 removed the navigation copy /tmp/claude-0/-home-user-golf-legacy/dd633163-5093-57b8-a35e-3e668bc4257e/scratchpad/v18/ui/final_c0d1ea5/world (source kept); free  3481 MB
+14:13:41 det_run c0d1ea5 exit 0 455s 2 seasons
+14:17:39 det_replay c0d1ea5 exit 0 238s identical="identical": true
+14:21:20 fam_off c0d1ea5 exit 0 221s {"seed": 4207, "year": 2027, "season_s_famoff": 203.0, "season_s_famon_smoke_off": 177.6, "created_s": 5.9, "parts_differing": ["development", "diagnostics", "familiarity", "fatigue_injuries", "finances", "history", "moments", "performance", "published", "rankings", "records", "results", "rounds_and
+14:21:20 QUEUE14 DONE free  3674 MB
+14:21:26 QUEUE15 START (skip reasons on c0d1ea5)
+14:35:53 skip_reasons c0d1ea5 exit 0 867s 5 skipped: test_retirement_into_a_staff_role_each_once (tests.test_observer_gaps.WorldGaps.test_retirement_into_a_staff_role_each_once): 'no golfer became a coach or caddie in this small world';test_outcomes_are_identical_to_the_parent_build (tests.test_decision_evidence_world.DecisionEvidenceWorld.test_outcomes_are_identical_to_the_parent_build): 'set GOLF_PARENT_CHECKOUT to the parent build';test_a_golfer_who_became_staff_keeps_one_identity (tests.test_observer_profiles.ProfilesAndStatsTests.test_a_golfer_who_became_staff_keeps_one_identity): 'no golfer became staff in this short world (checked on the 
+14:35:53 QUEUE15 DONE

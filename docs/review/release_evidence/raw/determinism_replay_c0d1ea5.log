@@ -1,0 +1,23 @@
+{
+ "seed": 4207,
+ "season": 2028,
+ "identical": true,
+ "parts": {
+  "results": true,
+  "performance": true,
+  "rounds_and_holes": true,
+  "development": true,
+  "familiarity": true,
+  "finances": true,
+  "staff": true,
+  "fatigue_injuries": true,
+  "rankings": true,
+  "records": true,
+  "moments": true,
+  "history": true,
+  "cursor": true,
+  "diagnostics": true,
+  "decision_evidence": true,
+  "published": true
+ }
+}

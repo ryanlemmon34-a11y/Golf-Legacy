@@ -1,0 +1,19 @@
+test_injured_now (tests.test_living_views.RatingsOverTime.test_injured_now) ... ok
+test_a_cheaper_event_is_still_an_option (tests.test_realism.FundingTests.test_a_cheaper_event_is_still_an_option)
+If the event a golfer would prefer is out of reach, an affordable eligible event that week ... ok
+test_a_source_copy_without_git_has_the_same_engine_id (tests.test_session.EngineIdTests.test_a_source_copy_without_git_has_the_same_engine_id)
+An exported source tarball (no .git) fingerprints itself exactly as git would, so the worlds it ... ok
+test_a_lock_left_by_a_dead_process_is_released (tests.test_session.TransactionTests.test_a_lock_left_by_a_dead_process_is_released) ... ok
+test_first_shared_majors_each_once (tests.test_observer_gaps.WorldGaps.test_first_shared_majors_each_once) ... ok
+test_retirement_into_a_staff_role_each_once (tests.test_observer_gaps.WorldGaps.test_retirement_into_a_staff_role_each_once) ... skipped 'no golfer became a coach or caddie in this small world'
+test_archive_only_browsing_shows_deaths (tests.test_mortality_world.SmallWorld.test_archive_only_browsing_shows_deaths) ... ok
+test_outcomes_are_identical_to_the_parent_build (tests.test_decision_evidence_world.DecisionEvidenceWorld.test_outcomes_are_identical_to_the_parent_build) ... skipped 'set GOLF_PARENT_CHECKOUT to the parent build'
+test_a_golfer_who_became_staff_keeps_one_identity (tests.test_observer_profiles.ProfilesAndStatsTests.test_a_golfer_who_became_staff_keeps_one_identity) ... skipped 'no golfer became staff in this short world (checked on the 50-season copy)'
+test_school_and_club_events_draw_nothing (tests.test_amateur_support.Rules.test_school_and_club_events_draw_nothing) ... ok
+test_it_is_archived (tests.test_amateur_support.Seasons.test_it_is_archived) ... ok
+test_recording_changes_no_outcome (tests.test_upsets.HeavyEquivalenceTests.test_recording_changes_no_outcome) ... skipped 'whole-season run: set GOLF_HEAVY_TESTS=1'
+
+----------------------------------------------------------------------
+Ran 12 tests in 861.719s
+
+OK (skipped=4)
