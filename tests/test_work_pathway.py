@@ -34,7 +34,7 @@ def world(**kw):
     g = Golfer(id=1, status='amateur', lifestyle='full_time', tour='AM_X', born=2000, backing=0.0, cash=-500.0)
     for k, v in kw.items():
         setattr(g, k, v)
-    s = NS(g={1: g}, am_pos={}, am_support={}, work_pathway_on=True, history=defaultdict(list))
+    s = NS(g={1: g}, am_pos={}, am_support={}, work_pathway_on=True, history=defaultdict(list), amateur_work_from={})
     s.log = lambda gid, y, w, t: s.history[gid].append((y, w, t))
     WP.init(s)
     return s, g
@@ -92,6 +92,7 @@ class Deciding(unittest.TestCase):
         self.assertEqual(s.work_pathway[2027], [{'gid': 1, 'year': 2027, 'week': 13, 'age': 27, 'weeks_blocked': 8,
                                                  'am_rank': 301, 'cash': -812, 'reason': WP.REASON}])
         self.assertEqual(s.history[1][0][:2], (2027, 13))
+        self.assertEqual(s.amateur_work_from[1], (2027, 13))           # the work start, for a later return
         self.assertNotIn(1, s.cash_blocked)
 
     def test_who_is_left_out(self):

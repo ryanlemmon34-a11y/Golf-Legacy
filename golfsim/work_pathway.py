@@ -25,12 +25,14 @@ has reached WEEKS takes a job from that block on, so the month they plan is alre
 weeks counted and the facts behind it are recorded (Season.work_pathway) and written in their career history.
 The count carries across the year end and ends when they stop being a full-time non-college amateur.
 
-The way back is unchanged: a working amateur's route to full-time golf is the existing winter decision to turn
-professional (careers.p_turn_pro); this pathway adds no return to full-time amateur golf (none existed before).
+The way back: the existing winter decision to turn professional (careers.p_turn_pro), and since rules
+2026-11-06 a return to full-time amateur golf when finances and results support it (golfsim/amateur_return.py).
 """
 from __future__ import annotations
 
 from collections import Counter, defaultdict
+
+from . import amateur_return as AR
 
 MIN_AGE = 21
 OUTSIDE_TOP = 300
@@ -86,6 +88,7 @@ def decide(season, year, week):
         if g is None or not tracked(g) or why_not(season, g, year):
             continue
         g.lifestyle = 'part_time'
+        AR.started_work(season, g, year, week)
         season.cash_blocked.pop(gid, None)
         rec = {'gid': gid, 'year': year, 'week': week, 'age': g.age(year), 'weeks_blocked': n,
                'am_rank': season.am_pos.get(gid), 'cash': round(g.cash), 'reason': REASON}

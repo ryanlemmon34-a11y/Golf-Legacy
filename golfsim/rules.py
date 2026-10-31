@@ -51,6 +51,9 @@ VERSIONS = (
                    'prestige from success beyond pre-event expectation, which sets their share of each year\'s new '
                    'juniors and new professionals. The number of new golfers is unchanged by it: only how the '
                    'fixed number is shared between nations.'),
+    ('2026-11-06', 'A working amateur can return to full-time amateur golf in the winter when their finances and '
+                   'results support it: a full season in work, no debt, savings covering a full-time amateur season '
+                   'of golf, and results worth going back for; the chance falls smoothly with age (no cut-off).'),
     ('2026-11-07', 'Death after retirement: in the winter after each season, anyone who is not an active competitive '
                    'golfer -- a golfer retired from competition (including one who coaches or caddies), or a coach '
                    'or caddie -- may die, at an annual risk rising with age (a provisional game calibration). A '
@@ -354,6 +357,17 @@ RULES = {
         'moves toward 4 ^ ((prestige - 50) / 50) -- between 0.25 and 4 -- by at most 10% a year. Set at each '
         'season\'s end for the next season\'s entrants.',
         '2026-11-05'),
+    'amateur-return': (
+        'Returning from work to full-time amateur golf',
+        'Each winter a working (part-time) amateur outside college who did not turn professional may return to '
+        'full-time amateur golf, if all three hold: at least one full season in work since taking the job (a job '
+        'taken during a season counts from the next); no debt, and savings plus family money covering a full-time '
+        'amateur season of golf (16 events at their own average trip cost last season, or a regional amateur trip '
+        'when they played too few to tell; support and salary do not count); and results in the season just ended '
+        '(amateur ranking inside the top 300, a win or top-3 finish, or a rise of 100 places). Then it is a chance, '
+        'never certain: higher with stronger results, more savings and more drive, lower with age from 23 with no '
+        'age excluded, at most 60 % a year. Provisional calibration (owner decision D5, thresholds D5a).',
+        '2026-11-06'),
     'injuries': (
         'Injuries',
         'A golfer can be hurt playing an event; the chance rises with tiredness, age and the rounds played and falls '

@@ -362,6 +362,8 @@ class Season:
         # otherwise, so support is the one difference: docs/LONG_RUN_PLAN.md)
         self.amateur_support_on = amateur_support
         self.work_pathway_on = True                          # cash-blocked adult amateurs can take work (WP)
+        self.amateur_return_on = True                        # ... and working amateurs can return (amateur_return)
+        self.amateur_work_from = {}                          # gid -> (year, week) they started working as amateurs
         self.lib = library or default_library(calendar or SCH.DEFAULT)   # new worlds: the reference calendar
         self.cal = self.lib.calendar
         self.calendar_version = self.cal.version
@@ -2058,6 +2060,8 @@ class Season:
         state.setdefault('mortality_on', False)              # saves from before deaths: nobody dies (no migration)
         state.setdefault('deaths', {})
         state.setdefault('mortality_done', set())
+        state.setdefault('amateur_return_on', False)          # saves from before the return: never applied
+        state.setdefault('amateur_work_from', {})
         if 'cash_blocked' not in state:
             state['cash_blocked'] = Counter()
             state['cash_blocked_max'] = defaultdict(Counter)

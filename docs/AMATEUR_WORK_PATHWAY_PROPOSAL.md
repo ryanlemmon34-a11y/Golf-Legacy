@@ -31,12 +31,9 @@ count in the season is archived too (`cash_blocked_max`), for measuring prolonge
 ## Departures from the proposal (flagged for the owner)
 
 1. **The way back.** The proposal said the existing winter comeback decision lets a part-timer return to
-   full-time. That was wrong for amateurs: the comeback decision (`careers.p_comeback`) applies to professionals
-   only. A working amateur's existing route to full-time golf is **turning professional** at a season's end
-   (`careers.p_turn_pro`, which already considers part-time amateurs; after 27 it is recorded as a comeback).
-   There is no return to full-time *amateur* golf, for this pathway or for amateurs who took a job at a season's
-   end. Nothing new was added; a return to full-time amateur golf when savings recover would be a new behaviour
-   and needs a decision.
+   full-time. That was wrong for amateurs (`careers.p_comeback` is for professionals only). Resolved since
+   rules 2026-11-06: the owner approved a return to full-time amateur golf (D5) and HAL decided its thresholds
+   under the owner's delegation (D5a): `golfsim/amateur_return.py`, below.
 2. **Funds test.** "Spendable funds below the cheapest eligible event" is not tested separately: it is exactly
    what the ledger's "could not afford any event" means each counted week. "No family money left" is checked
    when the decision is made.
@@ -44,6 +41,28 @@ count in the season is archived too (`cash_blocked_max`), for measuring prolonge
    is taken is 8 to 11 (the proposal's "from the next monthly block").
 4. **Consecutive.** "8 consecutive weeks" is 8 counted weeks with pauses allowed in between, as the owner
    directed (calendar gaps must not keep erasing the evidence).
+
+## Return to full-time amateur golf (rules 2026-11-06; provisional calibration)
+
+Each winter a working amateur outside college who did not turn professional may return, if all three hold:
+**a full season in work** since taking the job (a mid-season job counts from the next season; working before
+the world's records began counts); **sustainable funding** -- no debt, and savings plus family money covering a
+full-time amateur season of golf (16 events at their own average trip cost last season, or a regional amateur
+trip when they played fewer than 3); support and salary never count; and **results** in the season just ended --
+amateur ranking inside the top 300, a win or top-3, or a rise of 100+ places. Then a chance, never certain:
+
+    sig(-3.0 + 2.0 x results + 0.6 x min(2, savings / season cost) + 1.5 x (drive - 0.5) - 0.12 x max(0, age - 23))
+      x (1 - their chance of taking a job again next winter, a year older with that season paid for), at most 60 %
+
+No age is excluded; the last factor makes the chance fall with age consistently with the existing job decision
+(which makes full-time adult amateurs ever likelier to take work through their mid-twenties), so a return that
+would be undone a year later is correspondingly unlikely. The switch is never a way out of debt. Recorded as a
+career decision ("amateur returned to full-time golf") with its facts, and in the career history.
+
+**Measured so far (provisional, tiny sample):** a 5 % world (seed 93) over three seasons: 3, 2 and 1 returns
+(ages 23-30); 2 of the returners took a job again the next winter in 2028 and 2 in 2029; none was cash-blocked
+into the work pathway. The flip rate needs a full-population measurement before the numbers are anything but
+provisional.
 
 ## The original proposal
 

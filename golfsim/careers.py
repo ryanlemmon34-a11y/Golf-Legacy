@@ -30,6 +30,7 @@ import random
 from .calendar import TOUR_BY_KEY
 from .cards import home_challenger, home_lower, home_mini, premier_circuit, winner_exemptions
 from .development import EXPERIENCE_ROUNDS, init_ceilings
+from . import amateur_return as AR
 from . import finance as FIN
 from . import prestige as PR
 from . import staff as ST
@@ -375,6 +376,7 @@ def decide(season, year, snap):
                          p=round(p_pro, 4), am_rank=row.get('am_end'), graduating=graduating)
                 elif graduating:
                     g.tour, g.lifestyle = amateur_series(g, season.home_country(g)), 'part_time'
+                    AR.started_work(season, g, year, 53)
                     log(g.id, year, 53, 'College eligibility ended (the season they turned 22); kept playing as '
                                         f'an amateur alongside a job, on the {TOUR_BY_KEY[g.tour].name} where they live')
                     note('college to amateur', g, p=round(1 - p_pro, 4), am_rank=row.get('am_end'))
@@ -382,9 +384,20 @@ def decide(season, year, snap):
                     p_job = p_amateur_job(season, g, row, year)
                     if rng.random() < p_job:
                         g.lifestyle = 'part_time'
+                        AR.started_work(season, g, year, 53)
                         log(g.id, year, 53, f'Took a job at {age} and kept playing as an amateur')
                         note('amateur took a job', g, p=round(p_job, 4), am_rank=row.get('am_end'),
                              cash=round(g.cash))
+                elif g.lifestyle == 'part_time' and not college and season.amateur_return_on:
+                    # back to full-time amateur golf when finances and results support it (rules 2026-11-06;
+                    # its own random stream, so nobody else's decision moves)
+                    p_back, facts = AR.chance(season, g, row, year, amateur_standing(row.get('am_end')))
+                    if p_back and AR.draw(season, g.id, year) < p_back:
+                        g.lifestyle = 'full_time'
+                        season.amateur_work_from.pop(g.id, None)
+                        log(g.id, year, 53, f'Left their job at {age} to play full-time amateur golf again '
+                                            f'({"; ".join(facts["results"])})')
+                        note(AR.KIND, g, p=round(p_back, 4), am_rank=row.get('am_end'), **facts)
             continue
         if g.status != 'pro':
             continue
@@ -425,6 +438,7 @@ def decide(season, year, snap):
                 note('became club pro', g, **why)
             elif r < p_club + p_am:
                 g.status, g.lifestyle, g.tour = 'amateur', 'part_time', amateur_series(g, season.home_country(g))
+                AR.started_work(season, g, year, 53)
                 log(g.id, year, 53, f'Stopped chasing the tour at {age}, took a job and regained amateur status ({reason})')
                 note('back to amateur', g, **why)
             else:
