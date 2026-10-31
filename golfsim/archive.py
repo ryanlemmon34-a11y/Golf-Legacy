@@ -209,11 +209,11 @@ class ArchiveWriter:
                 careers[gid].update({'net': round(led.net), 'income': round(led.income), 'costs': round(led.costs),
                                      'support': round(led.support), 'backer_support': round(led.backer_support),
                                      'moving': round(led.moving), 'am_support': round(led.am_support)})
+            else:
+                careers[gid]['net'] = careers[gid]['net_at_decision']
             con = getattr(season, 'am_support_seasons', {}).get(year, {}).get(gid)
             if con is not None:                        # the season's amateur support (rules 2026-11-02)
                 careers[gid]['am_support_band'] = con['band']
-            else:
-                careers[gid]['net'] = careers[gid]['net_at_decision']
             g = season.g.get(gid)
             if g is not None:                   # ratings as the next season starts (after this one's aging):
                 careers[gid]['ratings'] = ([round(g.overall, 1)] +              # overall, then RATING_KEYS
