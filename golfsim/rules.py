@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import re
 
-RULES_VERSION = '2026-11-03'
+RULES_VERSION = '2026-11-06'
 RANKING_RULE = 'world-ranking-1'     # the world ranking's formula (unchanged since the world began; named now)
 VERSIONS = (
     ('2026-10-30', 'Winners\' exemptions count whatever a golfer\'s membership (a non-member champion earns a '
@@ -43,6 +43,9 @@ VERSIONS = (
                    '(it had been one edition more). The work pathway: a full-time adult amateur outside the top 300, '
                    'without support or family money, who cannot afford any eligible event for eight counted weeks '
                    'takes a job at the next monthly plan and keeps playing as a working amateur.'),
+    ('2026-11-06', 'A working amateur can return to full-time amateur golf in the winter when their finances and '
+                   'results support it: a full season in work, no debt, savings covering a full-time amateur season '
+                   'of golf, and results worth going back for; the chance falls smoothly with age (no cut-off).'),
 )
 EARLIER = ('Seasons archived before rules versions were recorded were played under earlier rules. The '
            'differences that matter for reading old results: a winner without a Premier card held no '
@@ -271,6 +274,17 @@ RULES = {
         'Nobody is given money and no cost is waived; the way back to full-time golf is turning professional, as '
         'for every working amateur.',
         '2026-11-03'),
+    'amateur-return': (
+        'Returning from work to full-time amateur golf',
+        'Each winter a working (part-time) amateur outside college who did not turn professional may return to '
+        'full-time amateur golf, if all three hold: at least one full season in work since taking the job (a job '
+        'taken during a season counts from the next); no debt, and savings plus family money covering a full-time '
+        'amateur season of golf (16 events at their own average trip cost last season, or a regional amateur trip '
+        'when they played too few to tell; support and salary do not count); and results in the season just ended '
+        '(amateur ranking inside the top 300, a win or top-3 finish, or a rise of 100 places). Then it is a chance, '
+        'never certain: higher with stronger results, more savings and more drive, lower with age from 23 with no '
+        'age excluded, at most 60 % a year. Provisional calibration (owner decision D5, thresholds D5a).',
+        '2026-11-06'),
     'injuries': (
         'Injuries',
         'A golfer can be hurt playing an event; the chance rises with tiredness, age and the rounds played and falls '
