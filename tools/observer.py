@@ -928,7 +928,7 @@ def directory(w, q, role='golfer'):
     if w.live and role in ('coach', 'caddie'):
         for g, s_ in (w.live.coach_of if role == 'coach' else w.live.caddie_of).items():
             clients[s_] = clients.get(s_, 0) + 1
-    rep_of = lambda r: (r[1].get(role) or {}).get('reputation') if role in ('coach', 'caddie') else None
+    rep_of = lambda r: (r[1].get(role) or {}).get('reputation') if role in ('coach', 'caddie') else golfer_prestige(w, r[0], r[1])
     key = {'name': lambda r: (r[1]['name'], r[0]), 'born': lambda r: (-(r[1].get('born') or 0), r[0]),
            'rank': lambda r: (wr.get(r[0], 10 ** 9), r[1]['name'], r[0]),
            'reputation': lambda r: (rep_of(r) is None, -(rep_of(r) or 0), r[1]['name'], r[0]),
@@ -943,24 +943,40 @@ def directory(w, q, role='golfer'):
                                                                  key=lambda x: x[1])))
     fields.append(('status', 'Status now', [('', 'any')] + [(s, s) for s in statuses]))
     fields.append(('sort', 'Sort', [(k, t) for k, t in (('rank', 'world ranking'), ('name', 'name'), ('born', 'youngest first'),
-                                                       ('reputation', 'reputation'), ('clients', 'clients now'))
-                                    if (role == 'golfer' and k in ('rank', 'name', 'born'))
+                                                       ('reputation', 'Prestige'), ('clients', 'clients now'))
+                                    if (role == 'golfer' and k in ('rank', 'name', 'born', 'reputation'))
                                     or (role in ('coach', 'caddie') and k != 'rank') or (role is None and k in ('name', 'born'))]))
     chunk, pager = paged(rows, q, path)
     if role in ('coach', 'caddie'):
-        body = table(['Name', 'Nation', 'Born', 'Status', 'Reputation', 'Clients now', 'Also'], [
+        body = table(['Name', 'Nation', 'Born', 'Status', 'Prestige', 'Clients now', 'Also'], [
             [w.person_link(pid), nation_link(p.get('country')), esc(p.get('born')), esc(st),
              esc(p.get(role, {}).get('reputation', '')), str(clients.get(pid, 0)) if w.live else '',
              esc(', '.join(r for r in p['roles'] if r != role))] for pid, p, st in chunk], numeric=(2, 4, 5))
     else:
-        body = table(['Name', 'Nation', 'Born', 'Status now', 'Tour now', 'World', 'Roles'], [
+        body = table(['Name', 'Nation', 'Born', 'Status now', 'Tour now', 'World', 'Prestige', 'Roles'], [
             [w.person_link(pid), nation_link(p.get('country')), esc(p.get('born')), esc(st),
-             tour_link(w, p.get('golfer', {}).get('tour')), esc(wr.get(pid, '')), esc(', '.join(p['roles']))]
-            for pid, p, st in chunk], numeric=(2, 5))
+             tour_link(w, p.get('golfer', {}).get('tour')), esc(wr.get(pid, '')),
+             esc(golfer_prestige(w, pid, p) if golfer_prestige(w, pid, p) is not None else ''), esc(', '.join(p['roles']))]
+            for pid, p, st in chunk], numeric=(2, 5, 6))
     note = ('<p class="muted">Everyone in the published history and the current world. "Now" is as of the date in the '
-            'header; retired people keep their pages.</p>')
+            'header; retired people keep their pages. ' + ('Prestige: a golfer\'s public standing (0-100), now, or at '
+            'their last recorded season\'s end -- the last 52 weeks\' results plus a slowly fading legacy of majors '
+            'and other big wins; not a rating of ability. Blank where not recorded.' if role in (None, 'golfer') else
+            'Prestige: their public reputation (0-100) in this role, not a measure of their skill.') + '</p>')
     return ROLE_TITLES[role] if not term else f'{ROLE_TITLES[role]} matching “{term}”', \
         filters(path, q, fields) + note + body + pager
+
+
+def golfer_prestige(w, pid, p=None):
+    """A golfer's Prestige: now (the live world), else as the published history ends (the people table, written
+    with each publication); None where never recorded (histories published before rules 2026-11-02). Never a
+    season file read, so a whole directory sorts by it."""
+    lp = w.live.people.get(pid) if w.live else None
+    if lp is not None and lp.get('prestige') is not None:
+        return lp['prestige']
+    if p is None:
+        p = w.a.people.get(pid) if w.a is not None else None
+    return ((p or {}).get('golfer') or {}).get('prestige')
 
 
 def golfers(w, q):
@@ -1517,7 +1533,7 @@ def _staff(w, pid, role):
     p = w.person(pid) or {}
     info = p.get(role, {})
     out.append(f'<p>{esc(role.title())} · status {esc(info.get("status"))}'
-               + (f' · reputation {esc(info.get("reputation"))}' if info.get('reputation') is not None else '')
+               + (f' · Prestige {esc(info.get("reputation"))}' if info.get('reputation') is not None else '')
                + (f' · {esc(info.get("background"))}' if info.get('background') else '') + '</p>')
     out.append(_staff_card(info, role))
     stints = w.a.staff_clients(pid, role) if w.a and pid in w.a.people else []
@@ -1559,26 +1575,36 @@ def _staff(w, pid, role):
 
 
 def _staff_card(info, role):
-    """A coach's or caddie's working profile as the world records it: a coach's speciality, whether they specialise
-    in young players and how many clients they take on; a caddie's skills (recorded from 2026-11-01). A coach's
-    teaching and scouting quality are hidden in the game's design and not shown."""
+    """A coach's or caddie's working profile as the world records it: a coach's teaching and scouting abilities
+    (recorded from rules 2026-11-02), speciality, whether they specialise in young players and how many clients
+    they take on; a caddie's skills (recorded from 2026-11-01). Prestige (public reputation) is shown apart: a
+    famous coach is not necessarily the best teacher or scout. A golfer's potential is never shown."""
     if not info:
         return ''
     rows = []
     if role == 'coach':
+        for k, label, what in (('teaching', 'Teaching', 'how much their coaching helps a client improve'),
+                               ('scouting', 'Scouting', 'how well they read a young player\'s prospects from what '
+                                                        'can be watched (never the player\'s hidden potential)')):
+            v = info.get(k)
+            rows.append((label, f'{v:.1f} <span class="muted">of 100: {what}</span>' if v is not None else
+                         '<span class="muted">not recorded (recorded from rules 2026-11-02)</span>'))
         if info.get('speciality'):
             rows.append(('Speciality', esc(str(info['speciality']).replace('_', ' '))))
         if info.get('youth') is not None:
             rows.append(('Young players', 'a youth specialist' if info['youth'] else 'not a youth specialist'))
         if info.get('clients'):
             rows.append(('Takes on', f'up to {info["clients"]} clients'))
-        rows.append(('Teaching and scouting', '<span class="muted">not shown (hidden in the game\'s design)</span>'))
     else:
         if info.get('seasons') is not None:
             rows.append(('Seasons worked', esc(info['seasons'])))
         sk = info.get('skills')
         rows.append(('Skills', ' · '.join(f'{esc(k.replace("_", " "))} {v:.1f}' for k, v in sk.items()) if sk else
                      '<span class="muted">not recorded (recorded from rules 2026-11-01)</span>'))
+    if info.get('reputation') is not None:
+        rows.append(('Prestige', f'{info["reputation"]} <span class="muted">of 100: their public reputation, built by '
+                     + ('their clients\' success' if role == 'coach' else 'the success and earnings of the bags they '
+                        'carry') + '; it is what golfers see when choosing, not a measure of skill</span>'))
     return '<dl class="kv">' + ''.join(f'<dt>{k}</dt><dd>{v}</dd>' for k, v in rows) + '</dl>'
 
 

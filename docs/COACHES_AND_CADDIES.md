@@ -11,8 +11,8 @@ Tests: `tests/test_staff.py`.
 |---|---|
 | **Speciality** | One of the training categories: physical, long game, short game, putting or mental. |
 | **Young players** | About a quarter of coaches specialise in developing golfers aged 22 and under. |
-| **Teaching** (hidden) | How much their coaching helps. |
-| **Scouting** (hidden) | How well they judge a young player's potential. |
+| **Teaching** (shown from rules 2026-11-02) | How much their coaching helps (0-100). |
+| **Scouting** (shown from rules 2026-11-02) | How well they read a young player's prospects from what can be watched (0-100); it never reveals the player's hidden potential. |
 | **Reputation** (seen) | What golfers can see when choosing; it follows their students' success (fame, progress). It sets the fee: about $15k a year at 50, $45k at 80, $70k at 95. |
 | **Clients** | How many players they coach individually: about 6 (4-8) by their availability and how intensively they work — separate from how well they teach. A tuning assumption to check against long runs, not a real-world limit. |
 
@@ -101,6 +101,25 @@ years apart (a reunion keeps some), and *scales* the staff member's ability: a n
 75% of a coach's or caddie's edge, a long one all of it (±5% for fit). It never changes a golfer's
 attributes, so hiring or firing costs no rating — only the speed of improvement and the help on the
 course. A familiar average coach never outperforms a clearly better one.
+
+**What profiles show (rules 2026-11-02).** A coach's teaching and scouting, a caddie's skills and each
+pairing's fit are shown and archived; each season's staff record keeps a coach's teaching and scouting and a
+caddie's skills, so later views can chart them. **Prestige** is shown apart for every person: a golfer's public
+standing (the last 52 weeks' results plus a slowly fading legacy of majors and big wins; recorded at every
+season's end and as each history is published), and for a coach or caddie their reputation in that role. Each
+role keeps its own value and directories sort by the one they list; unlike measures are never combined. A
+famous coach is not necessarily the best teacher or scout, and a golfer's potential is never shown.
+
+**Planned, not built: richer recruitment (roadmap S2/S3).** Scouting already reads only what can be watched --
+the level seen with error, the growth typical for the age, the last year's real improvement -- through an error
+that shrinks with scouting skill, with each coach's view of a player persisting, so good scouts tend to spot
+real improvers, are sometimes wrong, and miss late bloomers. The next step keeps that and adds: assessments that
+firm up with more seasons watched; development coaches pursuing promising growth while elite coaches weigh
+established achievement (Prestige and results, never potential), fit and major chances; caddies weighing
+earnings, compatibility and stability; and loyalty from the recorded rapport, fit and shared results, so a
+better-known offer does not dissolve a working partnership by itself. Approach, acceptance, refusal and
+departure reasons are recorded on the stints both people already share. Constants are proposed and validated
+across seeds before they are chosen.
 
 **Fit is recorded and shown.** Each pairing's fit is drawn once (normal, clipped to −2..+2) and saved with the
 relationship history (`Relations.pairs`: kind, staff member, golfer, work together, last year worked, fit), so

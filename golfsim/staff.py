@@ -659,6 +659,14 @@ def end_of_season(season, year, snap):
     for gid, cid in st.coach_of.items():
         r = record.setdefault(('coach', cid), {'students': 0, 'reputation': st.coaches[cid].reputation})
         r['students'] += 1
+    # each season's working abilities, kept for historical views (observation only: nothing reads them back)
+    for c in st.coaches.values():
+        if c.status == 'active':
+            r = record.setdefault(('coach', c.id), {'students': 0, 'reputation': c.reputation})
+            r['teaching'], r['scouting'] = round(c.teaching, 1), round(c.scouting, 1)
+    for k in st.caddies.values():
+        if k.status == 'active' and getattr(k, 'skills', None):
+            record[('caddie', k.id)]['skills'] = {s: round(v, 1) for s, v in k.skills.items()}
     for k in st.caddies.values():                     # experience comes from rounds actually worked
         if k.status == 'active' and k.rounds_worked > 0:
             k.seasons += 1

@@ -89,11 +89,17 @@ def capture(session):
         pk = peaks.get(g.id)
         if pk is not None:                            # highest Overall so far: (value, year, week reached by)
             people[g.id]['peak'] = (round(pk[0], 1), pk[1], pk[2])
+        people[g.id]['prestige'] = round(s.player_prestige(g.id), 1)   # public standing now (not ability)
     for kind, table in (('coach', st.coaches), ('caddie', st.caddies)):
         for c in table.values():
             p = people.setdefault(c.id, {'name': c.name, 'country': c.country, 'born': c.born, 'roles': []})
             p['roles'].append(kind)
             p[kind] = {'status': c.status, 'reputation': round(c.reputation, 1), 'background': c.background}
+            if kind == 'coach':
+                p[kind].update(teaching=round(c.teaching, 1), scouting=round(c.scouting, 1), speciality=c.speciality,
+                               youth=c.youth, clients=c.clients)
+            elif getattr(c, 'skills', None):
+                p[kind]['skills'] = {k: round(v, 1) for k, v in c.skills.items()}
     editions, by_person = {}, defaultdict(list)
     for r in s.results.values():
         if r.year in archived:

@@ -183,7 +183,7 @@ class ArchiveWriter:
             careers[gid] = {k: row.get(k) for k in ('tour', 'tier', 'status', 'lifestyle', 'events', 'wins', 'top10',
                                                     'cuts', 'majors', 'prize', 'net', 'wr_start', 'wr_end', 'am_start',
                                                     'am_end', 'injury_weeks', 'promoted', 'demoted', 'next_tour',
-                                                    'zero_start_reason', 'zero_start_kind')}
+                                                    'zero_start_reason', 'zero_start_kind', 'prestige')}
             if episodes.get(gid):                       # each injury of the season (onset, announced, out, back)
                 careers[gid]['injuries'] = episodes[gid]
             pk = getattr(season, 'peak_overall', {}).get(gid)
@@ -294,12 +294,16 @@ class ArchiveWriter:
             people[g.id] = {'name': g.name, 'country': g.country, 'born': g.born, 'hometown': g.hometown,
                             'created': self.created.get(g.id), 'initial': g.id in self.initial,
                             'golfer': {'status': g.status, 'lifestyle': g.lifestyle, 'tour': g.tour,
-                                       'turned_pro': g.turned_pro}}
+                                       'turned_pro': g.turned_pro,
+                                       # public standing as this history ends (from rules 2026-11-02)
+                                       'prestige': round(season.player_prestige(g.id), 1)}}
         for c in st.coaches.values():
             p = people.setdefault(c.id, {'name': c.name, 'country': c.country, 'born': c.born, 'hometown': None})
             p['coach'] = {'speciality': c.speciality, 'youth': c.youth, 'reputation': c.reputation, 'clients': c.clients,
                           'background': c.background, 'status': c.status, 'earnings': round(c.earnings),
-                          'history': c.history}
+                          'history': c.history,
+                          # their working abilities (recorded from rules 2026-11-02; fixed through a career)
+                          'teaching': round(c.teaching, 1), 'scouting': round(c.scouting, 1)}
         for k in st.caddies.values():
             p = people.setdefault(k.id, {'name': k.name, 'country': k.country, 'born': k.born, 'hometown': None})
             p['caddie'] = {'reputation': k.reputation, 'background': k.background, 'status': k.status,

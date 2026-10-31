@@ -260,6 +260,12 @@ def status_section(w, pid, p):
     import observer_data as OD
     rows.append(('Status', O.esc(OD.playing_status(gs)[1])))     # (retired, with the status last held)
     rows.append(('Lifestyle', O.esc(LIFESTYLE.get(gs.get('lifestyle'), gs.get('lifestyle') or '—'))))
+    pres = O.golfer_prestige(w, pid, p)
+    when = 'now' if lv is not None and lv.people[pid].get('prestige') is not None else 'as the published history ends'
+    rows.append(('Prestige', (f'{pres} <span class="muted">of 100, {when}: public standing from the last 52 weeks\' '
+                              'results plus a slowly fading legacy of majors and other big wins; not a rating of ability'
+                              '</span>') if pres is not None else
+                 '<span class="muted">not recorded (recorded from rules 2026-11-02)</span>'))
     if gs.get('lifestyle') != 'retired':
         if tour:
             rows.append(('Membership', O.tour_link(w, tour)))

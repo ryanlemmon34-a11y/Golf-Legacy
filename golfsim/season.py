@@ -2404,7 +2404,7 @@ class Season:
                           'prize_by_tier': {t: tuple(v) for t, v in self.level_earnings[year].get(g.id, {}).items()},
                           'wr_start': self.rank_start.get(year, {}).get(g.id), 'wr_end': self.wr_pos.get(g.id),
                           'am_start': self.am_start.get(year, {}).get(g.id), 'am_end': self.am_pos.get(g.id),
-                          'injury_weeks': 0}
+                          'injury_weeks': 0, 'prestige': round(self.player_prestige(g.id), 1)}
         for r in self.results.values():
             if r.year != year or self.cal.by_id[r.series_id].kind == 'qualifying':
                 continue

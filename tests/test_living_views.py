@@ -198,8 +198,15 @@ class RatingsOverTime(unittest.TestCase):
         html = O.render(self.w, f'/golfer/{coach}', parse_qs('tab=coaching'))[1]
         self.assertIn(f'<dt>Speciality</dt><dd>{info["speciality"].replace("_", " ")}</dd>', html)
         self.assertIn(f'<dt>Takes on</dt><dd>up to {info["clients"]} clients</dd>', html)
-        self.assertIn('not shown (hidden in the game', html)
-        self.assertFalse({'teaching', 'scouting'} & set(info))             # (never archived either)
+        for k, label in (('teaching', 'Teaching'), ('scouting', 'Scouting')):   # shown and archived (2026-11-02)
+            self.assertIn(f'<dt>{label}</dt><dd>{info[k]:.1f} ', html)
+        self.assertIn(f'<dt>Prestige</dt><dd>{info["reputation"]} ', html)  # public reputation, shown apart
+        self.assertIn('not a measure of skill', html)
+        self.assertNotIn('potential', html.split('<dl class="kv">')[1].split('</dl>')[0].replace(
+            'never the player\'s hidden potential', ''))                     # no golfer's potential, anywhere
+        y = max(self.w.a.years)
+        rec = self.w.a.year(y)['staff_year'][f'coach:{coach}']             # each season's abilities, for history
+        self.assertEqual((rec['teaching'], rec['scouting']), (info['teaching'], info['scouting']))
         st = a.staff_clients(coach, 'coach')[0]['stint']
         part = html.split('<h2>All partnerships')[1]                       # (not the current-clients table)
         row = re.search(rf'<a href="/golfer/{st.golfer}">[^<]*</a></td>.*?</tr>', part, re.S).group(0)
@@ -247,6 +254,24 @@ class RatingsOverTime(unittest.TestCase):
         self.assertIn(f'<td class=n>{100 * rap:.0f}%</td>', row)
         team = O.render(self.w, f'/golfer/{st.golfer}', parse_qs('tab=team'))[1]
         self.assertIn(f'<td class=n>{pair.fit:+.2f}</td>', team)              # the same value from the golfer's side
+
+    def test_prestige_for_every_golfer_shown_and_sortable(self):
+        lv = self.w.live
+        g = self.active
+        html = O.render(self.w, f'/golfer/{g}', {})[1]
+        self.assertIn(f'<dt>Prestige</dt><dd>{lv.people[g]["prestige"]} ', html)
+        self.assertIn('not a rating of ability', html)
+        y = max(self.w.a.years)
+        rows = self.w.a.year(y)['careers']
+        self.assertTrue(all(r.get('prestige') is not None for r in rows.values()))   # dated: each season's end
+        page = O.render(self.w, '/golfers', parse_qs('sort=reputation'))[1]
+        vals = [float(v) for v in re.findall(r'<td class=n>([0-9]+\.[0-9])</td><td>', page)]
+        self.assertTrue(vals)
+        self.assertEqual(vals, sorted(vals, reverse=True))                # highest first
+        self.assertIn('<th class=n title="Sort by this column">Prestige</th>', page)
+        coaches = O.render(self.w, '/coaches', parse_qs('sort=reputation'))[1]
+        self.assertIn('<th class=n title="Sort by this column">Prestige</th>', coaches)
+        self.assertNotIn('Reputation', coaches)
 
     def test_a_caddie_profile(self):
         a = self.w.a
