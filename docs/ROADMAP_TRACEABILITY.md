@@ -856,14 +856,14 @@ unchanged) brings the rest into step:
   is kept as written.
 
 Still out of step:
-- **`a2d56fb` is not on rc1.** Until it is merged, the documents on `integration/v16-rc1` (`c0d1ea5`) read as
+- **The docs-only branch `build/v16-docs-final` (`a2d56fb`, then `afb68f3`) is not on rc1.** Until it is merged, the documents on `integration/v16-rc1` (`c0d1ea5`) read as
   described above for `c0d1ea5`: `docs/BACKLOG.md` with T1-T3 timing "pending the CPU hold", the college-access
   paired runs "pending" and the P2, S3, G1, G3 and C1 measurements open; the decision log without D18-D21; and
   `docs/DECISION_EVIDENCE.md` with the estimate only.
-- **`docs/AMATEUR_WORK_PATHWAY_PROPOSAL.md`** (also at `a2d56fb`) still gives only the 5 % world under "Measured so
-  far" for returns; the full-population return and re-block results (D5.c, `dc41950`) are not in it.
+- **`docs/AMATEUR_WORK_PATHWAY_PROPOSAL.md`**: brought into step by the second docs-only commit `afb68f3` (the D5.c
+  full-population return and re-block results, `dc41950`); on rc1 it still gives only the 5 % world.
 - **`docs/BACKLOG.md`** (also at `a2d56fb`) points to this matrix on `build/v16-traceability`, which is not on rc1.
-- **The review documents and the ledger are on `origin/build/v16-report` only** (latest `0061501`), not on rc1:
+- **The review documents and the ledger are on `origin/build/v16-report` only** (latest `6b6d2f0`, with the release evidence in `docs/review/release_evidence/`), not on rc1:
   - the remedy options, `docs/review/U21_AND_COLLEGE_REMEDY_OPTIONS.md` (`9f2ac00`, `9baea7a`; RD3);
   - the Vaughan diagnosis, `docs/review/VAUGHAN_OUTLIER_DIAGNOSIS.md` (`b613b3b`, `d13ad91`; CQ1);
   - the F1 baseline and E1 scope, `docs/review/F1_BASELINE_PRESSURE_AND_E1_SCOPE.md` (`ac310a8`, `1de4119`; F1.i,
