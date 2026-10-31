@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import re
 
-RULES_VERSION = '2026-11-01'
+RULES_VERSION = '2026-11-02'
 RANKING_RULE = 'world-ranking-1'     # the world ranking's formula (unchanged since the world began; named now)
 VERSIONS = (
     ('2026-10-30', 'Winners\' exemptions count whatever a golfer\'s membership (a non-member champion earns a '
@@ -33,6 +33,9 @@ VERSIONS = (
                    'for money alone: when the golfer cannot pay the trip, the organizer pays its travel and entry, '
                    'in kind (the caddie\'s week stays the golfer\'s). Each major place records the money it was '
                    'decided on.'),
+    ('2026-11-02', 'An injury announced as n weeks keeps the golfer out of exactly n weeks of entries (it had kept '
+                   'them out one week longer). The world\'s first Tour Masters invitations are covered by the '
+                   'major-trip guarantee, as earned places and called-up alternates are.'),
 )
 EARLIER = ('Seasons archived before rules versions were recorded were played under earlier rules. The '
            'differences that matter for reading old results: a winner without a Premier card held no '
@@ -148,11 +151,13 @@ RULES = {
         'before rules 2026-11-01) or expired (an amateur\'s place after turning professional). Since 2026-11-01 a '
         'golfer with an earned place who cannot pay the trip has its travel and entry paid by the organizer, in '
         'kind; injury, retirement and an expired amateur place still end a place, and qualifying stages and other '
-        'events are paid as usual. Champion and runner-up places are separate '
+        'events are paid as usual; the same holds for an alternate called up and, in the world\'s first season, '
+        'for a Tour Masters invitation from the seeded world ranking (route INIT). Champion and runner-up places '
+        'are separate '
         'categories; an amateur title feeds the next edition its date allows (the Britannia Amateur, after the '
         'USA Open, feeds next season\'s USA Open and Masters but this season\'s Britannia Open). USA Open champions '
         'hold their place for the ten editions after their win (U1).',
-        '2026-11-01'),
+        '2026-11-02'),
     'calendar': (
         'The calendar',
         'Each world plays one calendar version, recorded with every season. Classic (v1): majors in weeks 18, 24, '
@@ -230,6 +235,15 @@ RULES = {
         'not a validated real-world baseline. Season, career and tour figures add up the counts and the '
         'opportunities (never averages of averages); seasons before this version show "not recorded".',
         '2026-10-30'),
+    'injuries': (
+        'Injuries',
+        'A golfer can be hurt playing an event; the chance rises with tiredness, age and the rounds played and falls '
+        'with injury resistance and stamina. An injury at an event in week W announced as n weeks keeps them out '
+        'of the entries of weeks W+1 to W+n, counted on across the year end (next season\'s week 1 follows week '
+        '52); they can enter again from week W+n+1, and a major place falling in those weeks is withdrawn. An '
+        'injury of 10 weeks or more can take some power, stamina and injury resistance, and their ceilings, for '
+        'good (the longer, the likelier). Before rules 2026-11-02 a golfer stayed out one week longer than announced.',
+        '2026-11-02'),
 }
 
 _PREMIER_RIGHTS = {

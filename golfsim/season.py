@@ -332,7 +332,7 @@ class Season:
         self.legacy = defaultdict(float)
         self.event_factors = {}                              # series_id -> [(tour, field, purse, course)]
         self.fatigue = defaultdict(float)                    # gid -> season fatigue, 0 (fresh) .. 1 (exhausted)
-        self.injured = {}                                    # gid -> (abs week fit again, injury, weeks)
+        self.injured = {}                                    # gid -> (first abs week they can enter again, injury, weeks)
         self.injuries = defaultdict(list)                    # year -> [(week, gid, injury, weeks out, event_id)]
         self._week_load = defaultdict(float)
         self._week_event = {}
@@ -1342,8 +1342,9 @@ class Season:
         as 'ALT') take their places; an invitation-only event without alternates simply plays with a
         smaller field. The only exception is explicit and limited to the world's first season, when
         no past results exist: the Tour Masters then invites the best of the seeded world ranking
-        (route 'INIT', 'Inaugural invitation'). Qualified golfers who cannot pay the trip decline
-        (`declined`) and alternates replace them in the same way."""
+        (route 'INIT', 'Inaugural invitation'). Money never ends a place (rules 2026-11-01): an earned
+        entrant, a called-up alternate or an inaugural invitee who cannot pay the trip has its travel and
+        entry paid by the organizer, in kind (`ok` below; recorded in `travel_grants` when played)."""
         f = Q.build_field(sid, year, self.ctx)
         self.stage_log[(year, sid, 'field')] = f
         can_play = lambda gid: gid in self.g and gid not in self.injured and self.g[gid].lifestyle != 'retired'
@@ -1433,8 +1434,9 @@ class Season:
 
     def lock_rights(self, major, year, week, f, routes):
         """At the field lock: every place the rules gave, with how it was resolved -- entered, withdrawn (injured
-        or retired), declined (could not pay the trip), or expired (an amateur's place after turning
-        professional) -- plus the alternates and invitations that took the places given up."""
+        or retired), or expired (an amateur's place after turning professional) -- plus the alternates and
+        invitations that took the places given up. 'declined: could not pay the trip' is only found in seasons
+        played before rules 2026-11-01 (the organizer pays since; the branch below is unreachable now)."""
         view = self.ctx.as_of(year, week)
         wins = Q.wins_index(view)
         amateur_only = {r.code for r in Q.rules_for(self.calendar_version)[major] if r.amateur_only}
@@ -2081,8 +2083,8 @@ class Season:
         """After the week: players who played get more tired (and may get hurt); the rest recover."""
         rng = random.Random(_seed(self.seed, year, week, 'injury'))
         now = self.abs_week(year, week)
-        for gid in [gid for gid, (back, _, _) in self.injured.items() if back <= now]:
-            del self.injured[gid]
+        for gid in [gid for gid, (back, _, _) in self.injured.items() if back <= now + 1]:
+            del self.injured[gid]                            # (fit for next week's entries)
         played = set(self._week_load)
         for g in self.active_golfers():                      # (retired golfers' fatigue was reset to 0)
             f = self.fatigue[g.id]
@@ -2093,8 +2095,7 @@ class Season:
                     weeks = max(1, min(40, round(math.exp(rng.gauss(math.log(3), 0.9))
                                                  * (1 + 0.03 * max(0, g.age(year) - 30)))))
                     kind = rng.choice(INJURIES)
-                    self.injured[g.id] = (now + weeks + 1, kind, weeks)
-                    self.injuries[year].append((week, g.id, kind, weeks, self._week_event.get(g.id)))
+                    self.injure(g.id, year, week, weeks, kind, self._week_event.get(g.id))
                     text = f'Injured ({kind}), out for {weeks} week{"s" if weeks > 1 else ""}'
                     if self.development:
                         self.note_peaks(year, week, (g,))     # (a lasting injury can lower the ratings)
@@ -2120,6 +2121,14 @@ class Season:
 
     def is_injured(self, gid):
         return gid in self.injured
+
+    def injure(self, gid, year, week, weeks, kind, event=None):
+        """An injury at the end of week W announced as n weeks: the golfer cannot enter the events of weeks W+1 .. W+n
+        (counted on across the year end: the next season's week 1 follows week 52) and can enter again from week
+        W+n+1; the end of week W+n clears it (update_fatigue). Rules 2026-11-02; earlier rules kept them out one
+        week longer than announced."""
+        self.injured[gid] = (self.abs_week(year, week) + weeks + 1, kind, weeks)
+        self.injuries[year].append((week, gid, kind, weeks, event))
 
     def pay_out(self, s, finish, year):
         """Pay the purse to professionals who made the cut, by the payout table (ties share the
@@ -2961,12 +2970,13 @@ class Season:
     def injury_episodes(self, year):
         """{gid: [episode]} of a season's injuries, as recorded when each happened: onset week, kind, the weeks
         announced, when the golfer can next enter an event (an injury at the end of week W announced as n weeks
-        keeps them out of the entries of weeks W+1 .. W+n+1), the event it happened at and any lasting losses."""
+        keeps them out of the entries of weeks W+1 .. W+n: see `injure`), the event it happened at and any lasting
+        losses."""
         out = defaultdict(list)
         lasting = self.injury_lasting.get(year, {})
         for week, gid, kind, weeks, ev in self.injuries.get(year, []):
-            k = week + weeks + 2 - 1                          # entries open again in week W + n + 2
-            out[gid].append({'week': week, 'kind': kind, 'announced': weeks, 'out': weeks + 1,
+            k = week + weeks                                  # entries open again in week W + n + 1
+            out[gid].append({'week': week, 'kind': kind, 'announced': weeks, 'out': weeks,
                              'available': [year + k // 52, k % 52 + 1], 'event': ev,
                              'lasting': lasting.get(f'{week}:{gid}', {})})
         return out

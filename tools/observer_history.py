@@ -562,14 +562,16 @@ def team_history(w, pid):
                 during = [r for r in rows if r[kind] == s.staff and (r['year'], r['week']) >= s.start
                           and (s.end is None or (r['year'], r['week']) < s.end)]
             wins = sum(1 for r in during if r['pos'] == 1 and not OD.is_qualifying(r))
+            pair = O.pair_cells(w, s) if kind != 'school' else ['—', '—']
             table_rows.append([w.person_link(s.staff) if s.staff else O.esc(s.arrangement), O.esc(s.arrangement),
-                               O.when(s.start), O.when(s.end) if s.end else 'still together',
+                               O.when(s.start), O.when(s.end) if s.end else 'still together', *pair,
                                str(len(during)), str(wins), O.esc(s.reason_end or '')])
-        out.append(f'<h2>{title}</h2>' + O.table(['Who', 'Arrangement', 'From', 'To', 'Starts together', 'Wins together',
-                                                  'Why it ended'], table_rows, numeric=(4, 5)))
+        out.append(f'<h2>{title}</h2>' + O.table(['Who', 'Arrangement', 'From', 'To', 'Fit', f'Rapport (end of {through})',
+                                                  'Starts together', 'Wins together', 'Why it ended'], table_rows,
+                                                 numeric=(4, 5, 6, 7)))
     out.append(f'<p class="muted">Stints as recorded at the end of {through}; starts and wins together are this golfer\'s '
                'results with that person recorded on their team that week (their achievements, not the coach\'s or '
-               'caddie\'s own wins). Changes since then show under “Now” and in each result.</p>')
+               'caddie\'s own wins). ' + O.PAIR_NOTE + ' Changes since then show under “Now” and in each result.</p>')
     return ''.join(out)
 
 

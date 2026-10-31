@@ -1157,8 +1157,9 @@ def ratings_history(w, q, pid, p):
 def injuries_section(w, pid, starts):
     """Injuries as recorded: whether the golfer is injured now and when they can enter events again; each episode
     with its onset, the weeks announced, the entries it actually kept them out of, when they could enter again,
-    their first start after it and any lasting losses. Seasons archived before episodes were recorded show their
-    announced injury weeks only ("episodes not recorded")."""
+    their first appearance after it (a qualifying stage counts: it is competing again) and, when that was a
+    qualifying stage, their first main event, and any lasting losses. Seasons archived before episodes were
+    recorded show their announced injury weeks only ("episodes not recorded")."""
     from golfsim.ratings import ATTRIBUTE_LABELS
     eps, legacy = [], []
     for y, r in OD.career_rows(w, pid):
@@ -1172,7 +1173,7 @@ def injuries_section(w, pid, starts):
     now_hurt = lv is not None and pid in set(getattr(lv, 'injured_now', None) or ())
     if not eps and not legacy and not now_hurt:
         return ''
-    played = sorted((r['year'], r['week']) for r in starts if not OD.is_qualifying(r))
+    played = sorted(((r['year'], r['week']), OD.is_qualifying(r), r['event']) for r in starts)
     out = ['<h2>Injuries</h2>']
     if now_hurt:
         cur = eps[-1][1] if eps else None
@@ -1183,25 +1184,37 @@ def injuries_section(w, pid, starts):
     rows = []
     for y, e in sorted(eps, key=lambda x: (x[0], x[1]['week']), reverse=True):
         back = tuple(e['available'])
-        ret = next((f'{a} week {b}' for a, b in played if (a, b) >= back), None)
+        ret = next((x for x in played if x[0] >= back), None)            # any appearance, qualifying included
+        main = next((x for x in played if x[0] >= back and not x[1]), None)
         future = lv is not None and back > (lv.cursor['year'], lv.cursor['week'])
         lost = ', '.join(f'{esc(ATTRIBUTE_LABELS.get(k, k))} −{v}' for k, v in (e.get('lasting') or {}).items())
         rows.append([f'{y} week {e["week"]}', esc(e['kind']), f'{e["announced"]}', f'{e["out"]}',
                      f'{back[0]} week {back[1]}' + (' (expected)' if future else ''),
-                     esc(ret) if ret else '<span class="muted">not yet</span>',
+                     _return_cell(w, ret), _return_cell(w, main) if ret is None or ret[1] else 'the same',
                      lost or '<span class="muted">none</span>',
                      event_link(w, e['event']) if e.get('event') else '<span class="muted">—</span>'])
     for y, n in sorted(legacy, reverse=True):
         rows.append([f'{y}', '<span class="muted">episodes not recorded</span>', f'{n} (season total)',
-                     NOT_RECORDED_TEXT, NOT_RECORDED_TEXT, NOT_RECORDED_TEXT, NOT_RECORDED_TEXT, '—'])
+                     NOT_RECORDED_TEXT, NOT_RECORDED_TEXT, NOT_RECORDED_TEXT, NOT_RECORDED_TEXT, NOT_RECORDED_TEXT, '—'])
     out.append(table(['Injured', 'Injury', 'Weeks announced', 'Entries missed (weeks)', 'Could enter again',
-                      'First start back', 'Lasting effects', 'Where'], rows, numeric=(2, 3)))
-    out.append('<p class="muted">As the world recorded it: an injury is announced in weeks; it keeps the golfer out '
-               'of the next week\'s entries too, so "entries missed" is one more than announced. "First start back" is '
-               'their next start after they could enter again (not every golfer plays at once). Lasting effects are '
-               'the ratings a serious injury took for good. Seasons played before episodes were recorded show only '
-               'their injury weeks.</p>')
+                      'First appearance back', 'First main event back', 'Lasting effects', 'Where'], rows,
+                     numeric=(2, 3)))
+    out.append('<p class="muted">As the world recorded it: an injury at an event in week W announced as n weeks keeps '
+               'the golfer out of the entries of weeks W+1 to W+n, and they can enter again from week W+n+1 (seasons '
+               'played before rules 2026-11-02 kept them out one week longer: "entries missed" shows what applied). '
+               '"First appearance back" is their next appearance after they could enter again, a qualifying stage '
+               'included; "first main event back" differs only when that appearance was a qualifying stage. Not every '
+               'golfer plays at once. Lasting effects are the ratings a serious injury took for good. Seasons played '
+               'before episodes were recorded show only their injury weeks.</p>')
     return ''.join(out)
+
+
+def _return_cell(w, x):
+    """An appearance ((year, week), qualifying?, event id) as a linked cell, or "not yet"."""
+    if x is None:
+        return '<span class="muted">not yet</span>'
+    (y, wk), qual, eid = x
+    return (f'{y} week {wk}: ' + event_link(w, eid) + (' <span class="tag">qualifying</span>' if qual else ''))
 
 
 NOT_RECORDED_TEXT = '<span class="muted">not recorded</span>'
@@ -1485,17 +1498,17 @@ def _staff(w, pid, role):
     if stints:
         unit = 'weeks' if role == 'coach' else 'rounds'
         out.append(f'<h2>All partnerships (through {w.a.years[-1]})</h2>' + table(
-            ['Player', 'From', 'To', 'How it began', 'Arrangement', f'Worked together ({unit})', 'How it ended',
-             'Starts together', 'Wins', 'Majors'],
+            ['Player', 'From', 'To', 'How it began', 'Arrangement', f'Worked together ({unit})', 'Fit',
+             f'Rapport (end of {w.a.years[-1]})', 'How it ended', 'Starts together', 'Wins', 'Majors'],
             [[w.person_link(c['stint'].golfer), when(c['stint'].start),
               when(c['stint'].end) if c['stint'].end else 'still together',
-              _began(c['stint']), _arrangement(c['stint']), f'{c["stint"].work:,.0f}',
+              _began(c['stint']), _arrangement(c['stint']), f'{c["stint"].work:,.0f}', *pair_cells(w, c['stint']),
               _ended(c['stint']) if c['stint'].end else '<span class="muted">—</span>',
-              str(c['starts']), str(len(c['wins'])), str(len(c['majors']))] for c in stints], numeric=(5, 7, 8, 9))
+              str(c['starts']), str(len(c['wins'])), str(len(c['majors']))] for c in stints], numeric=(5, 6, 7, 9, 10, 11))
             + '<p class="muted">As recorded when each partnership began and ended: who started it and why, the '
               'arrangement (a coaching fee per year, a share of winnings, a tour bag), the time actually worked '
-              'together and who ended it and why. Results during a partnership are the client’s achievements, '
-              'association not proof of cause. Starts together count the archived seasons.</p>')
+              'together and who ended it and why. ' + PAIR_NOTE + ' Results during a partnership are the client’s '
+              'achievements, association not proof of cause. Starts together count the archived seasons.</p>')
         out.append(_staff_seasons(w, pid, role, stints))
     if w.a and pid in w.a.people:
         hist = (w.a.people[pid].get(role) or {}).get('history') or []
@@ -1531,6 +1544,22 @@ def _staff_card(info, role):
     return '<dl class="kv">' + ''.join(f'<dt>{k}</dt><dd>{v}</dd>' for k, v in rows) + '</dl>'
 
 
+PAIR_NOTE = ('Fit: how well the two work together, drawn once for each pairing and kept for good (−2 to +2; most '
+             'pairs within ±1); it changes how much of the staff member\'s ability reaches the golfer by 5% a point, '
+             'and weighs in whether they stay together and whether a golfer goes back to someone. Rapport: built by '
+             'the time actually worked together and worn down by time apart (0-100%); it lifts the share of ability '
+             'that reaches the golfer from 75% toward all of it.')
+
+
+def pair_cells(w, s):
+    """[fit, rapport] of a partnership's pair as the archive records them (the same values the engine uses:
+    golfsim.history.Relations), rapport as it stood at the end of the archive's last season."""
+    p = w.a.rel.pairs.get((s.kind, s.staff, s.golfer)) if w.a is not None and s.staff else None
+    if p is None:
+        return [NOT_RECORDED_TEXT, NOT_RECORDED_TEXT]
+    return [f'{p.fit:+.2f}', f'{100 * w.a.rel.rapport(s.kind, s.staff, s.golfer, w.a.years[-1]):.0f}%']
+
+
 def _began(s):
     who = {'golfer': 'the player', 'coach': 'the coach (an approach)', 'caddie': 'the caddie', 'school': 'the school'}
     text = who.get(s.started_by, s.started_by or 'not recorded')
@@ -1554,19 +1583,16 @@ def _staff_seasons(w, pid, role, stints):
     staff member's own recorded season (weeks, rounds, reputation, earnings)."""
     import observer_stats as ST
     by = {}
+    lo, hi = w.a.years[0], w.a.years[-1]                  # (the archive's seasons only)
     for c in stints:
         s = c['stint']
-        first, last = s.start[0], (s.end[0] if s.end else w.a.years[-1])
-        for y in range(first, last + 1):
+        for y in s.years(lo, hi):                          # (an end is exclusive: see Stint.years)
             by.setdefault(y, {'clients': set(), 'starts': 0, 'wins': 0})['clients'].add(s.golfer)
+        for y, (n, won) in c['by_year'].items():           # starts and wins with this person on the team
+            d = by.setdefault(y, {'clients': set(), 'starts': 0, 'wins': 0})
+            d['starts'] += n
+            d['wins'] += won
     kind = 'coach' if role == 'coach' else 'caddie'
-    for c in stints:
-        s = c['stint']
-        for r in w.a.results(s.golfer):
-            if r[kind] == pid and (r['year'], r['week']) >= s.start and (s.end is None or (r['year'], r['week']) < s.end):
-                d = by.setdefault(r['year'], {'clients': set(), 'starts': 0, 'wins': 0})
-                d['starts'] += 1
-                d['wins'] += r['pos'] == 1
     db, _ = w.statistics()
     own = ST.staff_seasons(db, pid, kind) if db is not None else {}
     rows = []

@@ -132,14 +132,14 @@ class RatingsOverTime(unittest.TestCase):
         self.assertTrue(hurt)
         for g, y, r in hurt[:60]:
             self.assertEqual(sum(e['announced'] for e in r['injuries']), r['injury_weeks'], (g, y))
-            starts = {(x['year'], x['week']) for x in self.w.results(g)}
+            starts = {(x['year'], x['week']) for x in OD.results(self.w, g)}   # (qualifying stages included)
             for e in r['injuries']:
-                self.assertEqual(e['out'], e['announced'] + 1)
-                k = e['week'] + e['announced'] + 1
-                self.assertEqual(tuple(e['available']), (y + k // 52, k % 52 + 1))
+                self.assertEqual(e['out'], e['announced'])                # n weeks announced, n weeks out
+                k = e['week'] + e['announced']
+                self.assertEqual(tuple(e['available']), (y + k // 52, k % 52 + 1))   # week W + n + 1
                 first = (y, e['week'] + 1)
                 blocked = [s for s in starts if first <= s < tuple(e['available'])]
-                self.assertEqual(blocked, [], (g, y, e))              # no start while they were out
+                self.assertEqual(blocked, [], (g, y, e))              # no appearance while they were out
 
     def test_the_profile_shows_them(self):
         g, y, r = self.injured_golfers()[0]
@@ -150,6 +150,26 @@ class RatingsOverTime(unittest.TestCase):
         self.assertIn(f'{y} week {e["week"]}', html)
         self.assertIn(f'{e["available"][0]} week {e["available"][1]}', html)
         self.assertTrue(part)
+
+    def test_the_return_counts_a_qualifying_stage(self):
+        g, y, r = self.injured_golfers()[0]
+        e = r['injuries'][0]
+        back = tuple(e['available'])
+        nxt = (back[0], back[1] + 1) if back[1] < 52 else (back[0] + 1, 1)
+        qual = {'year': back[0], 'week': back[1], 'event': f'{back[0]}:SOME_QUALIFIER', 'tier': 7}
+        main = {'year': nxt[0], 'week': nxt[1], 'event': f'{nxt[0]}:SOME_EVENT', 'tier': 3}
+        with mock.patch.object(self.w.live, 'injuries', {}):
+            html = O.injuries_section(self.w, g, [qual, main])
+            same = O.injuries_section(self.w, g, [main])
+        row = re.search(rf'<td>{y} week {e["week"]}</td>.*?</tr>', html, re.S).group(0)
+        cells = re.findall(r'<td[^>]*>(.*?)</td>', row, re.S)
+        self.assertIn('SOME_QUALIFIER', cells[5])                         # first appearance back: the qualifier
+        self.assertIn('qualifying', cells[5])
+        self.assertIn('SOME_EVENT', cells[6])                             # first main event, labelled apart
+        row = re.search(rf'<td>{y} week {e["week"]}</td>.*?</tr>', same, re.S).group(0)
+        cells = re.findall(r'<td[^>]*>(.*?)</td>', row, re.S)
+        self.assertIn('SOME_EVENT', cells[5])
+        self.assertEqual(cells[6], 'the same')
 
     def test_older_seasons_say_episodes_not_recorded(self):
         import observer_data as OD
@@ -181,13 +201,52 @@ class RatingsOverTime(unittest.TestCase):
         self.assertIn('not shown (hidden in the game', html)
         self.assertFalse({'teaching', 'scouting'} & set(info))             # (never archived either)
         st = a.staff_clients(coach, 'coach')[0]['stint']
-        row = re.search(rf'<a href="/golfer/{st.golfer}">[^<]*</a></td>.*?</tr>', html, re.S).group(0)
+        part = html.split('<h2>All partnerships')[1]                       # (not the current-clients table)
+        row = re.search(rf'<a href="/golfer/{st.golfer}">[^<]*</a></td>.*?</tr>', part, re.S).group(0)
         self.assertIn(O._began(st), row)
         self.assertIn(f'{st.work:,.0f}', row)
         if st.end:
             self.assertIn(O._ended(st), row)
         team = O.render(self.w, f'/golfer/{st.golfer}', parse_qs('tab=team'))[1]
         self.assertIn(f'/golfer/{coach}"', team)                          # the golfer's side names them too
+
+    def test_staff_seasons_count_a_partnership_only_while_it_ran(self):
+        from golfsim.history import Stint
+        lo, hi = self.w.a.years[0], self.w.a.years[-1]
+        st = lambda i, g, start, end: Stint(i, 'coach', 999999, g, start, 'fee', 'golfer', end=end)
+        self.assertEqual(list(st(0, 1, (lo, 5), (lo + 1, 1)).years(lo, hi)), [lo])          # ended in week 1
+        self.assertEqual(list(st(0, 1, (lo, 5), (lo + 1, 2)).years(lo, hi)), [lo, lo + 1])  # ended in week 2
+        self.assertEqual(list(st(0, 1, (lo - 3, 5), None).years(lo, hi)), list(range(lo, hi + 1)))  # bounded
+        self.assertEqual(list(st(0, 1, (hi + 1, 1), None).years(lo, hi)), [])                # after the archive
+        stints = [{'stint': st(0, 5, (lo, 1), (lo + 1, 1)), 'by_year': {lo: [3, 1]}},       # ends at week 1
+                  {'stint': st(1, 6, (lo + 1, 30), (lo + 1, 40)), 'by_year': {lo + 1: [2, 0]}},
+                  {'stint': st(2, 5, (lo + 2, 10), None), 'by_year': {lo + 2: [4, 0]}},     # a reunion
+                  {'stint': st(3, 7, (hi + 1, 1), None), 'by_year': {}}]                       # beyond the archive
+        html = O._staff_seasons(self.w, 999999, 'coach', stints)
+        got = {int(m[0]): (int(m[1]), int(m[2]), int(m[3])) for m in
+               re.findall(r'<tr><td class=n>(\d+)</td><td class=n>(\d+)</td><td class=n>(\d+)</td><td class=n>(\d+)</td>', html)}
+        self.assertEqual(got, {lo: (1, 3, 1), lo + 1: (1, 2, 0), lo + 2: (1, 4, 0)})        # clients, starts, wins
+        coach = min(pid for pid, p in self.w.a.people.items() if (p.get('coach') or {}) and self.w.a.staff_clients(pid, 'coach'))
+        cl = self.w.a.staff_clients(coach, 'coach')
+        html = O._staff_seasons(self.w, coach, 'coach', cl)
+        rows = {int(m[0]): int(m[1]) for m in re.findall(r'<tr><td class=n>(\d+)</td><td class=n>(\d+)</td>', html)}
+        for y in range(lo, hi + 1):                                       # clients = partnerships in force that season
+            want = len({c['stint'].golfer for c in cl if y in c['stint'].years(lo, hi)})
+            self.assertEqual(rows.get(y, 0), want, y)
+        self.assertTrue(set(rows) <= set(range(lo, hi + 1)))
+
+    def test_partnerships_show_the_recorded_fit(self):
+        a = self.w.a
+        coach = min(pid for pid, p in a.people.items() if (p.get('coach') or {}) and a.staff_clients(pid, 'coach'))
+        st = a.staff_clients(coach, 'coach')[0]['stint']
+        pair = a.rel.pairs[('coach', coach, st.golfer)]                   # the value the engine draws and uses
+        html = O.render(self.w, f'/golfer/{coach}', parse_qs('tab=coaching'))[1].split('<h2>All partnerships')[1]
+        row = re.search(rf'<a href="/golfer/{st.golfer}">[^<]*</a></td>.*?</tr>', html, re.S).group(0)
+        self.assertIn(f'<td class=n>{pair.fit:+.2f}</td>', row)
+        rap = a.rel.rapport('coach', coach, st.golfer, a.years[-1])
+        self.assertIn(f'<td class=n>{100 * rap:.0f}%</td>', row)
+        team = O.render(self.w, f'/golfer/{st.golfer}', parse_qs('tab=team'))[1]
+        self.assertIn(f'<td class=n>{pair.fit:+.2f}</td>', team)              # the same value from the golfer's side
 
     def test_a_caddie_profile(self):
         a = self.w.a

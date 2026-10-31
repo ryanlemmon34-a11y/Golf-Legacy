@@ -739,8 +739,14 @@ class Archive:
             during = [r for r in cache[s.golfer] if r[role] == pid and (r['year'], r['week']) >= s.start
                       and (s.end is None or (r['year'], r['week']) < s.end)]
             wins = [r for r in during if r['pos'] == 1]
+            by_year = {}                                 # season -> [starts, wins] during this stint
+            for r in during:
+                d = by_year.setdefault(r['year'], [0, 0])
+                d[0] += 1
+                d[1] += r['pos'] == 1
             out.append({'stint': s, 'starts': len(during), 'wins': [r['event'] for r in wins],
-                        'majors': [r['event'] for r in wins if self.world['series'][r['series']]['kind'] == 'major']})
+                        'majors': [r['event'] for r in wins if self.world['series'][r['series']]['kind'] == 'major'],
+                        'by_year': by_year})
         return out
 
     def team_at(self, pid, event_id):

@@ -162,5 +162,138 @@ class Guarantee(unittest.TestCase):
         self.assertEqual(pickle.loads(pickle.dumps(a)).travel_grants[2027], a.travel_grants[2027])   # kept in saves
 
 
+class AllMajors(unittest.TestCase):
+    """Every major of a reference-calendar season (weeks 15, 20, 25 and 30). Before each field is set, one golfer of
+    each status in it (amateur, professional, club professional) is given no savings, deep debt and no backers --
+    reconstructed scenarios, as above -- and so is the first invitee of the world's first Tour Masters (route INIT,
+    from the seeded ranking). Before the USA Open an amateur holding last season's amateur award place turns
+    professional (the place expires), and a broke entrant is injured."""
+
+    MAJORS = {15: 'TOUR_MASTERS', 20: 'PREMIER_TOUR_CHAMPIONSHIP', 25: 'USA_OPEN', 30: 'BRITANNIA_OPEN'}
+
+    @classmethod
+    def setUpClass(cls):
+        from golfsim import qualification as Q
+        from golfsim.season import Season
+        s = Season(generate_world(seed=93, scale=0.05), seed=93, development=True, workers=1, calendar='v2')
+        s.start_year(2027)
+        cls.broke, cls.charged, cls.invitee, cls.expired, cls.hurt = {}, {}, None, None, None
+        broke = lambda g: (setattr(g, 'cash', -250000.0), setattr(g, 'backing', 0.0), setattr(g, 'backer_funds', 0.0))
+        for wk in range(1, 31):
+            sid = cls.MAJORS.get(wk)
+            if sid:
+                f = Q.build_field(sid, 2027, s.ctx)
+                ok = lambda gid: gid in s.g and gid not in s.injured and s.g[gid].lifestyle != 'retired'
+                pick = {}
+                for e in f.entries:
+                    if ok(e.golfer_id):
+                        pick.setdefault(s.g[e.golfer_id].status, e.golfer_id)
+                ids = list(pick.values())
+                if sid == 'TOUR_MASTERS':                               # the first invitee from the seeded ranking
+                    entrants = {e.golfer_id for e in f.entries}
+                    cls.invitee = next(g for g in s.ctx.ranking(2027, wk - 1) if g not in entrants and ok(g))
+                    ids.append(cls.invitee)
+                if sid == 'USA_OPEN':
+                    am = next(g for g in sorted(s.g) if ok(g) and s.g[g].status == 'amateur'
+                              and g not in {e.golfer_id for e in f.entries})
+                    s.ctx.__dict__.setdefault('awards', {})[('amateur_award', 2026)] = am
+                    s.note_right(2027, sid, am, ['UA'], 'conditional', (2026, 34), ['annual amateur award 2026'])
+                    s.g[am].status = 'pro'                               # turned professional: the place expires
+                    s.refresh_people(2027)
+                    broke(s.g[am])
+                    cls.expired = am
+                    cls.hurt = pick['pro']
+                for gid in ids:
+                    broke(s.g[gid])
+                if cls.hurt is not None and sid == 'USA_OPEN':
+                    s.injured[cls.hurt] = (s.abs_week(2027, 40), 'scenario', 15)
+                    ids.remove(cls.hurt)
+                cls.broke[sid] = ids
+                field = {e.golfer_id for e in f.entries} | {cls.invitee} | set(f.alternates)
+                led = lambda gid: s.ledgers[2027].get(gid)
+                cls.charged[sid] = {gid: (led(gid).events if led(gid) else 0.0) for gid in field}
+            s.advance_week(2027, wk)
+            if sid:
+                led = lambda gid: s.ledgers[2027].get(gid)
+                cls.charged[sid] = {gid: (led(gid).events if led(gid) else 0.0) - v for gid, v in cls.charged[sid].items()}
+        cls.s = s
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.s.close()
+
+    def book(self, sid):
+        return self.s.major_rights[2027][sid]
+
+    def cost(self, gid, eid):
+        """What the golfer's books are charged for playing that edition, by the rule they are priced by."""
+        from golfsim import finance as FIN
+        s = self.s
+        r, g = s.results[eid], s.g[gid]
+        series = s.cal.by_id[r.series_id]
+        site = next(i for i, f in enumerate(r.finish) if any(x[0] == gid for x in f))
+        if FIN.event_payer(g, series):
+            return 0.0                                                  # a school's or club's trip
+        return FIN.event_cost(g, series, r.sites[min(site, len(r.sites) - 1)][2], s.home_country(g))
+
+    def other_costs(self, gid, week, sid):
+        s = self.s
+        return sum(self.cost(gid, eid) for eid, r in s.results.items() if r.year == 2027 and r.week == week
+                   and eid != f'2027:{sid}' and any(x[0] == gid for f in r.finish for x in f))
+
+    def test_every_status_plays_every_major(self):
+        s = self.s
+        statuses = set()
+        for sid, ids in self.broke.items():
+            routes = s.entry_routes[(2027, sid)]
+            for gid in ids:
+                self.assertIn(gid, routes, (sid, gid, s.g[gid].status))
+                statuses.add(s.g[gid].status)
+                m = self.book(sid)[gid]['money']
+                self.assertLess(m['spendable'], m['trip'])              # they could not have paid
+                self.assertEqual(m['paid_by'], 'organizer')
+            self.assertFalse(any(str(r['result']).startswith('declined') for r in self.book(sid).values()), sid)
+        self.assertEqual(statuses, {'amateur', 'pro', 'club_pro'})
+
+    def test_the_first_masters_invitee_is_covered(self):
+        s = self.s
+        self.assertEqual(s.entry_routes[(2027, 'TOUR_MASTERS')][self.invitee], 'INIT')
+        r = self.book('TOUR_MASTERS')[self.invitee]
+        self.assertEqual((r['result'], r['routes']), ('entered', ['INIT']))
+        self.assertEqual(r['money']['paid_by'], 'organizer')
+        self.assertTrue(any(t['gid'] == self.invitee for t in s.travel_grants[2027]))
+
+    def test_injury_retirement_and_expired_places_still_end_a_place(self):
+        s = self.s
+        book = self.book('USA_OPEN')
+        self.assertEqual(book[self.hurt]['result'], 'withdrawn: injured')
+        self.assertEqual(book[self.expired]['result'], 'expired: turned professional')
+        for gid in (self.hurt, self.expired):
+            self.assertNotIn(gid, s.entry_routes[(2027, 'USA_OPEN')])
+            self.assertFalse(any(t['gid'] == gid and t['event'].endswith('USA_OPEN') for t in s.travel_grants[2027]))
+
+    def test_each_trip_is_paid_once_by_one_payer(self):
+        s = self.s
+        grants = s.travel_grants[2027]
+        keys = [(t['event'], t['gid']) for t in grants]
+        self.assertEqual(len(keys), len(set(keys)))                      # one grant per golfer and trip
+        for sid, delta in self.charged.items():
+            book, routes = self.book(sid), s.entry_routes[(2027, sid)]
+            got = {t['gid'] for t in grants if t['event'] == f'2027:{sid}'}
+            self.assertTrue(set(self.broke[sid]) <= got, sid)
+            week = next(w for w, x in self.MAJORS.items() if x == sid)
+            for gid in routes:
+                m = (book.get(gid) or {}).get('money')
+                other = self.other_costs(gid, week, sid)                 # e.g. a Monday qualifier elsewhere
+                if gid in got:                                          # the organizer paid: only the rest is theirs
+                    self.assertAlmostEqual(delta.get(gid, 0.0), other, places=2, msg=(sid, gid))
+                    self.assertEqual(m['paid_by'], 'organizer')
+                elif m and m['paid_by'] == 'golfer' and gid in delta:   # the golfer paid the trip, once
+                    trip = self.cost(gid, f'2027:{sid}')
+                    self.assertAlmostEqual(delta[gid], other + trip, places=2, msg=(sid, gid))
+        for t in grants:
+            self.assertEqual((t['covers'], t['source']), ('travel and entry', 'organizer: an earned major place'))
+
+
 if __name__ == '__main__':
     unittest.main()

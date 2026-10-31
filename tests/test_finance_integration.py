@@ -237,7 +237,7 @@ class InjuryDebtTests(unittest.TestCase):
         for g, cash in ((cls.poor, 1000.0), (cls.rich, 400000.0)):
             g.cash, g.backing, g.backer_funds = cash, 0.0, 0.0
             s.cash_start[2027][g.id] = g.cash
-            s.injured[g.id] = (s.abs_week(2027, 1) + 31, 'back', 30)    # out for weeks 1-30
+            s.injured[g.id] = (s.abs_week(2027, 31), 'back', 30)       # can enter from week 31: out 1-30
         for w in range(1, 31):
             s.advance_week(2027, w)
         cls.at30 = {g.id: (copy.deepcopy(s.ledger(2027, g.id)), g.cash) for g in (cls.poor, cls.rich)}

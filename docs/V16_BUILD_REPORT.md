@@ -165,8 +165,10 @@ kind starts. No cap was added.
   shows who began it and why, the arrangement (a fee a year, a share of winnings, a tour bag), the time actually
   worked together, who ended it and why, and the starts, wins and majors together. These come from the stint
   records that already existed; nothing is reconstructed. A coach's teaching and scouting stay hidden, as the
-  game is designed (decision below). No "fit" is shown: there is no recorded measure of it, and inventing
-  thresholds would present a guess as a fact.
+  game is designed (decision below). No "fit" was shown. *Correction (HAL's review of `324e263`)*: this said
+  there was no recorded measure of fit. That was wrong: every pairing's fit is drawn once and saved with the
+  relationship history (`Relations.pairs`), and the engine uses it. It is shown on both profiles from the
+  next pass.
 
 **Tested**: `test_living_views`, 10 tests, 11 with the fix below (an active golfer's bars and current ratings; a
 retired golfer ends at their retirement season; a missing season is a gap; levels and signed changes; each injury
@@ -188,7 +190,7 @@ that reading of the history (the same rows; worlds with an index are unaffected)
 exported copy read the career once (twelve times before).
 
 **Not built in this pass**: My World does not yet announce injuries and returns (one item per episode is the
-plan); "fit" between golfer and staff (needs a definition from you first).
+plan); showing the pair's fit (it is recorded: see the correction above).
 
 ## Validation
 
@@ -297,6 +299,6 @@ estimated 3.5-5 min a season, not measured on this build).
 - **Amateur sponsorship**: waiting for decision 1.
 - **Calibration**: waiting for the runs above.
 - **Retiring v1**: waiting for decision 2.
-- **My World injury and return items; staff "fit"**: next (fit needs a definition).
+- **My World injury and return items; showing the recorded fit**: next.
 - **Deferred, as asked**: small screens and phones, the death system; geography, course usage, prestige and
   deeper staff careers later. Hide results was not restored.

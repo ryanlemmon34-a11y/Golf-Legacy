@@ -104,7 +104,10 @@ Every golfer carries a **season fatigue** level (0 fresh, 1 exhausted):
 - **Injuries:** after every event there is a chance of injury that rises steeply with fatigue, and with
   low **injury resistance**, age and low stamina. Injuries (back, wrist, shoulder, knee...) keep a player
   out for a median of about 4 weeks, sometimes much longer (longer when older). Injured players cannot
-  enter any event, including majors.
+  enter any event, including majors. Timing (rules 2026-11-02): an injury at an event in week W announced as
+  n weeks keeps the golfer out of the entries of weeks W+1 to W+n, counted on across the year end (next
+  season's week 1 follows week 52); they can enter again from week W+n+1. Earlier rules kept them out one
+  week longer than announced (`tests/test_injury_timing.py`).
 - Golfers see their own fatigue when choosing events, so tired players skip weeks.
 
 ## World ranking, money, points lists

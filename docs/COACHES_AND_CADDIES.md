@@ -102,6 +102,15 @@ years apart (a reunion keeps some), and *scales* the staff member's ability: a n
 attributes, so hiring or firing costs no rating — only the speed of improvement and the help on the
 course. A familiar average coach never outperforms a clearly better one.
 
+**Fit is recorded and shown.** Each pairing's fit is drawn once (normal, clipped to −2..+2) and saved with the
+relationship history (`Relations.pairs`: kind, staff member, golfer, work together, last year worked, fit), so
+it survives saves, reunions and archiving. Both profiles show it beside each partnership, with the rapport as it
+stood at the end of the archive (`tools/observer.py: pair_cells`), the same values the engine uses. There is no
+second compatibility score. The richer staff system builds on these: recruitment and retention can weigh a
+pair's known fit (already used when a golfer goes back to a coach they worked with), their rapport and shared
+results; a staff member's motivations (development, established success, earnings, stability) and loyalty can
+read the same dated stints and pair records rather than new state.
+
 **School and local instruction.** Young amateurs (22 and under) have local or school instruction
 (quality 0.38, against 0.3 for teaching yourself); college golfers have their team's coaching (0.48),
 recorded as a school stint that ends — as an ordinary recorded transition, with no loss of ability —

@@ -51,6 +51,13 @@ class Stint:
     def active_in(self, year, week=26):
         return self.start <= (year, week) and (self.end is None or (year, week) < self.end)
 
+    def years(self, lo, hi):
+        """The seasons from lo to hi in which the stint was in force for at least one week. The end is exclusive
+        (the first week they were no longer together), so a stint that ended in week 1 of a season was not in
+        force that season; an open stint runs to hi."""
+        last = hi if self.end is None else (self.end[0] if self.end[1] > 1 else self.end[0] - 1)
+        return range(max(self.start[0], lo), min(last, hi) + 1)
+
 
 @dataclass
 class Pair:
