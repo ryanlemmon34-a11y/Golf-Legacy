@@ -17,7 +17,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, quote, urlparse
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -222,6 +222,30 @@ class UnitTeamNews(unittest.TestCase):
             self.assertEqual(collect(MW._staff_role, FakeWorld(roles={5: ['golfer', 'caddie']}), 5, (2029, 0)), [])
 
 
+class UnitRoundConditions(unittest.TestCase):
+    """Each round's wind, rain and pin difficulty as recorded; "not recorded" when absent, never estimated."""
+
+    full = {'conditions': [[[12.3, 0, 0.45], [20.1, 1, 0.45], [7.0, 0, 0.5]], None]}
+
+    def test_each_round_as_recorded(self):
+        h = OH.conditions_line(self.full, 0)
+        self.assertIn('R1 wind 12.3 mph, dry, pin difficulty 0.45', h)
+        self.assertIn('R2 wind 20.1 mph, rain, pin difficulty 0.45', h)
+        self.assertIn('R3 wind 7.0 mph, dry, pin difficulty 0.5', h)
+        self.assertNotIn('not recorded', h)
+        self.assertEqual(OH.round_conditions(self.full, 0)[1], (20.1, True, 0.45))
+
+    def test_a_replay_shows_nothing_beyond_the_round(self):
+        h = OH.conditions_line(self.full, 0, 2)
+        self.assertIn('R2 wind 20.1 mph', h)
+        self.assertNotIn('R3', h)
+
+    def test_not_recorded(self):
+        for full, site in ((self.full, 1), (self.full, 5), (None, 0), ({'scores': [{}]}, 0), ({'conditions': []}, 0)):
+            self.assertIsNone(OH.round_conditions(full, site))
+            self.assertIn('Round conditions: not recorded', OH.conditions_line(full, site))
+
+
 class WorldGaps(unittest.TestCase):
     """One small world: two archived seasons and a few weeks of the third."""
 
@@ -350,7 +374,7 @@ class WorldGaps(unittest.TestCase):
             mine = [x for x in got if f'/golfer/{g}"' in x[3] and f'/golfer/{st}"' in x[3] and f' as {role}:' in x[3]]
             self.assertEqual(len(mine), 1, (g, st, role))
             self.assertEqual(mine[0][:2], (y, wk))
-            self.assertIn(f'/event/{eid.replace(":", "%3A")}"', mine[0][3])
+            self.assertIn(f'/event/{quote(eid)}"', mine[0][3])
         with mock.patch.object(O, 'shortlist', lambda w: self.follow(people)), \
                 mock.patch.object(O, 'shortlist_seen', lambda w: None):
             page = O.render(self.w, '/my-world', parse_qs(f'since={self.w.a.years[0] - 1}.0'))[1]
@@ -381,6 +405,49 @@ class WorldGaps(unittest.TestCase):
         not_staff = [('person', g, '', None) for g, p in self.w.live.people.items()
                      if p.get('lifestyle') == 'retired' and g not in want][:20]
         self.assertFalse([x for x in MW.digest(self.w, not_staff, (self.w.a.years[0] - 1, 0)) if x[2] == 'staff role'])
+
+    # ---- 4. Round conditions on the edition's pages ----------------------------------------------------------
+    def expect(self, conds, upto=None):
+        return [f'R{i} wind {wind} mph, {"rain" if rain else "dry"}, pin difficulty {pins}'
+                for i, (wind, rain, pins) in enumerate(conds[:upto] if upto else conds, 1)]
+
+    def check_edition(self, eid, conds):
+        final = self.page(f'/event/{quote(eid)}')
+        for line in self.expect(conds):
+            self.assertIn(line, final)
+        self.assertNotIn('Round conditions: not recorded', final)
+        if len(conds) >= 2:                                             # the replay: rounds 1..k only
+            replay = self.page(f'/event/{quote(eid)}?view=rounds&round=1')
+            self.assertIn(self.expect(conds)[0], replay)
+            self.assertNotIn(self.expect(conds)[1], replay)
+            replay = self.page(f'/event/{quote(eid)}?view=rounds&round=2')
+            for line in self.expect(conds, 2):
+                self.assertIn(line, replay)
+
+    def test_conditions_current_season(self):
+        season = self.w.session.season
+        eid, r = next((eid, r) for eid, r in sorted(self.w.live.editions.items())
+                      if len(r.get('conditions') or ()) == 1 and r['conditions'][0])
+        self.check_edition(eid, season.results[eid].conditions[0])      # as the running world recorded them
+
+    def test_conditions_archived(self):
+        y = self.w.a.years[-1]
+        e = next(e for e in self.w.a.year(y)['events'] if len(e.get('conditions') or ()) == 1 and e['conditions'][0])
+        self.check_edition(e['id'], e['conditions'][0])                 # as the season file recorded them
+
+    def test_conditions_not_recorded(self):
+        y = self.w.a.years[-1]
+        e = next(e for e in self.w.a.year(y)['events'] if len(e.get('conditions') or ()) == 1 and e['conditions'][0])
+        real = OH.full_edition
+        with mock.patch.object(OH, 'full_edition', lambda w, ed: {k: v for k, v in (real(w, ed) or {}).items()
+                                                                   if k != 'conditions'}):
+            final = self.page(f'/event/{quote(e["id"])}')
+            replay = self.page(f'/event/{quote(e["id"])}?view=rounds&round=1')
+        for html in (final, replay):
+            self.assertIn('Round conditions: not recorded', html)
+            self.assertNotIn(' mph, ', html)
+        with mock.patch.object(OH, 'full_edition', lambda w, ed: None):  # (no full record at all)
+            self.assertIn('Round conditions: not recorded', self.page(f'/event/{quote(e["id"])}'))
 
 
 if __name__ == '__main__':

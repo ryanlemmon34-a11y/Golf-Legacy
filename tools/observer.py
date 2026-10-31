@@ -1810,6 +1810,9 @@ def event(w, q, eid):
     full = OH.full_edition(w, e) or {'finish': [[(r['person'], r['pos'], r['total']) for r in rows if r['site'] == k]
                                                 for k in range(len(e['sites']))], 'playoff': e.get('playoff'),
                                      'rounds': e.get('rounds')}
+    for k in range(len(e['sites'])):                   # each round's recorded conditions, at every site
+        out.append(OH.conditions_line(full, k, label=f'Site {k + 1} round conditions' if multi
+                                      else 'Round conditions'))
     for k in range(len(e['sites'])):                   # every playoff, at every site, with everyone in it
         lines = OH.playoff_lines(w, full, k, OH._layout_par(w, full['sites'][k]) if k < len(full.get('sites') or ()) else None)
         if lines:

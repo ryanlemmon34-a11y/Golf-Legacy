@@ -840,6 +840,27 @@ def playoff_status(full, site, gid):
     return 'Lost playoff' + (f' (out at extra hole {max(out)})' if out else '')
 
 
+def round_conditions(full, site):
+    """[(wind mph, rain?, pin difficulty)] of each round at a site as recorded, or None when not recorded (an edition
+    played before rules 2026-10-30, a match-play site, or no full record)."""
+    conds = (full or {}).get('conditions')
+    c = conds[site] if conds and site < len(conds) else None
+    return [(wind, bool(rain), pins) for wind, rain, pins in c] if c else None
+
+
+def conditions_line(full, site, through=None, label='Round conditions'):
+    """HTML: each round's recorded wind, rain and pin difficulty at a site (rounds 1..`through` when given), or
+    "not recorded". Never estimated: a missing round is not filled in from another."""
+    c = round_conditions(full, site)
+    if c is None:
+        return (f'<p class="muted">{label}: not recorded (wind, rain and pin positions are kept from rules 2026-10-30, '
+                'for stroke-play rounds).</p>')
+    rounds = c[:through] if through else c
+    return (f'<p class="muted">{label}: ' + ' · '.join(
+        f'R{i} wind {wind} mph, {"rain" if rain else "dry"}, pin difficulty {pins}' for i, (wind, rain, pins)
+        in enumerate(rounds, 1)) + ' (pin difficulty: 0 centre pins to 1 tucked tournament pins).</p>')
+
+
 def rounds_view(w, q, e):
     """The replay of an edition's recorded rounds: the leaderboard after each round (nothing after the round shown:
     no later rounds, final places or winner until the final round, which shows any playoff), each round's
@@ -873,7 +894,6 @@ def rounds_view(w, q, e):
     for i, t in enumerate(totals):
         rank.setdefault(t, i + 1)
     count = Counter(totals)
-    cond = (full.get('conditions') or [None] * (site + 1))[site] if full.get('conditions') else None
     final = {r[0]: r for r in (full['finish'][site] if site < len(full['finish']) else [])}
     step = lambda i: f'after round {i}'
     steps = ' · '.join((f'<strong>{step(i)}</strong>' if i == k else f'<a href="{base}?{urlencode({"view": "rounds", "round": i, "site": site})}">{step(i)}</a>')
@@ -884,9 +904,7 @@ def rounds_view(w, q, e):
         out.append('<p>Site: ' + ' · '.join((f'<strong>{i + 1}</strong>' if i == site else
                                              f'<a href="{base}?{urlencode({"view": "rounds", "site": i, "round": k})}">{i + 1}</a>')
                                             for i in range(len(full['sites']))) + '</p>')
-    if cond and k - 1 < len(cond):
-        wind, rain, pins = cond[k - 1]
-        out.append(f'<p class="muted">Round {k}: wind {wind} mph{", rain" if rain else ""}, pin difficulty {pins}.</p>')
+    out.append(conditions_line(full, site, k))         # (rounds 1..k: nothing beyond the round shown)
     has_holes = bool(full.get('holes'))
     rows = []
     for t, g, rs in board:
