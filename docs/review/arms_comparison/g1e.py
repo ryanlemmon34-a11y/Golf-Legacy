@@ -157,7 +157,8 @@ def main():
              f'two worlds (fields are set from the same starting state), and {len(first_ed)} of the '
              f'{sum(weeks[dw].values())} week-{dw} editions have different scores (first by id: {first_ed[0] if first_ed else "—"}). '
              f'Everything from week {dw + 1} on is a different world (fields differ from week {dw + 1}). The week-{dw} '
-             'editions are played from the same state, so they are the only like-for-like comparison.')
+             'editions start from the same state with the same fields, so they allow a field-matched exploratory '
+             'comparison (section 3) — not an isolated or causal measure of the baseline (see there why).')
     L.append('')
     # 2. what the baseline did
     starts_on = sum(len(s) for x in eo.values() for s in x['scores'])
@@ -212,16 +213,20 @@ def main():
     in_fb = sum(1 for g in app_golfers if g in ON['familiar_base'])
     L.append('## 3. Scoring')
     L.append('')
-    L.append(f'**Like-for-like pairs (week {dw}, identical fields).** Every golfer\'s familiarity at creation is recorded '
-             f'empty (generation-0 people table: {ON["fam0_empty"]}/{ON["fam0_n"]} golfers), so before week {dw} no '
-             'rounds had been played anywhere and the baseline applied to a start exactly when it is positive for that '
-             'golfer and course: reconstructed with the build\'s own `familiarity.baseline` and `home_floor` from the '
-             'recorded birthplace, residence and home club (Season.course_baseline). Differences are ON − OFF for the '
-             'same golfer in the same edition: round-1 score, round-1 score relative to the site\'s round-1 mean, and '
-             'the mean over the rounds both worlds played of each round\'s score relative to that round\'s field mean. '
-             'The engine\'s random draws are not isolated per golfer: starts where the baseline did NOT apply also '
-             'differ between the worlds (shown as the reference row), so only the contrast with that row is '
-             f'informative. {applied} applied starts and {n_app["none"]} not-applied starts. Check: '
+    L.append(f'**Week {dw}: a field-matched exploratory comparison (not an isolated or causal effect).** Every '
+             f'golfer\'s familiarity at creation is recorded empty (generation-0 people table: {ON["fam0_empty"]}/'
+             f'{ON["fam0_n"]} golfers), so before week {dw} no rounds had been played anywhere and the baseline applied '
+             'to a start exactly when it is positive for that golfer and course: reconstructed with the build\'s own '
+             '`familiarity.baseline` and `home_floor` from the recorded birthplace, residence and home club '
+             '(Season.course_baseline). Differences are ON − OFF for the same golfer in the same edition: round-1 '
+             'score, round-1 score relative to the site\'s round-1 mean, and the mean over the rounds both worlds '
+             'played of each round\'s score relative to that round\'s field mean. Why this is exploratory only: '
+             'identical fields do not isolate the baseline\'s effect, because the engine\'s random stream is shared — '
+             'once anything changes, every start\'s draws shift — so starts the baseline did not touch differ between '
+             'the worlds too (the reference row), and subtracting that untreated reference row does not remove the '
+             'contamination from the treated starts. Round 1 is the only round every starter played; the common-rounds '
+             'and all-rounds comparison depends on who made the cut in each world, since rounds after the cut exist '
+             f'only for those who made it. {applied} applied starts and {n_app["none"]} not-applied starts. Check: '
              f'{in_fb}/{len(app_golfers)} golfers with a reconstructed week-{dw} application are among the ON '
              'world\'s recorded `familiar_base` golfers.')
     L.append('')
@@ -235,11 +240,15 @@ def main():
     if len(bases) > 1:
         rows.append(('baseline applied (all bases)', applied, msd([d for k in n_app if k != 'none' for d in pairs[(k, 'r1raw')]]),
                      msd(allapp), msd(allapp_all)))
-    L.append(table(['starts (week 1)', 'n', 'round-1 strokes, ON − OFF', 'round-1 vs field, ON − OFF',
-                    'all rounds vs field, ON − OFF'], rows))
+    L.append(f'Table: week-{dw} field-matched exploratory comparison, ON − OFF per start (negative = fewer strokes '
+             'with the baseline on); mean (sd, naive se, n).')
     L.append('')
-    L.append('Negative = fewer strokes with the baseline on. A small n gives a wide spread; this is one season and one '
-             'seed.')
+    L.append(table(['starts (week 1)', 'n', 'round-1 strokes, ON − OFF (all starters)', 'round-1 vs field, ON − OFF '
+                    '(all starters)', 'common rounds vs field, ON − OFF (depends on the cut)'], rows))
+    L.append('')
+    L.append('The "se" values are naive sd/√starts: not clustered by event or field and not a calibrated causal '
+             'uncertainty; no significance is claimed. The measured differences are reported as they are, with the '
+             'caveats above; they do not show balance or prove an effect. One season, one seed.')
     L.append('')
     # after divergence: descriptive per world
     agg = {}

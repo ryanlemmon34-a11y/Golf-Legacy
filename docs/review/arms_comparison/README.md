@@ -47,9 +47,14 @@ Then refresh this folder without re-reading the arm runs:
 
 Limitations:
 
-- **Comparable editions.** Only the week-1 editions (identical fields) are like-for-like.
-- **Pairs are noisy.** The engine's random draws are not isolated per golfer, so not-applied starts differ too and
-  serve as the reference.
+- **Week 1 is exploratory.** The week-1 editions (identical fields) allow a field-matched exploratory comparison, not
+  an isolated or causal effect.
+  - The engine's random stream is shared, so once anything changes every start's draws shift.
+  - Starts the baseline did not touch therefore differ too (the reference row), and subtracting that row does not
+    remove the contamination.
+  - The standard errors are naive sd/√starts, not clustered by event or field and not calibrated causal uncertainty.
+    No significance is claimed.
+  - Round 1 is the only round every starter played; the common-rounds comparison depends on who made the cut.
 - **Which week-1 starts the baseline applied to.** This is reconstructed with the build's own familiarity functions,
   from the recorded places and home clubs. Creation familiarity is recorded empty, so the reconstruction is exact for
   week 1.

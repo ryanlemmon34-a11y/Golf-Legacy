@@ -10,7 +10,7 @@ Two fresh full-population worlds, seed 4207, build c0d1ea5, decision evidence of
 | 2 | 3 | 8 | 6 | 0 |
 | 3 | 1 | 3 | 13 | 0 |
 
-The results first differ in week 1, the season's first week: every week-1 field is identical in the two worlds (fields are set from the same starting state), and 10 of the 13 week-1 editions have different scores (first by id: 2027:AM_ASIA_001). Everything from week 2 on is a different world (fields differ from week 2). The week-1 editions are played from the same state, so they are the only like-for-like comparison.
+The results first differ in week 1, the season's first week: every week-1 field is identical in the two worlds (fields are set from the same starting state), and 10 of the 13 week-1 editions have different scores (first by id: 2027:AM_ASIA_001). Everything from week 2 on is a different world (fields differ from week 2). The week-1 editions start from the same state with the same fields, so they allow a field-matched exploratory comparison (section 3) — not an isolated or causal measure of the baseline (see there why).
 
 ## 2. What the baseline did in the ON world
 
@@ -20,14 +20,16 @@ The results first differ in week 1, the season's first week: every week-1 field 
 
 ## 3. Scoring
 
-**Like-for-like pairs (week 1, identical fields).** Every golfer's familiarity at creation is recorded empty (generation-0 people table: 6409/6409 golfers), so before week 1 no rounds had been played anywhere and the baseline applied to a start exactly when it is positive for that golfer and course: reconstructed with the build's own `familiarity.baseline` and `home_floor` from the recorded birthplace, residence and home club (Season.course_baseline). Differences are ON − OFF for the same golfer in the same edition: round-1 score, round-1 score relative to the site's round-1 mean, and the mean over the rounds both worlds played of each round's score relative to that round's field mean. The engine's random draws are not isolated per golfer: starts where the baseline did NOT apply also differ between the worlds (shown as the reference row), so only the contrast with that row is informative. 56 applied starts and 1382 not-applied starts. Check: 56/56 golfers with a reconstructed week-1 application are among the ON world's recorded `familiar_base` golfers.
+**Week 1: a field-matched exploratory comparison (not an isolated or causal effect).** Every golfer's familiarity at creation is recorded empty (generation-0 people table: 6409/6409 golfers), so before week 1 no rounds had been played anywhere and the baseline applied to a start exactly when it is positive for that golfer and course: reconstructed with the build's own `familiarity.baseline` and `home_floor` from the recorded birthplace, residence and home club (Season.course_baseline). Differences are ON − OFF for the same golfer in the same edition: round-1 score, round-1 score relative to the site's round-1 mean, and the mean over the rounds both worlds played of each round's score relative to that round's field mean. Why this is exploratory only: identical fields do not isolate the baseline's effect, because the engine's random stream is shared — once anything changes, every start's draws shift — so starts the baseline did not touch differ between the worlds too (the reference row), and subtracting that untreated reference row does not remove the contamination from the treated starts. Round 1 is the only round every starter played; the common-rounds and all-rounds comparison depends on who made the cut in each world, since rounds after the cut exist only for those who made it. 56 applied starts and 1382 not-applied starts. Check: 56/56 golfers with a reconstructed week-1 application are among the ON world's recorded `familiar_base` golfers.
 
-| starts (week 1) | n | round-1 strokes, ON − OFF | round-1 vs field, ON − OFF | all rounds vs field, ON − OFF |
+Table: week-1 field-matched exploratory comparison, ON − OFF per start (negative = fewer strokes with the baseline on); mean (sd, naive se, n).
+
+| starts (week 1) | n | round-1 strokes, ON − OFF (all starters) | round-1 vs field, ON − OFF (all starters) | common rounds vs field, ON − OFF (depends on the cut) |
 |---|---|---|---|---|
 | baseline applied (region) | 56 | -0.857 (sd 2.746, se 0.367, n=56) | -0.730 (sd 2.704, se 0.361, n=56) | -0.220 (sd 2.776, se 0.371, n=56) |
 | baseline not applied (reference) | 1382 | -0.044 (sd 2.132, se 0.057, n=1382) | +0.030 (sd 2.129, se 0.057, n=1382) | +0.017 (sd 2.190, se 0.059, n=1382) |
 
-Negative = fewer strokes with the baseline on. A small n gives a wide spread; this is one season and one seed.
+The "se" values are naive sd/√starts: not clustered by event or field and not a calibrated causal uncertainty; no significance is claimed. The measured differences are reported as they are, with the caveats above; they do not show balance or prove an effect. One season, one seed.
 
 **After week 1 (descriptive across diverged worlds; no per-golfer causal reading).** Mean over rounds of a start's score relative to its round's field mean, for starts at courses where the baseline would apply by place (positive baseline for that golfer and course) and for the others. In the ON world the baseline is used only while the golfer's own rounds there are fewer than it; this split is by place only, in both worlds.
 
