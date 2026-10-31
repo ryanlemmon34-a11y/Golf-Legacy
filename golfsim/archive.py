@@ -370,6 +370,8 @@ def _played(r):
         out['points'] = [{str(g): v for g, v in site.items()} for site in r.points]
     if any(getattr(r, 'matches', None) or ()):   # match play: [stage, winner, loser, result, holes scheduled]
         out['matches'] = list(r.matches)
+    if getattr(r, 'upset', None):               # Biggest Upsets: the pre-event estimate (golfsim/upsets.py)
+        out['upset'] = r.upset
     if any(getattr(r, 'playoffs', None) or ()):  # per site: players tied, winner, each extra hole's scores
         out['playoffs'] = [None if p is None else {'players': p['players'], 'winner': p['winner'],
                                                    'holes': [[n, h, {str(g): v for g, v in sc.items()}]
