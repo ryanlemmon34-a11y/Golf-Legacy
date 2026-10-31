@@ -625,6 +625,65 @@ def residence_section(w, pid, p, geo):
               'other moves are their own choice, at most one each winter.</p>')
 
 
+def familiar_courses(w, pid, p):
+    """(rows [(course, rounds)], as of) of a golfer's ten most familiar courses: the snapshot's, else the history's
+    as it ended; ([], None) where neither recorded them (histories written before rules 2026-11-08)."""
+    lp = w.live.people.get(pid) if w.live else None
+    if lp is not None and lp.get('familiar') is not None:
+        return [tuple(r) for r in lp['familiar']], 'now'
+    rows = ((p or {}).get('golfer') or {}).get('familiar')
+    if rows is not None:
+        return [tuple(r) for r in rows], 'as the history ends'
+    return [], None
+
+
+def familiar_section(w, pid, p, geo):
+    """The ten courses a golfer knows best (competitive rounds, the familiarity value the engine uses, a link to
+    each course), and the regional baseline their birthplace and residence give (rules 2026-11-08)."""
+    O = _o()
+    if 'golfer' not in (p or {}).get('roles', ('golfer',)):
+        return ''
+    from golfsim import familiarity as FAM
+    from golfsim.course_library import course_place
+    rows, as_of = familiar_courses(w, pid, p)
+    if as_of is None:
+        return ('<h2>Familiar courses</h2><p class="muted">Not recorded for this history (kept from rules '
+                '2026-11-08).</p>')
+    cs = w.courses()
+    places = []
+    for key in ('birthplace', 'residence'):
+        x = (geo or {}).get(key)
+        if x:
+            places.append((x.get('country'), x.get('region')))
+    body = []
+    for i, (cid, rounds) in enumerate(rows, 1):
+        c = cs.get(cid)
+        base, basis = FAM.baseline(course_place(c), places) if c else (0.0, None)
+        note = {'region': 'own state / province', 'country': 'own country (state / province unknown)'}.get(basis, '')
+        body.append([str(i), O.course_link(w, cid), f'{rounds:g}', f'{100 * FAM.value(rounds):.0f}%',
+                     O.esc(note) if note else '<span class="muted">—</span>'])
+    out = ['<h2>Familiar courses</h2>']
+    if body:
+        out.append(O.table(['#', 'Course', 'Rounds played', 'Familiarity', 'Local'], body, numeric=(0, 2, 3)))
+    else:
+        out.append('<p class="muted">No competitive rounds yet.</p>')
+    regions = []
+    for x in places:
+        text = O.where({'country': x[0], 'region': x[1]})
+        if text not in regions:
+            regions.append(text)
+    if regions:
+        out.append(f'<p class="muted">Ranked by competitive rounds played ({O.esc(as_of)}); familiarity is the value the '
+                   f'engine uses, 1 - exp(-rounds / {FAM.SCALE:g}). Courses in {O.esc(" and ".join(regions))} start as '
+                   f'if {FAM.REGION_ROUNDS:g} rounds had been played there ({100 * FAM.value(FAM.REGION_ROUNDS):.0f}%; '
+                   f'{FAM.COUNTRY_ROUNDS:g} by country where the state or province is unknown): a floor, never added '
+                   f'to rounds played, counted once (<a href="/rules#course-familiarity">rule</a>).</p>')
+    else:
+        out.append(f'<p class="muted">Ranked by competitive rounds played ({O.esc(as_of)}). Birthplace and residence '
+                   f'unknown: no regional baseline (<a href="/rules#course-familiarity">rule</a>).</p>')
+    return ''.join(out)
+
+
 # ---- tournaments and courses --------------------------------------------------------------------------------------
 def series_summary(w, sid):
     """A tournament's history in brief: editions, most-used courses, most wins, most starts, youngest and

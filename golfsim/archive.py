@@ -47,6 +47,7 @@ from pathlib import Path
 from .calendar import TOUR_BY_KEY
 from .history import Relations
 from .course_library import course_place
+from . import familiarity as FAM
 
 FORMAT = 'golf-legacy-archive/1'
 
@@ -314,7 +315,10 @@ class ArchiveWriter:
                             'golfer': {'status': g.status, 'lifestyle': g.lifestyle, 'tour': g.tour,
                                        'turned_pro': g.turned_pro,
                                        # public standing as this history ends (from rules 2026-11-02)
-                                       'prestige': round(season.player_prestige(g.id), 1)}}
+                                       'prestige': round(season.player_prestige(g.id), 1),
+                                       # the ten courses played most as this history ends: [course, rounds]
+                                       # (from rules 2026-11-08)
+                                       'familiar': [[k, round(r, 1)] for k, r in FAM.top_courses(g.familiarity)]}}
         for c in st.coaches.values():
             p = people.setdefault(c.id, {'name': c.name, 'country': c.country, 'born': c.born, 'hometown': None})
             p['coach'] = {'speciality': c.speciality, 'youth': c.youth, 'reputation': c.reputation, 'clients': c.clients,

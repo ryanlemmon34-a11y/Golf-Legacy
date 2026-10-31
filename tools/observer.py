@@ -1056,6 +1056,7 @@ def golfer(w, q, pid):
     if tab == 'playing':
         out.append(_playing(w, q, pid, p))
         out.append(OH.residence_section(w, pid, p, geo))
+        out.append(OH.familiar_section(w, pid, p, geo))
     elif tab == 'season':
         out.append(OH.season_view(w, q, pid, p))
     elif tab == 'results':

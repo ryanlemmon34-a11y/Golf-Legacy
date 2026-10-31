@@ -45,6 +45,15 @@ rounds there add a little more.
   familiarity section); the baseline is a fraction of it, so it nudges local golfers, it does not decide
   events. Its measured size is one of the checks to run after the CPU hold (below).
 
+### Profiles
+
+The playing tab shows the golfer's ten most familiar courses, ranked by competitive rounds played (ties by
+course id): the rounds, the familiarity value the engine uses, a link to each course, and whether the course
+is in their own state / province (or country, where that is unknown). A line states the regional baseline
+their birthplace and residence give, naming identical places once. The live view captures the top ten now;
+archived histories carry the top ten as the history ends (`people.json` `golfer.familiar`, from rules
+2026-11-08; older histories say "not recorded").
+
 ## To run after the CPU hold
 
 - Full test suite; observer/archive integration tests.

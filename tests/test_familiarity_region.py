@@ -181,6 +181,61 @@ class EngineInputTests(unittest.TestCase):
         self.assertEqual(a, c)
 
 
+class TopCoursesTests(unittest.TestCase):
+    def test_top_ten_most_first_ties_stable(self):
+        fam = {f'c{i:02d}': float(i) for i in range(1, 15)}
+        fam.update({'tie-b': 7.0, 'tie-a': 7.0, 'zero': 0.0})
+        top = FAM.top_courses(fam)
+        self.assertEqual(len(top), 10)
+        self.assertEqual(top[:3], [('c14', 14.0), ('c13', 13.0), ('c12', 12.0)])
+        self.assertEqual([k for k, r in top if r == 7.0], ['c07', 'tie-a', 'tie-b'])
+        self.assertEqual(FAM.top_courses(fam), top)                                 # deterministic
+        self.assertEqual(FAM.top_courses({'zero': 0.0}), [])
+        self.assertEqual(FAM.top_courses({'a': 2.5}, n=10), [('a', 2.5)])
+
+
+class ProfileTests(unittest.TestCase):
+    """The playing tab's familiar courses: top ten, values, links, the baseline line (no world needed)."""
+
+    @classmethod
+    def setUpClass(cls):
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
+        import observer_history as OH
+        cls.OH = OH
+
+    def world(self, live_familiar=None, archived=None):
+        courses = {f'c{i}': {'name': f'Course {i}', 'city': 'Southport' if i % 2 else 'Helsinki',
+                             'country': 'England' if i % 2 else 'Finland', 'class': 'standard', 'layouts': {}}
+                   for i in range(1, 13)}
+        people = {} if live_familiar is None else {7: {'familiar': live_familiar}}
+        return SimpleNamespace(live=SimpleNamespace(people=people), courses=lambda: courses)
+
+    def test_top_ten_with_values_and_links(self):
+        rows = [(f'c{i}', float(13 - i)) for i in range(1, 11)]
+        w = self.world(rows)
+        p = {'roles': ['golfer'], 'golfer': {}}
+        geo = {'birthplace': {'country': 'England', 'region': 'Merseyside'},
+               'residence': {'country': 'England', 'region': 'Merseyside'}}
+        html = self.OH.familiar_section(w, 7, p, geo)
+        self.assertEqual(html.count('href="/course/'), 10)
+        self.assertIn('<a href="/course/c1">Course 1</a>', html)
+        self.assertIn(f'{100 * FAM.value(12.0):.0f}%', html)                        # the value shown
+        self.assertEqual(html.count('own state / province'), 5)                   # the Southport courses
+        self.assertEqual(html.count('Merseyside, England'), 1)                    # identical places named once
+        self.assertIn('/rules#course-familiarity', html)
+        self.assertLess(html.index('Course 1<'), html.index('Course 2<'))         # most first
+
+    def test_archived_history_and_unrecorded(self):
+        w = self.world()
+        p = {'roles': ['golfer'], 'golfer': {'familiar': [['c3', 4.0]]}}
+        html = self.OH.familiar_section(w, 7, p, None)
+        self.assertIn('as the history ends', html)
+        self.assertIn('Birthplace and residence unknown', html)
+        html = self.OH.familiar_section(w, 7, {'roles': ['golfer'], 'golfer': {}}, None)
+        self.assertIn('Not recorded for this history', html)
+        self.assertEqual(self.OH.familiar_section(w, 7, {'roles': ['coach']}, None), '')
+
+
 class RuleTextTests(unittest.TestCase):
     def test_rule_and_version(self):
         from golfsim import rules

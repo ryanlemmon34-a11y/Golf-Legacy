@@ -77,6 +77,7 @@ def capture(session):
     archived = set(session._history_years())
     people = {}
     from golfsim.ratings import ATTRIBUTE_KEYS
+    from golfsim import familiarity as FAM
     peaks = getattr(s, 'peak_overall', {})
     initial = set((session.state.get('archive') or {}).get('initial') or ())   # golfers who were there at the start
     for g in s.world.golfers:
@@ -90,6 +91,8 @@ def capture(session):
         if pk is not None:                            # highest Overall so far: (value, year, week reached by)
             people[g.id]['peak'] = (round(pk[0], 1), pk[1], pk[2])
         people[g.id]['prestige'] = round(s.player_prestige(g.id), 1)   # public standing now (not ability)
+        # the ten courses they have played most (course, competitive rounds), most first (rules 2026-11-08)
+        people[g.id]['familiar'] = [(k, round(r, 1)) for k, r in FAM.top_courses(g.familiarity)]
     for kind, table in (('coach', st.coaches), ('caddie', st.caddies)):
         for c in table.values():
             p = people.setdefault(c.id, {'name': c.name, 'country': c.country, 'born': c.born, 'roles': []})
