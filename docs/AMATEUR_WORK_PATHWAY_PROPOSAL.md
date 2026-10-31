@@ -73,6 +73,20 @@ career decision ("amateur returned to full-time golf") with its facts, and in th
 into the work pathway. The flip rate needs a full-population measurement before the numbers are anything but
 provisional.
 
+**Measured on the full population (31 October 2026, candidate `c0d1ea5`; accepted provisionally, no tuning).**
+Four comparison runs, read only (seed 4207 for 10 seasons in three arms, seed 5309 for 5 seasons). The report is
+`docs/review/arms_comparison/ARMS_COMPARISON.md`, sections 5 and 5.1, on branch `build/v16-report`.
+- Returns: 1,166 by 1,125 people. Over all return evaluations, p = 0 included, the rate is 1.60 %; over the
+  eligible evaluations (p > 0) it is 7.8 %. By age band, eligible rates are 18-20 4/9, 21-24 25.7 %, 25-29 6.0 %,
+  30+ 0.1 %.
+- 157 returns came in a run's last season and are censored, not counted as successes.
+- Of the 1,009 observed returns, in the next season:
+  - 0 had a cash-blocked week and 0 re-entered the work pathway;
+  - 505 took a job again the following winter (36 % at 21-24, 71 % at 25-29). This is a separate event: the
+    ordinary winter job decision.
+- The return rule discounts that next-winter job decision with the same function on projected inputs, so it is a
+  proxy. On the 989 evaluated the next winter, the anticipated chances sum to 431.9 against 505 realised.
+
 ## The original proposal
 
 ### Proposed rule
