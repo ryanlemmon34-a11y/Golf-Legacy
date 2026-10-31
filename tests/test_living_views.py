@@ -96,6 +96,27 @@ class RatingsOverTime(unittest.TestCase):
         self.assertIn('no earlier season to compare', part)              # (the first bar has nothing before it)
 
 
+    def test_an_exported_history_without_an_index_reads_each_career_once(self):
+        dst = self.tmp / 'exported'                                      # (exports leave the index out)
+        shutil.copytree(self.tmp / 'w' / 'archive', dst, ignore=shutil.ignore_patterns('index.sqlite*'))
+        w = O.World(dst, workers=1, read_only=True)
+        try:
+            self.assertIsNone(w.a.index)
+            g = self.active
+            self.assertEqual(OD.career_rows(w, g), OD.career_rows(self.w, g))   # the index's rows exactly
+            self.assertEqual(OD.rating_snapshots(w, g), OD.rating_snapshots(self.w, g))
+            calls = []
+            real = type(w.a).playing_career
+            w.a.__dict__.pop('_careers', None)
+            with mock.patch.object(type(w.a), 'playing_career', lambda a, pid: calls.append(pid) or real(a, pid)):
+                html = O.render(w, f'/golfer/{g}', {})[1]
+                O.render(w, f'/golfer/{g}', parse_qs('rh=power&rm=change'))
+            self.assertEqual(calls, [g])                                 # once, however many sections read it
+            self.assertIn('<h3>Ratings over time</h3>', html)
+        finally:
+            w.close()
+
+
     # ---- injuries -------------------------------------------------------------------------------------------
     def injured_golfers(self):
         import observer_data as OD

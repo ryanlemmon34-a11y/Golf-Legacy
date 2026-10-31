@@ -221,16 +221,31 @@ def cut_flags(w, rows, db=None):
     return rows
 
 
+CAREERS = 64                                     # golfers' careers kept per history reading when there is no index
+
+
 def career_rows(w, pid):
     """[(year, season row)] for a golfer's archived seasons, without decoding season files: the index's full
     rows (schema 2 and later), else its short season rows (tour, status, lifestyle, starts, wins, prize, year-end
-    rankings) for an older index opened read-only -- whatever a row lacks shows as not recorded."""
+    rankings) for an older index opened read-only -- whatever a row lacks shows as not recorded. An archive
+    without an index (an exported history opened read-only) is read season by season once per golfer and kept
+    with this Archive object (replaced when the history is republished), as season_extract does."""
     a = w.a
     if a is None or pid not in a.people:
         return []
     idx = a.index
-    if idx is None:
-        return a.playing_career(pid)
+    if idx is None:                                  # (no index: every season file is read, so kept per golfer)
+        from collections import OrderedDict
+        cache = a.__dict__.get('_careers')
+        if cache is None:
+            cache = a._careers = OrderedDict()
+        if pid in cache:
+            cache.move_to_end(pid)
+            return list(cache[pid])
+        rows = cache[pid] = a.playing_career(pid)
+        while len(cache) > CAREERS:
+            cache.popitem(last=False)
+        return list(rows)
     if idx.derived_complete(a.years):
         return idx.career(pid)
     return [(r['year'], r) for r in idx.seasons(pid)]
