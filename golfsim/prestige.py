@@ -44,6 +44,12 @@ COURSE_YEARS = 5                      # completed seasons a course's prestige re
 COURSE_FADE = 0.9                     # hosted nothing in those seasons: its prestige x 0.9 a season
 COURSE_MAX_MOVE = 10.0                # most a course's prestige moves from one season to the next
 WINDOW = EVENT_YEARS                  # (the old name, kept for tools that read it)
+# Better host venues for events that have outgrown theirs (Season.review_venues; a per-world overlay on the shared
+# course plan, never a change to the course library):
+VENUE_GAP = 5.0                       # event prestige at least this far above its venue's course prestige ...
+VENUE_SUSTAIN = 3                     # ... at this many consecutive season ends
+VENUE_LAG = 2                         # decided at the end of season Y, played from season Y + VENUE_LAG
+VENUE_MIN_SEASONS = 10                # tradition: at most one move per event in this many seasons
 
 COURSE_QUALITY = {('elite', 'Championship'): 100, ('championship', 'Championship'): 80,
                   ('standard', 'Championship'): 62, ('championship', 'Club'): 55, ('standard', 'Club'): 45,

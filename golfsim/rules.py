@@ -45,7 +45,9 @@ VERSIONS = (
                    'takes a job at the next monthly plan and keeps playing as a working amateur.'),
     ('2026-11-05', 'Five-year prestige: event prestige reads the last five calendar years, recency-weighted, with '
                    'a limit on how far it moves in a year (it had been the last four editions); courses have a '
-                   'prestige of their own from the events they hosted in completed seasons; nations have a '
+                   'prestige of their own from the events they hosted in completed seasons, and an event that has '
+                   'outgrown its venue for three seasons moves to a better course in its city two seasons later; '
+                   'nations have a '
                    'prestige from success beyond pre-event expectation, which sets their share of each year\'s new '
                    'juniors and new professionals. The number of new golfers is unchanged by it: only how the '
                    'fixed number is shared between nations.'),
@@ -298,7 +300,18 @@ RULES = {
         '0.9, 0.8, 0.7 and 0.6 by age; it moves at most 10 points from one season to the next, and a course '
         'that hosted nothing in those five seasons loses 10% of its prestige a season. A new world assumes the '
         'four seasons before it hosted what its first season\'s schedule gives it. Courses that have hosted '
-        'nothing have none. Venues are still chosen by the course plan, not by prestige.',
+        'nothing have none.',
+        '2026-11-05'),
+    'venue-moves': (
+        'Better venues for events that outgrow theirs',
+        'Every edition is played where the course plan puts it unless the event has moved. At each season\'s end, '
+        'a single-site event (not a major, not a qualifying stage) whose prestige has been at least 5 points above '
+        'its venue\'s course prestige at three consecutive season ends, and which has not moved in the last ten '
+        'seasons, moves to the physically best other course in the same city that its level may use, that is '
+        'physically better than its current one and free that week (never an elite course in a major\'s week), '
+        'from the season after next; ties by course prestige, then course id. If none qualifies it stays. The move '
+        'applies whenever the event is planned on the course it replaced; a year in which the new course is '
+        'already booked that week it plays the planned course. Each edition records the venue actually used.',
         '2026-11-05'),
     'nation-shares': (
         'National prestige and shares of new golfers',

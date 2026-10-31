@@ -43,7 +43,7 @@ from . import residence as RES
 from .calendar import TOUR_BY_KEY, _in_window
 from . import schedule as SCH
 from . import work_pathway as WP
-from .course_library import default_library, library_version
+from .course_library import Venue, default_library, event_level, library_version
 from .engine import Conditions
 from .golfer import Caddie
 from .geography import CITY_BY_NAME, COUNTRIES
@@ -364,6 +364,11 @@ class Season:
         self.event_year_start = {}                           # series_id -> (year, prestige as that year began)
         self.course_hosted = {}                              # course_id -> {season: best prestige hosted}
         self.course_prestige = {}                            # course_id -> prestige this season
+        # this world's venue moves (review_venues): an overlay on the shared course plan, read by venues()
+        self.venue_moves = {}                                # (series_id, planned course_id) -> the better course
+        self.venue_watch = {}                                # series_id -> consecutive season ends above the gap
+        self.venue_moved = {}                                # series_id -> season end its last move was decided
+        self.venue_log = defaultdict(list)                   # season -> [moves decided at its end]
         self.participation = PT.Participation(world.nations, self.first_year)
         self.fatigue = defaultdict(float)                    # gid -> season fatigue, 0 (fresh) .. 1 (exhausted)
         self.injured = {}                                    # gid -> (first abs week they can enter again, injury, weeks)
@@ -532,7 +537,7 @@ class Season:
         # courses: the seasons before the world began are assumed to have hosted what the first season's plan
         # gives them, at the events' starting prestige (the same warm-up as the events')
         best = {}
-        for eid, vs in self.lib.venues(self.first_year).items():
+        for eid, vs in self.venues(self.first_year).items():
             p = self.event_prestige.get(eid.split(':', 1)[1])
             for v in vs:
                 if p is not None and p > best.get(v.course_id, -1.0):
@@ -546,8 +551,115 @@ class Season:
                 tours[s.tour].append(self.event_prestige[s.series_id])
         self.home_level = {t: S.median(v) for t, v in tours.items()}
 
+    def venues(self, year):
+        """{event_id: [Venue per site]} actually used this world in `year`: the shared course plan
+        (CourseLibrary.venues, never changed) with this world's venue moves laid over it (review_venues). A move
+        applies to an edition planned on the course it replaces, from its first season on, unless the new course
+        is already booked that week (then the planned course is used: never two events on one course in a week).
+        Moves are applied in a fixed order (series id), so the result is the same however often it is asked."""
+        cache = self.__dict__.get('_venue_cache')
+        if cache is not None and year in cache:
+            return cache[year]
+        base = self.lib.venues(year)
+        moves = sorted((k, m) for k, m in self.__dict__.get('venue_moves', {}).items() if m['from'] <= year)
+        out = base
+        if moves:
+            week_of = {ed.event_id: ed.week for ed in self.cal.editions(year)}
+            busy = defaultdict(set)
+            for eid, vs in base.items():
+                for v in vs:
+                    busy[week_of.get(eid)].add(v.course_id)
+            out = dict(base)
+            for (sid, planned), m in moves:
+                eid = f'{year}:{sid}'
+                vs = out.get(eid)
+                if not vs or len(vs) != 1 or vs[0].course_id != planned:
+                    continue
+                wk = week_of[eid]
+                if m['course'] in busy[wk]:
+                    continue
+                busy[wk].discard(planned)
+                busy[wk].add(m['course'])
+                out[eid] = [Venue(eid, 0, m['course'], m['layout'], m['city'])]
+        if cache is None:
+            cache = self._venue_cache = {}
+        cache[year] = out
+        return out
+
+    def review_venues(self, year):
+        """The season's end: events that have outgrown their venue move to a better one in the same city, from
+        season year + VENUE_LAG (rules 'venue-moves'). An event qualifies when its prestige (five calendar years,
+        as the season ended) has been at least VENUE_GAP above its venue's course prestige (set for the next season
+        from completed seasons) at VENUE_SUSTAIN consecutive season ends, and it has not moved in VENUE_MIN_SEASONS
+        seasons. Single-site events only; never majors (their venues are fixed) or qualifying stages. The new course:
+        in the same city (geography), of a class and layout the event's level may use (capacity:
+        course_library.LEVEL_LAYOUTS), physically better than the current one (COURSE_QUALITY), free that week in
+        the season it takes effect (availability), and never an elite course in a major's week for another event.
+        Best by physical quality, then course prestige, then course id. No random draw."""
+        moved = []
+        target = year + PR.VENUE_LAG
+        later = None
+        for sid in sorted(self.event_prestige):
+            eid = f'{year}:{sid}'
+            r = self.results.get(eid)
+            s = self.cal.by_id.get(sid)
+            if r is None or s is None or s.kind in ('major', 'qualifying') or s.sites != 1 or len(r.sites) != 1:
+                if r is not None:                            # (not held this season: the count waits)
+                    self.venue_watch.pop(sid, None)
+                continue
+            cur, cur_layout, city = r.sites[0]
+            gap = self.event_prestige[sid] - (self.course_prestige.get(cur) or 0.0)
+            n = self.venue_watch[sid] = self.venue_watch.get(sid, 0) + 1 if gap >= PR.VENUE_GAP else 0
+            if n < PR.VENUE_SUSTAIN or year - self.venue_moved.get(sid, -10 ** 6) < PR.VENUE_MIN_SEASONS:
+                continue
+            if later is None:
+                later = self.venues(target)
+                week_of = {ed.event_id: ed.week for ed in self.cal.editions(target)}
+                busy = defaultdict(set)
+                for e2, vs in later.items():
+                    for v in vs:
+                        busy[week_of.get(e2)].add(v.course_id)
+            e_t = f'{target}:{sid}'
+            planned = self.lib.venues(target).get(e_t)
+            now_t = later.get(e_t)
+            if not planned or not now_t or len(planned) != 1 or now_t[0].course_id != cur or now_t[0].city != city:
+                continue                                     # not at this course that season (another host city)
+            wk = week_of[e_t]
+            level = event_level(s)
+            cur_q = PR.COURSE_QUALITY[(self.lib.sites[cur]['cls'], cur_layout)]
+            best = None
+            for cid in self.lib.by_city.get(city, ()):
+                if cid == cur or cid in busy[wk]:
+                    continue
+                ok = self.lib._eligible(cid, level)
+                if not ok:
+                    continue
+                cls = self.lib.sites[cid]['cls']
+                q = PR.COURSE_QUALITY[(cls, ok[1])]
+                if q <= cur_q or (cls == 'elite' and wk in self.cal.major_weeks):
+                    continue
+                key = (-q, -(self.course_prestige.get(cid) or 0.0), cid)
+                if best is None or key < best[0]:
+                    best = (key, cid, ok[1])
+            if best is None:
+                continue
+            _, cid, layout = best
+            m = {'series': sid, 'course': cid, 'layout': layout, 'city': city, 'from': target, 'decided': year,
+                 'planned': planned[0].course_id, 'replaces': cur, 'replaces_layout': cur_layout, 'event_prestige': round(self.event_prestige[sid], 2),
+                 'course_prestige_before': round(self.course_prestige.get(cur) or 0.0, 2)}
+            self.venue_moves[(sid, planned[0].course_id)] = m
+            self.venue_moved[sid] = year
+            self.venue_watch[sid] = 0
+            busy[wk].discard(cur)
+            busy[wk].add(cid)
+            moved.append(m)
+        if moved:
+            self.venue_log[year].extend(moved)
+            self._venue_cache = {}                           # (the overlay is worked out again when next asked)
+        return moved
+
     def course_quality(self, ed, site):
-        v = self.lib.venues(ed.year)[ed.event_id][site]
+        v = self.venues(ed.year)[ed.event_id][site]
         return PR.COURSE_QUALITY[(self.lib.sites[v.course_id]['cls'], v.layout)]
 
     # ---- rankings -------------------------------------------------------------------------------
@@ -779,7 +891,7 @@ class Season:
             else:
                 v -= 40
         if g.status == 'club_pro' and ed.series.tier == 8:
-            v -= self.drive(g, self.lib.venues(ed.year)[ed.event_id][0].city) + self.club_diary(g, ed.year, ed.week)
+            v -= self.drive(g, self.venues(ed.year)[ed.event_id][0].city) + self.club_diary(g, ed.year, ed.week)
         return v
 
     def club_diary(self, g, year, week):
@@ -840,7 +952,7 @@ class Season:
         if champs and champs[-1][1] == g.id:
             v += 5                                           # defending champion
         if cost is None:
-            cost = self.trip_cost(g, s, self.lib.venues(ed.year)[ed.event_id][0].city)
+            cost = self.trip_cost(g, s, self.venues(ed.year)[ed.event_id][0].city)
         v -= (cost - self.expected_prize(g, s) * gw['kept']) / gw['unit']
         return v + rng.gauss(0, 3)
 
@@ -890,7 +1002,7 @@ class Season:
     def run_week(self, year, week, eds):
         self.week = week
         rng = random.Random(_seed(self.seed, year, week, 'entries'))
-        venues = self.lib.venues(year)
+        venues = self.venues(year)
         busy = defaultdict(set)                              # gid -> days committed this week
         self._week_where = where = defaultdict(list)         # gid -> [(days, country)] committed this week
         fields = {}                                          # event_id -> [per-site golfer lists]
@@ -1211,7 +1323,7 @@ class Season:
         the next alternate, takes the place."""
         s = ed.series
         sid = s.series_id
-        cities = {v.city for v in self.lib.venues(year)[ed.event_id]}
+        cities = {v.city for v in self.venues(year)[ed.event_id]}
         # a golfer who can pay for at least one of the event's sites; the site they are given is checked
         # again before the field is fixed (pay_at_sites)
         pays = lambda g: any(self.can_afford(g, s, c, self.spendable(g, year)) for c in cities)
@@ -1363,7 +1475,7 @@ class Season:
         exempt = self.usa_amateur_exempt(year)
         take = invite([self.g[gid] for gid in exempt if free(self.g[gid])], s.field)
         routes = {gid: exempt[gid] for gid in take}
-        city = self.lib.venues(year)[ed.event_id][0].city
+        city = self.venues(year)[ed.event_id][0].city
         sites, entrants = [], []
         for _, rows in sorted(self.ctx.results.get(('USA_AMATEUR_QUALIFYING', year), {}).items()):
             finishers = [gid for gid, pos in rows if pos is not None and gid not in exempt]
@@ -1402,7 +1514,7 @@ class Season:
         f = Q.build_field(sid, year, self.ctx)
         self.stage_log[(year, sid, 'field')] = f
         can_play = lambda gid: gid in self.g and gid not in self.injured and self.g[gid].lifestyle != 'retired'
-        cities = sorted({v.city for v in self.lib.venues(year)[ed.event_id]}) if ed is not None else []
+        cities = sorted({v.city for v in self.venues(year)[ed.event_id]}) if ed is not None else []
         money = {}                               # gid -> the money a place was decided on (observation only)
 
         def facts(g):
@@ -1879,6 +1991,7 @@ class Season:
         state.pop('_pf_memo', None)                          # derived caches (prize_forecast, update_fame):
         state.pop('_fame_seen', None)                        # rebuilt as they are used
         state.pop('_week_where', None)                       # (this week's commitments: empty between weeks)
+        state.pop('_venue_cache', None)                      # (derived from the course plan and venue_moves)
         v = library_version(state.get('lib'))
         if v is not None:                                    # a standard library: saved by its version
             state['lib'] = 'default' if v == SCH.LEGACY else f'default:{v}'
@@ -1943,6 +2056,10 @@ class Season:
         state.pop('event_factors', None)
         state.setdefault('course_hosted', {})                # courses: rated from the first season-end after loading
         state.setdefault('course_prestige', {})
+        state.setdefault('venue_moves', {})                  # saves from before venue moves: the course plan as it is
+        state.setdefault('venue_watch', {})
+        state.setdefault('venue_moved', {})
+        state.setdefault('venue_log', defaultdict(list))
         if 'participation' not in state:                     # nations: shares from the starting profiles, multipliers 1,
             state['participation'] = PT.Participation(state['world'].nations, state['first_year'])   # evidence from now
         now = state.get('year') or state.get('first_year')
@@ -2399,6 +2516,9 @@ class Season:
                 self.course_prestige[cid] = v
             for y in [y for y in hosted if y <= year - PR.COURSE_YEARS]:
                 del hosted[y]
+        self.review_venues(year)                             # (reads the course prestige just set)
+        for y in [y for y in self.venue_log if y < year - 1]:
+            del self.venue_log[y]                            # (archived with their season)
         self.participation.close_season(year)
 
     def prestige_view(self):
@@ -2406,6 +2526,7 @@ class Season:
         courses (this season's), nations (as last settled) with the cohort shares."""
         return {'events': {sid: round(v, 2) for sid, v in self.event_prestige.items()},
                 'courses': {cid: round(v, 2) for cid, v in self.course_prestige.items()},
+                'venue_moves': [dict(m) for _, m in sorted(self.venue_moves.items())],
                 'nations': self.participation.view()}
 
     def record_college(self, year, snap):
@@ -2605,7 +2726,7 @@ class Season:
         WP.decide(self, year, week0)                        # cash-blocked adult amateurs: a job from this month
         weeks = [w for w in range(week0, week0 + 4) if w <= 52]
         eds = [e for e in self.cal.editions(year) if e.week in weeks and not self.is_special(e.series)]
-        venues = self.lib.venues(year)
+        venues = self.venues(year)
         city = {e.event_id: venues[e.event_id][0].city for e in eds}
         by_week = {w: [e for e in eds if e.week == w] for w in weeks}
         rng = random.Random(_seed(self.seed, year, week0, 'plan'))

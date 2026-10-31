@@ -299,6 +299,10 @@ class ArchiveWriter:
                 'format': 'golf-legacy-prestige/1',
                 'events': {sid: round(v, 2) for sid, v in season.event_prestige.items()},
                 'courses': {cid: round(v, 2) for cid, v in getattr(season, 'course_prestige', {}).items()},
+                # venue moves (rules 'venue-moves'): those decided at this season's end, and every move standing
+                # (an edition's actual venue is always its own `sites`)
+                'venue_moves_decided': [dict(m) for m in getattr(season, 'venue_log', {}).get(year, [])],
+                'venue_moves': [dict(m) for _, m in sorted(getattr(season, 'venue_moves', {}).items())],
                 'nations': {'prestige': nxt.get('prestige', {}), 'ratio': nxt.get('ratio', {}),
                             'multiplier': nxt.get('multiplier', {}), 'shares': nxt.get('shares', {}),
                             'season': nxt.get('season', {}), 'entrant_year': year + 1,

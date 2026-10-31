@@ -45,6 +45,7 @@ def latest(w):
         if r:
             n = r.get('nations', {})
             return {'events': r.get('events', {}), 'courses': r.get('courses', {}),
+                    'venue_moves': r.get('venue_moves', []),
                     'nations': {'prestige': n.get('prestige', {}), 'multiplier': n.get('multiplier', {}),
                                 'shares': n.get('shares', {}), 'baseline_shares': n.get('baseline_shares', {})}}
     return None
@@ -99,7 +100,15 @@ def event_section(w, sid):
         c = w.live.cursor
         v = lv['events'][sid]
         pts.append((f'now', v, f'now ({c["year"]}, week {c["week"]}): {v:.2f}'))
-    return ('<h2>Prestige over time</h2>'
+    moves = [m for m in (latest(w) or {}).get('venue_moves', []) if m.get('series') == sid]
+    note = ''
+    if moves:
+        note = '<p>Venue moves: ' + '; '.join(
+            f'from {m["from"]}, <a href="/course/{esc(m["course"])}">{esc(m["course"])}</a> ({esc(m["layout"])}) in place '
+            f'of <a href="/course/{esc(m["replaces"])}">{esc(m["replaces"])}</a>, {esc(m["city"])} (decided at the end of '
+            f'{m["decided"]}: prestige {m["event_prestige"]} against the venue’s {m["course_prestige_before"]})'
+            for m in moves) + '</p>'
+    return ('<h2>Prestige over time</h2>' + note
             + bars(pts, note='One bar per season: the event’s prestige at the end of that season (after its edition, '
                              'carried into the next), then now. Five calendar years, recency-weighted, moving at most '
                              '6 points a year (rules: event prestige). “—”: not recorded.'))

@@ -7,7 +7,8 @@ Code: `golfsim/prestige.py` (events, courses), `golfsim/participation.py` (natio
 (`entrant_rows`: the cohort-share rule; `expected_shares`), `golfsim/careers.py` (the two pathways call it),
 `golfsim/season.py` (state, updates, season end, old saves), `golfsim/archive.py` (the season record),
 `golfsim/rules.py` (rules 2026-11-05 and three rule texts), `tools/observer_prestige.py` and `tools/observer.py`
-(columns and bars). Tests: `tests/test_nation_shares.py`, `tests/test_world_prestige.py`.
+(columns and bars). Tests: `tests/test_nation_shares.py`, `tests/test_world_prestige.py`,
+`tests/test_venue_moves.py`.
 
 Every constant below is in one commented block marked **PROPOSED calibration** (`prestige.py` for events and
 courses, `participation.py` for nations): starting values to measure, not proven ones.
@@ -44,22 +45,38 @@ upgrade its own venue and feed back into its own score.
 * Warm-up: the four seasons before the world began are assumed to have hosted what its first season's plan
   gives it, at the events' starting prestige. Courses that never hosted have no prestige (shown blank).
 
-### Venue selection: proposed, not implemented
+### Better future host venues (implemented per world; rules `venue-moves`)
 
-Venues come from the course library (`course_library.py`), which plans every edition of every event from the
-calendar and a seed and is **shared by every world in a process** (`default_library`). Making venue choice read
-one world's course prestige would mean a per-world library (or a per-world venue overlay) and a change to how
-saves store the library -- a large change, so per the brief it is proposed here instead:
+The course library (`course_library.py`) plans every edition from the calendar and a seed and is shared by every
+world in a process (`default_library`), so it is **never changed**. Each world instead keeps a venue overlay in
+its Season state (`Season.venue_moves`), and every place the season resolves an edition's venue goes through
+`Season.venues(year)`: the plan with this world's moves laid over it. That covers entries, travel and trip costs,
+course quality, the week's play and the result. Each edition's result, and so the archive and the observer,
+records the venue actually used. Before this change every one of those reads was `self.lib.venues(year)` in
+season.py; no other module resolves venues for a running season.
 
-1. Once a season ends, for each event whose prestige has been at least ~8 points above its venue's course
-   prestige for three consecutive seasons (sustained, not one field), consider moving its **next-but-one**
-   season's edition (two-season lag: the decision at the end of Y affects Y+2, so no edition can upgrade the
-   venue it is being played on, and course prestige read at Y never includes Y) to a better course.
-2. Candidates: courses in the event's existing host-city pool (geography), of a class its level allows
-   (`LEVEL_LAYOUTS`: capacity and layout), free that week (availability), preferring the course it already
-   uses unless the candidate's course prestige or class is clearly higher (tradition: a home course is kept
-   unless the gap is large; a stable tie-break by seed and course id).
-3. Host-quality development (a course's class rising over decades) would be a separate, slower rule.
+At each season's end (`Season.review_venues`, after course prestige is set for the next season):
+
+| Respecting | Rule | Constant |
+|---|---|---|
+| Sustained, not one field | the event's prestige (five calendar years, as the season ended) is at least 5 points above its venue's course prestige at 3 consecutive season ends; a season below resets the count | `VENUE_GAP = 5.0`, `VENUE_SUSTAIN = 3` |
+| Lag | decided at the end of season Y, played from season Y+2: no edition is played on a venue its own field upgraded, and the course prestige read never includes the current season | `VENUE_LAG = 2` |
+| Tradition | at most one move per event in 10 seasons; a move is permanent (the event's new home in that city) until a later move | `VENUE_MIN_SEASONS = 10` |
+| Geography | same city as its current venue | |
+| Capacity | a course of a class and layout the event's level may use (`LEVEL_LAYOUTS`), physically better (`COURSE_QUALITY`) than the current one | |
+| Availability | free that week in the season it takes effect; each later year it is applied only if the course is free that week, otherwise the planned course is used, so no course is ever double-booked; never an elite course in a major's week for another event | |
+| Scope | single-site events only; never majors (fixed venues) or qualifying stages | |
+
+The best candidate is the one with the highest physical quality, then course prestige, then course id. Nothing is
+random. A move applies whenever the event is planned on the course it replaced: a rotating event moves only for
+that city's editions.
+
+Feedback is bounded. A move raises the event's course factor (15 % of event prestige, physical quality only),
+but only two seasons after the decision, at most once in ten seasons, and only up to the best course in the city.
+Course prestige itself is never read by event prestige.
+
+Host-quality development (a course's class rising over decades) is not built; it would be a separate, slower
+rule.
 
 ## 3. National prestige and cohort shares (D7)
 
@@ -196,7 +213,11 @@ maximum multiplier 4 has about 0.2 %, about one every two years; the USA at 0.25
 * `Season.__setstate__`: an older save's event factor list is converted to the five-year window (played
   editions take their years from the prestige history, the four assumed ones the years before the world
   began); course prestige starts empty (rated from the first season end after loading); national prestige
-  starts at 50 with multipliers 1 and starting shares from the save's nation profiles.
+  starts at 50 with multipliers 1 and starting shares from the save's nation profiles; an older save has no venue
+  moves (`venue_moves`, `venue_watch`, `venue_moved`, `venue_log` default empty) and plays the course plan as before.
+  The venue overlay's cache is derived and not saved.
+* Season files also carry `venue_moves_decided` (moves decided at that season's end) and `venue_moves` (every
+  move standing) in the `prestige` record; a tournament page lists its moves.
 * Season files carry `prestige` (`golf-legacy-prestige/1`): every event's prestige as the season ended, every
   course's prestige for the next season, and for nations the prestige, ratio, multiplier, shares, actual and
   expected fame of the season, the next season's totals, allocations and the existing rule's own counts, and
@@ -237,6 +258,25 @@ with real junior draws for one year (the total is unchanged and the other nation
 gain). Also run: the starting-share table above (numerical integration) and ten years of the existing rule's
 realised totals.
 
+**Venue moves (second commit), run and passing** at `nice -n 19` (no season simulated: a minimal stand-in
+carries what `Season.venues` and `Season.review_venues` read; the shared course plan for 2027-2041):
+
+```
+python -m unittest tests.test_venue_moves -v              # 4 tests, 0.25 s
+python -m unittest tests.test_amateur_residence.RulesTests -v   # rule texts and versions, 2 tests
+```
+
+They cover:
+* a sustained gap moves the event at the third season end, played two seasons later, in the same city, to a
+  physically better course its level may use;
+* the shared plan is unchanged, and no course is double-booked in any week;
+* one move in ten seasons, and an interrupted gap restarts the count;
+* a course booked that week keeps the planned venue;
+* majors and qualifying stages never move.
+
+Not yet run for venue moves: a whole simulated world long enough for a move to happen (at least five seasons);
+`InASession` covers only one season, before any move can take effect.
+
 **Not run yet** (they need cohort draws or season simulation; to run once the hold is lifted):
 
 * Light (seconds, cohort draws only, no season): the rest of `tests.test_nation_shares` --
@@ -259,7 +299,9 @@ realised totals.
    development nations. The half/half blend is a proposal; the calibration table in section 5 (once run) will show how well
    the ability half fits.
 2. The bounds 0.25-4 and the 10 % step: the owner's call on how far and how fast.
-3. The venue-selection link (section 2) is proposed, not built.
+3. Venue moves (section 2): the thresholds (gap 5, three seasons, lag 2, ten seasons) are proposals. Moves
+   are limited to the same city; widening to the series' host-city pool would allow more moves but changes
+   where events are played. How often moves happen in a long run has not been measured.
 4. Small worlds (`scale` < 1) still receive full-size cohorts (the existing pathways ignore `scale`); unchanged.
 5. Course prestige uses the best event hosted each season; a course hosting many mid events and one hosting
    one major look different only through that maximum.
