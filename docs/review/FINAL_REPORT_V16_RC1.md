@@ -1,17 +1,19 @@
 # v16 release candidate: final report (31 October 2026)
 
 > **Released.** After the independent final review, and with the owner's explicit permission, `main` was
-> fast-forwarded (no force) from `33e1fa2` to **`afb68f3d4c74bfca8c3a7e4e4602afcfd80f3d72`**.
-> - That commit is the tested candidate `c0d1ea5` plus the two reviewed docs-only commits.
+> fast-forwarded (no force) from `33e1fa2` to `afb68f3`, then to
+> **`afa5e4a31047862587725a0e929a8388ac2c4db9`**.
+> - That head is the tested candidate `c0d1ea5` plus three docs-only commits: `a2d56fb` and `afb68f3`, then
+>   `afa5e4a`, which adds the BACKLOG zero-start qualifier.
 > - Every path outside `docs/` (`golfsim`, `tools`, `tests`, `data`, launchers) is identical to `c0d1ea5`. The 7 changed files are all `docs/*.md`.
 > - Windows runs and local timing on the owner's machine are forthcoming. Nothing here claims them.
 
-> **Status: HELD for review.** Nothing is merged to main.
+> *Historical (the status before release, kept for the record):* the candidate was held for review, with nothing
+> merged to main until the reviewer had checked the exact commit (D8); there was no self-approval and no force push.
 > - **Candidate:** `integration/v16-rc1` at **`c0d1ea5`** (`c0d1ea598bc784611e7e26cc414f754671965530`).
-> - **Docs-only follow-up for review:** branch `build/v16-docs-final`, two commits on top of `c0d1ea5`: `a2d56fb`, then `afb68f3`.
+> - **Docs-only follow-up:** branch `build/v16-docs-final`, now at `afa5e4a` (three commits on `c0d1ea5`).
 >   - It changes seven `docs/*.md` files and nothing else.
 >   - The engine id is unchanged (`1949ff63…`), so the code and test evidence below stays tied to `c0d1ea5`.
-> - Main is released only after the reviewer has checked the exact commit (D8). There is no self-approval and no force push.
 
 Evidence, all on `origin/build/v16-report` unless stated:
 
@@ -207,8 +209,8 @@ Use the build the reviewer approves: `c0d1ea5`, or `c0d1ea5` plus the docs-only 
 
 | Branch | Head | Role |
 |---|---|---|
-| `integration/v16-rc1` | `c0d1ea5` | The candidate (held) |
-| `build/v16-docs-final` | `afb68f3` | Docs-only follow-up for review (parent `c0d1ea5`) |
+| `integration/v16-rc1` | `c0d1ea5` | The tested candidate |
+| `build/v16-docs-final` | `afa5e4a` | Docs-only follow-up, released (three commits on `c0d1ea5`) |
 | `build/v16-report` | this commit | Review documents, comparison analysis, release evidence, this report |
 | `build/v16-traceability` | `1a92d3d` | Roadmap traceability matrix against `c0d1ea5` |
-| `main` | unchanged | Waits for the reviewer's check of the exact commit |
+| `main` | `afa5e4a` | Released: `c0d1ea5` plus the docs-only commits (fast-forward from `33e1fa2`) |
