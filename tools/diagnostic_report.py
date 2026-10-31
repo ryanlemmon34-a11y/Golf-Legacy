@@ -59,8 +59,11 @@ class Run:
     def season(self, y):
         """The archived season file (development diagnostics), read once."""
         if y not in self._seasons:
-            p = self.dir / f'world_{self.seed}' / 'archive' / 'years' / f'{y}.json.gz'
-            self._seasons[y] = json.loads(gzip.open(p).read()) if p.exists() else {}
+            from golfsim.archive import _read, read_manifest
+            a = self.dir / f'world_{self.seed}' / 'archive'
+            man = read_manifest(a) or {}
+            f = man.get('files', {}).get('years', {}).get(str(y)) or man.get('files', {}).get('years', {}).get(y)
+            self._seasons[y] = _read(a / f) if f else {}
         return self._seasons[y]
 
     def amateurs(self, y):
