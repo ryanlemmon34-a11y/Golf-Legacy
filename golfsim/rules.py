@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import re
 
-RULES_VERSION = '2026-11-03'
+RULES_VERSION = '2026-11-07'
 RANKING_RULE = 'world-ranking-1'     # the world ranking's formula (unchanged since the world began; named now)
 VERSIONS = (
     ('2026-10-30', 'Winners\' exemptions count whatever a golfer\'s membership (a non-member champion earns a '
@@ -43,6 +43,11 @@ VERSIONS = (
                    '(it had been one edition more). The work pathway: a full-time adult amateur outside the top 300, '
                    'without support or family money, who cannot afford any eligible event for eight counted weeks '
                    'takes a job at the next monthly plan and keeps playing as a working amateur.'),
+    ('2026-11-07', 'Death after retirement: in the winter after each season, anyone who is not an active competitive '
+                   'golfer -- a golfer retired from competition (including one who coaches or caddies), or a coach '
+                   'or caddie -- may die, at an annual risk rising with age (a provisional game calibration). A '
+                   'working coach\'s or caddie\'s partnerships end then, with the reason recorded; results, records '
+                   'and relationships are kept. Worlds started earlier never process deaths.'),
 )
 EARLIER = ('Seasons archived before rules versions were recorded were played under earlier rules. The '
            'differences that matter for reading old results: a winner without a Premier card held no '
@@ -271,6 +276,26 @@ RULES = {
         'Nobody is given money and no cost is waived; the way back to full-time golf is turning professional, as '
         'for every working amateur.',
         '2026-11-03'),
+    'mortality': (
+        'Death after retirement',
+        'An active competitive golfer never dies. Everyone else -- a golfer retired from competition (whether or '
+        'not they went on to coach or caddie), and every coach and caddie, working or retired -- may die in the '
+        'winter after a season. Deaths are processed once per season on one date, the winter after season Y, '
+        'after the season\'s career decisions, the staff\'s retirements and the ending of the relationships of '
+        'those who left, and before outside recruits are hired. A death is recorded as "the winter after season '
+        'Y" with the age then (the season\'s year minus the birth year, approximate like every age in the world), '
+        'and that age is kept for good. No date inside a completed season is ever drawn, so no death is dated '
+        'before anything the person did. The annual risk at age a is 0.0005 + 0.000041 x e^(0.09 a), at most '
+        '50 % (about 0.9 % at 60, 2.2 % at 70, 5.5 % at 80, 13.5 % at 90, 33 % at 100), the same for every '
+        'nation: a provisional game calibration, not a validated demographic fact. Each person\'s chance is '
+        'settled by a draw of their own for that season (from the world\'s seed, the season and the person), so '
+        'it moves nothing else in the world and is the same after a save and resume; a season is never processed '
+        'twice. A golfer who became a coach or caddie is one person: they die once, and every record of them '
+        'says so. A coach\'s or caddie\'s open partnerships end that winter ("coach died" / "caddie died") and '
+        'they stop working; outside recruits fill the gap as for any vacancy. Results, records, relationships '
+        'and profiles are kept. Worlds started before this rule never process deaths, and no past death is '
+        'invented: people already old when a world begins are processed from its first season\'s end.',
+        '2026-11-07'),
     'injuries': (
         'Injuries',
         'A golfer can be hurt playing an event; the chance rises with tiredness, age and the rounds played and falls '

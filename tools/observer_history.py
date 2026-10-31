@@ -392,7 +392,7 @@ def season_view(w, q, pid, p):
     if live:
         lp = w.live.people[pid]
         out.append(f'<div class="banner warn">{y} is in progress (to {O.date_text(w.live.cursor)}): a partial season.</div>')
-        facts = [('Age*', O.age_text(w, born, y)), ('Tour', O.tour_link(w, lp.get('tour'))),
+        facts = [('Age*', O.age_text(w, born, y, p.get('died'))), ('Tour', O.tour_link(w, lp.get('tour'))),
                  ('Status', O.esc(STATUS.get(lp.get('status'), lp.get('status')))),
                  ('Lifestyle', O.esc(LIFESTYLE.get(lp.get('lifestyle'), lp.get('lifestyle'))))]
         r = getattr(w.live, 'rights', {}).get(pid)
@@ -405,7 +405,7 @@ def season_view(w, q, pid, p):
             facts.append(('World ranking now', O.esc(w.live.wr[pid])))
         facts.append(('Prize money so far', O.money(w.live.prize.get(pid, 0.0))))   # (no ledger: paid nothing)
     else:
-        facts = [('Age*', O.age_text(w, born, y)), ('Tour', O.tour_link(w, row.get('tour'))),
+        facts = [('Age*', O.age_text(w, born, y, p.get('died'))), ('Tour', O.tour_link(w, row.get('tour'))),
                  ('Status', O.esc(STATUS.get(row.get('status'), row.get('status')))),
                  ('Lifestyle', O.esc(LIFESTYLE.get(row.get('lifestyle'), row.get('lifestyle'))))]
         r = row.get('rights')

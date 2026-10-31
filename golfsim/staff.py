@@ -42,7 +42,8 @@ Changes
     fit, affordability and better options; a coach who backed a prospect weighs the evidence over an
     observation period, not a birthday. Mid-season changes happen only when someone retires or genuinely
     cannot continue (cannot pay a coach; a caddie with no events to work). Staff retire gradually with
-    age (and leave the profession after long spells without work), which closes their stints.
+    age (and leave the profession after long spells without work), which closes their stints. A coach or
+    caddie can die in the winter after a season (mortality.py): their stints end then, with the reason.
 
 Where they come from
     Former golfers (by aptitude and age; rarely anyone who made a fortune), plus generated starting
@@ -731,6 +732,10 @@ def end_of_season(season, year, snap):
             k.history.append((year, f'Stopped caddying at {k.age(year)}'))
     release_departed(season, year, 53)
     sync_school(season, year, 53, closing=True)
+    # deaths (mortality.py, rules 2026-11-07): once per winter, after the season's career decisions, these
+    # retirements and the departed's relationships, before outside recruits (who then replace the dead)
+    from .mortality import winter as mortality_winter
+    mortality_winter(season, year)
     # outside recruits for unmet demand (labelled as such)
     demand = {}
     for g in season.world.golfers:

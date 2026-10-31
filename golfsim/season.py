@@ -434,6 +434,9 @@ class Season:
         self.stuck_blocks = Counter()                        # gid -> consecutive months unable to afford a trip
         self.block_flags = defaultdict(_dd_counter)          # year -> gid -> monthly money state
         WP.init(self)                                        # the work pathway's evidence and records
+        self.mortality_on = True                             # deaths after retirement (mortality.py, D6)
+        self.deaths = {}                                     # person id -> {year, week (53), age, roles}
+        self.mortality_done = set()                          # winters (season years) already processed
         self.year = self.first_year
         from .cards import tour_target
         for k, t in TOUR_BY_KEY.items():
@@ -1869,6 +1872,9 @@ class Season:
         state.setdefault('am_support_held', {})
         state.setdefault('amateur_support_on', True)
         state.setdefault('work_pathway_on', False)           # saves from before the pathway: never applied
+        state.setdefault('mortality_on', False)              # saves from before deaths: nobody dies (no migration)
+        state.setdefault('deaths', {})
+        state.setdefault('mortality_done', set())
         if 'cash_blocked' not in state:
             state['cash_blocked'] = Counter()
             state['cash_blocked_max'] = defaultdict(Counter)
