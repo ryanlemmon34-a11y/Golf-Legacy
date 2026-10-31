@@ -26,6 +26,9 @@ Definitions (shown on the pages):
   retired golfer's last row is their Overall when they retired. Never an event count: not filtered by tour.
 - **Records kept here** (per season, bounded): the longest drives and the best event driving averages
   (top RECORD_KEEP per season and tour), every stroke-play winning margin and every match-play result.
+- **Upsets** (roadmap B1/B2): one row per won, single-site, non-qualifying edition: its recorded pre-event estimate
+  (golfsim/upsets.py; NULL model when the edition was played before estimates were kept: never reconstructed) and,
+  apart from it, the result's drama (winning margin, playoff, strokes behind before the final round).
 
 The store is a small SQLite file next to the world (observer_cache/), built one season at a time from the
 season files (in the background), and rebuilt for a season whose published file changes (a rollback).
@@ -46,7 +49,7 @@ sys.path.insert(0, str(ROOT))
 
 from golfsim import golfstats as GS                                      # noqa: E402
 
-SCHEMA = 5
+SCHEMA = 6
 COLUMNS = ('starts', 'wins', 'runner_ups', 'top2', 'top5', 'top10', 'cut_events', 'cuts_made', 'qualifiers')
 GOLF = ('golf_starts',) + GS.FIELDS            # summed golf statistics counters (and the starts carrying them)
 ALL = COLUMNS + GOLF
@@ -54,7 +57,8 @@ RECORD_KEEP = 100                              # longest drives / event driving 
 EVENT_DRIVE_TIERS = (8, 20, 30, 40)            # event driving averages: the top RECORD_KEEP among the editions with
 EVENT_MIN_DRIVES = EVENT_DRIVE_TIERS[0]        # at least this many measured drives, kept for each tier (qualified
                                                # before limited: a record list never loses a qualified leader)
-TABLES = ('agg', 'season_prize', 'money', 'staff_year', 'long_drives', 'event_drives', 'margins', 'matches', 'overall')
+TABLES = ('agg', 'season_prize', 'money', 'staff_year', 'long_drives', 'event_drives', 'margins', 'matches', 'overall',
+          'upsets')
 ALL_TIME = ('agg_all', 'prize_all')            # every season summed (for all-time pages), with the seasons they hold
 DDL = """
 CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT);
@@ -73,6 +77,9 @@ CREATE TABLE IF NOT EXISTS margins(year INT, tour TEXT, event_id TEXT, series TE
     winner INT, win_total INT, runner_total INT, margin INT, runners_up TEXT, playoff INT, field INT);
 CREATE TABLE IF NOT EXISTS matches(year INT, tour TEXT, event_id TEXT, series TEXT, week INT, stage TEXT, winner INT,
     loser INT, result TEXT, holes INT, up INT, remaining INT);
+CREATE TABLE IF NOT EXISTS upsets(year INT, week INT, event_id TEXT, series TEXT, name TEXT, tour TEXT, tier INT,
+    major INT, winner INT, model TEXT, p REAL, status TEXT, age INT, field INT, margin INT, playoff INT, back INT,
+    rounds INT, match_play INT, detail TEXT);
 CREATE TABLE IF NOT EXISTS season_prize(person INT, year INT, prize REAL, reconciled INT, PRIMARY KEY(person, year));
 CREATE TABLE IF NOT EXISTS money(event_id TEXT PRIMARY KEY, year INT, purse INT, cut_top INT, field_size INT,
     match_play INT);
@@ -241,6 +248,43 @@ def season_records(events, year):
     return keep_long, keep_avg, margins, matches
 
 
+def upset_rows(events, year):
+    """The season's Upsets rows (see the module notes), from the editions as recorded: the pre-event estimate is
+    copied, never recomputed; margin, playoff and the deficit before the last round come from the recorded result
+    and stay apart from the estimate."""
+    out = []
+    for e in events:
+        if e.get('kind') == 'qualifying' or e.get('tier') == 7 or len(e.get('finish') or ()) != 1:
+            continue
+        site = e['finish'][0]
+        win = next(((g, t) for g, p, t in site if p == 1), None)
+        if win is None:
+            continue
+        up = e.get('upset') or {}
+        est = bool(up.get('estimated')) and up.get('winner') == win[0]
+        facts = (up.get('winner_facts') or {}) if est else {}
+        margin = back = None
+        if not e.get('match_play') and win[1] is not None:
+            rest = [t for g, p, t in site if t is not None and g != win[0]]
+            margin = (min(rest) - win[1]) if rest else None
+            scores = (e.get('scores') or [{}])[0]
+            r = e.get('rounds') or 0
+            if r >= 2 and scores:
+                before = {g: sum(v[:r - 1]) for g, v in scores.items() if len(v) >= r - 1}
+                mine = before.get(str(win[0]), before.get(win[0]))
+                if mine is not None:
+                    back = mine - min(before.values())
+        detail = {k: up[k] for k in ('why', 'rank', 'overall_rank', 'overall', 'favourite', 'favourite_p',
+                                     'favourite_overall', 'favourite_facts', 'top', 'winner_facts') if k in up}
+        out.append((year, e['week'], e['id'], e['series'], e.get('name'), e.get('tour') or '', e.get('tier'),
+                    int(e.get('kind') == 'major' or e.get('category') == 'major'), win[0],
+                    up.get('model') if up and (est or not up.get('estimated')) else None,
+                    up.get('p') if est else None, facts.get('status'), facts.get('age'), len(site), margin,
+                    e.get('playoff') or 0, back, e.get('rounds'), int(bool(e.get('match_play'))),
+                    json.dumps(detail, separators=(',', ':')) if up else None))
+    return out
+
+
 class StatsStore:
     """The SQLite store (one connection per thread: open one where it is used)."""
 
@@ -286,10 +330,12 @@ class StatsStore:
                 self.db.execute(f'DELETE FROM {t} WHERE year = ?', (year,))
             self.db.execute('DELETE FROM years WHERE year = ?', (year,))
 
-    def put(self, year, source, agg, reconciled, paid, money, staff=(), records=((), (), (), ()), overall=()):
+    def put(self, year, source, agg, reconciled, paid, money, staff=(), records=((), (), (), ()), overall=(), upsets=()):
         with self.db:
             for t in TABLES:
                 self.db.execute(f'DELETE FROM {t} WHERE year = ?', (year,))
+            if upsets:
+                self.db.executemany(f'INSERT INTO upsets VALUES ({",".join("?" * len(upsets[0]))})', upsets)
             self.db.executemany('INSERT INTO staff_year VALUES (?,?,?,?,?,?,?)', staff)
             self.db.executemany('INSERT INTO overall VALUES (?,?,?)', overall)
             self.db.executemany(
@@ -351,7 +397,7 @@ def build(archive_dir, store_path):
                 staff = [(int(k.split(':')[1]), y, k.split(':')[0], v.get('rounds'), v.get('weeks'),
                           v.get('reputation'), v.get('earnings_total')) for k, v in d.get('staff_year', {}).items()]
                 store.put(y, want[y], agg, rec, paid, money, staff, season_records(d['events'], y),
-                          season_overall(careers, y, a.world.get('rating_keys')))
+                          season_overall(careers, y, a.world.get('rating_keys')), upset_rows(d['events'], y))
                 a._years.clear()                         # (one decoded season at a time)
             if changed or store.db.execute("SELECT 1 FROM meta WHERE key = 'all_time'").fetchone() is None:
                 store.sum_all_time()

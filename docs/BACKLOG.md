@@ -102,7 +102,7 @@ Status is what was built and tested, not what was proposed. Report: `docs/V17_PA
 | G2 Visible Aggression | Built, unit-tested: shown on profiles, stable, reach/aggression interaction tested; no second risk score | `docs/FAMILIARITY_AND_AGGRESSION.md` |
 | G3 Seasonal weather | Built on branch build/v16-weather (rules 2026-11-09): seasonal climate by city and week, wind direction per hole, skill mitigation, conditions on scorecards and summaries; temperature/firmness open for the owner; season-scale runs pending | `golfsim/weather.py` |
 | Record Book; nation count links | Record Book built; nation counts linked to their exact population **not yet** | -- |
-| B1/B2 Biggest Upsets | Planned | -- |
+| B1/B2 Biggest Upsets | Built: pre-event estimate recorded per edition (`upset-model-1`, recording only), observer page with a majors-only view and filters; whole-season equivalence and cost measurement pending the CPU release | `golfsim/upsets.py`, `tools/observer_upsets.py` |
 | T1-T3 Tournament stories, linked history | Planned | -- |
 | C1 Calibration | Waiting for the long runs (`docs/LONG_RUN_PLAN.md`, for approval) | -- |
 | C2 Death after retirement | Built per D6 (rules 2026-11-07): winter processing at (Y, 53), never an active competitive golfer, provisional curve; awaiting review and the small-world runs | `golfsim/mortality.py` |

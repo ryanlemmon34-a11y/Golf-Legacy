@@ -213,6 +213,25 @@ began (`ranking_seed`). The index (schema 4) adds each start's points (`starts.p
 statistics store (schema 2, derived and rebuilt from the season files) sums the counters per golfer, season and
 tour and keeps per-season record rows (longest drives, event driving averages, winning margins, match results).
 
+**Recorded since Biggest Upsets (roadmap B1/B2):** each won, single-site, non-qualifying edition carries its
+pre-event estimate (`upset`, `golfsim/upsets.py`): the model version (`upset-model-1`), field size and rounds, the
+winner's chance, their rank in the field by the model and by Overall, their Overall, and their status, age, world
+and amateur ranking as the field was set; the favourite (chance, Overall, the same facts) and the top 5 chances;
+and the complete input snapshot (`inputs`: the entrants' ids and their Overall at the estimate, to one decimal, the
+precision the model uses; two parallel lists in field order), from which `upsets.reproduce` recomputes every stored
+chance exactly (tests/test_upsets.py). The model is ratings-based: the snapshot holds no hidden potential or other
+hidden fact. It is worked out in the simulation from the field before any shot (no random numbers; no outcome
+reads it); every entrant's chance is computed but only the top 5 and the winner's are kept (the snapshot lets any
+of the others be recomputed).
+Archive growth (uncompressed JSON, measured on synthetic fields): about 11 bytes per entrant for the snapshot plus
+about 450 bytes per edition for the rest -- about 0.8 KB for a 30-player field, 1.3 KB for 80 and 2.2 KB for 156
+(about half that gzipped). A season grows by roughly 11 bytes x its estimated starts + 450 bytes x its estimated
+editions: for example 900 editions with 80,000 starts would add about 1.3 MB uncompressed, about 0.6 MB in the
+gzipped season file (an illustration; the measured share of a real season file is pending the long runs). Match play is marked not estimated.
+Editions played before it have none and are shown as not recorded (never reconstructed). The statistics store
+(schema 6) keeps one `upsets` row per won edition for the observer's Biggest Upsets page, with the margin, playoff
+and strokes behind before the final round kept apart from the estimate.
+
 ### Queries (`archive.Archive`)
 
 | Question | Call |

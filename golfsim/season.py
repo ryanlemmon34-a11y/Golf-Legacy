@@ -44,6 +44,7 @@ from . import familiarity as FAM
 from . import home_clubs as HC
 from .calendar import TOUR_BY_KEY, _in_window
 from . import schedule as SCH
+from . import upsets as UP
 from . import work_pathway as WP
 from .course_library import Venue, course_place, default_library, event_level, library_version
 from .engine import Conditions
@@ -300,6 +301,9 @@ def play_site(task):
     def on_match(stage, w, l, text, scheduled):
         matches.append([stage, w.id, l.id, text, scheduled])
     out = {'event_id': task['event_id'], 'site': task['site'], 'rounds': rounds_data, 'holes': holes_data}
+    if task.get('estimate'):                 # Biggest Upsets: the pre-event estimate, from the field as set and
+        # before any shot (no random numbers: the event's own draws are untouched; golfsim/upsets.py)
+        out['estimate'] = UP.estimate([(g.id, g.overall) for g in golfers], task['rounds'], task['match_play'])
     if not golfers:
         out.update(finish=[], playoff=0)
         return out
@@ -363,6 +367,8 @@ class EventResult:
     matches: list = field(default_factory=list)      # match play, per site: [[stage, winner, loser, result, holes]]
     points: list = field(default_factory=list)       # per site: {gid: world ranking points awarded}
     playoffs: list = field(default_factory=list)     # per site: None, or the playoff (see playoff_evidence)
+    upset: dict = None                               # the pre-event estimate's record (golfsim/upsets.py; None:
+                                                     # not recorded -- results from before it was kept)
 
     def winner(self, site=0):
         rows = self.finish[site] if self.finish else []
@@ -461,6 +467,9 @@ class Season:
         self.staff_receipts = defaultdict(Counter)            # year -> ('coach'|'caddie', id) -> $ received
         self.overall_start = {}                              # year -> gid -> overall on 1 January
         self._teams = {}                                     # event id -> {gid: (coach, caddie)} this week
+        # Biggest Upsets: each stroke-play edition's pre-event win estimate (recording only: no outcome reads it)
+        self.upset_estimates = True
+        self._upset_facts = {}                               # event id -> {gid: (status, age, world, amateur rank)}
         self.entry_misses = defaultdict(Counter)             # year -> gid -> weeks shut out of full fields
         self.entry_wants = defaultdict(Counter)              # year -> gid -> weeks they wanted to play
         self.season_rounds = defaultdict(Counter)            # year -> gid -> competitive rounds played
@@ -2015,6 +2024,11 @@ class Season:
             # who was in each golfer's team this week (kept with the result: history never relies on
             # later assignments)
             self._teams[ed.event_id] = {gid: self.staff.team(gid) for ids in fields[ed.event_id] for gid in ids}
+            estimate = self.upset_estimates and s.kind != 'qualifying' and len(fields[ed.event_id]) == 1
+            if estimate:                                     # facts as the field was set (rankings: last week's)
+                self._upset_facts[ed.event_id] = {gid: (self.g[gid].status, year - self.g[gid].born,
+                                                        self.wr_pos.get(gid), self.am_pos.get(gid))
+                                                  for gid in fields[ed.event_id][0]}
             for site, ids in enumerate(fields[ed.event_id]):
                 v = venues[ed.event_id][min(site, len(venues[ed.event_id]) - 1)]
                 course = self.lib.course(v)
@@ -2032,7 +2046,7 @@ class Season:
                               'rounds': s.rounds, 'cut_top': s.cut_top,
                               'prestige': self.event_prestige[s.series_id],
                               'week': week, 'weather': self.weather,
-                              'seed': _seed(self.seed, ed.event_id, site)})
+                              'seed': _seed(self.seed, ed.event_id, site), 'estimate': estimate})
         if not tasks:
             return
         tasks.sort(key=lambda t: -len(t['golfers']) * t['rounds'])
@@ -2085,6 +2099,8 @@ class Season:
         state.setdefault('creations', defaultdict(dict))
         state.setdefault('injury_lasting', defaultdict(dict))   # lasting injury losses before they were kept
         state.setdefault('week', 0)
+        state.setdefault('upset_estimates', True)          # saves from before: estimates kept from now on
+        state.setdefault('_upset_facts', {})
         state.setdefault('am_support', {})                   # saves from before amateur support: none held
         state.setdefault('am_support_log', defaultdict(list))
         state.setdefault('am_support_seasons', {})
@@ -2351,8 +2367,23 @@ class Season:
             hosted = self.course_hosted.setdefault(v.course_id, {})
             hosted[year] = max(hosted.get(year, 0.0), p)
         self.prestige_history[sid].append((year, p, res.field_strength))
+        self.record_upset(ed, res, site_out)
         self.results[ed.event_id] = res
         self.stats[year]['events'] += 1
+
+    def record_upset(self, ed, res, site_out):
+        """Biggest Upsets: the edition's pre-event estimate (worked out before the event, unchanged here) with its
+        winner looked up afterwards, and the facts as the field was set. Reads only; changes nothing else."""
+        facts = self._upset_facts.pop(ed.event_id, None)
+        pre = (site_out.get(0) or {}).get('estimate')
+        if pre is None:
+            if ed.series.kind != 'qualifying' and self.upset_estimates and len(site_out) > 1:
+                res.upset = {'model': UP.VERSION, 'estimated': False, 'why': 'several sites (no single field)'}
+            return
+        def fact(gid):
+            st, age, wr, ar = facts.get(gid, (None, None, None, None)) if facts else (None, None, None, None)
+            return {'status': st, 'age': age, 'wr': wr, 'ar': ar}
+        res.upset = UP.record(pre, res.winner(0), fact)
 
     # ---- fatigue and injuries ------------------------------------------------------------------
     def load(self, g, rounds, travelled, year):
