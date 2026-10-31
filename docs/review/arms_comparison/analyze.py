@@ -33,7 +33,7 @@ DEFAULT_BUILD = V18 / 'arms' / 'build_c0d1ea5'
 DEFAULT_ARMS = {k: V18 / 'arms' / k for k in ('a21old', 'a18old', 'a18new', 'seed2')}
 DEFAULT_STORY_ARCHIVE = V18 / 'runs' / 'A' / 'world_360013' / 'archive'
 # what each arm's sections read of the season summaries (the rest is dropped after loading, to keep memory modest)
-_COMMON = {'prestige', 'created', 'arrival_log', 'venue_sites', 'ar_ev', 'cash_blocked_max', 'work_pathway', 'transitions',
+_COMMON = {'prestige', 'created', 'arrival_log', 'venue_sites', 'ar_ev', 'aj_ev', 'cash_blocked_max', 'work_pathway', 'transitions',
            'careers'}
 KEEP = {'a21old': {'plans', 'careers', 'transitions', 'work_pathway', 'oo', 'open_starts', 't5_starts', 'start_weeks'} | _COMMON,
         'a18old': {'plans', 'careers', 'transitions', 'work_pathway', 'oo', 'open_starts', 't5_starts', 'start_weeks'} | _COMMON,
@@ -1378,9 +1378,32 @@ def section_return(arms, lines):
     pooled_starts = defaultdict(list)
     pooled_people = defaultdict(set)
     checks = []
+    A1_missing, A2_fail, A3_fail = [], [], []
+    A1_n = A2_n = A3_n = 0
+    absent_zero = Counter()
     for a in arms:
         if not a['seasons'] or 'ar_ev' not in a['summ'][a['seasons'][0]]:
             continue
+        for y in a['seasons']:                       # assertion 2: every season's inputs are present
+            S_ = a['summ'][y]
+            A2_n += 1
+            why = []
+            if S_.get('evidence_format') != 'golf-legacy-decision-evidence/2':
+                why.append(f'format {S_.get("evidence_format")}')
+            if not {'amateur_return', 'amateur_job'} <= set(S_.get('evidence_models') or ()):
+                why.append('models ' + ','.join(S_.get('evidence_models') or ()))
+            if not S_.get('cash_blocked_present'):
+                why.append('cash_blocked_max missing')
+            if not S_.get('work_pathway_present'):
+                why.append('work_pathway missing')
+            if why:
+                A2_fail.append(f'{a["name"]} {y}: ' + '; '.join(why))
+        tr = Counter((t['gid'], y) for y in a['seasons'] for t in a['summ'][y]['transitions'] if t.get('kind') == RETURN_KIND)
+        evp = Counter((g, y) for y in a['seasons'] for g, r_ in a['summ'][y]['ar_ev'].items() if r_[2] == 1)
+        A3_n += len(tr)
+        for k in sorted(set(tr) | set(evp)):         # assertion 3: one-to-one per (arm, golfer, year)
+            if tr.get(k, 0) != 1 or evp.get(k, 0) != 1:
+                A3_fail.append(f'{a["name"]} golfer {k[0]} {k[1]}: transitions {tr.get(k, 0)}, positive evaluations {evp.get(k, 0)}')
         last = a['seasons'][-1]
         C = defaultdict(Counter)
         starts = defaultdict(list)
@@ -1388,7 +1411,8 @@ def section_return(arms, lines):
         n_ev_out = n_tr = 0
         for y in a['seasons']:
             S_ = a['summ'][y]
-            for g, (p, u, out, age, blocked) in S_['ar_ev'].items():
+            for g, r_ in S_['ar_ev'].items():
+                p, u, out, age, blocked = r_[:5]
                 if age is None:
                     born = (a['people'].get(g) or {}).get('born')
                     age = y - born if born else None
@@ -1410,7 +1434,11 @@ def section_return(arms, lines):
                         C[b]['cens'] += 1
                     continue
                 S1 = a['summ'][y + 1]
-                cb = S1['cash_blocked_max'].get(g, 0)
+                A1_n += 1
+                if g not in S1['careers']:                   # assertion 1: a Y+1 career row, never a silent zero
+                    A1_missing.append(f'{a["name"]} golfer {g} return {y}')
+                absent_zero['cash_blocked_max'] += g not in S1['cash_blocked_max']
+                cb = S1['cash_blocked_max'].get(g, 0)        # (a present map without the golfer: zero, counted)
                 re_ = [r for r in S1['work_pathway'] if r['gid'] == g]
                 tj = any(t2.get('gid') == g and t2.get('kind') == 'amateur took a job' for t2 in S1['transitions'])
                 kinds = {t2['kind'] for t2 in S1['transitions'] if t2.get('gid') == g}
@@ -1425,7 +1453,8 @@ def section_return(arms, lines):
                     C[b]['retired'] += 'retired' in kinds
                     C[b]['staff'] += bool(kinds & {'became coach', 'became caddie'})
                     C[b]['died'] += died is not None and died in (y, y + 1)
-                    starts[b].append((S1['careers'].get(g) or {}).get('events', 0) or 0)
+                    if g in S1['careers']:
+                        starts[b].append(S1['careers'][g]['events'])
         checks.append(f'{a["name"]}: {n_tr} return transitions, {n_ev_out} evaluations with outcome 1'
                       + ('' if n_tr == n_ev_out else ' (DIFFER)'))
         rows = []
@@ -1452,6 +1481,139 @@ def section_return(arms, lines):
     lines.append('Consistency of the two sources: ' + '; '.join(checks) + '. Death counts a death in the winter of the '
                  'return or the winter after Y+1 (people table `died`).')
     lines.append('')
+    obs = pooled['all']['obs']
+    lines.append(f'**Two different events, reported separately (pooled, observed returns):** a winter "amateur took a '
+                 f'job" career decision after Y+1: {frac(pooled["all"]["tookjob"], obs)}; a mid-season cash re-block '
+                 f'or a work-pathway re-entry during Y+1: {frac(pooled["all"]["blocked"], obs)} with any cash-blocked '
+                 f'week, {frac(pooled["all"]["reentry"], obs)} re-entries. Neither stands in for the other.')
+    lines.append('')
+    res = lambda fails: 'PASS' if not fails else f'FAIL ({len(fails)}): ' + '; '.join(fails[:20]) + (' …' if len(fails) > 20 else '')
+    for msg in ([f'A1 {x}' for x in A1_missing] + [f'A2 {x}' for x in A2_fail] + [f'A3 {x}' for x in A3_fail]):
+        print('FAIL', msg, flush=True)
+    lines.append('**Completeness assertions** (analysis-only; a failure is printed with its ids):')
+    lines.append('')
+    lines.append(f'- A1, a season-(Y+1) career row for every observed return (starts are never defaulted to zero): '
+                 f'{A1_n - len(A1_missing)}/{A1_n} — {res(A1_missing)}.'
+                 + (f' Smallest Y+1 starts among them: {min(pooled_starts["all"])}.' if pooled_starts['all'] else ''))
+    lines.append(f'- A2, inputs present in every season used (decision evidence format golf-legacy-decision-evidence/2 '
+                 f'with the `amateur_return` and `amateur_job` models; `cash_blocked_max` and `work_pathway` present): '
+                 f'{A2_n - len(A2_fail)}/{A2_n} seasons — {res(A2_fail)}. A present map without the golfer means zero '
+                 f'(counted: {absent_zero["cash_blocked_max"]} observed returns absent from the Y+1 `cash_blocked_max`).')
+    lines.append(f'- A3, return transitions and positive `amateur_return` evaluations matched one-to-one per (arm, golfer, '
+                 f'year): {A3_n} transitions — {res(A3_fail)}.')
+    lines.append('')
+    section_return_jobs(arms, lines)
+
+
+def section_return_jobs(arms, lines):
+    """5.1: the job probability anticipated at return vs the decision faced the following winter."""
+    lines.append('### 5.1 The job chance anticipated at return vs the next winter\'s job decision')
+    lines.append('')
+    lines.append('**What the rule discounts.** The return chance is `min(CAP, sig(x) × keep_up)` '
+                 '(golfsim/amateur_return.py lines 142 and 147), where `keep_up` (lines 150–160) is `1 − '
+                 'careers.p_amateur_job(season, g, row, year + 1)` evaluated in the return winter Y, after the turn-pro '
+                 'draw and before the golfer\'s lifestyle changes, with cash reduced by the full-time season cost '
+                 '(savings first, then family money: line 155) and restored afterwards. So it discounts the same '
+                 'decision function the next winter applies (careers.py lines 355–365: `x = −1.2 + 0.8 (age − 22) − '
+                 '0.4 min(runway, 5) + 1[cash < 0]`, at age Y+1) — the same kind of event, a full-time amateur '
+                 'taking a job in the winter after Y+1 (careers.decide lines 449–458) — but evaluated on PROJECTED '
+                 'inputs, so it is a proxy, not that exact future draw: (i) the golfer is still part-time when '
+                 'it is computed, so `runway_years` (careers.py 81–96, called with row None) costs the season with a '
+                 'working amateur\'s committed costs (season.committed_weekly: living 40,000 less salary 52,000, i.e. '
+                 'none, plus any coach fee) where the actual decision costs it as a full-time amateur (no living cost); '
+                 '(ii) events = max(8, events of season Y, as a part-timer) rather than of Y+1; (iii) cash is the '
+                 'savings after paying the season cost, with no other money in or out during Y+1, so the debt term is '
+                 'never on at the prediction; (iv) `season.funds(g, Y+2)` has no Y+1 ledger yet, so the credit line is '
+                 'the base limit. The actual decision (careers.py 449–454) uses the golfer\'s real end-of-Y+1 cash, '
+                 'row and credit, and is reached only if the golfer did not retire (line 415) or turn professional '
+                 '(line 433) first and is a full-time non-college amateur aged 19+. The other route to work in Y+1, '
+                 'the mid-season work pathway, had 0 re-entries (above).')
+    lines.append('')
+    lines.append('**Data.** Prediction: the stored `keep_up` input of the return\'s decision evidence /2 '
+                 '`amateur_return` row (rounded to 3 decimals by decision_evidence._input), so predicted p = 1 − '
+                 'keep_up; not recomputed. Actual: the following winter\'s `amateur_job` row for that golfer (p, '
+                 'its draw u, outcome, and inputs age, runway, cash), read as stored. Population: the observed '
+                 'returns (season Y+1 archived; censored excluded). Episodes and unique (arm, golfer) pairs are shown '
+                 'side by side: a golfer who returned twice contributes two episodes, which are not independent. '
+                 'Drift medians compare the prediction\'s projected funds (`funds_k − season_cost_k`, savings plus '
+                 'family money after the season) with the decision\'s `cash_k` (savings only: family money is not an '
+                 'input of p_amateur_job), Overall and amateur rank at the end of Y and Y+1 (season file `careers`), '
+                 'and the age used at each point.')
+    lines.append('')
+    head = ['arm', 'band', 'episodes (unique people)', 'with a next-winter job evaluation', 'not evaluated (why)',
+            'predicted mean p at return', 'evaluated mean p next winter', 'realised: took a job',
+            'Σ predicted p vs observed', 'Σ evaluated p vs observed (evaluated only)', 'projected funds → cash at decision, $k (medians)',
+            'Overall change (median)', 'amateur rank end Y → end Y+1 (medians)', 'age used by the prediction (age at Y + 1) / at the decision',
+            'debt term on at the decision']
+    rows, pool = [], defaultdict(lambda: defaultdict(list))
+    for a in arms:
+        if not a['seasons'] or 'aj_ev' not in a['summ'][a['seasons'][0]]:
+            continue
+        D = defaultdict(lambda: defaultdict(list))
+        for y in a['seasons'][:-1]:
+            S0, S1 = a['summ'][y], a['summ'][y + 1]
+            for t in S0['transitions']:
+                if t.get('kind') != RETURN_KIND:
+                    continue
+                g = t['gid']
+                r = S0['ar_ev'].get(g)
+                inp = r[5] if r and len(r) > 5 else {}
+                ku = inp.get('keep_up')
+                aj = S1['aj_ev'].get(g)
+                kinds = {t2['kind'] for t2 in S1['transitions'] if t2.get('gid') == g}
+                c0, c1 = S0['careers'].get(g) or {}, S1['careers'].get(g) or {}
+                rec = {'gid': (a['name'], g), 'pred': None if ku is None else 1 - ku,
+                       'took': 'amateur took a job' in kinds}
+                if aj:
+                    p, u, out, ain, terms = aj
+                    rec.update(act=p, out=out, cash=ain.get('cash_k'), debt=(terms.get('debt') or 0) > 0, age1=ain.get('age'))
+                else:
+                    rec['why'] = ('turned pro / comeback' if kinds & {'turned pro', 'comeback'} else 'retired or staff'
+                                  if kinds & {'retired', 'became coach', 'became caddie'} else
+                                  f'{c1.get("status")} {c1.get("lifestyle")}' if c1 else 'no Y+1 row')
+                if inp.get('funds_k') is not None and inp.get('season_cost_k') is not None:
+                    rec['proj'] = inp['funds_k'] - inp['season_cost_k']
+                rec['age0'] = None if inp.get('age') is None else inp['age'] + 1   # keep_up evaluates at Y+1's age
+                if c0.get('overall') is not None and c1.get('overall') is not None:
+                    rec['dov'] = c1['overall'] - c0['overall']
+                rec['r0'], rec['r1'] = c0.get('am_end'), c1.get('am_end')
+                for b in (band5(t.get('age')), 'all'):
+                    D[b]['r'].append(rec)
+                    pool[b]['r'].append(rec)
+        for b in [x for x, _, _ in BANDS5] + ['all']:
+            if D[b]['r']:
+                rows.append(row51(a['name'], b, D[b]['r']))
+    for b in [x for x, _, _ in BANDS5] + ['all']:
+        if pool[b]['r']:
+            rows.append(row51('POOLED (four arms; sums of episodes from different worlds)', b, pool[b]['r']))
+    lines.append(table(head, rows))
+    lines.append('')
+    lines.append('Return-rate denominators (the table above section 5.1): "returns / all evaluations" counts every '
+                 '`amateur_return` evaluation, including p = 0 (blocked by work, funds or results: the discount never '
+                 'enters those); "returns / eligible" counts only p > 0, where the chance is already multiplied by the '
+                 'anticipated keep-up factor (and capped at 0.6), so the discount lowers the eligible-rate numerator '
+                 'directly and the all-evaluations rate only through the eligible ones. Differences between predicted '
+                 'and evaluated p are described only by the recorded inputs above; no tuning is proposed.')
+    lines.append('')
+
+
+def row51(name, b, R):
+    md = lambda xs: f'{S.median(xs):.1f}' if xs else '—'
+    pred = [r['pred'] for r in R if r['pred'] is not None]
+    ev = [r for r in R if 'act' in r]
+    why = Counter(r['why'] for r in R if 'act' not in r)
+    took = sum(r['took'] for r in R)
+    took_ev = sum(r['out'] for r in ev)
+    return (name, b, f'{len(R)} ({len({r["gid"] for r in R})})', frac(len(ev), len(R)),
+            '; '.join(f'{k} {v}' for k, v in why.most_common()) or '—',
+            f'{S.mean(pred):.3f} (n={len(pred)})' if pred else '—',
+            f'{S.mean([r["act"] for r in ev]):.3f}' if ev else '—', frac(took, len(R)),
+            f'{sum(pred):.1f} vs {took}', f'{sum(r["act"] for r in ev):.1f} vs {took_ev}',
+            f'{md([r["proj"] for r in R if r.get("proj") is not None])} → {md([r["cash"] for r in ev if r.get("cash") is not None])}',
+            f'{S.median([r["dov"] for r in R if "dov" in r]):+.1f}' if any('dov' in r for r in R) else '—',
+            f'{md([r["r0"] for r in R if r["r0"]])} → {md([r["r1"] for r in R if r["r1"]])}',
+            f'{md([r["age0"] for r in R if r.get("age0") is not None])} / {md([r["age1"] for r in ev if r.get("age1") is not None])}',
+            frac(sum(r.get('debt', False) for r in ev), len(ev)))
 
 
 def row5(b, c, people, starts):

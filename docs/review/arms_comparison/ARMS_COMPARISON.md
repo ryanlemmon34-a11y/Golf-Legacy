@@ -1,6 +1,6 @@
 # Arms comparison (pinned build c0d1ea5)
 
-Written 2026-10-31 12:23 UTC by armsan/analyze.py from the run folders as committed at read time (read-only). Same build for every arm; seeds pinned. Partial arms are labelled with the seasons included. No conclusions beyond the data; effects are noted, not tuned.
+Written 2026-10-31 12:36 UTC by armsan/analyze.py from the run folders as committed at read time (read-only). Same build for every arm; seeds pinned. Partial arms are labelled with the seasons included. No conclusions beyond the data; effects are noted, not tuned.
 
 | arm | seed | build | arm recorded | pathway min age in force | seasons | run state read from | archive generation |
 |---|---|---|---|---|---|---|---|
@@ -698,6 +698,48 @@ Sources (the build's own records, read from the season files): **episodes** are 
 
 Consistency of the two sources: a21old: 346 return transitions, 346 evaluations with outcome 1; a18old: 328 return transitions, 328 evaluations with outcome 1; a18new: 362 return transitions, 362 evaluations with outcome 1; seed2: 130 return transitions, 130 evaluations with outcome 1. Death counts a death in the winter of the return or the winter after Y+1 (people table `died`).
 
+**Two different events, reported separately (pooled, observed returns):** a winter "amateur took a job" career decision after Y+1: 505/1009 (50.0%); a mid-season cash re-block or a work-pathway re-entry during Y+1: 0/1009 (0.0%) with any cash-blocked week, 0/1009 (0.0%) re-entries. Neither stands in for the other.
+
+**Completeness assertions** (analysis-only; a failure is printed with its ids):
+
+- A1, a season-(Y+1) career row for every observed return (starts are never defaulted to zero): 1009/1009 — PASS. Smallest Y+1 starts among them: 8.
+- A2, inputs present in every season used (decision evidence format golf-legacy-decision-evidence/2 with the `amateur_return` and `amateur_job` models; `cash_blocked_max` and `work_pathway` present): 35/35 seasons — PASS. A present map without the golfer means zero (counted: 1009 observed returns absent from the Y+1 `cash_blocked_max`).
+- A3, return transitions and positive `amateur_return` evaluations matched one-to-one per (arm, golfer, year): 1166 transitions — PASS.
+
+### 5.1 The job chance anticipated at return vs the next winter's job decision
+
+**What the rule discounts.** The return chance is `min(CAP, sig(x) × keep_up)` (golfsim/amateur_return.py lines 142 and 147), where `keep_up` (lines 150–160) is `1 − careers.p_amateur_job(season, g, row, year + 1)` evaluated in the return winter Y, after the turn-pro draw and before the golfer's lifestyle changes, with cash reduced by the full-time season cost (savings first, then family money: line 155) and restored afterwards. So it discounts the same decision function the next winter applies (careers.py lines 355–365: `x = −1.2 + 0.8 (age − 22) − 0.4 min(runway, 5) + 1[cash < 0]`, at age Y+1) — the same kind of event, a full-time amateur taking a job in the winter after Y+1 (careers.decide lines 449–458) — but evaluated on PROJECTED inputs, so it is a proxy, not that exact future draw: (i) the golfer is still part-time when it is computed, so `runway_years` (careers.py 81–96, called with row None) costs the season with a working amateur's committed costs (season.committed_weekly: living 40,000 less salary 52,000, i.e. none, plus any coach fee) where the actual decision costs it as a full-time amateur (no living cost); (ii) events = max(8, events of season Y, as a part-timer) rather than of Y+1; (iii) cash is the savings after paying the season cost, with no other money in or out during Y+1, so the debt term is never on at the prediction; (iv) `season.funds(g, Y+2)` has no Y+1 ledger yet, so the credit line is the base limit. The actual decision (careers.py 449–454) uses the golfer's real end-of-Y+1 cash, row and credit, and is reached only if the golfer did not retire (line 415) or turn professional (line 433) first and is a full-time non-college amateur aged 19+. The other route to work in Y+1, the mid-season work pathway, had 0 re-entries (above).
+
+**Data.** Prediction: the stored `keep_up` input of the return's decision evidence /2 `amateur_return` row (rounded to 3 decimals by decision_evidence._input), so predicted p = 1 − keep_up; not recomputed. Actual: the following winter's `amateur_job` row for that golfer (p, its draw u, outcome, and inputs age, runway, cash), read as stored. Population: the observed returns (season Y+1 archived; censored excluded). Episodes and unique (arm, golfer) pairs are shown side by side: a golfer who returned twice contributes two episodes, which are not independent. Drift medians compare the prediction's projected funds (`funds_k − season_cost_k`, savings plus family money after the season) with the decision's `cash_k` (savings only: family money is not an input of p_amateur_job), Overall and amateur rank at the end of Y and Y+1 (season file `careers`), and the age used at each point.
+
+| arm | band | episodes (unique people) | with a next-winter job evaluation | not evaluated (why) | predicted mean p at return | evaluated mean p next winter | realised: took a job | Σ predicted p vs observed | Σ evaluated p vs observed (evaluated only) | projected funds → cash at decision, $k (medians) | Overall change (median) | amateur rank end Y → end Y+1 (medians) | age used by the prediction (age at Y + 1) / at the decision | debt term on at the decision |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| a21old | 18–20 | 2 (2) | 2/2 (100.0%) | — | 0.048 (n=2) | 0.053 | 0/2 (0.0%) | 0.1 vs 0 | 0.1 vs 0 | 6.0 → 9.5 | +1.2 | 182.0 → 273.5 | 21.0 / 21.0 | 0/2 (0.0%) |
+| a21old | 21–24 | 190 (190) | 185/190 (97.4%) | turned pro / comeback 5 | 0.298 (n=190) | 0.418 | 77/190 (40.5%) | 56.7 vs 77 | 77.4 vs 77 | 15.0 → 8.0 | +0.4 | 938.5 → 1068.0 | 24.0 / 24.0 | 6/185 (3.2%) |
+| a21old | 25–29 | 110 (108) | 105/110 (95.5%) | turned pro / comeback 5 | 0.664 (n=110) | 0.754 | 76/110 (69.1%) | 73.0 vs 76 | 79.2 vs 76 | 20.0 → 14.0 | +0.3 | 994.5 → 1132.5 | 26.0 / 26.0 | 1/105 (1.0%) |
+| a21old | 30+ | 2 (2) | 2/2 (100.0%) | — | 0.982 (n=2) | 0.994 | 2/2 (100.0%) | 2.0 vs 2 | 2.0 vs 2 | 24.5 → 18.5 | +0.0 | 556.0 → 1370.0 | 31.0 / 31.0 | 0/2 (0.0%) |
+| a21old | all | 304 (295) | 294/304 (96.7%) | turned pro / comeback 10 | 0.433 (n=304) | 0.540 | 155/304 (51.0%) | 131.8 vs 155 | 158.7 vs 155 | 17.0 → 10.0 | +0.3 | 949.0 → 1110.5 | 25.0 / 25.0 | 7/294 (2.4%) |
+| a18old | 18–20 | 1 (1) | 1/1 (100.0%) | — | 0.026 (n=1) | 0.045 | 0/1 (0.0%) | 0.0 vs 0 | 0.0 vs 0 | 13.0 → 13.0 | +1.1 | 420.0 → 502.0 | 21.0 / 21.0 | 0/1 (0.0%) |
+| a18old | 21–24 | 169 (169) | 163/169 (96.4%) | turned pro / comeback 6 | 0.279 (n=169) | 0.381 | 54/169 (32.0%) | 47.2 vs 54 | 62.1 vs 54 | 17.0 → 8.0 | +0.4 | 947.0 → 1052.0 | 24.0 / 24.0 | 5/163 (3.1%) |
+| a18old | 25–29 | 122 (122) | 121/122 (99.2%) | turned pro / comeback 1 | 0.658 (n=122) | 0.745 | 84/122 (68.9%) | 80.3 vs 84 | 90.2 vs 84 | 19.0 → 13.0 | +0.2 | 964.0 → 1096.0 | 26.0 / 26.0 | 0/121 (0.0%) |
+| a18old | 30+ | 2 (2) | 2/2 (100.0%) | — | 0.982 (n=2) | 0.993 | 2/2 (100.0%) | 2.0 vs 2 | 2.0 vs 2 | 32.0 → 16.0 | -0.2 | 1094.5 → 1704.0 | 31.0 / 31.0 | 0/2 (0.0%) |
+| a18old | all | 294 (280) | 287/294 (97.6%) | turned pro / comeback 7 | 0.440 (n=294) | 0.538 | 140/294 (47.6%) | 129.5 vs 140 | 154.3 vs 140 | 18.0 → 11.0 | +0.3 | 942.0 → 1069.5 | 25.0 / 25.0 | 5/287 (1.7%) |
+| a18new | 18–20 | 1 (1) | 1/1 (100.0%) | — | 0.054 (n=1) | 0.054 | 0/1 (0.0%) | 0.1 vs 0 | 0.1 vs 0 | 6.0 → 7.0 | +0.5 | 331.0 → 152.0 | 21.0 / 21.0 | 0/1 (0.0%) |
+| a18new | 21–24 | 182 (182) | 180/182 (98.9%) | turned pro / comeback 2 | 0.291 (n=182) | 0.395 | 71/182 (39.0%) | 52.9 vs 71 | 71.0 vs 71 | 13.5 → 8.0 | +0.4 | 983.0 → 1193.0 | 25.0 / 25.0 | 3/180 (1.7%) |
+| a18new | 25–29 | 135 (134) | 135/135 (100.0%) | — | 0.668 (n=135) | 0.734 | 101/135 (74.8%) | 90.2 vs 101 | 99.1 vs 101 | 19.0 → 14.0 | +0.2 | 1206.0 → 1311.0 | 26.0 / 26.0 | 0/135 (0.0%) |
+| a18new | 30+ | 1 (1) | 1/1 (100.0%) | — | 0.982 (n=1) | 0.982 | 1/1 (100.0%) | 1.0 vs 1 | 1.0 vs 1 | 25.0 → 24.0 | +0.0 | 693.0 → 1685.0 | 31.0 / 31.0 | 0/1 (0.0%) |
+| a18new | all | 319 (309) | 317/319 (99.4%) | turned pro / comeback 2 | 0.452 (n=319) | 0.540 | 173/319 (54.2%) | 144.2 vs 173 | 171.1 vs 173 | 16.0 → 10.0 | +0.3 | 1044.0 → 1269.0 | 25.0 / 25.0 | 3/317 (0.9%) |
+| seed2 | 21–24 | 63 (63) | 62/63 (98.4%) | turned pro / comeback 1 | 0.249 (n=63) | 0.316 | 16/63 (25.4%) | 15.7 vs 16 | 19.6 vs 16 | 16.0 → 12.0 | +0.4 | 748.0 → 1075.0 | 24.0 / 24.0 | 1/62 (1.6%) |
+| seed2 | 25–29 | 29 (29) | 29/29 (100.0%) | — | 0.649 (n=29) | 0.744 | 21/29 (72.4%) | 18.8 vs 21 | 21.6 vs 21 | 22.0 → 17.0 | +0.2 | 936.0 → 1777.0 | 26.0 / 26.0 | 0/29 (0.0%) |
+| seed2 | all | 92 (92) | 91/92 (98.9%) | turned pro / comeback 1 | 0.375 (n=92) | 0.452 | 37/92 (40.2%) | 34.5 vs 37 | 41.1 vs 37 | 18.5 → 13.0 | +0.3 | 875.0 → 1117.0 | 24.0 / 24.0 | 1/91 (1.1%) |
+| POOLED (four arms; sums of episodes from different worlds) | 18–20 | 4 (4) | 4/4 (100.0%) | — | 0.044 (n=4) | 0.052 | 0/4 (0.0%) | 0.2 vs 0 | 0.2 vs 0 | 8.0 → 9.5 | +1.1 | 329.0 → 313.5 | 21.0 / 21.0 | 0/4 (0.0%) |
+| POOLED (four arms; sums of episodes from different worlds) | 21–24 | 604 (604) | 590/604 (97.7%) | turned pro / comeback 14 | 0.286 (n=604) | 0.390 | 218/604 (36.1%) | 172.5 vs 218 | 230.0 vs 218 | 15.5 → 8.5 | +0.4 | 935.5 → 1082.0 | 24.0 / 24.0 | 15/590 (2.5%) |
+| POOLED (four arms; sums of episodes from different worlds) | 25–29 | 396 (393) | 390/396 (98.5%) | turned pro / comeback 6 | 0.662 (n=396) | 0.744 | 282/396 (71.2%) | 262.3 vs 282 | 290.0 vs 282 | 19.0 → 14.0 | +0.2 | 1021.5 → 1232.0 | 26.0 / 26.0 | 1/390 (0.3%) |
+| POOLED (four arms; sums of episodes from different worlds) | 30+ | 5 (5) | 5/5 (100.0%) | — | 0.982 (n=5) | 0.991 | 5/5 (100.0%) | 4.9 vs 5 | 5.0 vs 5 | 25.0 → 17.0 | -0.1 | 667.0 → 1478.0 | 31.0 / 31.0 | 0/5 (0.0%) |
+| POOLED (four arms; sums of episodes from different worlds) | all | 1009 (976) | 989/1009 (98.0%) | turned pro / comeback 20 | 0.436 (n=1009) | 0.531 | 505/1009 (50.0%) | 439.9 vs 505 | 525.2 vs 505 | 17.0 → 11.0 | +0.3 | 968.0 → 1140.0 | 25.0 / 25.0 | 16/989 (1.6%) |
+
+Return-rate denominators (the table above section 5.1): "returns / all evaluations" counts every `amateur_return` evaluation, including p = 0 (blocked by work, funds or results: the discount never enters those); "returns / eligible" counts only p > 0, where the chance is already multiplied by the anticipated keep-up factor (and capped at 0.6), so the discount lowers the eligible-rate numerator directly and the all-evaluations rate only through the eligible ones. Differences between predicted and evaluated p are described only by the recorded inputs above; no tuning is proposed.
+
 ## 6. Upset snapshot cost (a18new and seed2)
 
 Bytes of each edition's archived `upset` record (golfsim/upsets.record), in the archive's own JSON encoding (compact separators, archive._write). "gzip alone" compresses a season's upset records (or their `inputs` snapshots) by themselves at the archive's level 6: an approximation of their contribution inside the whole-file compression, not an exact share of the gzip file.
@@ -736,4 +778,4 @@ Bytes of each edition's archived `upset` record (golfsim/upsets.record), in the 
 - Per-week entrants who were refused by a full ordinary open field are recorded only as the golfer's week (`careers.denied`: first choice and what they played instead); counts above are golfer-weeks, not entries per event.
 - The run state (seed rows, extras) is checkpointed every season in seed_<s>.state.pkl; seed_<s>.json.gz only every 5 seasons. The report reads whichever lists more seasons, and only seasons also published in the archive.
 
-_Analysis time: 20 s._
+_Analysis time: 136 s._

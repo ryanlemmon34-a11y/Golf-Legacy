@@ -25,7 +25,7 @@ sys.dont_write_bytecode = True          # never write __pycache__ into the pinne
 
 HERE = Path(__file__).resolve().parent
 CACHE = HERE / 'cache'
-EXTRACT_VERSION = 5                       # bump when the summary's contents change
+EXTRACT_VERSION = 6                       # bump when the summary's contents change
 
 
 def use_build(build):
@@ -193,7 +193,11 @@ def extract_season(path, year, defs, homeclub_country, lib_sites):
     # career evaluations of every amateur -- through decision_evidence.read
     blk = d.get('decision_evidence')
     out['evidence_format'] = blk.get('format') if blk else None
-    plans, careers_ev, ar_ev = {}, {}, {}
+    out['evidence_models'] = sorted(((blk or {}).get('definitions') or {}).get('careers', {}).get('models', {}))
+    out['cash_blocked_present'] = 'cash_blocked_max' in d
+    out['work_pathway_present'] = 'work_pathway' in d
+    out['amateur_support_on'] = d.get('amateur_support_on')
+    plans, careers_ev, ar_ev, aj_ev = {}, {}, {}, {}
     if blk:
         for gid, rec in car.items():
             if rec['status'] != 'amateur':
@@ -205,9 +209,13 @@ def extract_season(path, year, defs, homeclub_country, lib_sites):
                 careers_ev[gid] = [(c['model'], c['p'], c['outcome']) for c in ev['careers']]
                 for c in ev['careers']:
                     if c['model'] == 'amateur_return':      # every evaluation, p = 0 included (careers.decide)
-                        ar_ev[gid] = (c['p'], c['u'], c['outcome'], c['inputs'].get('age'), c['inputs'].get('blocked'))
+                        ar_ev[gid] = (c['p'], c['u'], c['outcome'], c['inputs'].get('age'), c['inputs'].get('blocked'),
+                                      dict(c['inputs']))
+                    elif c['model'] == 'amateur_job':         # the winter job decision of a full-time amateur
+                        aj_ev[gid] = (c['p'], c['u'], c['outcome'], dict(c['inputs']), dict(c['terms']))
     out['plans'] = plans
     out['ar_ev'] = ar_ev
+    out['aj_ev'] = aj_ev
     out['career_ev'] = careers_ev
     dg = (d.get('diagnostics') or {})
     lay = (dg.get('layout') or {}).get('overall_by_source', [25, 30])
@@ -264,7 +272,9 @@ def prune(summary, keep):
     """Only the parts a report reads (careers lose the access counts, which no table uses)."""
     if keep is None:
         return summary
-    out = {k: v for k, v in summary.items() if k in keep or k in ('version', 'year', 'file', 'evidence_format')}
+    out = {k: v for k, v in summary.items() if k in keep or k in ('version', 'year', 'file', 'evidence_format',
+                                                                    'evidence_models', 'cash_blocked_present',
+                                                                    'work_pathway_present', 'amateur_support_on')}
     if 'careers' in out:
         out['careers'] = {g: {k: v for k, v in c.items() if k != 'access'} for g, c in out['careers'].items()}
     return out
