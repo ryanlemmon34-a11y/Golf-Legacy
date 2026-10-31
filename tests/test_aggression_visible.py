@@ -96,6 +96,19 @@ class ReachTests(unittest.TestCase):
         self.assertGreater(pins(golfer(OLD, 95)), pins(golfer(OLD, 5)))
         self.assertEqual(pins(golfer(OLD, 95)), pins(golfer(YOUNG, 95)))   # same choice where both can play it
 
+    def test_reach_takes_the_conditions_distance_factor(self):
+        # (for wind and other conditions: callers pass the shot's effective-distance factor; 1.0 is calm)
+        pl = player(golfer(YOUNG, 95))
+        for lie in ('fairway', 'rough', 'fairway_bunker'):
+            self.assertEqual(E._reach(pl, lie, 1.0), E._reach(pl, lie))
+            self.assertAlmostEqual(E._reach(pl, lie, 0.9), 0.9 * E._reach(pl, lie))
+        calm = E._reach(pl, 'fairway')
+        dist = calm - 5                                            # reachable in calm air, not into the wind
+        de = dist * (E.TOUR_DRIVE / pl.drive) ** 0.5
+        rng = random.Random(2)
+        self.assertTrue(E._go_or_lay_up(pl, PAR5, 5, 2, 'fairway', dist, de, rng, dfac=0.95)[0])
+        self.assertGreater(E._reach(pl, 'fairway', 1.05), calm)
+
     def test_decisions_are_deterministic(self):
         self.assertEqual(go_rate(golfer(YOUNG, 70), 255), go_rate(golfer(YOUNG, 70), 255))
         a = [E.play_round(golfer(OLD, 90), COURSE, random.Random(s)).score for s in range(5)]

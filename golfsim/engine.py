@@ -327,20 +327,23 @@ def _attack_pin(pl, hole, mean_ft, rng):
     return value > 0
 
 
-def _reach(pl, lie):
+def _reach(pl, lie, dfac=1.0):
     """The longest full shot this golfer can hit from this lie today (yards): a 3-wood from the fairway, less
-    from rough or a fairway bunker. It follows their distance (Power, age, season fatigue), not Aggression."""
-    reach = pl.reach_fw * (0.88 if lie == 'rough' else 0.78 if lie == 'fairway_bunker' else 1.0)
+    from rough or a fairway bunker. It follows their physical distance (Power, age, season fatigue), never
+    Aggression. `dfac` scales that distance for the conditions of the shot (1.0 = calm; a caller with wind or
+    other conditions passes its effective-distance factor, so reach is always the physical reach that day)."""
+    reach = pl.reach_fw * dfac * (0.88 if lie == 'rough' else 0.78 if lie == 'fairway_bunker' else 1.0)
     if lie == 'fairway_bunker':
-        reach = min(reach, 210 * pl.drive / TOUR_DRIVE)
+        reach = min(reach, 210 * pl.drive * dfac / TOUR_DRIVE)
     return reach
 
 
-def _go_or_lay_up(pl, hole, par, strokes, lie, dist, de, rng):
+def _go_or_lay_up(pl, hole, par, strokes, lie, dist, de, rng, dfac=1.0):
     """(lay up?, reach) for a full shot from `dist` yards. Out of reach is always a lay-up, however aggressive
     the golfer; a par 5's second shot within reach (over 200 yards) is weighed: going for the green against
-    laying up to a wedge, with Aggression tilting the choice and Course Management's noise blurring it."""
-    reach = _reach(pl, lie)
+    laying up to a wedge, with Aggression tilting the choice and Course Management's noise blurring it.
+    `dfac`: the shot's effective-distance factor for the conditions (see _reach; 1.0 = calm)."""
+    reach = _reach(pl, lie, dfac)
     lay_up = dist > reach
     if not lay_up and par == 5 and strokes == 2 and dist > 200:
         # Go for the green in two, or lay up to a wedge? Weigh it up.
