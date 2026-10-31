@@ -17,9 +17,9 @@ Each package cites the decision it implements. Proposals still open are marked a
 | D9 | Ryan's local long tests begin around 17:00 UTC (noon Central) on 31 October | Final readiness |
 | D10 | F1.c amateur support form (relayed by HAL): the roadmap asks to distinguish cash sponsorship, equipment, restricted coverage and prize eligibility, not to build all four. The chosen policy is restricted in-kind golf expenses only; no unrestricted cash or living costs; amateur prize eligibility unchanged. The $25k / $12k / $5k caps are the chosen initial test calibration (changing them needs evidence and a decision; keeping them does not) | Built (`golfsim/amateur_support.py`); not a missing feature |
 | D11 | F2 coverage (HAL, in preparation): table-driven reconstructed eligible / cannot-pay fixtures from an independently revalidated manifest of all 269 historical affordability declines -- coverage of the cases, not a historical replay (exact past balances are unknown) | F2 test package (pending the manifest) |
+| D5a | (HAL's delegated decision, 04:31 UTC window) Return-to-full-time thresholds: no hard age-30 cut-off; sustainable funding, relevant results, a meaningful period in work, a smooth probability declining with age; avoid lifestyle-flipping advantages; provisional; validate return and re-block rates | `build/v16-amateur-return` |
+| D12 | G1 unused municipal courses (Ryan replied "I agree!" at 05:08 UTC to HAL's proposal): meaningful local/home-course roles and suitable lower-level hosting where eligible, without forcing every course into rotation | `build/v16-geography` follow-up |
 
 ## Open (proposed, waiting for the owner)
 
-| # | Question | Proposal |
-|---|---|---|
-| D5a | Return-to-full-time thresholds | First proposal used a hard age-30 gate; HAL's refinement under review: a sustainable season budget, a meaningful period in work, results, and a probability declining with age instead of a cut-off |
+None at present.
