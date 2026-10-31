@@ -943,7 +943,7 @@ def people_filter(w, q, role):
 
 def directory(w, q, role='golfer'):
     """People, filtered: name, nation, role, tour, status, active now, world ranking now, major champions; sorted by
-    name, birth year or world ranking."""
+    name, birth year, world ranking, Prestige or clients, in either direction (?dir=asc|desc; directory_sort)."""
     nation = one(q, 'nation', '') or ''
     status = one(q, 'status', '') or ''
     term = (one(q, 'q', '') or '').strip().lower()
@@ -961,11 +961,9 @@ def directory(w, q, role='golfer'):
         for g, s_ in (w.live.coach_of if role == 'coach' else w.live.caddie_of).items():
             clients[s_] = clients.get(s_, 0) + 1
     rep_of = lambda r: (r[1].get(role) or {}).get('reputation') if role in ('coach', 'caddie') else golfer_prestige(w, r[0], r[1])
-    key = {'name': lambda r: (r[1]['name'], r[0]), 'born': lambda r: (-(r[1].get('born') or 0), r[0]),
-           'rank': lambda r: (wr.get(r[0], 10 ** 9), r[1]['name'], r[0]),
-           'reputation': lambda r: (rep_of(r) is None, -(rep_of(r) or 0), r[1]['name'], r[0]),
-           'clients': lambda r: (-clients.get(r[0], 0), r[1]['name'], r[0])}.get(sort, lambda r: (r[1]['name'], r[0]))
-    rows.sort(key=key)
+    rows = directory_sort(rows, sort, one(q, 'dir', ''), {
+        'name': lambda r: r[1]['name'], 'born': lambda r: r[1].get('born'), 'rank': lambda r: wr.get(r[0]),
+        'reputation': rep_of, 'clients': lambda r: clients.get(r[0], 0)})
     nations = sorted({p.get('country') for _, p, _ in rows} | ({nation} if nation else set()) - {None})
     path = {None: '/search', 'golfer': '/golfers', 'coach': '/coaches', 'caddie': '/caddies'}[role]
     statuses = sorted({s for _, _, s in rows if s} | ({status} if status else set()))
@@ -978,10 +976,12 @@ def directory(w, q, role='golfer'):
                                                     ('100', 'top 100')]))
         fields.append(('champion', 'Honors', [('', 'any'), ('major', 'major champion (archived seasons)')]))
     fields.append(('status', 'Status now', [('', 'any')] + [(s, s) for s in statuses]))
-    fields.append(('sort', 'Sort', [(k, t) for k, t in (('rank', 'world ranking'), ('name', 'name'), ('born', 'youngest first'),
+    fields.append(('sort', 'Sort', [(k, t) for k, t in (('rank', 'world ranking'), ('name', 'name'), ('born', 'birth year (youngest first)'),
                                                        ('reputation', 'Prestige'), ('clients', 'clients now'))
                                     if (role == 'golfer' and k in ('rank', 'name', 'born', 'reputation'))
                                     or (role in ('coach', 'caddie') and k != 'rank') or (role is None and k in ('name', 'born'))]))
+    fields.append(('dir', 'Order', [('', 'usual for the sort'), ('desc', 'descending (highest first)'),
+                                    ('asc', 'ascending (lowest first)')]))
     chunk, pager = paged(rows, q, path)
     if role in ('coach', 'caddie'):
         body = table(['Name', 'Nation', 'Born', 'Status', 'Prestige', 'Clients now', 'Also'], [
@@ -998,9 +998,30 @@ def directory(w, q, role='golfer'):
             'header; retired people keep their pages. ' + ('Prestige: a golfer\'s public standing (0-100), now, or at '
             'their last recorded season\'s end -- the last 52 weeks\' results plus a slowly fading legacy of majors '
             'and other big wins; not a rating of ability. Blank where not recorded.' if role in (None, 'golfer') else
-            'Prestige: their public reputation (0-100) in this role, not a measure of their skill.') + '</p>')
+            'Prestige: their public reputation (0-100) in this role, not a measure of their skill.')
+            + (' Sort by Prestige either way with Order (descending: highest first; ascending: lowest first); anyone '
+               'with no recorded Prestige is listed last either way.' if role is not None else '') + '</p>')
     return ROLE_TITLES[role] if not term else f'{ROLE_TITLES[role]} matching “{term}”', \
         filters(path, q, fields) + note + body + pager
+
+
+DIR_FIRST = {'name': 'asc', 'rank': 'asc', 'born': 'desc', 'reputation': 'desc', 'clients': 'desc'}
+
+
+def directory_sort(rows, sort, direction, values):
+    """A directory's rows [(pid, person, status)], the whole set before paging, sorted by `sort` (a key of `values`:
+    {sort: row -> value or None}) in `direction` ('asc' or 'desc'; '' = the sort's usual first direction: name and
+    world ranking ascending, birth year (youngest first), Prestige and clients descending). Numbers sort as numbers;
+    rows with no recorded value come last in either direction; ties by name then id, in either direction (as the
+    Stats page's sort)."""
+    if sort not in values:
+        sort = 'name'
+    desc = (direction if direction in ('asc', 'desc') else DIR_FIRST.get(sort, 'asc')) == 'desc'
+    value = values[sort]
+    rows = sorted(rows, key=lambda r: (r[1]['name'], r[0]))
+    known = [r for r in rows if value(r) is not None]
+    known.sort(key=value, reverse=desc)                   # (stable: the tie order above is kept)
+    return known + [r for r in rows if value(r) is None]
 
 
 def golfer_prestige(w, pid, p=None):
