@@ -1819,7 +1819,7 @@ class Season:
             # or committed elsewhere) withdraws; the place is not passed down to the next regional finisher
             # (there is no reserve list), so the field is smaller by one
             can = {g.id for g in d1}
-            done = self.nationals_withdrawn[year]            # (one edition a year: a repeated selection records once)
+            done = self.nationals_withdrawn.get(year, {})    # (one edition a year: a repeated selection records once)
             for gid in ids:
                 if gid not in can and gid not in done:
                     g = self.g.get(gid)
