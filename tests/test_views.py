@@ -172,8 +172,9 @@ const { chromium } = require('playwright');
   const names = () => pg.$$eval('table.sortable tbody tr td:first-child', c => c.map(x => x.textContent));
   await pg.goto(base + '/golfers?q=a');
   out.before = await names();
-  await pg.click('table.sortable th:nth-child(1)');            // sort by the first column, then reverse it
-  await pg.click('table.sortable th:nth-child(1)');
+  // a server-sorted list: each heading click is a new address (sorted by name, then reversed)
+  await Promise.all([pg.waitForNavigation(), pg.click('table.sortable th:nth-child(1)')]);
+  await Promise.all([pg.waitForNavigation(), pg.click('table.sortable th:nth-child(1)')]);
   out.url = pg.url();
   out.sorted = await names();
   await pg.click('table.sortable tbody tr:first-child a[href^="/golfer/"]');
@@ -186,6 +187,12 @@ const { chromium } = require('playwright');
   out.menu_url = pg.url();
   out.menu_aria = await pg.getAttribute('table.sortable th:nth-child(1)', 'aria-sort');
   out.menu = await names();
+  await pg.goto(base + '/golfers?q=a&sort=name&dir=desc&tsort=0.0.a');   // a stale browser sort of a server list
+  out.stale_url = pg.url();
+  out.stale = await names();
+  await pg.goto(base + '/nations');                            // a list that is not server-sorted: browser sort
+  await pg.click('table.sortable th:nth-child(1)');
+  out.nations_url = pg.url();
   await b.close();
   console.log(JSON.stringify(out));
 })().catch(e => { console.error(e); process.exit(1); });
@@ -199,8 +206,8 @@ const { chromium } = require('playwright');
   const names = () => pg.$$eval('table.sortable tbody tr td:first-child', c => c.map(x => x.textContent));
   await pg.goto(base + '/golfers?q=e&status=full_time&sort=name&page=2');   // filters, a sort and a page
   out.before = await names();
-  await pg.click('table.sortable th:nth-child(1)');            // re-sorted in the browser: by name, descending
-  await pg.click('table.sortable th:nth-child(1)');
+  // the Name heading of a server-sorted list: the whole list by name, descending, from page 1, filters kept
+  await Promise.all([pg.waitForNavigation(), pg.click('table.sortable th:nth-child(1)')]);
   out.sorted = await names();
   out.url = pg.url();
   out.form_query = await pg.inputValue('form.viewsave input[name=query]');
@@ -238,7 +245,8 @@ def node_playwright():
 @unittest.skipUnless(node_playwright(), 'Node.js with Playwright not available')
 class BrowserSort(unittest.TestCase):
     """In a real browser (Chromium): a column sort survives opening a profile and pressing Back, and the menu
-    restores it (address and order)."""
+    restores it (address and order). On a server-sorted list the heading sorts the whole list and a stale browser
+    sort (tsort) is dropped; other tables still sort in the browser."""
 
     def test_sort_back_and_menu(self):
         import json
@@ -260,20 +268,26 @@ class BrowserSort(unittest.TestCase):
                            text=True, timeout=300, cwd=tmp)
         self.assertEqual(r.returncode, 0, r.stderr[-2000:])
         out = json.loads(r.stdout.strip().splitlines()[-1])
-        self.assertIn('tsort=0.0.d', out['url'])
-        self.assertEqual(out['sorted'], sorted(out['before'], key=str.lower, reverse=True))
+        q = parse_qs(urlparse(out['url']).query)
+        self.assertEqual((q['sort'], q['dir'], q['q']), (['name'], ['desc'], ['a']))   # sorted by the server
+        self.assertNotIn('tsort', q)
+        self.assertEqual(out['sorted'], sorted(out['sorted'], reverse=True))
+        self.assertEqual(sorted(out['sorted']), sorted(out['before']))  # (one page: the same golfers)
         self.assertTrue(out['back_link'])
         self.assertEqual(out['after_back'], out['sorted'])            # Back: the same order
-        self.assertIn('tsort=0.0.d', out['menu_url'])                   # the menu: the address and order restored
+        self.assertEqual(parse_qs(urlparse(out['menu_url']).query), q)  # the menu: the address and order restored
         self.assertEqual(out['menu_aria'], 'descending')
         self.assertEqual(out['menu'], out['sorted'])
+        self.assertNotIn('tsort', out['stale_url'])                    # dropped, and not applied
+        self.assertEqual(out['stale'], out['sorted'])
+        self.assertIn('tsort=0.0.a', out['nations_url'])               # other tables still sort in the browser
 
 
 @unittest.skipUnless(node_playwright(), 'Node.js with Playwright not available')
 class BrowserSaveView(unittest.TestCase):
-    """In a real browser (Chromium): a list sorted in the browser, then named and saved without reloading, is saved
-    as it is shown -- filters, sort, page and the browser's column sort -- and reopens in that order (after leaving,
-    on refresh, and with Back and Forward)."""
+    """In a real browser (Chromium): a list sorted by a column heading (a server sort of the whole list), then named
+    and saved without reloading, is saved as it is shown -- filters and sort -- and reopens in that order (after
+    leaving, on refresh, and with Back and Forward)."""
 
     def test_sort_then_save_then_reopen(self):
         import json
@@ -295,10 +309,10 @@ class BrowserSaveView(unittest.TestCase):
                            text=True, timeout=300, cwd=tmp)
         self.assertEqual(r.returncode, 0, r.stderr[-2000:])
         out = json.loads(r.stdout.strip().splitlines()[-1])
-        want = {'q': ['e'], 'status': ['full_time'], 'sort': ['name'], 'page': ['2'], 'tsort': ['0.0.d']}
+        want = {'q': ['e'], 'status': ['full_time'], 'sort': ['name'], 'dir': ['desc']}   # page 1 again
         self.assertEqual(parse_qs(urlparse(out['url']).query), want)
         self.assertTrue(out['before'] and out['sorted'] != out['before'])
-        self.assertEqual(sorted(out['sorted']), sorted(out['before']))  # the same page, re-ordered
+        self.assertEqual(out['sorted'], sorted(out['sorted'], reverse=True))   # the whole list by name, descending
         self.assertEqual(parse_qs(out['form_query']), want)             # the form holds the view as shown
         saved = [x for x in V.state(app.world)['saved'] if x['name'] == 'E golfers reversed']
         self.assertEqual(len(saved), 1)

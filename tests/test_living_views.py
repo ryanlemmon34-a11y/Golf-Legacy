@@ -268,9 +268,11 @@ class RatingsOverTime(unittest.TestCase):
         vals = [float(v) for v in re.findall(r'<td class=n>([0-9]+\.[0-9])</td><td>', page)]
         self.assertTrue(vals)
         self.assertEqual(vals, sorted(vals, reverse=True))                # highest first
-        self.assertIn('<th class=n title="Sort by this column">Prestige</th>', page)
+        head = (r'<th class=n aria-sort="descending" data-href="/{}\?[^"]*sort=reputation&amp;dir=asc" '
+                r'title="Sort the whole list by this column"><a href="[^"]+">Prestige</a></th>')
+        self.assertRegex(page, head.format('golfers'))                   # a heading that sorts the whole list
         coaches = O.render(self.w, '/coaches', parse_qs('sort=reputation'))[1]
-        self.assertIn('<th class=n title="Sort by this column">Prestige</th>', coaches)
+        self.assertRegex(coaches, head.format('coaches'))
         self.assertNotIn('Reputation', coaches)
 
     def test_a_caddie_profile(self):

@@ -181,7 +181,7 @@ def nation_section(w, code):
     if trs:
         h = ['Entrant season', 'Prestige', 'Multiplier', 'Share of juniors', 'Share of new pros', 'Juniors', 'New pros']
         out.append('<div class="scroll"><table class="sortable"><thead><tr>'
-                   + ''.join(f'<th{" class=n" if i else ""} title="Sort by this column">{esc(x)}</th>' for i, x in enumerate(h))
+                   + ''.join(f'<th{" class=n" if i else ""} title="Sort the rows shown by this column">{esc(x)}</th>' for i, x in enumerate(h))
                    + '</tr></thead><tbody>'
                    + ''.join('<tr>' + ''.join(f'<td{" class=n" if i else ""}>{c}</td>' for i, c in enumerate(r)) + '</tr>'
                              for r in trs) + '</tbody></table></div>')

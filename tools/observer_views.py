@@ -246,6 +246,8 @@ def views_page(w, q):
 
 # Browser-side column sorts are kept in the address (tsort=table.column.a|d, replaced in place, so Back and
 # the trail return to them), applied again when the page opens, and reported so the page's last view has them.
+# A server-sorted list (table data-server-sort: its headings are links that sort the whole list before paging) is
+# never re-sorted in the browser, and a tsort aimed at it (left from an earlier view) is dropped from the address.
 SORT_JS = """<script>
 (function () {
   function key(c) {
@@ -273,6 +275,9 @@ SORT_JS = """<script>
   document.addEventListener('click', function (ev) {
     var th = ev.target.closest('table.sortable th'); if (!th || ev.target.closest('a,button,input,select')) return;
     var table = th.closest('table'), i = Array.prototype.indexOf.call(th.parentNode.children, th);
+    if (table.hasAttribute('data-server-sort')) {      // the server sorts the whole list: follow the heading's link
+      var href = th.getAttribute('data-href'); if (href) location.href = href; return;
+    }
     var dir = th.getAttribute('aria-sort') === 'ascending' ? 'descending' : 'ascending';
     sortBy(table, i, dir);
     try {
@@ -287,9 +292,12 @@ SORT_JS = """<script>
     } catch (e) {}
   });
   try {
-    var s = new URL(location.href).searchParams.get('tsort');
+    var u0 = new URL(location.href), s = u0.searchParams.get('tsort');
     if (s) { var p = s.split('.'), t = tables()[+p[0]];
-             if (t) sortBy(t, +p[1], p[2] === 'a' ? 'ascending' : 'descending'); }
+             if (t && t.hasAttribute('data-server-sort')) {   // a stale browser sort of a server-sorted list: drop it
+               u0.searchParams.delete('tsort');
+               history.replaceState(history.state, '', u0.pathname + u0.search + u0.hash);
+             } else if (t) sortBy(t, +p[1], p[2] === 'a' ? 'ascending' : 'descending'); }
   } catch (e) {}
 })();
 </script>"""
