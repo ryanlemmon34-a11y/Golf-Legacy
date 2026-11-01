@@ -303,6 +303,9 @@ class PrestigeStore:
         self.tries = {}                       # (year, source) -> readers that could not open it, in this observer
         self.start_lock = threading.Lock()
         self.stopped = False                  # the reader was stopped on purpose (not a failure)
+        self.verify_years = set()             # the seasons the running (or last) reader was to bytes-check
+        self.reaped = None                    # the last reader whose end has been dealt with (reap)
+        self.last_exit = None                 # how it ended: 'done', 'busy', 'stopped' or 'crashed'
         self.crashes = 0                      # readers that ended abnormally in a row
         self.history_size = 0                 # seasons in the history (memory bound without a store file)
         self.reads_inline = 0
@@ -431,6 +434,7 @@ class PrestigeStore:
                         members = json.loads(members)
                         if same_content(need[y][1], members):
                             rec = check_record(json.loads(zlib.decompress(blob)))
+                            self.failed.pop(y, None)        # (stored as read: no failure stands)
                             self._remember(y, src, rec, members)
                             out[y] = rec
                             if checked != self.session:
@@ -447,6 +451,7 @@ class PrestigeStore:
         return out
 
     def put(self, y, source, rec, members, digest=None):
+        self.failed.pop(y, None)                  # (read: whatever failure was known is over)
         self._remember(y, source, rec, members)
         self._write(y, source, 'ok', members, zlib.compress(json.dumps(rec, separators=(',', ':')).encode(), 6),
                     digest, self.session)
@@ -558,7 +563,8 @@ class PrestigeStore:
                 return
             self.jobs = {y: src for y, _, src, mode in jobs if mode == 'read'}
             self.job_paths = {y: p for y, p, _, mode in jobs if mode == 'read'}
-            self.verifying = any(mode == 'verify' for *_, mode in jobs)
+            self.verify_years = {y for y, _, _, mode in jobs if mode == 'verify'}
+            self.verifying = bool(self.verify_years)
             self.stopped = False
             self.stop_event.clear()
             if self.has_file():
@@ -584,23 +590,56 @@ class PrestigeStore:
             return False
         return p.is_alive() if isinstance(p, threading.Thread) else p.poll() is None
 
+    def reap(self):
+        """Once for each reader that has ended, whatever it was given (missing seasons to read, bytes to check, or
+        both): how it ended. A busy store sets the back-off (BUSY_RETRY) and puts its bytes checks back in the queue --
+        a lock is never a failure; a reader stopped on purpose puts them back too; an abnormal end counts towards
+        CRASHES (and its bytes checks are queued again only below that); a clean end resets the count. Then, if it was
+        to check bytes, memory is taken from the store again and the failures among those seasons are looked up
+        afresh (a season it found changed was read again there: a repaired file is shown at once)."""
+        p = self.indexer
+        if p is None or self.indexing() or self.reaped is p:
+            return
+        self.reaped = p
+        thread = isinstance(p, threading.Thread)
+        if self.stopped:
+            how = 'stopped'
+        elif thread or p.returncode == 0:
+            how = 'done'
+        elif p.returncode == EXIT_BUSY:
+            how = 'busy'
+        else:
+            how = 'crashed'
+        self.last_exit = how
+        if how == 'busy':
+            self.retry_after = time.time() + BUSY_RETRY      # (the store was locked: not a failure, wait a little)
+        elif how == 'crashed':
+            self.crashes += 1
+        elif how == 'done':
+            self.crashes = 0
+        if how != 'done' and self.crashes < self.CRASHES:
+            self.unchecked |= self.verify_years             # (not known to be checked: queued again)
+        if self.verify_years:
+            with self.lock:
+                self.mem.clear()
+                for y in self.verify_years:
+                    self.failed.pop(y, None)
+            self.verify_years = set()
+        self.verifying = False
+
+    def after_reader(self):
+        self.reap()
+
     def settle(self, have):
-        """After a reader ended. Seasons it reported unreadable are known (stored as such); one it could not open is
-        given to READ_TRIES readers before it is shown as not recorded in this observer; a season merely no longer in
-        memory is never taken for a failure. A reader stopped on purpose is simply started again; one that ended
-        abnormally is started again up to CRASHES times in a row, then the seasons it left are not recorded here."""
+        """After a reader ended (reap), for the missing seasons it was given. Seasons it reported unreadable are
+        known (stored as such); one it could not open is given to READ_TRIES readers before it is shown as not
+        recorded in this observer; a season merely no longer in memory is never taken for a failure. After a busy
+        store or a stop, they are simply read again later; after CRASHES abnormal ends in a row, the seasons left are
+        not recorded here."""
+        self.reap()
         if not self.jobs or self.indexing():
             return
-        p = self.indexer
-        thread = isinstance(p, threading.Thread)
-        busy = (not thread and p is not None and p.returncode == EXIT_BUSY)
-        done = thread or (p is not None and p.returncode == 0)
-        if busy:
-            self.retry_after = time.time() + BUSY_RETRY      # (the store was locked: not a failure, wait a little)
-        elif not done and not self.stopped:
-            self.crashes += 1
-        if done:
-            self.crashes = 0
+        thread = isinstance(self.indexer, threading.Thread)
         left = {y: src for y, src in self.jobs.items() if y not in have}
         paths = getattr(self, 'job_paths', {})
         give_up = lambda y, src: self.failed.__setitem__(y, (src, file_mark(paths[y]) if y in paths else None))
@@ -618,14 +657,6 @@ class PrestigeStore:
             for y, src in left.items():
                 give_up(y, src)
         self.jobs = {}
-
-    def after_reader(self):
-        """After a reader that checked bytes: what memory holds is taken from the store again (a season it found
-        changed was read again there)."""
-        if self.verifying and not self.indexing():
-            with self.lock:
-                self.mem.clear()
-            self.verifying = False
 
     def stop_indexer(self):
         self.stopped = True
@@ -709,7 +740,7 @@ def records(w, years, inline_newest=True):
         return {}
     st = store_for(w)
     st.history_size = len(a.years)
-    st.after_reader()
+    st.reap()                                           # (a reader that ended: its outcome, before anything else)
     path = lambda y: str(a.year_path(y))
     sources = {y: (source_identity(a, y), path(y)) for y in years if y in a.years}
     out = dict(st.stored(sources))
