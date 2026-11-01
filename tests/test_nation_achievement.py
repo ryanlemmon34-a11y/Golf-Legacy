@@ -91,6 +91,38 @@ class Components(unittest.TestCase):
         self.assertEqual(PT.nation_prestige_achievement([(0.0, 1e9, 1e9)])[0], 0.0)
 
 
+class ObserverText(unittest.TestCase):
+    """The nation page says what prestige measures: achievement and expectation when the season recorded them, the
+    earlier wording for seasons settled before rules 2026-11-14."""
+
+    def page(self, nations):
+        from unittest import mock
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
+        import observer_prestige as OP
+        recs = {2030: {'nations': nations}}
+        with mock.patch.object(OP, '_years', lambda w: [2030]), mock.patch.object(OP, '_record', lambda w, y: recs[y]), \
+                mock.patch.object(OP, '_live', lambda w: None):
+            return OP.nation_section(object(), 'Argentina')
+
+    def test_achievement_shown_with_its_explanation(self):
+        n = {'prestige': {'Argentina': 73.6}, 'ratio': {'Argentina': 0.789}, 'achievement': {'Argentina': 3.002},
+             'multiplier': {'Argentina': 1.92}, 'shares': {'juniors': {'Argentina': 0.0187}, 'new_pros': {}},
+             'allocated': {'juniors': {'Argentina': 6}}}
+        html = self.page(n)
+        self.assertIn('>Achievement</th>', html)
+        self.assertIn('>Against expectation</th>', html)
+        self.assertIn('<td class=n>3.002</td><td class=n>0.789</td>', html)
+        self.assertIn('Visible success first', html)
+        self.assertNotIn('exactly the success expected', html)
+
+    def test_a_season_settled_before_keeps_the_earlier_wording(self):
+        n = {'prestige': {'Argentina': 41.5}, 'ratio': {'Argentina': 0.789}, 'multiplier': {'Argentina': 0.79},
+             'shares': {'juniors': {'Argentina': 0.0076}, 'new_pros': {}}}
+        html = self.page(n)
+        self.assertNotIn('>Achievement</th>', html)
+        self.assertIn('exactly the success expected', html)
+
+
 class InTheWorld(unittest.TestCase):
     def test_close_season_uses_achievement_and_records_it(self):
         pt = PT.Participation(nations(), 2027)

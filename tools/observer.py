@@ -2145,7 +2145,8 @@ def nations(w, q):
     share = lambda kind, n, key='shares': ((nv.get(key) or {}).get(kind) or {}).get(n)
     k = len(NATION_COUNTS)
     return 'Nations', (f'<p class="muted">{esc(NATION_NOTE)} Where people live can change. Prestige: national '
-                       'prestige as last settled (50 = the success expected of its golfers before each event). Shares: '
+                       'prestige as last settled (50 = as expected: visible success against an even share of the fame on offer, '
+                       'and success against what its golfers\' ability predicted; rules: national prestige). Shares: '
                        'each nation’s share of the next season’s new juniors and new professionals (the numbers '
                        'themselves never depend on prestige), against its starting share.</p>' +
                        table(['Nation', *(label for label, *_ in NATION_COUNTS), 'Prestige', 'Multiplier',
