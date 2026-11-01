@@ -133,7 +133,7 @@ class InASession(unittest.TestCase):
     def test_observer_columns_and_bars(self):
         O, w = self.O, self.w
         _, html = O.tournaments(w, {})
-        self.assertIn('>Prestige</th>', html)
+        self.assertRegex(html, r'>Prestige(</a>)?</th>')
         _, html = O.tournaments(w, {'sort': ['prestige']})
         # the most prestigious first; tied leaders (the majors can tie exactly) in the list's own order: tier, then name
         import observer_prestige as OP
@@ -148,7 +148,7 @@ class InASession(unittest.TestCase):
         self.assertIn('<span class="ry">2027</span>', html)
         self.assertIn('<span class="ry">now</span>', html)
         _, html = O.courses_page(w, {})
-        self.assertIn('>Prestige</th>', html)
+        self.assertRegex(html, r'>Prestige(</a>)?</th>')
         cid = max(self.end_courses, key=self.end_courses.get)
         _, html = O.course(w, {}, cid)
         self.assertIn('Prestige over time', html)

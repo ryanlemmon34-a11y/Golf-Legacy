@@ -292,9 +292,9 @@ class MyWorld(unittest.TestCase):
         with mock.patch.object(OH, 'grand_slams', lambda w: fake):
             slam = self.page('/grand-slam')
         done, short = slam.split('<h2>One major short</h2>')
-        self.assertIn('<th title="Sort by this column">Now</th>', done)
+        self.assertIn('<th title="Sort the rows shown by this column">Now</th>', done)
         self.assertRegex(done, rf'href="/golfer/{pid}">[^<]*</a></td><td>retired</td>')
-        self.assertIn('<th title="Sort by this column">Now</th>', short)
+        self.assertIn('<th title="Sort the rows shown by this column">Now</th>', short)
         self.assertRegex(short, rf'href="/golfer/{active}">[^<]*</a></td><td>active</td>')
 
     def test_desktop_menu_and_record_book(self):

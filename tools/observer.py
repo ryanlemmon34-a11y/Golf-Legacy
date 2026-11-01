@@ -670,22 +670,60 @@ def history_note(w):
                      f'generation {esc(gen)}.</p>')
 
 
-def table(headers, rows, numeric=()):
-    """headers: [label]; rows: [[cell html]]; numeric: column indexes right-aligned. Every table sorts by any
-    column in the browser (numbers as numbers, missing values last; on a paged list, the page shown)."""
-    h = ''.join(f'<th{" class=n" if i in numeric else ""} title="Sort by this column">{esc(x)}</th>'
-                for i, x in enumerate(headers))
+def table(headers, rows, numeric=(), heads=None):
+    """headers: [label]; rows: [[cell html]]; numeric: column indexes right-aligned. A table sorts the rows it shows
+    by any column in the browser (numbers as numbers, missing values last). `heads` (sort_heads) makes it a
+    server-sorted list instead: its column headers are links that sort the whole filtered list before paging, and
+    the browser never re-sorts the page shown."""
+    def th(i, x):
+        n = ' class=n' if i in numeric else ''
+        if heads is None:
+            return f'<th{n} title="Sort the rows shown by this column">{esc(x)}</th>'
+        if i not in heads:
+            return f'<th{n}>{esc(x)}</th>'
+        href, aria = heads[i]
+        return (f'<th{n}{f" aria-sort={chr(34)}{aria}{chr(34)}" if aria else ""} data-href="{esc(href)}" '
+                f'title="Sort the whole list by this column"><a href="{esc(href)}">{esc(x)}</a></th>')
+    h = ''.join(th(i, x) for i, x in enumerate(headers))
     body = ''.join('<tr>' + ''.join(f'<td{" class=n" if i in numeric else ""}>{c}</td>' for i, c in enumerate(r)) + '</tr>'
                    for r in rows)
-    return f'<div class="scroll"><table class="sortable"><thead><tr>{h}</tr></thead><tbody>{body}</tbody></table></div>'
+    own = ' data-server-sort="1"' if heads is not None else ''
+    return f'<div class="scroll"><table class="sortable"{own}><thead><tr>{h}</tr></thead><tbody>{body}</tbody></table></div>'
 
 
-def paged(rows, q, path, size=PAGE_SIZE):
-    """(rows of this page, pager html): ?page=N, other filters kept."""
+SERVER_DROP = ('sort', 'dir', 'page', 'tsort', 'default')
+
+
+def sort_heads(path, q, cols, sort, direction):
+    """A server-sorted list's header links: {column index: (link, aria-sort or None)} for `cols` ({column index:
+    sort key}). A link sorts the whole filtered list (before paging) by that key: first in the key's usual direction
+    (DIR_FIRST), and the column already sorted by turns the other way. It keeps the filters and search and returns
+    to page 1; a browser sort of the page (tsort) is dropped, since the server now owns the order."""
+    keep = {k: v[0] for k, v in q.items() if v and v[0] and k not in SERVER_DROP}
+    cur = direction if direction in ('asc', 'desc') else DIR_FIRST.get(sort, 'asc')
+    out = {}
+    for i, key in cols.items():
+        if key == sort:
+            nxt, aria = ('asc', 'descending') if cur == 'desc' else ('desc', 'ascending')
+        else:
+            nxt, aria = DIR_FIRST.get(key, 'asc'), None
+        out[i] = (f'{path}?{urlencode({**keep, "sort": key, "dir": nxt})}', aria)
+    return out
+
+
+def text_key(v):
+    """A text column's sort value: case-insensitive; blank is not recorded (sorted last)."""
+    v = '' if v is None else str(v).strip()
+    return v.casefold() or None
+
+
+def paged(rows, q, path, size=PAGE_SIZE, drop=()):
+    """(rows of this page, pager html): ?page=N, other filters kept (but not `drop`: a server-sorted list drops a
+    browser sort of the page, tsort)."""
     n = max(1, int(one(q, 'page', '1') or 1))
     pages = max(1, (len(rows) + size - 1) // size)
     n = min(n, pages)
-    keep = {k: v[0] for k, v in q.items() if k != 'page' and v and v[0]}
+    keep = {k: v[0] for k, v in q.items() if k != 'page' and k not in drop and v and v[0]}
     link = lambda k, label: f'<a href="{path}?{urlencode({**keep, "page": k})}">{label}</a>'
     nav = []
     if n > 1:
@@ -696,9 +734,13 @@ def paged(rows, q, path, size=PAGE_SIZE):
     return rows[(n - 1) * size:n * size], '<p>' + ' · '.join(nav) + '</p>'
 
 
-def filters(path, q, fields):
-    """A GET form of filters. fields: [(name, label, options or None)]; options: [(value, label)]."""
+def filters(path, q, fields, carry=()):
+    """A GET form of filters. fields: [(name, label, options or None)]; options: [(value, label)]. `carry`: query
+    keys kept as they are when the form is applied (a server-sorted list's sort and direction)."""
     out = [f'<form class="filters" action="{path}">']
+    for name in carry:
+        if one(q, name):
+            out.append(f'<input type="hidden" name="{name}" value="{esc(one(q, name))}">')
     for name, label, options in fields:
         cur = one(q, name, '') or ''
         if options is None:
@@ -986,9 +1028,16 @@ def directory(w, q, role='golfer'):
         for g, s_ in (w.live.coach_of if role == 'coach' else w.live.caddie_of).items():
             clients[s_] = clients.get(s_, 0) + 1
     rep_of = lambda r: (r[1].get(role) or {}).get('reputation') if role in ('coach', 'caddie') else golfer_prestige(w, r[0], r[1])
-    rows = directory_sort(rows, sort, one(q, 'dir', ''), {
-        'name': lambda r: r[1]['name'], 'born': lambda r: r[1].get('born'), 'rank': lambda r: wr.get(r[0]),
-        'reputation': rep_of, 'clients': lambda r: clients.get(r[0], 0)})
+    tour_name = lambda k: (w.tours().get(k) or {}).get('name', k) if k else None
+    values = {'name': lambda r: r[1]['name'], 'born': lambda r: r[1].get('born'), 'rank': lambda r: wr.get(r[0]),
+              'reputation': rep_of, 'clients': lambda r: clients.get(r[0], 0),
+              'nation': lambda r: text_key(r[1].get('country')), 'status': lambda r: text_key(r[2]),
+              'tour': lambda r: text_key(tour_name((r[1].get('golfer') or {}).get('tour'))),
+              'roles': lambda r: text_key(', '.join(r[1]['roles'])),
+              'also': lambda r: text_key(', '.join(x for x in r[1]['roles'] if x != role))}
+    rows = directory_sort(rows, sort, one(q, 'dir', ''), values)
+    if sort not in values:
+        sort = 'name'                                    # (directory_sort's fallback, for the header marks)
     nations = sorted({p.get('country') for _, p, _ in rows} | ({nation} if nation else set()) - {None})
     path = {None: '/search', 'golfer': '/golfers', 'coach': '/coaches', 'caddie': '/caddies'}[role]
     statuses = sorted({s for _, _, s in rows if s} | ({status} if status else set()))
@@ -1002,31 +1051,41 @@ def directory(w, q, role='golfer'):
         fields.append(('champion', 'Honors', [('', 'any'), ('major', 'major champion (archived seasons)')]))
     fields.append(('status', 'Status now', [('', 'any')] + [(s, s) for s in statuses]))
     fields.append(('alive', 'Living or deceased', [('', 'everyone'), ('living', 'living'), ('deceased', 'deceased')]))
-    fields.append(('sort', 'Sort', [(k, t) for k, t in (('rank', 'world ranking'), ('name', 'name'), ('born', 'birth year (youngest first)'),
-                                                       ('reputation', 'Prestige'), ('clients', 'clients now'))
-                                    if (role == 'golfer' and k in ('rank', 'name', 'born', 'reputation'))
-                                    or (role in ('coach', 'caddie') and k != 'rank') or (role is None and k in ('name', 'born'))]))
+    sorts = [(k, t) for k, t in (('rank', 'world ranking'), ('name', 'name'), ('born', 'birth year (youngest first)'),
+                                 ('reputation', 'Prestige'), ('clients', 'clients now'))
+             if (role == 'golfer' and k in ('rank', 'name', 'born', 'reputation'))
+             or (role in ('coach', 'caddie') and k != 'rank') or (role is None and k in ('name', 'born'))]
+    if sort not in dict(sorts):                          # sorted by a column header: shown as chosen
+        sorts.append((sort, {'nation': 'nation', 'status': 'status now', 'tour': 'tour now', 'roles': 'roles',
+                             'also': 'other roles', 'rank': 'world ranking', 'reputation': 'Prestige',
+                             'clients': 'clients now', 'born': 'birth year'}.get(sort, sort)))
+    fields.append(('sort', 'Sort', sorts))
     fields.append(('dir', 'Order', [('', 'usual for the sort'), ('desc', 'descending (highest first)'),
                                     ('asc', 'ascending (lowest first)')]))
-    chunk, pager = paged(rows, q, path)
+    chunk, pager = paged(rows, q, path, drop=('tsort',))
     if role in ('coach', 'caddie'):
+        heads = sort_heads(path, q, {0: 'name', 1: 'nation', 2: 'born', 3: 'status', 4: 'reputation', 5: 'clients',
+                                     6: 'also'}, sort, one(q, 'dir', ''))
         body = table(['Name', 'Nation', 'Born', 'Status', 'Prestige', 'Clients now', 'Also'], [
             [w.person_link(pid), nation_link(p.get('country')), esc(p.get('born')), status_cell(p, st),
              esc(p.get(role, {}).get('reputation', '')), str(clients.get(pid, 0)) if w.live else '',
-             esc(', '.join(r for r in p['roles'] if r != role))] for pid, p, st in chunk], numeric=(2, 4, 5))
+             esc(', '.join(r for r in p['roles'] if r != role))] for pid, p, st in chunk], numeric=(2, 4, 5), heads=heads)
     else:
+        heads = sort_heads(path, q, {0: 'name', 1: 'nation', 2: 'born', 3: 'status', 4: 'tour', 5: 'rank',
+                                     6: 'reputation', 7: 'roles'}, sort, one(q, 'dir', ''))
         body = table(['Name', 'Nation', 'Born', 'Status now', 'Tour now', 'World', 'Prestige', 'Roles'], [
             [w.person_link(pid), nation_link(p.get('country')), esc(p.get('born')), status_cell(p, st),
              tour_link(w, p.get('golfer', {}).get('tour')), esc(wr.get(pid, '')),
              esc(golfer_prestige(w, pid, p) if golfer_prestige(w, pid, p) is not None else ''), esc(', '.join(p['roles']))]
-            for pid, p, st in chunk], numeric=(2, 5, 6))
+            for pid, p, st in chunk], numeric=(2, 5, 6), heads=heads)
     note = ('<p class="muted">Everyone in the published history and the current world. "Now" is as of the date in the '
             'header; retired people keep their pages, and so do people who have died (marked deceased). ' + ('Prestige: a golfer\'s public standing (0-100), now, or at '
             'their last recorded season\'s end -- the last 52 weeks\' results plus a slowly fading legacy of majors '
             'and other big wins; not a rating of ability. Blank where not recorded.' if role in (None, 'golfer') else
             'Prestige: their public reputation (0-100) in this role, not a measure of their skill.')
             + (' Sort by Prestige either way with Order (descending: highest first; ascending: lowest first); anyone '
-               'with no recorded Prestige is listed last either way.' if role is not None else '') + '</p>')
+               'with no recorded Prestige is listed last either way.' if role is not None else '')
+            + ' A column heading sorts the whole list, not only this page (click again for the other direction).</p>')
     return ROLE_TITLES[role] if not term else f'{ROLE_TITLES[role]} matching “{term}”', \
         filters(path, q, fields) + note + body + pager
 
@@ -1040,7 +1099,8 @@ def status_cell(p, st):
     return esc(st) + tag
 
 
-DIR_FIRST = {'name': 'asc', 'rank': 'asc', 'born': 'desc', 'reputation': 'desc', 'clients': 'desc'}
+DIR_FIRST = {'name': 'asc', 'rank': 'asc', 'born': 'desc', 'reputation': 'desc', 'clients': 'desc',
+             'prestige': 'desc', 'hosted': 'desc', 'editions': 'desc'}       # (any other key: ascending first)
 
 
 def directory_sort(rows, sort, direction, values):
@@ -2003,19 +2063,29 @@ def tournaments(w, q):
     kinds = sorted({s.get('kind') for s in allseries.values() if s.get('kind')})
     f = filters('/tournaments', q, [('tour', 'Tour', [('', 'any')] + sorted(((k, t.get('name', k)) for k, t in w.tours().items()),
                                                                              key=lambda x: x[1])),
-                                    ('kind', 'Kind', [('', 'any')] + [(k, k) for k in kinds])])
+                                    ('kind', 'Kind', [('', 'any')] + [(k, k) for k in kinds])], carry=('sort', 'dir'))
     pres = (OP.latest(w) or {}).get('events', {})
-    if one(q, 'sort') == 'prestige':                   # the whole list by prestige (a column click sorts the page)
-        rows.sort(key=lambda x: -(pres.get(x[0]) if pres.get(x[0]) is not None else -1))
-    chunk, pager = paged(rows, q, '/tournaments')
-    keep = {k: v[0] for k, v in q.items() if v and v[0] and k not in ('sort', 'page')}
-    by_prestige = (f'<p class="muted"><a href="/tournaments?{esc(urlencode({**keep, "sort": "prestige"}))}">List by '
-                   'prestige</a> (prestige now: five calendar years, rules 2026-11-05)</p>')
+    sort, direction = one(q, 'sort', '') or '', one(q, 'dir', '') or ''
+    tname = lambda k: (w.tours().get(k) or {}).get('name', k) if k else None
+    values = {'name': lambda r: r[1].get('name', r[0]), 'tour': lambda r: text_key(tname(r[1].get('tour'))),
+              'tier': lambda r: r[1].get('tier'), 'kind': lambda r: text_key(r[1].get('kind')),
+              'category': lambda r: text_key(r[1].get('category')), 'prestige': lambda r: pres.get(r[0]),
+              'editions': lambda r: counts.get(r[0], 0)}
+    rows = [(sid, {**s, 'name': s.get('name', sid)}) for sid, s in rows]
+    if sort in values:                                 # the whole filtered list, before paging (else tier, name)
+        rows = directory_sort(rows, sort, direction, values)
+    chunk, pager = paged(rows, q, '/tournaments', drop=('tsort',))
+    keep = {k: v[0] for k, v in q.items() if v and v[0] and k not in SERVER_DROP}
+    by_prestige = (f'<p class="muted"><a href="/tournaments?{esc(urlencode({**keep, "sort": "prestige", "dir": "desc"}))}">'
+                   'List by prestige</a> (prestige now: five calendar years, rules 2026-11-05). A column heading sorts '
+                   'the whole list, not only this page.</p>')
+    heads = sort_heads('/tournaments', q, {0: 'name', 1: 'tour', 2: 'tier', 3: 'kind', 4: 'category', 5: 'prestige',
+                                           6: 'editions'}, sort, direction)
     return 'Tournaments', f + by_prestige + table(
         ['Tournament', 'Tour', 'Tier', 'Kind', 'Category', 'Prestige', 'Editions played'], [
         [f'<a href="/series/{quote(sid)}">{esc(s.get("name", sid))}</a>', tour_link(w, s.get('tour')), esc(s.get('tier')),
          esc(s.get('kind')), esc(s.get('category')), OP.cell(pres.get(sid)), str(counts.get(sid, 0))] for sid, s in chunk],
-        numeric=(2, 5, 6)) + pager
+        numeric=(2, 5, 6), heads=heads) + pager
 
 
 def calendar(w, q):
@@ -2053,22 +2123,34 @@ def courses_page(w, q):
     rows = sorted(((cid, c) for cid, c in cs.items() if (not country or c.get('country') == country)
                    and (not term or term in c.get('name', '').lower())), key=lambda x: (x[1].get('country', ''), x[1].get('name', '')))
     f = filters('/courses', q, [('q', 'Name contains', None),
-                                ('country', 'Country', [('', 'any')] + [(c, c) for c in sorted({c.get('country') for c in cs.values()})])])
+                                ('country', 'Country', [('', 'any')] + [(c, c) for c in sorted({c.get('country') for c in cs.values()})])],
+                carry=('sort', 'dir'))
     pres = (OP.latest(w) or {}).get('courses', {})
-    if one(q, 'sort') == 'prestige':                   # the whole list by prestige (a column click sorts the page)
-        rows.sort(key=lambda x: -(pres.get(x[0]) if pres.get(x[0]) is not None else -1))
-    chunk, pager = paged(rows, q, '/courses')
-    keep = {k: v[0] for k, v in q.items() if v and v[0] and k not in ('sort', 'page')}
-    by_prestige = (f'<p class="muted"><a href="/courses?{esc(urlencode({**keep, "sort": "prestige"}))}">List by '
-                   'prestige</a> (this season’s course prestige, from the events hosted in the five completed seasons '
-                   'before; separate from the class, which is physical quality)</p>')
     from golfsim.course_library import course_place
     sub = lambda c: (c['subdivision'] if 'subdivision' in c else course_place(c)[1]) or 'unknown'
+    sort, direction = one(q, 'sort', '') or '', one(q, 'dir', '') or ''
+    raw_sub = lambda c: c['subdivision'] if 'subdivision' in c else course_place(c)[1]   # (None: not recorded)
+    values = {'name': lambda r: r[1].get('name', r[0]), 'city': lambda r: text_key(r[1].get('city')),
+              'subdivision': lambda r: text_key(raw_sub(r[1])), 'country': lambda r: text_key(r[1].get('country')),
+              'class': lambda r: text_key(r[1].get('class')),
+              'layouts': lambda r: text_key(', '.join(r[1].get('layouts', {}))), 'prestige': lambda r: pres.get(r[0]),
+              'hosted': lambda r: hosted.get(r[0], 0)}
+    rows = [(cid, {**c, 'name': c.get('name', cid)}) for cid, c in rows]
+    if sort in values:                                 # the whole filtered list, before paging (else country, name)
+        rows = directory_sort(rows, sort, direction, values)
+    chunk, pager = paged(rows, q, '/courses', drop=('tsort',))
+    keep = {k: v[0] for k, v in q.items() if v and v[0] and k not in SERVER_DROP}
+    by_prestige = (f'<p class="muted"><a href="/courses?{esc(urlencode({**keep, "sort": "prestige", "dir": "desc"}))}">'
+                   'List by prestige</a> (this season’s course prestige, from the events hosted in the five completed '
+                   'seasons before; separate from the class, which is physical quality). A column heading sorts the '
+                   'whole list, not only this page.</p>')
+    heads = sort_heads('/courses', q, {0: 'name', 1: 'city', 2: 'subdivision', 3: 'country', 4: 'class',
+                                       5: 'layouts', 6: 'prestige', 7: 'hosted'}, sort, direction)
     return 'Courses', f + by_prestige + table(['Course', 'City', 'State / province', 'Country', 'Class', 'Layouts',
                                                'Prestige', 'Editions hosted'], [
         [course_link(w, cid), esc(c.get('city')), esc(sub(c)), nation_link(c.get('country')), esc(c.get('class')),
          esc(', '.join(c.get('layouts', {}))), OP.cell(pres.get(cid)), str(hosted.get(cid, 0)) if hosted.get(cid) else
-         '0 <span class="muted">(local club)</span>'] for cid, c in chunk], numeric=(6, 7)) + pager
+         '0 <span class="muted">(local club)</span>'] for cid, c in chunk], numeric=(6, 7), heads=heads) + pager
 
 
 def course(w, q, cid):

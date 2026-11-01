@@ -238,7 +238,7 @@ class HistoryViewTests(unittest.TestCase):
 
     def test_records_show_when_and_who_is_pursuing(self):
         body = self.page('/records/most-wins')
-        self.assertIn('<th title="Sort by this column">Now</th>', body)
+        self.assertIn('<th title="Sort the rows shown by this column">Now</th>', body)
         self.assertIn('competing: can add to it', body)
         body = self.page('/records/weeks-at-number-one')
         no1 = next(g for g, p in self.w.live.wr.items() if p == 1)
