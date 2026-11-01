@@ -395,13 +395,17 @@ for arm in ARMS:
     rows.append(f'| {LABEL[arm]} | {len(teen) / n:.1f} | {sum(years_at_or_above(e, 90) for e in teen) / n:.1f} | '
                 + ' / '.join(f1(med([at(e, a) for e in teen]), 1) for a in (21, 25, 30, 35, 40))
                 + f' | {len(late) / n:.1f} | {len(late70) / n:.1f} | {len(r80) / n:.1f} | {len(best30) / n:.1f} | '
-                f'{f1(st.fmean([e["peak"] for e in late]), 2) if late else "-"} |')
+                f'{f1(st.fmean([e["peak"] for e in late]), 2) if late else "-"} | '
+                f'{f1(st.fmean([e["peak"] for e in late70]), 2) if late70 else "-"} |')
 L += ['### 3e (continued). Elite teens and late bloomers, recalculated selection (paired layer, per seed)', '',
       'Same definitions as 3c, over five seeds (projected entrants have stored potential 70+, which includes every '
-      'junior who can reach 75+). The last column is the mean peak (decline) age of the late bloomers.', '',
+      'junior who can reach 75+). These are THRESHOLD-DEFINED groups within each arm\'s own cohort: entry readiness '
+      'decides who enters below 60 or 65, so the groups\' membership changes with the arm (3i follows the same '
+      'candidates). The last two columns are the mean peak (decline) age of each late group.', '',
       '| arm | entered 80+ | their golfer-years 90+ | their median at 21 / 25 / 30 / 35 / 40 | entered < 65, reach 80+ | '
-      'entered < 60, reach 75+ | reach 80+ | of whom best at 30+ | late bloomers\' mean peak age |',
-      '|---|---|---|---|---|---|---|---|---|'] + rows + ['']
+      'entered < 60, reach 75+ | reach 80+ | of whom best at 30+ | mean peak age, < 65 -> 80+ | '
+      'mean peak age, < 60 -> 75+ |',
+      '|---|---|---|---|---|---|---|---|---|---|'] + rows + ['']
 
 # sensitivity: light schedule
 rl = {a: load(f'replay_{a}_juniors_light')['entrants'] for a in ARMS}
@@ -473,6 +477,37 @@ L += ['### 3h. Common entrants: the same candidate under an arm minus under A0 (
       '| arm | group | common entrants | ' + ' | '.join(f'delta at {a}' for a in DAGES[1:]) + ' |',
       '|---|---|---|' + '---|' * len(DAGES[1:])] + r3 + ['']
 J['common_entrant_deltas'] = {'replay_juniors': j1, 'paired_juniors': j2, 'replay_new_pros': j3}
+
+# 3i. fixed-candidate check of the late-bloomer counts (common entrants, paired layer)
+rows, j4 = [], {}
+for arm in ARMS[1:]:
+    base = {e['key']: e for e in pjt['A0']}
+    common = [(e, base[e['key']]) for e in pjt[arm] if e['key'] in base]
+    r0 = sum(max(o['traj']) >= 75 for _, o in common)
+    ra = sum(max(e['traj']) >= 75 for e, _ in common)
+    only0 = sum(max(o['traj']) >= 75 > max(e['traj']) for e, o in common)
+    onlya = sum(max(e['traj']) >= 75 > max(o['traj']) for e, o in common)
+    lb0 = [(e, o) for e, o in common if o['cur'] < 60 and max(o['traj']) >= 75]
+    lba = [(e, o) for e, o in common if e['cur'] < 60 and max(e['traj']) >= 75]
+    d0 = [max(e['traj']) - max(o['traj']) for e, o in lb0]
+    dm = [max(e['traj']) - max(o['traj']) for e, o in common if 75 <= e['pot'] < 85]
+    lb0_entry = [e['cur'] for e, _ in lb0]
+    j4[arm] = {'common': len(common), 'reach75_A0': r0, 'reach75_arm': ra, 'only_A0': only0, 'only_arm': onlya,
+               'A0_late_bloomers': len(lb0), 'of_them_reach75_under_arm': sum(max(e['traj']) >= 75 for e, _ in lb0),
+               'of_them_still_below60_under_arm': sum(c < 60 for c in lb0_entry),
+               'arm_late_bloomers': len(lba), 'of_them_reach75_under_A0': sum(max(o['traj']) >= 75 for _, o in lba)}
+    rows.append(f'| {LABEL[arm]} | {len(common):,} | {r0:,} / {ra:,} ({only0} only A0, {onlya} only arm) | {len(lb0)} | '
+                f'{j4[arm]["of_them_reach75_under_arm"]} | {j4[arm]["of_them_still_below60_under_arm"]} | '
+                f'{f1(med(d0), 2)} ({f1(q(d0, .1), 2)}, {f1(q(d0, .9), 2)}) | {len(lba)} | '
+                f'{j4[arm]["of_them_reach75_under_A0"]} | {f1(med(dm), 2)} ({f1(q(dm, .1), 2)}, {f1(q(dm, .9), 2)}) |')
+L += ['### 3i. Fixed-candidate check of the late-bloomer counts (paired layer, five seeds, common entrants)', '',
+      'The same candidates under A0 and the arm (key-matched; projected entrants, stored potential 70+). "A0 late '
+      'bloomers": entered below 60 and reached 75+ under A0; the columns follow those same candidates under the arm. '
+      'Delta max: projected maximum under the arm minus under A0 (median, 10th and 90th percentiles).', '',
+      '| arm | common entrants | reach 75+ under A0 / under arm | A0 late bloomers | of them reach 75+ under the arm | '
+      'of them still enter below 60 under the arm | their delta max | arm late bloomers | of them reach 75+ under A0 | '
+      'delta max, raw potential 75-85 |', '|---|---|---|---|---|---|---|---|---|---|'] + rows + ['']
+J['late_bloomer_fixed_candidates'] = j4
 J['trajectories'] = sec3
 
 open(OUT_MD, 'w').write('\n'.join(L) + '\n')

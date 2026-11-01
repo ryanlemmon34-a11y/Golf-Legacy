@@ -89,7 +89,10 @@ baseline validation), `provenance.py` (validation stamp and gates), `run.py` (ru
    | 80+, five-seed total | 31 | 42 | 41 | 40 |
    | 85+, five-seed total | 8 | 8 | 7 | 6 |
 
-   Per seed, 80+ goes 4/9/4/6/8 under A0 and 11/8/7/7/9 under A2: mixed in direction, and flat in the wider 75+ band.
+   Per seed, 80+ goes 4/9/4/6/8 under A0 and 11/8/7/7/9 under A2 (higher in four of five seeds), while the wider 75+
+   band (191 vs 194) and 85+ (8 vs 8) show no shift. The arms are not designed to change entry-overall frequencies:
+   juniors' entry overall has the same distribution under A0, A2 and A3, so a difference in one narrow band is not
+   evidence of a shift. No significance test is applied.
    Replay (Test2 candidates): 80+ is 8 under A0 against 10, 10 and 11, and 85+ is 1 in every arm.
 
    **A1** changes one Test2 junior, Cárdenas (96.09 → 94.21), and nobody's selection.
@@ -102,7 +105,8 @@ baseline validation), `provenance.py` (validation stamp and gates), `run.py` (ru
    | mean peak (decline) age of passers who entered 75+ | 25.26 | 26.84 | 26.22 | 25.99 |
 
    Under A0, selecting on entry level also selects early decliners. A2 replaces about a quarter of each cohort with
-   different individuals (4,312 out and 4,275 in per seed) without changing the cohort's distribution.
+   different individuals (4,312 out and 4,275 in per seed); the entry-overall distribution stays the same, but the
+   selected entrants' mean decline age moves from 26.10 to 27.00.
 3. **Scouting.**
    - Talented candidates (raw potential 80+) are kept 98.6% of the time under A0 and 99.1–99.3% under A2/A3.
    - Under A0, the talented candidates the scouts miss are late decliners (mean peak 31.0); under A2 the missed ones
@@ -113,10 +117,10 @@ baseline validation), `provenance.py` (validation stamp and gates), `run.py` (ru
      recomputed.
 4. **The same golfer converges by the mid-20s** (key-matched common entrants, fixed raw-potential groups, paired
    layer). Under A2, the 10th–90th percentile difference from A0 is about ±6 at 18, ±3 at 21, ±1.2–1.3 at 25,
-   ±0.6–0.7 at 30 and ±0.4–0.5 at 35–40. Medians stay near 0 throughout, and A3 and ρ 0.5 are narrower still. Readiness shapes
-   roughly the first 5–7 years. After that, projected ability is set by potential and the unchanged growth and decline
-   laws.
-5. **Elite exposure (projected, absolute ability): no measurable change.**
+   ±0.6–0.7 at 30 and ±0.4–0.5 at 35–40. Medians stay near 0 throughout, and A3 and ρ 0.5 are narrower still. In the
+   projection, readiness shapes roughly the first 5–7 years; after that, projected ability follows potential and the
+   unchanged growth and decline laws.
+5. **Elite exposure (projected, absolute ability, controlled schedule): no material change in the reported summaries.**
 
    | paired layer, per seed | A0 | A2 | A3 | A3r5 |
    |---|---|---|---|---|
@@ -126,46 +130,68 @@ baseline validation), `provenance.py` (validation stamp and gates), `run.py` (ru
 
    The median age at the projected maximum is 32 in every arm. The same Cárdenas candidate has 23 / 23 / 22 / 23
    projected years at 90+ (A0 / A1 / A2 / A3). Under A2 he enters at 88.7 instead of 96.1, but is at 97.2 by 25.
-6. **Late bloomers: the measurable cost of decoupling.**
+6. **Late bloomers: fewer threshold-defined late bloomers, with no lost development for the same candidates.**
 
    | paired layer, per seed | A0 | A2 | A3 | A3r5 |
    |---|---|---|---|---|
    | entered below 60 and reached 75+ | 17.6 | 12.2 | 13.6 | 15.8 |
-   | those late bloomers' mean decline-peak age | 30.17 | 27.01 | 28.69 | 29.24 |
+   | entered below 65 and reached 80+ | 4.8 | 4.4 | 5.0 | 4.4 |
+   | reached 80+ (any entry level) | 99.2 | 101.6 | 100.8 | 100.0 |
+   | mean decline-peak age, below 60 -> 75+ group | 30.34 | 27.46 | 28.53 | 28.83 |
+   | mean decline-peak age, below 65 -> 80+ group | 30.17 | 27.01 | 28.69 | 29.24 |
 
-   Pooled, A0 against A2 is 88 vs 61, about 2.2 standard deviations (Poisson approximation). Under A0, late readiness comes with late decline.
-   Decoupling lets some slow developers decline before they mature. A3 keeps part of the tie and loses fewer.
+   These groups are defined by thresholds within each arm's own cohort, and entry readiness decides who enters below
+   60 or 65, so their membership changes with the arm. Following the same candidates (`RESULTS.md` 3i: key-matched
+   common entrants, paired layer):
+   - all 88 of A0's below-60 → 75+ late bloomers are common entrants under A2, and all 88 still reach 75+ under A2;
+   - 80 of the 88 enter at 60 or above under A2, so they leave the threshold group;
+   - their projected maximum is slightly higher under A2 (median +0.41; 10th–90th percentile +0.07 to +0.79);
+   - across all common entrants, 1,933 reach 75+ under A0 and 1,931 under A2 (86 only under A0, 84 only under A2).
+
+   A3 and ρ 0.5 behave the same way (84 of 84 still reach 75+). So the lower count reflects who enters below the
+   threshold, not slow developers declining before they mature. The mean decline-peak age of the threshold groups
+   falls under A2 because readiness no longer tracks the decline draw.
 
 ## 4. Interpretation
 
-- **Readiness does not explain the Test2 concern.** None of the four arms changes how often near-finished 18-year-olds
-  appear or how good juniors are at entry. In this model, readiness does not explain one golfer holding the top for
-  decades: by the mid-20s the same candidate's projected ability is nearly the same under every arm.
-- **Where an extreme entrant comes from.** Cárdenas came from raw potential 100.9 combined with an early tempo. The
-  potential tail and the (fixed) growth and decline laws set his long-run level. Competitive dominance also depends on
-  the field and on round-to-round variance, which is a separate question.
-- **Costs and benefits of each arm.**
-  - A2's only measurable effects are realism ones, mainly the loss of late bloomers.
-  - A3 keeps more of the tie and loses fewer late bloomers, but shows no outcome benefit either.
-  - A1 is a consistency correction of negligible size.
+- **What the arms are and are not.** The tested arms are not designed to reduce how often high entry overalls occur, and
+  they do not. Under this controlled schedule they show no material change in the reported elite-exposure summaries
+  (reaching 85+/90+, golfer-years at 90+, age at the projected maximum). The same candidate's projected ability is
+  close to the same under every arm by the mid-20s.
+- **What A2/A3 do change.** They change who is precocious, and the tie between precocity and decline. The selected
+  entrants' mean decline age moves from 26.10 to 27.00 under A2, and about a quarter of each junior cohort is different
+  individuals. They also produce fewer threshold-defined late bloomers. As the fixed-candidate check shows, that is a
+  membership effect, not lost development.
+- **What is untested.** None of these changes has been followed through careers. Access to events, earnings, survival
+  (quitting and retirement), ranking and competition feedback could differ, and this study measures none of them.
+- **Where an extreme entrant comes from.** In the generation model, Cárdenas came from raw potential 100.9 with an early
+  tempo. Competitive dominance also depends on the field and on round-to-round variance, a separate question not
+  studied here.
+- **A1** is a consistency correction of negligible size at entry.
 
 ## 5. Recommendation for review (no decision taken, nothing implemented)
 
-1. **Keep A0 (no change).** The tested alternatives do not address the concern that prompted the study, and A2 costs
-   late bloomers.
+1. **Keep A0 (no change) for now.** The tested arms are not designed to make near-finished juniors rarer, and under this
+   controlled schedule they show no material change in the reported elite-exposure summaries.
 2. **A1 only as a consistency fix, if Ryan wants one.** It would be a rules-versioned change for fresh worlds only. It
    alters only candidates with raw potential above 99; it is low value and low risk, and is Ryan's call.
-3. **Do not adopt A2 or A3 as a balance fix.** If Ryan wants "precocious does not mean early decline" for realism alone,
-   a weak tie (A3, ρ 0.3–0.5) is preferable to full independence, but there is no evidence of an outcome benefit.
-4. **If the goal is fewer near-finished teenagers or less extreme dominance, a different study is needed.** It needs
-   Ryan's approval first. Candidates are the shape of the readiness distribution's early tail or the potential tail (no
-   hard caps), and, for dominance, the competition-variance question. Fresh-world runs would only be worthwhile for an
-   arm that changes a distribution; for A2/A3 the generation evidence predicts no aggregate difference.
+3. **Hold A2 and A3.** Neither lowers the entry distribution, so neither is a fix for the concern that prompted the
+   study. If Ryan wants "precocious does not mean early decline" for realism, a weak tie (A3, ρ 0.3–0.5) keeps more of
+   the existing tie than full independence. Its consequences for careers are untested.
+4. **Further evidence, only with Ryan's approval.**
+   - If the goal is fewer near-finished teenagers or less extreme dominance, a different study is needed: the shape of
+     the readiness distribution's early tail or the potential tail (no hard caps), and, for dominance, competition
+     variance.
+   - If A2/A3 stay of interest, fresh-world runs could still show differences this study cannot: about a quarter of
+     entrants change and their mean decline age moves. Such runs would measure access, earnings, survival, ranking and
+     competition. Whether that is worth doing is Ryan's call.
 
 ## 6. Assumptions and limitations
 
 - **Fixed inputs.** Nation profiles are the starting ones. The replay holds Test2's recorded allocations fixed. Shares,
   carry and national prestige are never recomputed.
+- **Careers not simulated.** Access to events, earnings, survival (quitting and retirement), ranking and competition
+  feedback are untested for every arm.
 - **Projection simplifications.** One fixed schedule (plus a light sensitivity) and self-coaching. There are no
   injuries, permanent injury losses, quitting, retirement, money or access effects, and no competition. Category
   choice and aging use the production functions with candidate-keyed random numbers. The paired layer projects only

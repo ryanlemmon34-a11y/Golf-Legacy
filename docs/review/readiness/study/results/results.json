@@ -1907,6 +1907,56 @@
    }
   }
  },
+ "late_bloomer_fixed_candidates": {
+  "A1": {
+   "common": 6662,
+   "reach75_A0": 1986,
+   "reach75_arm": 1986,
+   "only_A0": 0,
+   "only_arm": 0,
+   "A0_late_bloomers": 88,
+   "of_them_reach75_under_arm": 88,
+   "of_them_still_below60_under_arm": 88,
+   "arm_late_bloomers": 88,
+   "of_them_reach75_under_A0": 88
+  },
+  "A2": {
+   "common": 6177,
+   "reach75_A0": 1933,
+   "reach75_arm": 1931,
+   "only_A0": 86,
+   "only_arm": 84,
+   "A0_late_bloomers": 88,
+   "of_them_reach75_under_arm": 88,
+   "of_them_still_below60_under_arm": 8,
+   "arm_late_bloomers": 61,
+   "of_them_reach75_under_A0": 61
+  },
+  "A3": {
+   "common": 6239,
+   "reach75_A0": 1935,
+   "reach75_arm": 1931,
+   "only_A0": 80,
+   "only_arm": 76,
+   "A0_late_bloomers": 84,
+   "of_them_reach75_under_arm": 84,
+   "of_them_still_below60_under_arm": 20,
+   "arm_late_bloomers": 67,
+   "of_them_reach75_under_A0": 66
+  },
+  "A3r5": {
+   "common": 6315,
+   "reach75_A0": 1944,
+   "reach75_arm": 1951,
+   "only_A0": 66,
+   "only_arm": 73,
+   "A0_late_bloomers": 84,
+   "of_them_reach75_under_arm": 84,
+   "of_them_still_below60_under_arm": 26,
+   "arm_late_bloomers": 77,
+   "of_them_reach75_under_A0": 75
+  }
+ },
  "trajectories": {
   "A0": {
    "reach85": 26,

@@ -172,15 +172,15 @@ Entry ages 21-26, so the 18 column is empty.
 
 ### 3e (continued). Elite teens and late bloomers, recalculated selection (paired layer, per seed)
 
-Same definitions as 3c, over five seeds (projected entrants have stored potential 70+, which includes every junior who can reach 75+). The last column is the mean peak (decline) age of the late bloomers.
+Same definitions as 3c, over five seeds (projected entrants have stored potential 70+, which includes every junior who can reach 75+). These are THRESHOLD-DEFINED groups within each arm's own cohort: entry readiness decides who enters below 60 or 65, so the groups' membership changes with the arm (3i follows the same candidates). The last two columns are the mean peak (decline) age of each late group.
 
-| arm | entered 80+ | their golfer-years 90+ | their median at 21 / 25 / 30 / 35 / 40 | entered < 65, reach 80+ | entered < 60, reach 75+ | reach 80+ | of whom best at 30+ | late bloomers' mean peak age |
-|---|---|---|---|---|---|---|---|---|
-| A0 no change | 6.2 | 43.8 | 86.9 / 88.7 / 89.2 / 88.6 / 86.1 | 4.8 | 17.6 | 99.2 | 86.6 | 30.17 |
-| A1 cap order | 6.2 | 43.8 | 86.9 / 88.7 / 89.2 / 88.6 / 86.1 | 4.8 | 17.6 | 99.2 | 86.6 | 30.17 |
-| A2 independent | 8.4 | 48.8 | 86.0 / 87.9 / 88.5 / 88.4 / 86.5 | 4.4 | 12.2 | 101.6 | 94.0 | 27.01 |
-| A3 rho 0.3 | 8.2 | 48.6 | 86.0 / 87.9 / 88.8 / 88.5 / 86.3 | 5.0 | 13.6 | 100.8 | 92.0 | 28.69 |
-| A3r5 rho 0.5 | 8.0 | 48.8 | 86.0 / 87.9 / 88.7 / 88.5 / 86.1 | 4.4 | 15.8 | 100.0 | 90.6 | 29.24 |
+| arm | entered 80+ | their golfer-years 90+ | their median at 21 / 25 / 30 / 35 / 40 | entered < 65, reach 80+ | entered < 60, reach 75+ | reach 80+ | of whom best at 30+ | mean peak age, < 65 -> 80+ | mean peak age, < 60 -> 75+ |
+|---|---|---|---|---|---|---|---|---|---|
+| A0 no change | 6.2 | 43.8 | 86.9 / 88.7 / 89.2 / 88.6 / 86.1 | 4.8 | 17.6 | 99.2 | 86.6 | 30.17 | 30.34 |
+| A1 cap order | 6.2 | 43.8 | 86.9 / 88.7 / 89.2 / 88.6 / 86.1 | 4.8 | 17.6 | 99.2 | 86.6 | 30.17 | 30.34 |
+| A2 independent | 8.4 | 48.8 | 86.0 / 87.9 / 88.5 / 88.4 / 86.5 | 4.4 | 12.2 | 101.6 | 94.0 | 27.01 | 27.46 |
+| A3 rho 0.3 | 8.2 | 48.6 | 86.0 / 87.9 / 88.8 / 88.5 / 86.3 | 5.0 | 13.6 | 100.8 | 92.0 | 28.69 | 28.53 |
+| A3r5 rho 0.5 | 8.0 | 48.8 | 86.0 / 87.9 / 88.7 / 88.5 / 86.1 | 4.4 | 15.8 | 100.0 | 90.6 | 29.24 | 28.83 |
 
 ### 3f. Sensitivity: light schedule (one tournament, one training week, two rest weeks per block)
 
@@ -284,4 +284,15 @@ Only candidates who enter under both A0 and the arm, matched by candidate key; g
 | A2 independent | raw potential < 70 | 16,653 | 0.00 (-3.90, 3.98) | 0.00 (-2.20, 2.18) | 0.00 (-1.33, 1.32) | 0.00 (-1.04, 1.03) | 0.00 (-0.91, 0.91) |
 | A3 rho 0.3 | raw potential < 70 | 17,534 | 0.05 (-3.31, 3.58) | 0.00 (-1.92, 1.90) | 0.00 (-1.16, 1.17) | 0.00 (-0.90, 0.90) | 0.00 (-0.79, 0.80) |
 | A3r5 rho 0.5 | raw potential < 70 | 18,255 | 0.06 (-2.90, 3.02) | 0.00 (-1.68, 1.64) | 0.00 (-1.01, 1.01) | 0.00 (-0.79, 0.79) | 0.00 (-0.69, 0.70) |
+
+### 3i. Fixed-candidate check of the late-bloomer counts (paired layer, five seeds, common entrants)
+
+The same candidates under A0 and the arm (key-matched; projected entrants, stored potential 70+). "A0 late bloomers": entered below 60 and reached 75+ under A0; the columns follow those same candidates under the arm. Delta max: projected maximum under the arm minus under A0 (median, 10th and 90th percentiles).
+
+| arm | common entrants | reach 75+ under A0 / under arm | A0 late bloomers | of them reach 75+ under the arm | of them still enter below 60 under the arm | their delta max | arm late bloomers | of them reach 75+ under A0 | delta max, raw potential 75-85 |
+|---|---|---|---|---|---|---|---|---|---|
+| A1 cap order | 6,662 | 1,986 / 1,986 (0 only A0, 0 only arm) | 88 | 88 | 88 | 0.00 (0.00, 0.00) | 88 | 88 | 0.00 (0.00, 0.00) |
+| A2 independent | 6,177 | 1,933 / 1,931 (86 only A0, 84 only arm) | 88 | 88 | 8 | 0.41 (0.07, 0.79) | 61 | 61 | 0.00 (-0.61, 0.51) |
+| A3 rho 0.3 | 6,239 | 1,935 / 1,931 (80 only A0, 76 only arm) | 84 | 84 | 20 | 0.28 (0.05, 0.65) | 67 | 66 | 0.00 (-0.50, 0.44) |
+| A3r5 rho 0.5 | 6,315 | 1,944 / 1,951 (66 only A0, 73 only arm) | 84 | 84 | 26 | 0.19 (0.02, 0.50) | 77 | 75 | 0.01 (-0.42, 0.39) |
 
