@@ -32,9 +32,14 @@ moves, nations) is a few tens of kilobytes. The record of every published season
                index), and the page shows them as being read meanwhile -- never as missing, never decoded on the
                request. If the reader's process cannot be started (no writable job file), it runs as a thread.
     failures   a season the reader could not read is reported by the reader itself (never inferred from what is no
-               longer in memory): a file that is not a readable season of the expected shape is shown as not
-               recorded until its file changes; one that could not be opened (locked, vanished) is tried again,
-               READ_TRIES times in this observer. A reader that keeps dying is given up on after CRASHES.
+               longer in memory): a file that is not a readable season of the expected shape -- including a record
+               whose values the pages could not show (a share that is not a number, a value that is not finite, a
+               venue move without its facts) -- is shown as not recorded until its file changes; one that could not
+               be opened (locked, vanished) is tried again, READ_TRIES times in this observer. A reader that keeps
+               dying is given up on after CRASHES. "Until its file changes": the source as above and a mark of the
+               file's first and last bytes (read back on every use, so a file repaired in place is read again even
+               with the same size and modification time), and the session's bytes check (any other repair); an
+               unchanged failure is never retried.
     locking    the store file is shared (pages read while the background reader writes). A page waits for it at most
                PAGE_TIMEOUT; if it is busy or locked the page shows the seasons not in memory as being read, and the
                file is left as it is -- a lock is never taken for damage. The reader waits up to READER_TIMEOUT, then
@@ -54,6 +59,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import os
 import sqlite3
 import subprocess
@@ -78,7 +84,32 @@ _stat = os.stat                               # (tests give it another system's 
 
 
 class UnreadableSeason(ValueError):
-    """A season file that is not a readable season with a prestige record of the expected shape."""
+    """A season file that is not a readable season with a prestige record of the expected shape. `mark` and `digest`
+    (when the file was read) identify the bytes found unreadable."""
+    mark = None
+    digest = None
+
+
+MARK_BYTES = 32
+
+
+def mark_of(data):
+    """A cheap mark of a file's bytes: its size and its first and last MARK_BYTES bytes (hex)."""
+    return f'{len(data)}:{bytes(data[:MARK_BYTES]).hex()}:{bytes(data[-MARK_BYTES:]).hex()}'
+
+
+def file_mark(path):
+    """mark_of(the file) from two small reads; None if it cannot be read."""
+    try:
+        with open(path, 'rb') as f:
+            head = f.read(MARK_BYTES)
+            f.seek(0, 2)
+            size = f.tell()
+            f.seek(max(0, size - MARK_BYTES))
+            tail = f.read(MARK_BYTES)
+        return f'{size}:{head.hex()}:{tail.hex()}'
+    except (OSError, ValueError):
+        return None
 
 
 class StoreBusy(Exception):
@@ -149,31 +180,39 @@ def source_identity(a, y):
 
 # ---- a season file: its record and its members' trailers ----------------------------------------------------------
 def _number(v):
-    return v is None or (isinstance(v, (int, float)) and not isinstance(v, bool))
+    """A value the pages can show as a number: missing (None), or a finite int or float (not a bool)."""
+    return v is None or (isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v))
+
+
+MOVE_FACTS = ('series', 'from', 'course', 'layout', 'replaces', 'city', 'decided', 'event_prestige',
+              'course_prestige_before')     # what a venue move must say (observer_prestige.event_section shows them)
+
+
+def _numbers(d):
+    return isinstance(d, dict) and all(_number(x) for x in d.values())
 
 
 def check_record(rec):
-    """The record as archived if it has the shape the pages read (None: the season has none); else UnreadableSeason."""
+    """The record as archived if every value the pages read is there in a form they can show (None: the season has
+    none); else UnreadableSeason -- the season is then shown as not recorded, never half-shown or a failed page."""
     if rec is None:
         return None
     ok = isinstance(rec, dict)
     if ok:
-        for k in ('events', 'courses'):
-            v = rec.get(k, {})
-            ok = ok and isinstance(v, dict) and all(_number(x) for x in v.values())
+        ok = _numbers(rec.get('events', {})) and _numbers(rec.get('courses', {}))
         moves = rec.get('venue_moves', [])
-        ok = ok and isinstance(moves, list) and all(isinstance(m, dict) for m in moves)
+        ok = ok and isinstance(moves, list) and all(
+            isinstance(m, dict) and all(k in m for k in MOVE_FACTS) and isinstance(m['series'], str)
+            and _number(m['event_prestige']) and _number(m['course_prestige_before']) for m in moves)
         n = rec.get('nations', {})
         ok = ok and isinstance(n, dict)
         if ok:
-            for k in ('prestige', 'multiplier', 'ratio', 'achievement'):
+            ok = all(_numbers(n.get(k, {})) for k in ('prestige', 'multiplier', 'ratio', 'achievement'))
+            for k in ('shares', 'allocated', 'baseline_shares', 'carry'):
                 v = n.get(k, {})
-                ok = ok and isinstance(v, dict) and all(_number(x) for x in v.values())
-            for k in ('shares', 'allocated', 'baseline_shares'):
-                v = n.get(k, {})
-                ok = ok and isinstance(v, dict) and all(isinstance(x, dict) for x in v.values())
+                ok = ok and isinstance(v, dict) and all(_numbers(x) for x in v.values())
     if not ok:
-        raise UnreadableSeason('a prestige record of an unexpected shape')
+        raise UnreadableSeason('a prestige record with values the pages cannot show')
     return rec
 
 
@@ -185,6 +224,14 @@ def read_season(path):
     with open(path, 'rb') as f:
         data = f.read()
     digest = hashlib.sha256(data).hexdigest()
+    try:
+        return _decode(data, digest)
+    except UnreadableSeason as e:
+        e.mark, e.digest = mark_of(data), digest
+        raise
+
+
+def _decode(data, digest):
     view, pos, parts, members = memoryview(data), 0, [], []
     try:
         while pos < len(data):
@@ -252,7 +299,7 @@ class PrestigeStore:
         self.indexer = None
         self.stop_event = threading.Event()
         self.jobs = {}                        # year -> source identity given to the running (or last) reader
-        self.failed = {}                      # year -> source identity: not readable (shown as not recorded)
+        self.failed = {}                      # year -> (source identity, file mark): not readable (not recorded)
         self.tries = {}                       # (year, source) -> readers that could not open it, in this observer
         self.start_lock = threading.Lock()
         self.stopped = False                  # the reader was stopped on purpose (not a failure)
@@ -350,7 +397,7 @@ class PrestigeStore:
             got = hits[y]
             if src is None:
                 continue
-            if self.failed.get(y) == src:
+            if self.is_failed(y, src, path):
                 out[y] = None
             elif got is not None and got[0] == src and same_content(path, got[2]):
                 with self.lock:
@@ -374,8 +421,12 @@ class PrestigeStore:
                     if src != need[y][0] or ver != RECORD_VERSION:
                         continue
                     if status == 'content':
-                        self.failed[y] = src
-                        out[y] = None
+                        mark = members                          # (an unreadable season keeps its file's mark)
+                        if mark is not None and file_mark(need[y][1]) == mark:
+                            self.failed[y] = (src, mark)
+                            out[y] = None
+                            if checked != self.session:
+                                self.unchecked.add(y)
                     elif status == 'ok':
                         members = json.loads(members)
                         if same_content(need[y][1], members):
@@ -400,13 +451,26 @@ class PrestigeStore:
         self._write(y, source, 'ok', members, zlib.compress(json.dumps(rec, separators=(',', ':')).encode(), 6),
                     digest, self.session)
 
-    def put_failure(self, y, source, status):
+    def is_failed(self, y, src, path):
+        """Whether season y is known unreadable as its file is now (same source, same mark); a failure whose file
+        has changed is forgotten (read again)."""
+        f = self.failed.get(y)
+        if f is None:
+            return False
+        if f[0] == src and file_mark(path) == f[1]:
+            return True
+        self.failed.pop(y, None)
+        return False
+
+    def put_failure(self, y, source, status, path=None, mark=None, digest=None):
         """The reader could not read this season: 'content' (not a readable season: not recorded until the file
-        changes) or 'io' (could not be opened: tried again)."""
+        changes -- `mark`, `digest`: the bytes found unreadable) or 'io' (could not be opened: tried again)."""
         if status == 'content':
-            self.failed[y] = source
-        else:
-            self.tries[(y, source)] = self.tries.get((y, source), 0) + 1   # (a thread's own count; see settle)
+            mark = mark if mark is not None else file_mark(path) if path else None
+            self.failed[y] = (source, mark)
+            self._write(y, source, status, mark, None, digest, self.session)
+            return
+        self.tries[(y, source)] = self.tries.get((y, source), 0) + 1   # (a thread's own count; see settle)
         self._write(y, source, status, None, None, None, None)
 
     def _write(self, y, source, status, members, blob, digest, checked):
@@ -415,8 +479,8 @@ class PrestigeStore:
             return
         try:
             db.execute('INSERT OR REPLACE INTO seasons VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-                       (y, source, RECORD_VERSION, status, None if members is None else json.dumps(members), digest,
-                        checked, blob))
+                       (y, source, RECORD_VERSION, status, members if isinstance(members, str) or members is None
+                        else json.dumps(members), digest, checked, blob))
             db.commit()
         except sqlite3.DatabaseError as e:
             db.close()
@@ -427,13 +491,14 @@ class PrestigeStore:
                 db.close()
 
     def stored_digest(self, y, source):
-        """(digest, checked) of a stored readable season with this source, else None."""
+        """(digest, checked) of a stored season with this source (read, or found unreadable), else None."""
         db = self._db()
         if db is None:
             return None
         try:
-            row = db.execute('SELECT digest, checked FROM seasons WHERE year = ? AND source = ? AND status = ? '
-                             'AND version = ?', (y, source, 'ok', RECORD_VERSION)).fetchone()
+            row = db.execute('SELECT digest, checked FROM seasons WHERE year = ? AND source = ? AND status IN (?, ?) '
+                             'AND version = ? AND digest IS NOT NULL', (y, source, 'ok', 'content',
+                                                                       RECORD_VERSION)).fetchone()
             return row
         except sqlite3.DatabaseError as e:
             db.close()
@@ -492,6 +557,7 @@ class PrestigeStore:
             if not jobs or self.indexing() or time.time() < self.retry_after:
                 return
             self.jobs = {y: src for y, _, src, mode in jobs if mode == 'read'}
+            self.job_paths = {y: p for y, p, _, mode in jobs if mode == 'read'}
             self.verifying = any(mode == 'verify' for *_, mode in jobs)
             self.stopped = False
             self.stop_event.clear()
@@ -536,19 +602,21 @@ class PrestigeStore:
         if done:
             self.crashes = 0
         left = {y: src for y, src in self.jobs.items() if y not in have}
+        paths = getattr(self, 'job_paths', {})
+        give_up = lambda y, src: self.failed.__setitem__(y, (src, file_mark(paths[y]) if y in paths else None))
         if thread:                                       # (counted by the thread itself, store file or not)
             for y, src in left.items():
                 if self.tries.get((y, src), 0) >= READ_TRIES:
-                    self.failed[y] = src
+                    give_up(y, src)
         else:
             for y, src in self.io_failures(left).items():
                 if left.get(y) == src:
                     n = self.tries[(y, src)] = self.tries.get((y, src), 0) + 1
                     if n >= READ_TRIES:
-                        self.failed[y] = src
+                        give_up(y, src)
         if self.crashes >= self.CRASHES:
             for y, src in left.items():
-                self.failed[y] = src
+                give_up(y, src)
         self.jobs = {}
 
     def after_reader(self):
@@ -580,8 +648,8 @@ def read_into(store, y, path, src):
     """Read one season into the store (or record why it could not be)."""
     try:
         rec, members, digest = read_season(path)
-    except UnreadableSeason:
-        store.put_failure(y, src, 'content')
+    except UnreadableSeason as e:
+        store.put_failure(y, src, 'content', path, e.mark, e.digest)
         return
     except OSError:
         store.put_failure(y, src, 'io')
@@ -652,8 +720,8 @@ def records(w, years, inline_newest=True):
             rec, members, digest = read_season(sources[newest][1])
             st.reads_inline += 1
             st.put(newest, sources[newest][0], rec, members, digest)
-        except UnreadableSeason:
-            st.put_failure(newest, sources[newest][0], 'content')
+        except UnreadableSeason as e:
+            st.put_failure(newest, sources[newest][0], 'content', sources[newest][1], e.mark, e.digest)
             rec = None
         except OSError:
             rec = None                                  # (could not be opened now: tried again next time)
@@ -671,7 +739,7 @@ def records(w, years, inline_newest=True):
             have = st.stored(every)
             st.settle(have)
             todo = [[y, every[y][1], every[y][0], 'read'] for y in sorted(set(every) - set(have), reverse=True)
-                    if every[y][0] is not None and st.failed.get(y) != every[y][0]]
+                    if every[y][0] is not None and not st.is_failed(y, *every[y])]
         for y in verify:                                # (seasons served from the store, bytes not yet checked
             src = sources[y][0] if y in sources else source_identity(a, y)   # this session: behind the reads)
             if src is not None:
@@ -680,7 +748,7 @@ def records(w, years, inline_newest=True):
         if st.indexing():
             st.unchecked -= set(verify)
         for y in missing:
-            out[y] = None if st.failed.get(y) == sources[y][0] else PENDING
+            out[y] = None if st.is_failed(y, *sources[y]) else PENDING
     return out
 
 

@@ -60,7 +60,8 @@ def latest(w):
     The newest season is read now if it is not stored yet (one season). Only if it has no record (none archived, or
     its file not readable) are older seasons consulted, from the store; while one of those newer than any recorded
     season is still being read in the background, the values are empty and 'pending' is True (never an older
-    season's values passed off as the newest)."""
+    season's values passed off as the newest). 'year' is the season the values were recorded at the end of, 'newest'
+    the newest archived season: when they differ the lists say so (latest_note)."""
     lv = _live(w)
     if lv:
         return lv
@@ -73,22 +74,27 @@ def latest(w):
     for y in reversed(years):
         r = recs.get(y)
         if r is PS.PENDING:
-            return {'events': {}, 'courses': {}, 'venue_moves': [], 'nations': {}, 'pending': True, 'year': None}
+            return {'events': {}, 'courses': {}, 'venue_moves': [], 'nations': {}, 'pending': True, 'year': None,
+                    'newest': years[-1]}
         if _has_values(r):
             return {'events': r.get('events', {}), 'courses': r.get('courses', {}),
                     'venue_moves': r.get('venue_moves', []), 'nations': nations_view(r.get('nations')),
-                    'pending': False, 'year': y}
+                    'pending': False, 'year': y, 'newest': years[-1]}
     return None
 
 
 def latest_note(lt):
     """A line for the Tournaments, Courses and Nations lists when latest() could not give the newest values: being read
-    (pending), or the most recent season that recorded them is not the newest."""
+    (pending), or the values shown are an older season's (the newest has none recorded or cannot be read)."""
     if not lt:
         return ''
     if lt.get('pending'):
         return ('<p class="muted pending">Prestige values are being read from the history in the background (the newest '
                 'season has none recorded); reload in a moment.</p>')
+    year, newest = lt.get('year'), lt.get('newest')
+    if year is not None and newest is not None and year != newest:
+        return (f'<p class="muted">Prestige values shown are those recorded at the end of {year}: the newest archived '
+                f'season ({newest}) has none recorded (or its file cannot be read).</p>')
     return ''
 
 

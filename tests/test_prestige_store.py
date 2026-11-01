@@ -595,5 +595,104 @@ class LocksAndBytes(StoreCase):
             self.assertIn('being read', O.nations(w, {})[1])
 
 
+class NestedAndRepaired(StoreCase):
+    """Review of 1c1ab53: nested values the pages cannot show, a failed season repaired in place, and the lists'
+    note when the values are an older season's."""
+
+    def bad(self, y, mutate):
+        rec = record(y)
+        mutate(rec)
+        self.a.publish(y, 400 + y - FIRST, rec)
+
+    def test_nested_values_the_pages_cannot_show_are_not_recorded(self):
+        cases = {
+            FIRST + 1: lambda r: r['nations']['shares']['juniors'].__setitem__('Fiji', 'high'),
+            FIRST + 2: lambda r: r.__setitem__('venue_moves', [{'series': 'TOUR_MASTERS'}]),
+            FIRST + 3: lambda r: r['events'].__setitem__('TOUR_MASTERS', float('nan')),
+            FIRST + 4: lambda r: r['nations']['prestige'].__setitem__('Fiji', float('inf')),
+            FIRST + 5: lambda r: r['nations']['allocated']['juniors'].__setitem__('USA', 'two'),
+            FIRST + 6: lambda r: r['courses'].__setitem__('augusta-like', True),
+            LAST: lambda r: r['nations']['baseline_shares']['new_pros'].__setitem__('USA', None) or
+            r['nations']['multiplier'].__setitem__('USA', float('-inf')),
+        }
+        for y, f in cases.items():
+            self.bad(y, f)
+        got = PS.records(self.w, list(self.a.years))                          # the newest (inline): no exception
+        self.assertIsNone(got[LAST])
+        got = self.warm_partial()
+        for y in cases:
+            self.assertIsNone(got[y], y)
+        for y in set(self.a.years) - set(cases):
+            self.assertEqual(got[y], record(y))
+        for html in (OP.event_section(self.w, 'TOUR_MASTERS'), OP.course_section(self.w, 'augusta-like'),
+                     OP.nation_section(self.w, 'Fiji'), OP.nation_section(self.w, 'USA')):
+            self.assertIn('not recorded', html)
+        self.assertEqual(OP.latest(self.w)['year'], LAST - 1)
+
+    def test_a_valid_venue_move_is_kept(self):
+        move = {'series': 'TOUR_MASTERS', 'from': 2045, 'course': 'augusta-like', 'layout': 'main', 'replaces': 'old-club',
+                'city': 'Augusta', 'decided': 2044, 'event_prestige': 81.0, 'course_prestige_before': 60.5}
+        self.bad(LAST, lambda r: r.__setitem__('venue_moves', [move]))
+        self.assertEqual(PS.records(self.w, [LAST])[LAST]['venue_moves'], [move])
+        self.assertIn('Venue moves: from 2045', OP.event_section(self.w, 'TOUR_MASTERS'))
+
+    def write_same_size(self, p, raw, size):
+        blob = gzip.compress(raw, mtime=0)
+        if len(blob) < size:
+            hdr, body = blob[:10], blob[10:]
+            blob = hdr[:3] + bytes([hdr[3] | 0x08]) + hdr[4:] + b'x' * (size - len(blob) - 1) + b'\0' + body
+        self.assertEqual(len(blob), size, 'test setup: sizes')
+        with open(p, 'r+b') as f:                                            # in place: the same file
+            f.seek(0)
+            f.write(blob)
+            f.truncate(size)
+
+    def test_a_failed_season_repaired_in_place_is_read_again(self):
+        y = FIRST + 7
+        p = self.a.year_path(y)
+        good = gzip.decompress(p.read_bytes())
+        broken = good.replace(b'"SMALL_OPEN": 40.0', b'"SMALL_OPEN": "40"')   # same length, not a number
+        self.assertEqual(len(broken), len(good))
+        size = max(len(gzip.compress(good, mtime=0)), len(gzip.compress(broken, mtime=0))) + 40
+        self.write_same_size(p, broken, size)
+        got = self.warm_partial()
+        self.assertIsNone(got[y])                                            # unreadable: not recorded
+        st0 = os.stat(p)
+        frozen = {str(p): st0}
+        idx = self.w._prestige_store.indexer
+        for _ in range(3):                                                   # an unchanged failure: never retried
+            self.assertIsNone(PS.records(self.w, list(self.a.years))[y])
+        self.assertIs(self.w._prestige_store.indexer, idx)
+        with mock.patch.object(PS, '_stat', ReviewFindings.windows_stat(self, frozen)):
+            before = PS.source_identity(self.a, y)
+        self.write_same_size(p, good, size)                                  # repaired in place ...
+        os.utime(p, ns=(st0.st_atime_ns, st0.st_mtime_ns))                   # ... same size and modification time
+        with mock.patch.object(PS, '_stat', ReviewFindings.windows_stat(self, frozen)):
+            self.assertEqual(PS.source_identity(self.a, y), before)          # the stat identity cannot tell
+            w2 = self.world()                                                # reopened (the store file's row)
+            PS.records(w2, list(self.a.years))
+            self.wait(w2)
+            self.assertEqual(PS.records(w2, [y])[y], record(y))
+            got = PS.records(self.w, list(self.a.years))                      # and the session that saw it fail
+            if got[y] is PS.PENDING:
+                self.wait(self.w)
+                got = PS.records(self.w, list(self.a.years))
+            self.assertEqual(got[y], record(y))
+
+    def test_the_lists_name_the_older_season_shown(self):
+        self.a.publish(LAST, 900, None)                                      # the newest season: no record
+        self.warm_partial()
+        lt = OP.latest(self.w)
+        self.assertEqual((lt['year'], lt['newest'], lt['pending']), (LAST - 1, LAST, False))
+        note = OP.latest_note(lt)
+        self.assertIn(f'recorded at the end of {LAST - 1}', note)
+        self.assertIn(f'({LAST})', note)
+        self.assertEqual(OP.latest_note(dict(lt, year=LAST)), '')           # the newest itself: nothing to say
+        import observer as O
+        with mock.patch.object(O.OP, 'latest', lambda w: lt), \
+                mock.patch.object(O, 'nation_counts', lambda w: {'Fiji': [1, 1, 0, 0]}):
+            self.assertIn(f'recorded at the end of {LAST - 1}', O.nations(NS(live=None, a=None), {})[1])
+
+
 if __name__ == '__main__':
     unittest.main()
