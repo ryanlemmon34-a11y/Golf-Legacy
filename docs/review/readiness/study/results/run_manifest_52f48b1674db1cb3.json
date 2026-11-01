@@ -1,0 +1,31 @@
+{
+ "config": {
+  "test2_seed": 386509,
+  "paired_seeds": [
+   2027,
+   11,
+   23,
+   83,
+   386509
+  ],
+  "arms": [
+   "A0",
+   "A1",
+   "A2",
+   "A3",
+   "A3r5"
+  ],
+  "years": [
+   2028,
+   2084
+  ],
+  "project_min_pot_paired": 70.0,
+  "to_age": 40
+ },
+ "study.py": "3f8a752784b9459be867f369ac222df0ac521c36e852b2253dbaa41b649131f7",
+ "run.py": "751b94a6e89ebda1c312e1d4ba6da8ba402ff2914501b2d5f58eff67c26a82cb",
+ "fixture": "3993923fa787526d98cf201fe366123b1757ca36a8a6851f7aff264ebbcfa9c9",
+ "checkout_head": "60c962b66f6b0c35e69d1b5075ac6734318d39a5",
+ "golfsim_digest": "b39eb853cf215aa9fecd3eadd23497f5c813ff4584c90cda71b847a44db2c7cd",
+ "hash": "52f48b1674db1cb3"
+}

@@ -1,6 +1,6 @@
 # Study self-test: negative cases for validation and the gates
 
-Output of `selftest.sh` (scratch copies in /dev/shm; the original fixture and stamp are never written). Each case must exit with the stated code and name the stated failure; the script exits 1 otherwise. R5/R6 (report gate) are added once a run exists.
+Output of `selftest.sh` against run 52f48b1674db1cb3 (scratch copies in /dev/shm; the original fixture and stamp are never written). Each case must exit with the stated code and name the stated failure; the script exits 1 otherwise.
 
 | case | wanted exit | got | must name | result |
 |---|---|---|---|---|
@@ -14,5 +14,7 @@ N5 stamp passed False checks [['F1 cohort boundary', True], ['F2 every cohort pa
 | R2 runner, failed stamp | 2 | 2 | validation did not pass | PASS |
 | R3 runner, stale stamp (study.py edited) | 2 | 2 | stale validation: study.py | PASS |
 | R4 runner, current passing stamp | 0 | 0 | validation stamp ok | PASS |
+| R5 report, failed stamp | 2 | 2 | validation did not pass | PASS |
+| R6 report, current passing stamp | 0 | 0 | Starting-ability study | PASS |
 
 selftest: 0 case(s) not as stated

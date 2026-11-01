@@ -377,6 +377,25 @@ for arm in ARMS:
 L += ['### 3e. Elite outcomes, recalculated selection (paired layer, five seeds, entrants with stored potential 70+)', '',
       '| arm | projected juniors | reach 85+ per seed | reach 90+ per seed | golfer-years 85+ per seed | 90+ per seed | '
       'median age at max (85+) | median drop max -> 40 |', '|---|---|---|---|---|---|---|---|'] + rows + ['']
+rows = []
+for arm in ARMS:
+    es = pjt[arm]
+    teen = [e for e in es if e['cur'] >= 80]
+    late = [e for e in es if e['cur'] < 65 and max(e['traj']) >= 80]
+    late70 = [e for e in es if e['cur'] < 60 and max(e['traj']) >= 75]
+    best30 = [e for e in es if max(e['traj']) >= 80 and peak_of(e)[1] >= 30]
+    r80 = [e for e in es if max(e['traj']) >= 80]
+    n = len(seeds)
+    rows.append(f'| {LABEL[arm]} | {len(teen) / n:.1f} | {sum(years_at_or_above(e, 90) for e in teen) / n:.1f} | '
+                + ' / '.join(f1(med([at(e, a) for e in teen]), 1) for a in (21, 25, 30, 35, 40))
+                + f' | {len(late) / n:.1f} | {len(late70) / n:.1f} | {len(r80) / n:.1f} | {len(best30) / n:.1f} | '
+                f'{f1(st.fmean([e["peak"] for e in late]), 2) if late else "-"} |')
+L += ['### 3e (continued). Elite teens and late bloomers, recalculated selection (paired layer, per seed)', '',
+      'Same definitions as 3c, over five seeds (projected entrants have stored potential 70+, which includes every '
+      'junior who can reach 75+). The last column is the mean peak (decline) age of the late bloomers.', '',
+      '| arm | entered 80+ | their golfer-years 90+ | their median at 21 / 25 / 30 / 35 / 40 | entered < 65, reach 80+ | '
+      'entered < 60, reach 75+ | reach 80+ | of whom best at 30+ | late bloomers\' mean peak age |',
+      '|---|---|---|---|---|---|---|---|---|'] + rows + ['']
 
 # sensitivity: light schedule
 rl = {a: load(f'replay_{a}_juniors_light')['entrants'] for a in ARMS}
@@ -390,15 +409,22 @@ for arm in ARMS:
     rows.append(f'| {LABEL[arm]} | {len(r85)} | {len(r90)} | {sum(years_at_or_above(e, 90) for e in r90)} |')
 L += ['| arm (light schedule) | reach 85+ | reach 90+ | golfer-years 90+ |', '|---|---|---|---|'] + rows + ['']
 
-# orientation against the brief (not a reproduction)
-g = [e for e in rj['A0'] if 80 <= e['pot_s'] < 90 and e['year'] <= 2083]
-L += ['### 3g. Orientation only: A0 projection against Test2\'s realized figures (from the review brief)', '',
-      f'Test2 juniors with potential 80-90 (brief: n = 31, median start 72.27, 83.2 at 31 among those still playing). '
-      f'Here, stored potential 80-90 juniors entering 2028-2083: n = {len(g)}, median entry {f1(med([e["cur"] for e in g]), 2)}, '
-      f'median projected at 31 {f1(med([at(e, 31) for e in g]), 1)} (standard schedule) and '
-      f'{f1(med([at(e, 31) for e in [x for x in rl["A0"] if 80 <= x["pot_s"] < 90 and x["year"] <= 2083]]), 1)} (light). '
-      'The brief\'s group may be defined differently (its potential field, survivors only), so this is a scale check of '
-      'the schedule, not a validation of the projection.', '']
+# projected peak summary (projection only; deliberately not compared with any realized Test2 figure)
+rows = []
+for arm in ARMS:
+    for name, es in (('standard', [e for e in rj[arm] if 80 <= e['pot_s'] < 90]),
+                     ('light', [e for e in rl[arm] if 80 <= e['pot_s'] < 90])):
+        pk = [peak_of(e) for e in es]
+        rows.append(f'| {LABEL[arm]} | {name} | {len(es)} | {f1(med([e["cur"] for e in es]), 2)} | '
+                    f'{f1(med([m for m, _ in pk]), 1)} | {f1(med([a for _, a in pk]), 0)} |')
+L += ['### 3g. Projected peak summary: juniors with stored potential 80-90', '',
+      'Median projected maximum overall (entry to 40) and median age at that maximum. These are peak summaries of the '
+      'projection; the fixed-age tables above are a different statistic, and neither is compared with Test2\'s '
+      'realized careers: the review brief\'s 83.2 and 31 for Test2\'s mature high-potential cohort are its median '
+      'career-peak overall and median peak age, for a cohort defined in the archive that is not reconstructed here, so '
+      'no matched comparison is made.', '',
+      '| arm | schedule | n | median entry | median projected max | median age at projected max |',
+      '|---|---|---|---|---|---|'] + rows + ['']
 J['trajectories'] = sec3
 
 open(OUT_MD, 'w').write('\n'.join(L) + '\n')
