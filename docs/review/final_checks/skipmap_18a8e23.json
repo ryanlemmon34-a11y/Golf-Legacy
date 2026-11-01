@@ -1,0 +1,60 @@
+{
+ "collected": 1136,
+ "collect_seconds": 98.8,
+ "failed_imports": [],
+ "progress_chars": 1136,
+ "dots": 1132,
+ "s": 4,
+ "skips_by_position": [
+  {
+   "index": 207,
+   "id": "test_decision_evidence_world.DecisionEvidenceWorld.test_outcomes_are_identical_to_the_parent_build",
+   "static_skip": [
+    "method",
+    "set GOLF_PARENT_CHECKOUT to the parent build"
+   ],
+   "runtime_skipTest_in_body": []
+  },
+  {
+   "index": 634,
+   "id": "test_observer_gaps.WorldGaps.test_retirement_into_a_staff_role_each_once",
+   "static_skip": null,
+   "runtime_skipTest_in_body": [
+    "'no golfer became a coach or caddie in this small world'"
+   ]
+  },
+  {
+   "index": 655,
+   "id": "test_observer_profiles.ProfilesAndStatsTests.test_a_golfer_who_became_staff_keeps_one_identity",
+   "static_skip": null,
+   "runtime_skipTest_in_body": [
+    "'no golfer became staff in this short world (checked on the 50-season copy)'"
+   ]
+  },
+  {
+   "index": 1014,
+   "id": "test_upsets.HeavyEquivalenceTests.test_recording_changes_no_outcome",
+   "static_skip": [
+    "class",
+    "whole-season run: set GOLF_HEAVY_TESTS=1"
+   ],
+   "runtime_skipTest_in_body": []
+  }
+ ],
+ "static_skips_at_collection": [
+  {
+   "id": "test_decision_evidence_world.DecisionEvidenceWorld.test_outcomes_are_identical_to_the_parent_build",
+   "where_why": [
+    "method",
+    "set GOLF_PARENT_CHECKOUT to the parent build"
+   ]
+  },
+  {
+   "id": "test_upsets.HeavyEquivalenceTests.test_recording_changes_no_outcome",
+   "where_why": [
+    "class",
+    "whole-season run: set GOLF_HEAVY_TESTS=1"
+   ]
+  }
+ ]
+}

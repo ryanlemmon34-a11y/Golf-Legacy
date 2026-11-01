@@ -74,8 +74,40 @@ Earlier smoke runs found one real defect, fixed in build/v17-early-pro dcc0c64: 
     OK (skipped=4)
     rc=0
 
-- The run finished inside the 10,800 s wrapper (rc 0, not 124), so every test that was collected ran to completion.
-- The 4 skips are conditional skips (fixtures, heavy runs or environment variables that are not set), the same count as the previous full run. The run was not verbose, so the 4 are not named individually here.
-- Compared with the previous full run on 4018797 (`Ran 1132 tests in 6975.263s`, `FAILED (errors=6, skipped=4)`, wrapper rc 124):
-  - The 6 errors were `test_nation_achievement` stubbing `_record` but not `_records`, a test-mock gap. It was fixed in that test (4 lines) and the 6 tests now pass. There was no production change for it.
-  - The 4 extra tests are `test_perf_v17` (+1), `test_college_early_pro` (+1) and `test_prestige_store` (+2).
+The run finished inside the 10,800 s wrapper, and the wrapper itself exited 0.
+
+**The 4 skips (labelled static reconstruction).** The run was not verbose, so the log has one progress symbol per test
+(1,132 `.` and 4 `s`) but no skip reasons. The skips below were reconstructed without rerunning any test:
+
+- alphabetic discovery of the 89 test files at 18a8e23 collects exactly 1,136 test methods, one for each of the 1,136 progress symbols;
+- each `s` is matched by its position in that order to a test;
+- the reason comes from that test's definition.
+
+HAL's independent review got the same four, and so did `skipmap.py` (here; collection only, no test run; output in
+`skipmap_18a8e23.json`).
+
+| position | test | kind | why it skipped in this run |
+|---|---|---|---|
+| 207 | `test_decision_evidence_world.DecisionEvidenceWorld.test_outcomes_are_identical_to_the_parent_build` | static, `skipUnless` | `GOLF_PARENT_CHECKOUT` is not set (the comparison needs a parent build checked out) |
+| 634 | `test_observer_gaps.WorldGaps.test_retirement_into_a_staff_role_each_once` | `skipTest` in the body | the small-world fixture has no golfer moving into a coach or caddie role |
+| 655 | `test_observer_profiles.ProfilesAndStatsTests.test_a_golfer_who_became_staff_keeps_one_identity` | `skipTest` in the body | the same fixture limitation: no golfer became staff in the short world (the test notes the case was checked on the 50-season copy) |
+| 1014 | `test_upsets.HeavyEquivalenceTests.test_recording_changes_no_outcome` | static, class `skipUnless` | `GOLF_HEAVY_TESTS` is not `1` (a whole-season run) |
+
+No browser test was skipped: the `test_views` Node Playwright tests ran.
+
+**Previous full run on 4018797, for the record** (`full_suite_4018797.log` and `full_suite_4018797.NOTE.txt`, kept
+outside the repository):
+
+- The run was started under a 7,000 s `timeout` wrapper. The run before it had taken 7,524.9 s, so at 4,514 s the
+  wrapper alone was paused (SIGSTOP). The test process kept running and reached unittest's own summary:
+  `Ran 1132 tests in 6975.263s` / `FAILED (errors=6, skipped=4)`.
+- The wrapper was then resumed (SIGCONT) only so it could be reaped. Its alarm had passed while it was paused, so the
+  `rc=124` it appended is the wrapper's timeout code, not the test result.
+- The run was not cut off; its result is the summary above.
+- The 6 errors were stale mocks in `test_nation_achievement` (ObserverProjections 4, ObserverText 2), all
+  `AttributeError: 'object' object has no attribute 'a'`. Those tests stubbed `OP._record` only, but on the integrated
+  build the nation page reads through the prestige store's `OP._records`.
+- The fix stubs `_records` as well (4 lines in that test file), and the 6 tests pass in the run above. No production
+  change was made for it.
+- The 4 tests added since are `test_perf_v17` (+1), `test_college_early_pro` (+1) and `test_prestige_store` (+2):
+  1,132 + 4 = 1,136.
