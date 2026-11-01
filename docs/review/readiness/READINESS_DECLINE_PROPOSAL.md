@@ -13,7 +13,8 @@ would need. Figures marked *(brief)* are from HAL's review brief on Test2; the r
   No. 1 (last major at 47, last Premier win at 52) and retired at 60 after five starts in his last season (one cut,
   world ranking 1117).
 - **Ordinary development already includes rapid organic growth.** The mature 4,814-junior cohort's peak age median is
-  28; juniors with potential 80-90 (n = 31) start at a median 72.27 and reach 83.2 at 31; arcs such as 74.86 -> 91.5
+  28; juniors with potential 80-90 (n = 31) start at a median 72.27, and their median career-peak overall is 83.2 at a
+  median peak age of 31 (a peak summary, not the overall at age 31); arcs such as 74.86 -> 91.5
   at 34 and 60.94 -> 81.8 at 34 exist.
 - **Decline among survivors.** Overall change 30 -> 40: -3.6; 40 -> 50: -9.6; 50 -> 60: -13.4. Nine Premier or major
   wins by golfers aged 50+ across 2,280 such events; none in a major.
