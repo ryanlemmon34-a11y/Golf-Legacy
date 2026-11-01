@@ -144,6 +144,11 @@ CAREER_MODELS = {
     'turn_pro': {
         'terms': ('base', 'standing', 'means', 'willingness', 'wins', 'age'),
         'inputs': ('age', 'graduating', 'am_rank')},
+    # (rules 2026-11-15) a college amateur aged 18-21 eligible to turn professional before graduating: the same
+    # terms as turn_pro's non-graduating model; inputs say why they were eligible (exempt: holds a winner's exemption)
+    'turn_pro_college': {
+        'terms': ('base', 'standing', 'means', 'willingness', 'wins', 'age'),
+        'inputs': ('age', 'am_rank', 'exempt')},
     'amateur_job': {
         'terms': ('base', 'age', 'runway', 'debt'),
         'inputs': ('age', 'runway', 'cash_k')},

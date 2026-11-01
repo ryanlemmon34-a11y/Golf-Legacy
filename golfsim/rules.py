@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import re
 
-RULES_VERSION = '2026-11-11'
+RULES_VERSION = '2026-11-15'
 RANKING_RULE = 'world-ranking-1'     # the world ranking's formula (unchanged since the world began; named now)
 VERSIONS = (
     ('2026-10-30', 'Winners\' exemptions count whatever a golfer\'s membership (a non-member champion earns a '
@@ -99,6 +99,14 @@ VERSIONS = (
                    'eligibility, field sizes (up to 1.5 times the usual field) and the calendar; no place is '
                    'reserved or guaranteed, and members can lose places in full fields. Worlds started earlier keep '
                    'the previous order.'),
+    ('2026-11-15', 'College amateurs may turn professional before their eligibility ends: in each winter at ages 18 to '
+                   '21, a college golfer (US Division I, US small college or international university golf) who holds '
+                   'a winner\'s exemption for the next season or finishes the season in the amateur ranking\'s top 15 '
+                   'decides, with the same model as other amateurs who are not graduating, whether to turn '
+                   'professional now. Those who do start where any new professional with their ranking or exemption '
+                   'starts; those who stay remain full-time college golfers. Unchanged: the model, graduation in the '
+                   'season they turn 22, everyone else\'s decisions and draws. Worlds started earlier keep the old '
+                   'rule (no decision before 22).'),
 )
 EARLIER = ('Seasons archived before rules versions were recorded were played under earlier rules. The '
            'differences that matter for reading old results: a winner without a Premier card held no '
@@ -279,6 +287,20 @@ RULES = {
         'recorded once in the eligibility ledger. No redshirt, waiver or transfer exceptions. A fictional rule: '
         'close to the NCAA\'s age-based five-year window, not its older four-seasons-in-five rule.',
         '2026-10-30'),
+    'college-turning-pro': (
+        'Turning professional from college',
+        'In the winter after each season, a college amateur aged 18 to 21 (age by birth year) on a college tour (US '
+        'Division I, US small college or international university golf) may turn professional before their '
+        'eligibility ends if they hold a winner\'s exemption for the next season (a major in the five seasons before '
+        'it, a Premier event in the two before it) or finish the season ranked 15th or better in the amateur '
+        'ranking. Nothing else makes them eligible -- not their ability or potential. The decision is voluntary and '
+        'uses the same model as other amateurs who are not graduating: amateur standing, means (cash and family '
+        'money), willingness, wins and age. Those who turn professional start on the Premier Tour with a winner\'s '
+        'exemption, else on their Challenger tour (ranked 15th or better); a place earned only as an amateur (an '
+        'amateur invitation) lapses, as it does for any amateur who turns professional. Those who decide to stay '
+        'remain full-time college golfers for the next season, as before. Graduation in the season they turn 22 is '
+        'unchanged.',
+        '2026-11-15'),
     'world-ranking': (
         'World ranking (world-ranking-1)',
         'Every start in a professional event -- majors, Premier, Challenger, Regional and Mini tour events; not '
