@@ -1,0 +1,127 @@
+{
+ "code": "/dev/shm/v17/wt_int",
+ "arm": "on",
+ "seed": 11,
+ "rules": "2026-11-15",
+ "carry_on": true,
+ "achievement_on": true,
+ "seasons": [
+  {
+   "entrant_year": 2028,
+   "seconds_so_far": 152.9,
+   "totals": {
+    "juniors": 287,
+    "new_pros": 419
+   },
+   "allocated_sums": {
+    "juniors": 287,
+    "new_pros": 419
+   },
+   "totals_exact": true,
+   "carry_min": -0.516363,
+   "carry_max": 0.486312,
+   "carry_sum": -1e-06,
+   "prestige_min": 42.68,
+   "prestige_max": 61.33,
+   "mult_min": 0.9091,
+   "mult_max": 1.1,
+   "at_cap": 0,
+   "at_floor": 0,
+   "usa_share": 0.33402,
+   "top5_share": 0.58964,
+   "below_45": 7,
+   "achievement_min": 0.7725,
+   "achievement_max": 1.3291,
+   "nations_with_share": 57,
+   "nations_never_given_newcomer": 16
+  },
+  {
+   "entrant_year": 2029,
+   "seconds_so_far": 295.9,
+   "totals": {
+    "juniors": 301,
+    "new_pros": 467
+   },
+   "allocated_sums": {
+    "juniors": 301,
+    "new_pros": 467
+   },
+   "totals_exact": true,
+   "carry_min": -0.535077,
+   "carry_max": 0.458484,
+   "carry_sum": 3e-06,
+   "prestige_min": 40.5,
+   "prestige_max": 57.61,
+   "mult_min": 0.8264,
+   "mult_max": 1.21,
+   "at_cap": 0,
+   "at_floor": 0,
+   "usa_share": 0.34226,
+   "top5_share": 0.59561,
+   "below_45": 9,
+   "achievement_min": 0.7361,
+   "achievement_max": 1.306,
+   "nations_with_share": 57,
+   "nations_never_given_newcomer": 10
+  },
+  {
+   "entrant_year": 2030,
+   "seconds_so_far": 453.9,
+   "totals": {
+    "juniors": 299,
+    "new_pros": 412
+   },
+   "allocated_sums": {
+    "juniors": 299,
+    "new_pros": 412
+   },
+   "totals_exact": true,
+   "carry_min": -0.538121,
+   "carry_max": 0.526681,
+   "carry_sum": 3e-06,
+   "prestige_min": 38.0,
+   "prestige_max": 61.61,
+   "mult_min": 0.7513,
+   "mult_max": 1.2858,
+   "at_cap": 0,
+   "at_floor": 0,
+   "usa_share": 0.35034,
+   "top5_share": 0.59699,
+   "below_45": 10,
+   "achievement_min": 0.7064,
+   "achievement_max": 1.4566,
+   "nations_with_share": 57,
+   "nations_never_given_newcomer": 7
+  },
+  {
+   "entrant_year": 2031,
+   "seconds_so_far": 619.2,
+   "totals": {
+    "juniors": 279,
+    "new_pros": 439
+   },
+   "allocated_sums": {
+    "juniors": 279,
+    "new_pros": 439
+   },
+   "totals_exact": true,
+   "carry_min": -0.49914,
+   "carry_max": 0.519504,
+   "carry_sum": 4e-06,
+   "prestige_min": 38.8,
+   "prestige_max": 60.77,
+   "mult_min": 0.733,
+   "mult_max": 1.348,
+   "at_cap": 0,
+   "at_floor": 0,
+   "usa_share": 0.35085,
+   "top5_share": 0.59847,
+   "below_45": 12,
+   "achievement_min": 0.6888,
+   "achievement_max": 1.4237,
+   "nations_with_share": 57,
+   "nations_never_given_newcomer": 3
+  }
+ ],
+ "seconds": 619.2
+}
