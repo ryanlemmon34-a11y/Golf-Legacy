@@ -2129,8 +2129,9 @@ def courses_page(w, q):
     from golfsim.course_library import course_place
     sub = lambda c: (c['subdivision'] if 'subdivision' in c else course_place(c)[1]) or 'unknown'
     sort, direction = one(q, 'sort', '') or '', one(q, 'dir', '') or ''
+    raw_sub = lambda c: c['subdivision'] if 'subdivision' in c else course_place(c)[1]   # (None: not recorded)
     values = {'name': lambda r: r[1].get('name', r[0]), 'city': lambda r: text_key(r[1].get('city')),
-              'subdivision': lambda r: text_key(sub(r[1])), 'country': lambda r: text_key(r[1].get('country')),
+              'subdivision': lambda r: text_key(raw_sub(r[1])), 'country': lambda r: text_key(r[1].get('country')),
               'class': lambda r: text_key(r[1].get('class')),
               'layouts': lambda r: text_key(', '.join(r[1].get('layouts', {}))), 'prestige': lambda r: pres.get(r[0]),
               'hosted': lambda r: hosted.get(r[0], 0)}

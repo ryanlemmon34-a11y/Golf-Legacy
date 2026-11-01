@@ -129,12 +129,16 @@ class Views(unittest.TestCase):
         self.assertNotIn('Majors by starts', self.get('/views'))
 
     def test_browser_sort_is_kept_in_the_address(self):
-        self.post('/views/last', {'url': '/golfers?q=e&tsort=0.2.d'})
-        page = self.get('/golfers')
+        # (a list sorted in the browser: Nations; a server-sorted list never keeps one -- test_server_sort)
+        self.post('/views/last', {'url': '/nations?tsort=0.2.d'})
+        page = self.get('/nations')
         self.assertIn('table sorted by column 3 (descending)', page)
         self.assertIn("searchParams.get('tsort')", page)              # the page applies it when it opens
         prof = self.get('/golfer/1')
         self.assertIn('tsort=0.2.d', prof)
+        self.post('/views/last', {'url': '/golfers?q=e&tsort=0.2.d'})  # a server-sorted list: not remembered
+        self.assertNotIn('table sorted by column', self.get('/golfers'))
+        self.assertNotIn('tsort=0.2.d', self.get('/golfer/1'))           # (Back to the list: no browser sort)
 
     def test_golf_statistics_sort_both_ways(self):
         import observer_golf as OG

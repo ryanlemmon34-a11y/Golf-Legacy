@@ -257,6 +257,74 @@ class PeopleTests(unittest.TestCase, Traversal):
         self.assertIn('<option value="nation" selected>nation</option>', html)
 
 
+class StaleBrowserSortInViews(unittest.TestCase):
+    """A browser column sort (tsort) is never part of a server-sorted list's view: not in the page's query, the last
+    view, the trail ("Back to"), the Save view form, a saved view or a description -- also when it was persisted
+    before. Other lists keep it."""
+
+    def setUp(self):
+        import tempfile
+        import shutil
+        self.dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.dir, True)
+        self.w = NS(read_only=False, path=self.dir)
+
+    def test_opened_records_and_restores_without_tsort(self):
+        got, _ = OV.opened(self.w, '/courses', q(sort='prestige', dir='desc', tsort='0.6.a'))
+        self.assertNotIn('tsort', got)
+        st = OV.state(self.w)
+        self.assertEqual(st['last']['/courses'], 'dir=desc&sort=prestige')
+        self.assertEqual(st['trail'], ['/courses', 'dir=desc&sort=prestige'])
+        back = OV.back_link(self.w, '/course/C001')
+        self.assertIn('sorted by prestige (descending)', back)
+        self.assertNotIn('table sorted by column', back)
+        self.assertNotIn('tsort', back)
+        form = OV.bar(self.w, '/courses', q(sort='prestige', dir='desc', tsort='0.6.a'))
+        self.assertIn('name="query" value="dir=desc&amp;sort=prestige"', form)
+
+    def test_a_stale_persisted_view_is_cleaned_when_used(self):
+        OV._save(self.w, {'last': {'/golfers': 'sort=reputation&dir=desc&tsort=0.6.a'},
+                          'trail': ['/golfers', 'sort=reputation&dir=desc&tsort=0.6.a'],
+                          'saved': [{'id': 'x', 'name': 'Old', 'path': '/golfers',
+                                     'query': 'sort=reputation&dir=desc&tsort=0.6.a', 'added': ''}]})
+        self.w.__dict__.pop('_views', None)
+        restored, note = OV.opened(self.w, '/golfers', {})              # from the menu: the last view
+        self.assertNotIn('tsort', restored)
+        self.assertNotIn('tsort', note)
+        self.assertNotIn('tsort', OV.state(self.w)['last']['/golfers'])
+        page = OV.views_page(self.w, {})[1]
+        self.assertNotIn('tsort', page)
+        self.assertNotIn('table sorted by column', page)
+        chips = OV.bar(self.w, '/golfers', q(sort='reputation', dir='desc'))
+        self.assertIn('class="on"', chips)                                 # the saved view is the one shown
+
+    def test_save_drops_tsort_on_server_lists_only(self):
+        OV.save(self.w, 'A', '/caddies', 'sort=reputation&dir=asc&tsort=0.4.d')
+        OV.save(self.w, 'B', '/nations', 'tsort=0.1.d')
+        saved = {x['name']: x['query'] for x in OV.state(self.w)['saved']}
+        self.assertEqual(saved['A'], 'dir=asc&sort=reputation')
+        self.assertEqual(saved['B'], 'tsort=0.1.d')                        # a browser-sorted list keeps it
+        self.assertIn('table sorted by column 2', OV.describe('/nations', 'tsort=0.1.d'))
+
+
+class MissingSubdivision(unittest.TestCase):
+    def test_missing_state_or_province_sorts_last_both_ways(self):
+        w = CourseWorld()
+        for i, cid in enumerate(w.ids):
+            if i % 10 == 0:
+                w._courses[cid]['subdivision'] = None                     # not recorded: shown as 'unknown'
+        with mock.patch.object(OP, 'latest', lambda w_: {'courses': w.pres, 'events': {}}):
+            for d in ('asc', 'desc'):
+                got = []
+                for page in (1, 2, 3):
+                    got += body_ids(O.courses_page(w, q(sort='subdivision', dir=d, page=page))[1],
+                                    r'href="/course/([^"]+)"')
+                missing = [c for c in w.ids if w._courses[c]['subdivision'] is None]
+                self.assertEqual(set(got[-len(missing):]), set(missing), d)
+            html = O.courses_page(w, q(sort='subdivision', dir='asc', page=3))[1]
+            self.assertIn('<td>unknown</td>', html)                          # still shown as before
+
+
 class ClientSide(unittest.TestCase):
     def test_script_never_resorts_a_server_sorted_table_and_drops_a_stale_tsort(self):
         js = OV.SORT_JS

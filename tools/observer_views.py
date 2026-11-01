@@ -36,6 +36,9 @@ LISTS = {'/rankings': 'World ranking', '/golfers': 'Golfers', '/coaches': 'Coach
          '/goat': 'GOAT Lab', '/compare': 'Compare careers'}
 PREFIXES = {'/records/': 'Record', '/golf-records/': 'Golf record'}
 TRANSIENT = ('default',)                     # never part of a view
+# lists whose headings sort the whole list on the server (observer.sort_heads): a browser column sort (tsort) is
+# never part of their view -- not in the address, the last view, the trail, a saved view or its description
+SERVER_SORTED = ('/courses', '/tournaments', '/golfers', '/coaches', '/caddies', '/search')
 LABELS = {'year': 'season', 'tour': 'tour', 'q': 'search', 'sort': 'sorted by', 'page': 'page', 'show': 'showing',
           'min': 'minimum rounds', 'nation': 'nation', 'status': 'status', 'role': 'role', 'kind': 'kind',
           'rounds': 'rounds', 'field': 'field', 'decade': 'decade', 'active': 'playing now', 'top': 'world top',
@@ -55,12 +58,14 @@ def page_name(path):
     return path
 
 
-def canonical(q):
-    """The view part of a query ({key: [values]} or {key: value}) as a stable query string."""
+def canonical(q, path=None):
+    """The view part of a query ({key: [values]} or {key: value}) as a stable query string (on a server-sorted
+    list, without a browser column sort: SERVER_SORTED)."""
     items = []
+    drop = ('tsort',) if path in SERVER_SORTED else ()
     for k, v in sorted((q or {}).items()):
         v = v[0] if isinstance(v, (list, tuple)) else v
-        if k in TRANSIENT or v in (None, ''):
+        if k in TRANSIENT or k in drop or v in (None, ''):
             continue
         items.append((k, str(v)))
     return urlencode(items)
@@ -107,19 +112,19 @@ def opened(w, path, q):
     page's last view is restored (said so, with the default one click away); otherwise q becomes its last view.
     Either way it becomes the trail a detail page's "Back to" link returns to."""
     asked = bool(q)                                  # (?default=1 asks for the default: nothing restored)
-    q = {k: v for k, v in (q or {}).items() if k not in TRANSIENT}
+    q = {k: v for k, v in (q or {}).items() if k not in TRANSIENT and not (k == 'tsort' and path in SERVER_SORTED)}
     if w is None or not is_list(path):
         return q, ''
     st = state(w)
     note = ''
     if not asked and st['last'].get(path):
-        query = st['last'][path]
+        query = canonical(parse_qs(st['last'][path]), path)     # (a stale browser sort kept from before: dropped)
         q = parse_qs(query)
         note = (f'<p class="muted viewnote">Your last view of this page: {describe(path, query)} · '
                 f'<a href="{esc(path)}?default=1">default view</a></p>'      # (the address becomes the view's:
                 f'<script>try {{ history.replaceState(history.state, "", {json.dumps(href(path, query))}); }}'
                 ' catch (e) {}</script>')                                    # Back, bookmarks, a browser sort)
-    query = canonical(q)
+    query = canonical(q, path)
     if st['last'].get(path, '') != query or st['trail'] != [path, query]:
         st = dict(st, last={**st['last'], path: query}, trail=[path, query])
         _save(w, st)
@@ -134,14 +139,14 @@ def remember(w, url):
         return False
     q = parse_qs(u.query)
     st = state(w)
-    query = canonical(q)
+    query = canonical(q, u.path)
     _save(w, dict(st, last={**st['last'], u.path: query}, trail=[u.path, query]))
     return True
 
 
 def describe(path, query):
     """'season 2040 · Majors + Premier · sorted by wins (descending) · page 3' for a view's address."""
-    q = {k: v[0] for k, v in parse_qs(query).items()}
+    q = {k: v[0] for k, v in parse_qs(canonical(parse_qs(query), path)).items()}
     parts = []
     for k, v in q.items():
         if k in ('dir', 'tsort'):
@@ -167,6 +172,7 @@ def describe(path, query):
 
 
 def href(path, query):
+    query = canonical(parse_qs(query), path) if path in SERVER_SORTED else query
     return path + (f'?{query}' if query else '?default=1')
 
 
@@ -189,7 +195,7 @@ def save(w, name, path, query):
     st = state(w)
     saved = [x for x in st['saved'] if not (x['path'] == path and x['name'] == name)]
     vid = hashlib.sha1(f'{path}?{query}#{name}#{time.time()}'.encode()).hexdigest()[:10]
-    saved.append({'id': vid, 'name': name, 'path': path, 'query': canonical(parse_qs(query)),
+    saved.append({'id': vid, 'name': name, 'path': path, 'query': canonical(parse_qs(query), path),
                   'added': time.strftime('%Y-%m-%d %H:%M')})
     _save(w, dict(st, saved=saved[-MAX_SAVED:]))
     return True
@@ -208,9 +214,10 @@ def bar(w, path, q):
     """The views strip on a list page: its saved views, and a form to save the view shown."""
     if w is None or not is_list(path):
         return ''
-    query = canonical(q)
+    query = canonical(q, path)
     mine = [x for x in state(w)['saved'] if x['path'] == path]
-    chips = ''.join(f'<a href="{esc(href(x["path"], x["query"]))}" class="{"on" if x["query"] == query else ""}" '
+    chips = ''.join(f'<a href="{esc(href(x["path"], x["query"]))}" '
+                    f'class="{"on" if canonical(parse_qs(x["query"]), path) == query else ""}" '
                     f'title="{describe(x["path"], x["query"])}">{esc(x["name"])}</a>' for x in mine)
     form = (f'<form method="post" action="/views/save" class="inline viewsave"><input type="hidden" name="path" '
             f'value="{esc(path)}"><input type="hidden" name="query" value="{esc(query)}">'
