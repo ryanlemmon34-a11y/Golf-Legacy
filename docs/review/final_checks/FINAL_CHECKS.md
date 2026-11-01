@@ -60,3 +60,22 @@ Result: ok = True, problems = none.
 | rules | `/rules` | 0.09 | 1920 | early-pro rule True; versions ['2026-11-12', '2026-11-13', '2026-11-14', '2026-11-15'] |
 
 Earlier smoke runs found one real defect, fixed in build/v17-early-pro dcc0c64: the early decision's history line repeated the amateur ranking, and the status table did not name the early decision. Independent review also ran a 148-case ordering matrix on the sorted lists (passing).
+
+## 3. Full test suite on the final head
+
+**Build.** build/v17-integration 18a8e23fb06c241892a73af29124c168c2018467, clean checkout (worktree in /dev/shm, `TMPDIR` in /dev/shm).
+
+    (TMPDIR=/dev/shm/v17/tmp timeout 10800 python3 -m unittest discover -s tests 2>&1; echo "rc=$?")
+
+**Result** (`full_suite_18a8e23.log`, unittest's own summary, copied verbatim):
+
+    Ran 1136 tests in 7048.262s
+
+    OK (skipped=4)
+    rc=0
+
+- The run finished inside the 10,800 s wrapper (rc 0, not 124), so every test that was collected ran to completion.
+- The 4 skips are conditional skips (fixtures, heavy runs or environment variables that are not set), the same count as the previous full run. The run was not verbose, so the 4 are not named individually here.
+- Compared with the previous full run on 4018797 (`Ran 1132 tests in 6975.263s`, `FAILED (errors=6, skipped=4)`, wrapper rc 124):
+  - The 6 errors were `test_nation_achievement` stubbing `_record` but not `_records`, a test-mock gap. It was fixed in that test (4 lines) and the 6 tests now pass. There was no production change for it.
+  - The 4 extra tests are `test_perf_v17` (+1), `test_college_early_pro` (+1) and `test_prestige_store` (+2).
