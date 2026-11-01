@@ -20,6 +20,7 @@ import random
 import sys
 import unittest
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from golfsim import participation as PT                                   # noqa: E402
@@ -122,6 +123,60 @@ class Invariants(unittest.TestCase):
         self.assertEqual(sum(a.values()), 2)
         self.assertAlmostEqual(sum(c.values()), 0.0)
         self.assertTrue(all(-1 < v < 2 for v in c.values()))
+
+
+class UnsupportedLedgers(unittest.TestCase):
+    """A ledger no world reaches (review repro, exact fractions): it is rejected with a clear error before anything
+    is generated or recorded, instead of silently giving the wrong total."""
+
+    def ledger(self):
+        from fractions import Fraction as F
+        shares = {'A': F(1, 2), 'B': F(1, 2), **{c: F(0) for c in 'CDEFG'}}
+        carry = {'A': F(19, 10), 'B': F(19, 10), **{c: F(-19, 25) for c in 'CDEFG'}}
+        self.assertEqual(sum(carry.values()), 0)                          # it sums to 0, inside (-1, 2)
+        return shares, carry
+
+    def test_rejected_not_silently_wrong(self):
+        shares, carry = self.ledger()
+        with self.assertRaises(P.CarryLedgerError) as cm:
+            P.allocate_with_carry(1, shares, carry)
+        self.assertIn('a total of 1 would give 2 places', str(cm.exception))
+
+    def test_nothing_generated_or_recorded(self):
+        shares, carry = self.ledger()
+        prof = {c: p for c, p in list(nations().items())[:7]}
+        names = list(prof)
+        sh = {names[i]: shares[k] for i, k in enumerate('ABCDEFG')}
+        cy = {names[i]: carry[k] for i, k in enumerate('ABCDEFG')}
+        rep = {}
+        one = lambda kind, year, seed, profiles: {c: ((['row'] if c == names[0] else []), None) for c in profiles}
+        with mock.patch.object(P, 'existing_rule', one), self.assertRaises(P.CarryLedgerError):   # a total of 1
+            P.entrant_rows('juniors', 2031, 7, prof, shares=sh, report=rep, carry=cy)
+        self.assertEqual(rep, {})                                         # no report: nothing allocated
+        pt = PT.Participation(prof, 2027)
+        before = (dict(pt.carry['juniors']), dict(pt.carry_settled), dict(pt.history))
+        with self.assertRaises(P.CarryLedgerError):
+            P.allocate_with_carry(1, sh, cy)
+        self.assertEqual((pt.carry['juniors'], pt.carry_settled, pt.history), before)
+
+    def test_carry_for_an_unknown_nation_is_rejected(self):
+        with self.assertRaises(P.CarryLedgerError):
+            P.allocate_with_carry(5, {'A': 1.0}, {'Z': 0.5})
+
+    def test_every_reachable_settlement_meets_the_postcondition(self):
+        """From an empty ledger, years of varying exact-fraction shares and totals never raise."""
+        from fractions import Fraction as F
+        rng = random.Random(41)
+        names = [f'N{i}' for i in range(9)]
+        carry = {}
+        for _ in range(3000):
+            sh = {c: F(rng.randint(0, 40), 7) for c in names}
+            if not any(sh.values()):
+                sh[names[0]] = F(1)
+            total = rng.choice((0, 1, 2, 3, rng.randint(0, 50)))
+            out, carry = P.allocate_with_carry(total, sh, carry)
+            self.assertEqual(sum(out.values()), total)
+            self.assertEqual(sum(carry.values()), 0)
 
 
 class InTheWorld(unittest.TestCase):

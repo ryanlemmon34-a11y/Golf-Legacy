@@ -406,6 +406,10 @@ def allocate(total, shares):
     return out
 
 
+class CarryLedgerError(ValueError):
+    """A carry ledger allocate_with_carry cannot honour (a ledger no world reaches from its start)."""
+
+
 def allocate_with_carry(total, shares, carry):
     """`allocate` with each nation's fraction carried forward (rules 2026-11-13): (allocation, carry after).
 
@@ -421,10 +425,18 @@ def allocate_with_carry(total, shares, carry):
     no nation can borrow future places beyond one. A negative entitlement (a small nation given a place ahead of a
     tiny quota) counts as none. If the whole parts then exceed the total (possible only after such a year), places
     are taken back from the nations most ahead (smallest fraction left, ties: the smaller quota, then the name).
-    No minimum per nation, no extra golfers, nothing about talent: only how the fixed total is rounded."""
+    No minimum per nation, no extra golfers, nothing about talent: only how the fixed total is rounded.
+
+    Checked before anything is generated or recorded (the caller has changed nothing yet): the places must total
+    exactly `total`, none may be negative and every carry after must stay within (-1, 2). A ledger that would break
+    one of these (none is reached from a world's start: tests/test_nation_quota_carry) raises CarryLedgerError
+    rather than silently creating the wrong number of golfers."""
+    unknown = set(carry) - set(shares)
+    if unknown:
+        raise CarryLedgerError(f'carry for nations with no share: {sorted(unknown)}')
     shares = normalised(shares)
     quota = {c: total * s for c, s in shares.items()}
-    owed = {c: quota[c] + carry.get(c, 0.0) for c in quota}
+    owed = {c: quota[c] + carry.get(c, 0) for c in quota}            # (0: exact fractions stay exact)
     out = {c: max(0, int(math.floor(o))) for c, o in owed.items()}
     left = total - sum(out.values())
     if left > 0:
@@ -435,7 +447,13 @@ def allocate_with_carry(total, shares, carry):
         order = sorted((c for c in owed if out[c] > 0), key=lambda c: (owed[c] - out[c], quota[c], c))
         for c in order[:-left]:
             out[c] -= 1
-    return out, {c: owed[c] - out[c] for c in owed}
+    after = {c: owed[c] - out[c] for c in owed}
+    if sum(out.values()) != total or min(out.values(), default=0) < 0 or \
+            not all(-1 < v < 2 for v in after.values()):
+        raise CarryLedgerError(
+            f'unsupported carry ledger: a total of {total} would give {sum(out.values())} places; carries after '
+            f'{min(after.values(), default=0):.3f} to {max(after.values(), default=0):.3f} (allowed: between -1 and 2)')
+    return out, after
 
 
 def normalised(weights):
