@@ -132,6 +132,17 @@ class FieldTests(unittest.TestCase):
         self.assertEqual(field, cut[1:])                            # 99: the 101st earned place stays out
         self.assertNotIn(earned(fin)[100], field)
 
+    def test_a_repeated_selection_records_the_withdrawal_once(self):
+        fin, gs = regionals()
+        s = Stub(gs, fin)
+        hurt = fin[3][4][0]
+        s.injured[hurt] = (s.abs_week(YEAR, NATIONALS_WEEK) + 5, 'wrist', 5)
+        first = s.nationals()
+        second = s.nationals()                                      # the same week's selection again
+        self.assertEqual(first, second)
+        self.assertEqual(s.nationals_withdrawn[YEAR], {hurt: 'injured'})
+        self.assertEqual(sum('Withdrew from the College National Championship' in t for _, _, t in s.history[hurt]), 1)
+
     def test_deterministic(self):
         fin, gs = regionals(missed_every=5)
         a, b = Stub(gs, fin), Stub(gs, fin)

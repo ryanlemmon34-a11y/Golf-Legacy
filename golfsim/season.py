@@ -1819,8 +1819,9 @@ class Season:
             # or committed elsewhere) withdraws; the place is not passed down to the next regional finisher
             # (there is no reserve list), so the field is smaller by one
             can = {g.id for g in d1}
+            done = self.nationals_withdrawn[year]            # (one edition a year: a repeated selection records once)
             for gid in ids:
-                if gid not in can:
+                if gid not in can and gid not in done:
                     g = self.g.get(gid)
                     why = ('injured' if gid in self.injured else 'retired' if g is None or g.lifestyle == 'retired'
                            else 'no longer a D1 college golfer' if g.tour != 'CO_US_D1' else 'could not play that week')
