@@ -17,6 +17,33 @@ import observer_data as OD
 
 PATHWAY_LABELS = {'juniors': 'juniors (18)', 'new_pros': 'new professionals (21-26)'}
 
+# what national prestige measures (rules 2026-11-14; seasons settled before them: the ratio alone)
+PRESTIGE_NOTE = ('Visible success first: the fame its golfers won against an even share of the fame on offer in the '
+                 'events they entered (Achievement: 1 = an even share; majors count most), two thirds of the weight; '
+                 'and how they did against what their ability predicted before each event (Against expectation: 1 = '
+                 'as expected), one third. 50 = both as expected; five completed seasons, steadied for small samples.')
+PRESTIGE_NOTE_BEFORE = ('50 = exactly the success expected of its golfers before each event; 75 = twice that, 25 = half '
+                        '(five completed seasons, steadied for small samples). Settled before rules 2026-11-14, which '
+                        'count visible success first.')
+
+
+def achievement_mode(n):
+    """Whether a nations record (archived or live) was settled with visible achievement (rules 2026-11-14), read from
+    the record itself: its 'rules' block when the archive kept one, else whether it carries the achievement
+    component (the live view has it exactly when the rule is on, even before the first season closes)."""
+    if not n:
+        return False
+    r = n.get('rules')
+    if isinstance(r, dict) and 'achievement' in r:
+        return bool(r['achievement'])
+    return 'achievement' in n
+
+
+def nations_view(n):
+    """A nations record as the observer shows it: every field kept (components, rules, carry), the live view's
+    bookkeeping ('closed') left out."""
+    return {k: v for k, v in (n or {}).items() if k != 'closed'}
+
 
 def esc(x):
     return html.escape('' if x is None else str(x))
@@ -43,11 +70,8 @@ def latest(w):
     for y in reversed(_years(w)):
         r = _record(w, y)
         if r:
-            n = r.get('nations', {})
             return {'events': r.get('events', {}), 'courses': r.get('courses', {}),
-                    'venue_moves': r.get('venue_moves', []),
-                    'nations': {'prestige': n.get('prestige', {}), 'multiplier': n.get('multiplier', {}),
-                                'shares': n.get('shares', {}), 'baseline_shares': n.get('baseline_shares', {})}}
+                    'venue_moves': r.get('venue_moves', []), 'nations': nations_view(r.get('nations'))}
     return None
 
 
@@ -142,8 +166,7 @@ def nation_section(w, code):
     if lv and (lv.get('nations') or {}).get('closed') is not None:
         nv = lv['nations']
         if nv['closed'] + 1 not in {y for y, _ in rows}:
-            rows.append((nv['closed'] + 1, {'prestige': nv['prestige'], 'multiplier': nv['multiplier'],
-                                            'shares': nv['shares'], 'baseline_shares': nv['baseline_shares']}))
+            rows.append((nv['closed'] + 1, nations_view(nv)))
     base = None
     for _, n in rows:
         if n and n.get('baseline_shares'):
@@ -160,10 +183,10 @@ def nation_section(w, code):
     def share(n, kind='juniors'):
         v = ((n or {}).get('shares') or {}).get(kind, {}).get(code)
         return None if v is None else 100 * v
+    achieved = any(achievement_mode(n) for _, n in rows)
     out.append('<h3>National prestige</h3>' + bars(
         [(str(y), get(n, 'prestige'), f'for {y} (set at the end of {y - 1}): prestige {get(n, "prestige")}') for y, n in rows],
-        top=100, note='50 = exactly the success expected of its golfers before each event; 75 = twice that, 25 = half '
-                      '(five completed seasons, steadied for small samples).'))
+        top=100, note=PRESTIGE_NOTE if achieved else PRESTIGE_NOTE_BEFORE))
     sh = [(str(y), share(n), f'{y} (set at the end of {y - 1}): {share(n)}% of the juniors') for y, n in rows]
     out.append('<h3>Share of each year’s juniors</h3>' + bars(sh, unit='%', digits=2,
                                                               note='The nation’s share of the year’s fixed number of new '
@@ -171,15 +194,17 @@ def nation_section(w, code):
     trs = []
     for y, n in reversed(rows):
         if not n:
-            trs.append([str(y)] + ['<span class="muted">not recorded</span>'] + [''] * 5)
+            trs.append([str(y)] + ['<span class="muted">not recorded</span>'] + [''] * (7 if achieved else 5))
             continue
         alloc = n.get('allocated') or {}
-        trs.append([str(y), cell(get(n, 'prestige')), cell(get(n, 'multiplier'), 3),
+        trs.append([str(y), cell(get(n, 'prestige'))] + ([cell(get(n, 'achievement'), 3), cell(get(n, 'ratio'), 3)]
+                                                        if achieved else []) + [cell(get(n, 'multiplier'), 3),
                     pct(None if share(n) is None else share(n) / 100),
                     pct(None if share(n, 'new_pros') is None else share(n, 'new_pros') / 100),
                     esc(alloc.get('juniors', {}).get(code, '')), esc(alloc.get('new_pros', {}).get(code, ''))])
     if trs:
-        h = ['Entrant season', 'Prestige', 'Multiplier', 'Share of juniors', 'Share of new pros', 'Juniors', 'New pros']
+        h = (['Entrant season', 'Prestige'] + (['Achievement', 'Against expectation'] if achieved else [])
+             + ['Multiplier', 'Share of juniors', 'Share of new pros', 'Juniors', 'New pros'])
         out.append('<div class="scroll"><table class="sortable"><thead><tr>'
                    + ''.join(f'<th{" class=n" if i else ""} title="Sort the rows shown by this column">{esc(x)}</th>' for i, x in enumerate(h))
                    + '</tr></thead><tbody>'

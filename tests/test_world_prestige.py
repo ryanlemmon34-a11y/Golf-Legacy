@@ -14,6 +14,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / 'tools'))
+from golfsim import participation as PT                                # noqa: E402
 from golfsim import prestige as PR                                     # noqa: E402
 from golfsim.calendar import WorldCalendar                              # noqa: E402
 from golfsim.population import generate_world                           # noqa: E402
@@ -86,6 +87,8 @@ class InASession(unittest.TestCase):
         cls.end = dict(s.season.event_prestige)
         cls.end_courses = dict(s.season.course_prestige)
         cls.success = {c: list(v) for c, v in s.season.participation.success.get(2027, {}).items()}
+        cls.history2028 = {k: v for k, v in s.season.participation.history[2028].items()}
+        cls.nations = set(s.season.participation.baseline)
         s.advance(3)
         cls.mid_courses = dict(s.season.course_prestige)
         s.close()
@@ -129,6 +132,18 @@ class InASession(unittest.TestCase):
             self.assertAlmostEqual(sum(n['baseline_shares'][kind].values()), 1.0, places=4)
             self.assertEqual(sum(n['allocated'][kind].values()), n['totals'][kind])
             self.assertEqual(sum(n['existing'][kind].values()), n['totals'][kind])
+            # rules 2026-11-13: the carry after each allocation, archived (it sums to 0, each within (-1, 2))
+            self.assertAlmostEqual(sum(n['carry'][kind].values()), 0.0, places=4)
+            self.assertTrue(all(-1 < v < 2 for v in n['carry'][kind].values()))
+        # rules 2026-11-14: visible achievement Q and the three season figures, archived and read back as written
+        self.assertEqual(n['rules'], {'achievement': True, 'achievement_weight': round(PT.ACHIEVEMENT_WEIGHT, 6),
+                                      'carry': True})
+        self.assertEqual(n['achievement'], self.history2028['achievement'])
+        self.assertEqual(n['carry'], self.history2028['carry'])
+        self.assertEqual(set(n['achievement']), self.nations)
+        self.assertTrue(n['season'] and all(len(v) == 3 for v in n['season'].values()))
+        self.assertAlmostEqual(sum(v[0] for v in n['season'].values()), sum(v[2] for v in n['season'].values()),
+                               delta=0.01 * len(n['season']))       # fame won and fame on offer total the same
 
     def test_observer_columns_and_bars(self):
         O, w = self.O, self.w

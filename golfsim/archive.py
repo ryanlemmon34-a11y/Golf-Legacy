@@ -52,6 +52,7 @@ from .calendar import TOUR_BY_KEY
 from .history import Relations
 from .course_library import course_place
 from . import familiarity as FAM
+from . import participation as PT
 from . import home_clubs as HC
 
 FORMAT = 'golf-legacy-archive/1'
@@ -329,7 +330,15 @@ class ArchiveWriter:
                             'totals': nxt.get('totals', {}), 'allocated': nxt.get('allocated', {}),
                             'existing': nxt.get('existing', {}),
                             'baseline_shares': {k: {c: round(v, 6) for c, v in s.items()}
-                                                for k, s in pt.base_share.items()}}}
+                                                for k, s in pt.base_share.items()},
+                            # rules 2026-11-14: visible achievement Q (its 'season' rows are then [actual, expected,
+                            # fame on offer]); rules 2026-11-13: each nation's fraction carried after the allocation
+                            **({'achievement': nxt['achievement']} if 'achievement' in nxt else {}),
+                            **({'carry': nxt['carry']} if 'carry' in nxt else {}),
+                            'rules': {'achievement': bool(getattr(pt, 'achievement_on', False)),
+                                      'achievement_weight': round(PT.ACHIEVEMENT_WEIGHT, 6)
+                                      if getattr(pt, 'achievement_on', False) else None,
+                                      'carry': bool(getattr(pt, 'carry_on', False))}}}
         # decision evidence (recording only, from this build): each monthly plan's inputs and each winter career
         # evaluation's terms (golfsim.decision_evidence; its own format and field definitions). A season without
         # the key was played before it was kept: not recorded, never estimated

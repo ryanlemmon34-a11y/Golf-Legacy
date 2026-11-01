@@ -2227,6 +2227,7 @@ class Season:
         state.setdefault('venue_log', defaultdict(list))
         if 'participation' not in state:                     # nations: shares from the starting profiles, multipliers 1,
             state['participation'] = PT.Participation(state['world'].nations, state['first_year'])   # evidence from now
+            state['participation'].carry_on = False            # (and the year-by-year rounding it was played with)
         now = state.get('year') or state.get('first_year')
         for rec in (r for tiers in state['prize_record'].values() for r in tiers.values()):
             if len(rec) == 2:                                # evidence from before it was dated: as of now
