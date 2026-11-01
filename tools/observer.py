@@ -323,6 +323,8 @@ class World:
             self._indexer.stop()
         if self.__dict__.get('_story_cache') is not None:
             self._story_cache.stop_indexer()            # (stories' season index: built again when next needed)
+        if self.__dict__.get('_prestige_store') is not None:
+            self._prestige_store.stop_indexer()         # (prestige histories: resumed from the store when next needed)
         if self._stats_db is not None:
             self._stats_db.close()
             self._stats_db = None
@@ -2088,7 +2090,8 @@ def tournaments(w, q):
     f = filters('/tournaments', q, [('tour', 'Tour', [('', 'any')] + sorted(((k, t.get('name', k)) for k, t in w.tours().items()),
                                                                              key=lambda x: x[1])),
                                     ('kind', 'Kind', [('', 'any')] + [(k, k) for k in kinds])], carry=('sort', 'dir'))
-    pres = (OP.latest(w) or {}).get('events', {})
+    lt = OP.latest(w)
+    pres = (lt or {}).get('events', {})
     sort, direction = one(q, 'sort', '') or '', one(q, 'dir', '') or ''
     tname = lambda k: (w.tours().get(k) or {}).get('name', k) if k else None
     values = {'name': lambda r: r[1].get('name', r[0]), 'tour': lambda r: text_key(tname(r[1].get('tour'))),
@@ -2105,7 +2108,7 @@ def tournaments(w, q):
                    'the whole list, not only this page.</p>')
     heads = sort_heads('/tournaments', q, {0: 'name', 1: 'tour', 2: 'tier', 3: 'kind', 4: 'category', 5: 'prestige',
                                            6: 'editions'}, sort, direction)
-    return 'Tournaments', f + by_prestige + table(
+    return 'Tournaments', f + by_prestige + OP.latest_note(lt) + table(
         ['Tournament', 'Tour', 'Tier', 'Kind', 'Category', 'Prestige', 'Editions played'], [
         [f'<a href="/series/{quote(sid)}">{esc(s.get("name", sid))}</a>', tour_link(w, s.get('tour')), esc(s.get('tier')),
          esc(s.get('kind')), esc(s.get('category')), OP.cell(pres.get(sid)), str(counts.get(sid, 0))] for sid, s in chunk],
@@ -2149,7 +2152,8 @@ def courses_page(w, q):
     f = filters('/courses', q, [('q', 'Name contains', None),
                                 ('country', 'Country', [('', 'any')] + [(c, c) for c in sorted({c.get('country') for c in cs.values()})])],
                 carry=('sort', 'dir'))
-    pres = (OP.latest(w) or {}).get('courses', {})
+    lt = OP.latest(w)
+    pres = (lt or {}).get('courses', {})
     from golfsim.course_library import course_place
     sub = lambda c: (c['subdivision'] if 'subdivision' in c else course_place(c)[1]) or 'unknown'
     sort, direction = one(q, 'sort', '') or '', one(q, 'dir', '') or ''
@@ -2170,7 +2174,7 @@ def courses_page(w, q):
                    'whole list, not only this page.</p>')
     heads = sort_heads('/courses', q, {0: 'name', 1: 'city', 2: 'subdivision', 3: 'country', 4: 'class',
                                        5: 'layouts', 6: 'prestige', 7: 'hosted'}, sort, direction)
-    return 'Courses', f + by_prestige + table(['Course', 'City', 'State / province', 'Country', 'Class', 'Layouts',
+    return 'Courses', f + by_prestige + OP.latest_note(lt) + table(['Course', 'City', 'State / province', 'Country', 'Class', 'Layouts',
                                                'Prestige', 'Editions hosted'], [
         [course_link(w, cid), esc(c.get('city')), esc(sub(c)), nation_link(c.get('country')), esc(c.get('class')),
          esc(', '.join(c.get('layouts', {}))), OP.cell(pres.get(cid)), str(hosted.get(cid, 0)) if hosted.get(cid) else
@@ -2264,17 +2268,19 @@ def nation_count_link(code, i, n):
 def nations(w, q):
     counts = nation_counts(w)
     rows = sorted(counts.items(), key=lambda x: (-x[1][2], -x[1][1], str(x[0])))
-    nv = (OP.latest(w) or {}).get('nations') or {}
+    lt = OP.latest(w)
+    nv = (lt or {}).get('nations') or {}
     get = lambda k, n: (nv.get(k) or {}).get(n)
     share = lambda kind, n, key='shares': ((nv.get(key) or {}).get(kind) or {}).get(n)
     k = len(NATION_COUNTS)
-    measure = ('50 = as expected: visible success against an even share of the fame on offer, and success against '
+    measure = ('50 = as expected; rules: national prestige' if (lt or {}).get('pending') else   # (not read yet)
+               '50 = as expected: visible success against an even share of the fame on offer, and success against '
                'what its golfers\' ability predicted; rules: national prestige' if OP.achievement_mode(nv) else
                '50 = the success expected of its golfers before each event; settled before rules 2026-11-14')
     return 'Nations', (f'<p class="muted">{esc(NATION_NOTE)} Where people live can change. Prestige: national '
                        f'prestige as last settled ({measure}). Shares: '
                        'each nation’s share of the next season’s new juniors and new professionals (the numbers '
-                       'themselves never depend on prestige), against its starting share.</p>' +
+                       'themselves never depend on prestige), against its starting share.</p>' + OP.latest_note(lt) +
                        table(['Nation', *(label for label, *_ in NATION_COUNTS), 'Prestige', 'Multiplier',
                               'Share of juniors', 'Starting share', 'Share of new pros'], [
                            [nation_link(n)] + [nation_count_link(n, i, x) for i, x in enumerate(r)] +
