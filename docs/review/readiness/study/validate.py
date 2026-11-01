@@ -15,8 +15,22 @@
    2028-2083 total against the review brief's 16,811.
 3. The juniors who entered at 80+ (the brief: 8, one at 85+: Cardenas).
 
+Fail closed: the run exits 1, and the stamp says passed = false, unless every one of these holds (each is listed with
+its result in the output): F1 exactly the 114 cohorts 2028-2084 x both pathways were checked; F2 every cohort passes
+checks a-e; F3 juniors 2028-2083 = 16,811 and 2084 = 257; F4 juniors at 80+ = 8 and at 85+ = 1, the top one Cardenas
+(2041, Argentina, 96.09, raw potential 100.881, peak 20.892, aging 0.718); F5 the cohorts where entrant_rows' allocation
+from the recorded (6-decimal) shares differs from the recorded allocation are exactly the documented one, 2061 juniors
+(that discrepancy is reported separately and does not affect the replay, which uses the recorded allocation; any new
+or missing discrepancy fails); F6 not a negative-test run. The stamp (provenance.py) binds the result to study.py,
+validate.py, the fixture and the golfsim sources; run.py and report.py refuse a missing, failed or stale stamp.
+
     python3 -I validate.py <checkout> <tests/data/test2_nation_shares.json.gz> <out.json> <out.md>
+           [--stamp PATH] [--years FIRST-LAST] [--negative-baseline ARM]
+
+--years and --negative-baseline exist for the negative tests (selftest.sh): a subset of years fails F1; a baseline
+other than A0 (e.g. A1) must fail the parity checks; neither can ever produce a passing stamp.
 """
+import argparse
 import gzip
 import hashlib
 import json
@@ -25,13 +39,33 @@ import sys
 from collections import Counter
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import provenance as PV  # noqa: E402
 import study as S  # noqa: E402
 
-S.setup(sys.argv[1])
+ap = argparse.ArgumentParser()
+ap.add_argument('checkout')
+ap.add_argument('fixture')
+ap.add_argument('out_json')
+ap.add_argument('out_md')
+ap.add_argument('--stamp', default=PV.STAMP)
+ap.add_argument('--years', default=None)
+ap.add_argument('--negative-baseline', default=None)
+args = ap.parse_args()
+
+S.setup(args.checkout)
 P = S.P
-fx = json.load(gzip.open(sys.argv[2], 'rt'))
+fx = json.load(gzip.open(args.fixture, 'rt'))
 SEED = 386509
-A0, A2 = S.ARMS['A0'], S.ARMS['A2']
+EXPECT = {'years': (2028, 2084), 'cohorts': 114, 'juniors_2028_2083': 16811, 'juniors_2084': 257, 'juniors_80_plus': 8,
+          'juniors_85_plus': 1, 'top_junior': {'year': 2041, 'country': 'Argentina', 'overall': 96.09,
+                                               'raw_potential': 100.881, 'peak_age': 20.892, 'aging_rate': 0.718},
+          'known_allocation_discrepancies': [[2061, 'juniors']]}
+A2 = S.ARMS['A2']
+A0 = S.ARMS[args.negative_baseline] if args.negative_baseline else S.ARMS['A0']   # the baseline under test
+YEARS = sorted(map(int, fx['years']))
+if args.years:
+    lo, hi = map(int, args.years.split('-'))
+    YEARS = [y for y in YEARS if lo <= y <= hi]
 
 
 def digest(rows):
@@ -41,7 +75,7 @@ def digest(rows):
 cohorts = []
 j80 = []
 problems = []
-for y in sorted(map(int, fx['years'])):
+for y in YEARS:
     rec = fx['years'][str(y)]
     for kind in ('juniors', 'new_pros'):
         alloc = rec['allocated'][kind]
@@ -139,10 +173,56 @@ out = {'cohorts_checked': len(cohorts), 'cohorts_ok': sum(c['ok'] for c in cohor
        'entrant_rows_totals_equal': sum(c['entrant_rows_total'] == c['recorded_total'] for c in cohorts),
        'entrant_rows_allocation_differs': alloc_diff, 'allocation_gaps': gaps,
        'reconciliation': recon, 'juniors_80_plus': sorted(j80, key=lambda r: -r['overall']), 'cohorts': cohorts}
-json.dump(out, open(sys.argv[3], 'w'), indent=1)
+
+# ---- failure conditions (fail closed) ------------------------------------------------------------------------------
+checks = []
+
+
+def check(name, ok, detail):
+    checks.append({'check': name, 'ok': bool(ok), 'detail': detail})
+
+
+want_cohorts = {(y, k) for y in range(EXPECT['years'][0], EXPECT['years'][1] + 1) for k in ('juniors', 'new_pros')}
+got_cohorts = {(c['year'], c['kind']) for c in cohorts}
+check('F1 cohort boundary', got_cohorts == want_cohorts and len(cohorts) == EXPECT['cohorts'],
+      f'{len(cohorts)} cohorts checked, {len(want_cohorts)} expected (2028-2084 x juniors, new professionals); '
+      f'missing {sorted(want_cohorts - got_cohorts)[:4]}{"..." if len(want_cohorts - got_cohorts) > 4 else ""}')
+check('F2 every cohort passes a-e', not problems and all(c['ok'] for c in cohorts),
+      f'{sum(c["ok"] for c in cohorts)} of {len(cohorts)} pass; failing: {problems[:6]}')
+check('F3 junior reconciliation', recon['juniors_2028_2083'] == EXPECT['juniors_2028_2083']
+      and recon['juniors_2084'] == EXPECT['juniors_2084'],
+      f'2028-2083 {recon["juniors_2028_2083"]} (expected {EXPECT["juniors_2028_2083"]}), 2084 {recon["juniors_2084"]} '
+      f'(expected {EXPECT["juniors_2084"]})')
+top = sorted(j80, key=lambda r: -r['overall'])
+check('F4 tail counts and top junior', len(j80) == EXPECT['juniors_80_plus']
+      and sum(r['overall'] >= 85 for r in j80) == EXPECT['juniors_85_plus'] and bool(top)
+      and top[0] == EXPECT['top_junior'],
+      f'80+: {len(j80)} (expected 8); 85+: {sum(r["overall"] >= 85 for r in j80)} (expected 1); top: '
+      f'{top[0] if top else None}')
+check('F5 allocation discrepancies are exactly the documented one', sorted(map(list, alloc_diff))
+      == EXPECT['known_allocation_discrepancies'],
+      f'found {sorted(map(list, alloc_diff))}, documented {EXPECT["known_allocation_discrepancies"]} (recorded shares '
+      'are rounded to 6 decimals; the replay uses the recorded allocation)')
+check('F6 not a negative-test run', not args.negative_baseline and not args.years,
+      f'negative baseline {args.negative_baseline}, years {args.years}')
+failures = [c['check'] + ': ' + c['detail'] for c in checks if not c['ok']]
+out['checks'] = checks
+out['passed'] = not failures
+json.dump(out, open(args.out_json, 'w'), indent=1)
+stamp = {'passed': not failures, 'failures': failures, 'bound': PV.bindings(args.checkout, args.fixture),
+         'checks': [(c['check'], c['ok']) for c in checks], 'cohorts_ok': out['cohorts_ok'],
+         'cohorts_checked': out['cohorts_checked']}
+os.makedirs(os.path.dirname(os.path.abspath(args.stamp)), exist_ok=True)
+json.dump(stamp, open(args.stamp, 'w'), indent=1)
 
 L = ['# Study validation: Test2 cohorts, baseline (A0) parity per cohort', '',
-     f'Seed 386509, entrant years 2028-2084, both pathways: {out["cohorts_ok"]} of {out["cohorts_checked"]} cohorts '
+     f"**Result: {'PASSED' if not failures else 'FAILED'}.** Stamp bound to study.py {stamp['bound']['study.py'][:12]}, "
+     f"validate.py {stamp['bound']['validate.py'][:12]}, fixture {stamp['bound']['fixture'][:12]}, golfsim "
+     f"{stamp['bound']['golfsim_digest'][:12]}.", '',
+     '| failure condition | result | detail |', '|---|---|---|']
+L += [f"| {c['check']} | {'ok' if c['ok'] else 'FAILED'} | {c['detail']} |" for c in checks]
+L += ['',
+     f'Seed 386509, entrant years {YEARS[0]}-{YEARS[-1]}, both pathways: {out["cohorts_ok"]} of {out["cohorts_checked"]} cohorts '
      f'pass every check; {out["rows_identical"]:,} of {out["rows_compared"]:,} entrant rows identical (country, age, '
      f'stored potential, peak age, current overall, status, aging rate); {out["draws_identical"]:,} of '
      f'{out["draws_compared"]:,} production draws identical. Production entrant_rows with the recorded shares gives '
@@ -184,5 +264,9 @@ L += ['', '## Juniors who entered at 80+ (A0 = Test2)', '', '| year | nation | o
       '|---|---|---|---|---|---|']
 L += [f"| {r['year']} | {r['country']} | {r['overall']} | {r['raw_potential']} | {r['peak_age']} | {r['aging_rate']} |"
       for r in out['juniors_80_plus']]
-open(sys.argv[4], 'w').write('\n'.join(L) + '\n')
-print(json.dumps({k: v for k, v in out.items() if k != 'cohorts'}, indent=1))
+open(args.out_md, 'w').write('\n'.join(L) + '\n')
+print(json.dumps({k: v for k, v in out.items() if k not in ('cohorts', 'juniors_80_plus', 'allocation_gaps')}, indent=1))
+if failures:
+    print('VALIDATION FAILED:', *failures, sep='\n  ', file=sys.stderr)
+    sys.exit(1)
+print('validation passed')

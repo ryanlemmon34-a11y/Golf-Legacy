@@ -1,0 +1,38 @@
+{
+ "passed": true,
+ "failures": [],
+ "bound": {
+  "study.py": "3f8a752784b9459be867f369ac222df0ac521c36e852b2253dbaa41b649131f7",
+  "validate.py": "bf392fbce234485f92601586d3ec22265017c1a0d9f7f365e48ab4bd52302a58",
+  "fixture": "3993923fa787526d98cf201fe366123b1757ca36a8a6851f7aff264ebbcfa9c9",
+  "golfsim_digest": "b39eb853cf215aa9fecd3eadd23497f5c813ff4584c90cda71b847a44db2c7cd"
+ },
+ "checks": [
+  [
+   "F1 cohort boundary",
+   true
+  ],
+  [
+   "F2 every cohort passes a-e",
+   true
+  ],
+  [
+   "F3 junior reconciliation",
+   true
+  ],
+  [
+   "F4 tail counts and top junior",
+   true
+  ],
+  [
+   "F5 allocation discrepancies are exactly the documented one",
+   true
+  ],
+  [
+   "F6 not a negative-test run",
+   true
+  ]
+ ],
+ "cohorts_ok": 114,
+ "cohorts_checked": 114
+}

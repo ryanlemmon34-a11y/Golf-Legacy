@@ -1,5 +1,16 @@
 # Study validation: Test2 cohorts, baseline (A0) parity per cohort
 
+**Result: PASSED.** Stamp bound to study.py 3f8a752784b9, validate.py bf392fbce234, fixture 3993923fa787, golfsim b39eb853cf21.
+
+| failure condition | result | detail |
+|---|---|---|
+| F1 cohort boundary | ok | 114 cohorts checked, 114 expected (2028-2084 x juniors, new professionals); missing [] |
+| F2 every cohort passes a-e | ok | 114 of 114 pass; failing: [] |
+| F3 junior reconciliation | ok | 2028-2083 16811 (expected 16811), 2084 257 (expected 257) |
+| F4 tail counts and top junior | ok | 80+: 8 (expected 8); 85+: 1 (expected 1); top: {'year': 2041, 'country': 'Argentina', 'overall': 96.09, 'raw_potential': 100.881, 'peak_age': 20.892, 'aging_rate': 0.718} |
+| F5 allocation discrepancies are exactly the documented one | ok | found [[2061, 'juniors']], documented [[2061, 'juniors']] (recorded shares are rounded to 6 decimals; the replay uses the recorded allocation) |
+| F6 not a negative-test run | ok | negative baseline None, years None |
+
 Seed 386509, entrant years 2028-2084, both pathways: 114 of 114 cohorts pass every check; 41,439 of 41,439 entrant rows identical (country, age, stored potential, peak age, current overall, status, aging rate); 4,303,391 of 4,303,391 production draws identical. Production entrant_rows with the recorded shares gives the recorded total in 114 of 114 cohorts and the recorded allocation in all but 1. The replay always uses the recorded allocation, so it is unaffected.
 
 **2061 juniors: allocation recomputed from the recorded shares differs from the recorded one.** Norway: recorded share 0.008289, quota 2.461838, remainder 0.4618379, recorded 3 place(s), recomputed 2; Sweden: recorded share 0.025124, quota 7.461843, remainder 0.4618429, recorded 7 place(s), recomputed 8. The two remainders differ by 0.0000050. Rounding a share to 6 decimals can move that nation's quota by up to 297 x 0.0000005 = 0.0001485 (and the recorded shares sum to 0.999998, so renormalising moves every quota slightly too): the gap is about 1/30 of one nation's rounding bound, so share rounding is large enough to reverse the order. That it did is not established: the cause is unresolved.

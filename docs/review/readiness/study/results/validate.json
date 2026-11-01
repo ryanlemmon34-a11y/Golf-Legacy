@@ -3141,5 +3141,38 @@
    },
    "ok": true
   }
- ]
+ ],
+ "checks": [
+  {
+   "check": "F1 cohort boundary",
+   "ok": true,
+   "detail": "114 cohorts checked, 114 expected (2028-2084 x juniors, new professionals); missing []"
+  },
+  {
+   "check": "F2 every cohort passes a-e",
+   "ok": true,
+   "detail": "114 of 114 pass; failing: []"
+  },
+  {
+   "check": "F3 junior reconciliation",
+   "ok": true,
+   "detail": "2028-2083 16811 (expected 16811), 2084 257 (expected 257)"
+  },
+  {
+   "check": "F4 tail counts and top junior",
+   "ok": true,
+   "detail": "80+: 8 (expected 8); 85+: 1 (expected 1); top: {'year': 2041, 'country': 'Argentina', 'overall': 96.09, 'raw_potential': 100.881, 'peak_age': 20.892, 'aging_rate': 0.718}"
+  },
+  {
+   "check": "F5 allocation discrepancies are exactly the documented one",
+   "ok": true,
+   "detail": "found [[2061, 'juniors']], documented [[2061, 'juniors']] (recorded shares are rounded to 6 decimals; the replay uses the recorded allocation)"
+  },
+  {
+   "check": "F6 not a negative-test run",
+   "ok": true,
+   "detail": "negative baseline None, years None"
+  }
+ ],
+ "passed": true
 }

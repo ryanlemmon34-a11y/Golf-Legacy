@@ -1,6 +1,11 @@
 """Run the starting-ability study (experiment only; nothing here changes the game or any save).
 
-    python3 -I run.py <checkout> <tests/data/test2_nation_shares.json.gz> <workroot> [procs]
+    python3 -I run.py <checkout> <tests/data/test2_nation_shares.json.gz> <workroot> [procs] [--stamp PATH]
+                      [--check-only]
+
+Gate: nothing runs unless validate.py's stamp (results/validation_stamp.json, provenance.py) passed and is bound to the
+current study.py, validate.py, fixture and golfsim sources; a missing, failed or stale stamp exits 2. --check-only
+applies the gate, prints the manifest and exits.
 
 Results go to <workroot>/<manifest hash>/, one pickle per task, each carrying the manifest hash. The manifest
 covers the study's source files (study.py, run.py), the configuration below, the input fixture's SHA-256 and the
@@ -17,6 +22,7 @@ Tasks:
            existing rule's filter over its fixed candidate count (no allocation); entrants with stored potential
            >= 70 projected (standard schedule).
 """
+import argparse
 import gzip
 import hashlib
 import json
@@ -30,10 +36,18 @@ from multiprocessing import Pool
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
+import provenance as PV  # noqa: E402
 import study as S  # noqa: E402
 
-CHECKOUT, FIXTURE, ROOT = sys.argv[1], sys.argv[2], sys.argv[3]
-PROCS = int(sys.argv[4]) if len(sys.argv) > 4 else 4
+_ap = argparse.ArgumentParser()
+_ap.add_argument('checkout')
+_ap.add_argument('fixture')
+_ap.add_argument('root')
+_ap.add_argument('procs', nargs='?', type=int, default=4)
+_ap.add_argument('--stamp', default=PV.STAMP)
+_ap.add_argument('--check-only', action='store_true')
+ARGS = _ap.parse_args()
+CHECKOUT, FIXTURE, ROOT, PROCS = ARGS.checkout, ARGS.fixture, ARGS.root, ARGS.procs
 CONFIG = {'test2_seed': 386509, 'paired_seeds': [2027, 11, 23, 83, 386509], 'arms': ['A0', 'A1', 'A2', 'A3', 'A3r5'],
           'years': [2028, 2084], 'project_min_pot_paired': 70.0, 'to_age': 40}
 YEARS = list(range(CONFIG['years'][0], CONFIG['years'][1] + 1))
@@ -48,15 +62,13 @@ def sha256_file(path):
 
 
 def manifest():
-    golf = hashlib.sha256()
-    gdir = os.path.join(CHECKOUT, 'golfsim')
-    for name in sorted(os.listdir(gdir)):
-        if name.endswith('.py'):
-            golf.update(name.encode() + b'\0' + open(os.path.join(gdir, name), 'rb').read())
     head = subprocess.run(['git', '-C', CHECKOUT, 'rev-parse', 'HEAD'], capture_output=True, text=True).stdout.strip()
-    m = {'config': CONFIG, 'study.py': sha256_file(os.path.join(HERE, 'study.py')),
-         'run.py': sha256_file(os.path.join(HERE, 'run.py')), 'fixture': sha256_file(FIXTURE),
-         'checkout_head': head, 'golfsim_digest': golf.hexdigest()}
+    b = PV.bindings(CHECKOUT, FIXTURE)
+    m = {'config': CONFIG, 'study.py': b['study.py'], 'validate.py': b['validate.py'],
+         'provenance.py': sha256_file(os.path.join(HERE, 'provenance.py')),
+         'run.py': sha256_file(os.path.join(HERE, 'run.py')), 'fixture': b['fixture'],
+         'checkout_head': head, 'golfsim_digest': b['golfsim_digest'],
+         'validation_stamp': sha256_file(ARGS.stamp) if os.path.exists(ARGS.stamp) else None}
     m['hash'] = hashlib.sha256(json.dumps(m, sort_keys=True).encode()).hexdigest()[:16]
     return m
 
@@ -189,6 +201,14 @@ TASKS = ([('replay', a, k, 'standard') for a in CONFIG['arms'] for k in ('junior
          + [('replay', a, 'juniors', 'light') for a in CONFIG['arms']])
 
 if __name__ == '__main__':
+    gate = PV.stamp_problems(PV.bindings(CHECKOUT, FIXTURE), ARGS.stamp)
+    if gate:
+        print('REFUSED: run validate.py first;', *gate, sep='\n  ', file=sys.stderr)
+        sys.exit(2)
+    print('validation stamp ok', ARGS.stamp, flush=True)
+    if ARGS.check_only:
+        print('manifest', json.dumps(MANIFEST), flush=True)
+        sys.exit(0)
     os.makedirs(WORK, exist_ok=True)
     mpath = os.path.join(WORK, 'manifest.json')
     if os.path.exists(mpath) and json.load(open(mpath))['hash'] != MANIFEST['hash']:
