@@ -472,8 +472,8 @@ def decide(season, year, snap):
                 rank = row.get('am_end')
                 why = f'a winner\'s exemption: {held}' if gate == 'exemption' else f'amateur ranking {rank}'
                 if u < p_pro:
-                    turn_pro(season, g, year, rank or 99999, f'from college at {age}, before their eligibility ended '
-                                                             f'({why})', held)
+                    turn_pro(season, g, year, rank or 99999, f'from college at {age}, before their eligibility ended',
+                             held)                          # (turn_pro's line adds the ranking, or the exemption)
                     note('turned pro', g, p=round(p_pro, 4), am_rank=rank, graduating=False, early=gate,
                          **({'exemption': held} if held else {}))
                 else:
