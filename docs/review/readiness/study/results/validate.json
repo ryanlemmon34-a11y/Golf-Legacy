@@ -1,0 +1,77 @@
+{
+ "draw_identity": {
+  "draws_compared": 393144,
+  "mismatches": 0
+ },
+ "test2_replay": {
+  "juniors": 17068,
+  "new_pros": 24371,
+  "allocation_mismatches": [],
+  "juniors_80_plus": [
+   {
+    "year": 2041,
+    "country": "Argentina",
+    "overall": 96.09,
+    "raw_potential": 100.881,
+    "peak_age": 20.892,
+    "aging_rate": 0.718
+   },
+   {
+    "year": 2082,
+    "country": "Ireland",
+    "overall": 84.894,
+    "raw_potential": 88.181,
+    "peak_age": 22.14,
+    "aging_rate": 1.323
+   },
+   {
+    "year": 2081,
+    "country": "Australia",
+    "overall": 83.776,
+    "raw_potential": 93.286,
+    "peak_age": 26.627,
+    "aging_rate": 1.111
+   },
+   {
+    "year": 2032,
+    "country": "USA",
+    "overall": 83.265,
+    "raw_potential": 93.496,
+    "peak_age": 26.095,
+    "aging_rate": 0.518
+   },
+   {
+    "year": 2029,
+    "country": "Australia",
+    "overall": 83.114,
+    "raw_potential": 90.903,
+    "peak_age": 26.29,
+    "aging_rate": 1.365
+   },
+   {
+    "year": 2028,
+    "country": "USA",
+    "overall": 82.658,
+    "raw_potential": 91.936,
+    "peak_age": 26.443,
+    "aging_rate": 0.846
+   },
+   {
+    "year": 2077,
+    "country": "USA",
+    "overall": 81.393,
+    "raw_potential": 88.947,
+    "peak_age": 26.481,
+    "aging_rate": 1.35
+   },
+   {
+    "year": 2059,
+    "country": "USA",
+    "overall": 80.052,
+    "raw_potential": 84.884,
+    "peak_age": 25.296,
+    "aging_rate": 0.617
+   }
+  ]
+ }
+}
