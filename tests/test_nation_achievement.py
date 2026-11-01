@@ -101,6 +101,7 @@ class ObserverText(unittest.TestCase):
         import observer_prestige as OP
         recs = {2030: {'nations': nations}}
         with mock.patch.object(OP, '_years', lambda w: [2030]), mock.patch.object(OP, '_record', lambda w, y: recs[y]), \
+                mock.patch.object(OP, '_records', lambda w, ys: {y: recs[y] for y in ys}), \
                 mock.patch.object(OP, '_live', lambda w: None):
             return OP.nation_section(object(), 'Argentina')
 
@@ -141,6 +142,7 @@ class ObserverProjections(unittest.TestCase):
         OP = self.OP
         with mock.patch.object(OP, '_years', lambda w: list(years)), \
                 mock.patch.object(OP, '_record', lambda w, y: (recs or {}).get(y)), \
+                mock.patch.object(OP, '_records', lambda w, ys: {y: (recs or {}).get(y) for y in ys}), \
                 mock.patch.object(OP, '_live', lambda w: {'nations': live} if live else None):
             return OP.nation_section(object(), 'Argentina')
 
@@ -169,6 +171,8 @@ class ObserverProjections(unittest.TestCase):
         n.pop('closed')
         with mock.patch.object(OP, '_years', lambda w: [2055]), \
                 mock.patch.object(OP, '_record', lambda w, y: {'nations': n, 'events': {}, 'courses': {}}), \
+                mock.patch.object(OP, '_records', lambda w, ys: {y: {'nations': n, 'events': {}, 'courses': {}}
+                                                                 for y in ys}), \
                 mock.patch.object(OP, '_live', lambda w: None):
             got = OP.latest(object())['nations']
         self.assertEqual(got, n)
