@@ -20,7 +20,6 @@ At the end of the season `cards.py` moves players between tours (promotion, rele
 """
 from __future__ import annotations
 
-import functools
 import hashlib
 import math
 import os
@@ -94,14 +93,7 @@ QS_EUROPE = ('Europe', 'Africa', 'Middle East')
 
 
 def _seed(*parts):
-    return _seed_of(':'.join(map(str, parts)))
-
-
-@functools.lru_cache(maxsize=1 << 16)
-def _seed_of(key):
-    """The hash behind _seed, remembered (a pure function of its key: a remembered value is the value; the same
-    golfer-week and entry-ticket seeds recur every week of a season)."""
-    return int.from_bytes(hashlib.blake2b(key.encode(), digest_size=8).digest(), 'big')
+    return int.from_bytes(hashlib.blake2b(':'.join(map(str, parts)).encode(), digest_size=8).digest(), 'big')
 
 
 def playoff_evidence(finish, out):
@@ -1048,8 +1040,7 @@ class Season:
                 'after_major': week - 1 in self.cal.major_weeks and week - 1 in weeks,
                 # tired golfers rest; good course managers plan their rest better
                 'tired': (8 + 10 * g.attrs["management"] / 100) * 2 * max(0.0, self.fatigue[g.id] - 0.1),
-                'kept': self.prize_kept(g), 'unit': FIN.money_unit(self.funds(g, year)),
-                'forecast': {}}                              # tier -> prize_forecast (nothing it reads changes this week)
+                'kept': self.prize_kept(g), 'unit': FIN.money_unit(self.funds(g, year))}
 
     def event_value(self, g, ed, week, rng, venue_country, cost=None, gw=None, base=None):
         s = ed.series
@@ -1068,15 +1059,7 @@ class Season:
             v += 5                                           # defending champion
         if cost is None:
             cost = self.trip_cost(g, s, self.venues(ed.year)[ed.event_id][0].city)
-        fc = gw.get('forecast')
-        if fc is None or g.status == 'amateur' or not s.purse:
-            prize = self.expected_prize(g, s)
-        else:                                                # (expected_prize's own arithmetic, the forecast kept)
-            f = fc.get(s.tier)
-            if f is None:
-                f = fc[s.tier] = self.prize_forecast(g, s.tier)
-            prize = f * s.purse
-        v -= (cost - prize * gw['kept']) / gw['unit']
+        v -= (cost - self.expected_prize(g, s) * gw['kept']) / gw['unit']
         return v + rng.gauss(0, 3)
 
     # ---- the week ------------------------------------------------------------------------------
