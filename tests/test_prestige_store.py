@@ -20,6 +20,7 @@ import sys
 import tempfile
 import time
 import unittest
+import zlib
 from pathlib import Path
 from types import SimpleNamespace as NS
 from unittest import mock
@@ -692,6 +693,87 @@ class NestedAndRepaired(StoreCase):
         with mock.patch.object(O.OP, 'latest', lambda w: lt), \
                 mock.patch.object(O, 'nation_counts', lambda w: {'Fiji': [1, 1, 0, 0]}):
             self.assertIn(f'recorded at the end of {LAST - 1}', O.nations(NS(live=None, a=None), {})[1])
+
+
+class ReaderLifecycle(StoreCase):
+    """Review of fa78bc7: a reader that only checks bytes keeps the busy back-off, and a failure repaired in a way the
+    cheap mark cannot see is shown as soon as the session's bytes check has read it again."""
+
+    def busy_reader(self):
+        script = self.tmp / 'busy.sh'
+        script.write_text(f'#!/bin/sh\nexit {PS.EXIT_BUSY}\n')
+        script.chmod(0o755)
+        return str(script)
+
+    def test_a_verification_only_reader_keeps_the_busy_back_off(self):
+        self.warm()
+        w2 = self.world()                                                    # a new session: everything unchecked
+        st = w2._prestige_store
+        starts = []
+        real = PS.subprocess.Popen
+
+        def counted(*a, **k):
+            starts.append(a[0])
+            return real(*a, **k)
+        with mock.patch.object(PS.sys, 'executable', self.busy_reader()), \
+                mock.patch.object(PS.subprocess, 'Popen', counted), mock.patch.object(PS, 'BUSY_RETRY', 0.6):
+            for _ in range(3):                                               # three requests, three busy exits ...
+                got = PS.records(w2, list(self.a.years))
+                self.wait(w2)
+                self.assertEqual(got, {y: record(y) for y in self.a.years})   # (pages served from the store)
+            self.assertEqual(len(starts), 1)                                 # ... but one start: the back-off holds
+            self.assertEqual(st.last_exit, 'busy')
+            self.assertGreater(st.retry_after, time.time())
+            self.assertTrue(st.unchecked)                                    # the checks are queued again
+            time.sleep(0.7)
+            PS.records(w2, list(self.a.years))                               # after the wait: started again
+            self.wait(w2)
+            self.assertEqual(len(starts), 2)
+            PS.records(w2, list(self.a.years))                               # (its busy exit dealt with)
+            self.assertEqual(len(starts), 2)
+        self.assertEqual((st.crashes, st.failed), (0, {}))                   # a lock is never a failure
+        st.retry_after = 0.0                                                 # (the wait over)
+        PS.records(w2, list(self.a.years))                                   # a real reader now: the checks done
+        self.wait(w2)
+        PS.records(w2, list(self.a.years))
+        self.assertEqual(st.last_exit, 'done')
+        self.assertFalse(st.unchecked)
+
+    def padded_member(self, raw, extra, size):
+        """A gzip member with an FEXTRA field (fixed bytes at the head) and zero padding to `size` bytes (zeros at the
+        tail): two such files share their size and first and last 32 bytes whatever they hold."""
+        comp = zlib.compressobj(9, zlib.DEFLATED, -15)
+        body = comp.compress(raw) + comp.flush()
+        head = b'\x1f\x8b\x08\x04' + b'\0\0\0\0' + b'\x00\xff' + len(extra).to_bytes(2, 'little') + extra
+        member = head + body + zlib.crc32(raw).to_bytes(4, 'little') + (len(raw) & 0xffffffff).to_bytes(4, 'little')
+        self.assertGreaterEqual(size - len(member), 64, 'test setup: padding')
+        return member + b'\0' * (size - len(member))
+
+    def test_a_repair_the_mark_cannot_see_is_shown_after_the_bytes_check(self):
+        y = FIRST + 6
+        p = self.a.year_path(y)
+        good = gzip.decompress(p.read_bytes())
+        broken = good.replace(b'"SMALL_OPEN": 40.0', b'"SMALL_OPEN": "40"')
+        extra = b'GL' + (20).to_bytes(2, 'little') + b'x' * 20                 # (one FEXTRA subfield)
+        size = len(gzip.compress(good)) + 400
+        p.write_bytes(self.padded_member(broken, extra, size))
+        self.assertIsNone(gzip.decompress(p.read_bytes()) and None)          # (valid gzip: decodes)
+        got = self.warm_partial()
+        self.assertIsNone(got[y])                                            # unreadable (a string, not a number)
+        st0 = os.stat(p)
+        mark = PS.file_mark(p)
+        with open(p, 'r+b') as f:                                            # repaired in place ...
+            f.write(self.padded_member(good, extra, size))
+        os.utime(p, ns=(st0.st_atime_ns, st0.st_mtime_ns))                   # ... same size, mtime, first/last 32
+        self.assertEqual(PS.file_mark(p), mark)
+        with mock.patch.object(PS, '_stat', ReviewFindings.windows_stat(self, {str(p): st0})):
+            w2 = self.world()                                                # the next session
+            first = PS.records(w2, list(self.a.years))
+            self.assertIsNone(first[y])                                      # (still the stored failure, for now)
+            self.wait(w2)                                                    # its bytes check finds the change ...
+            got = PS.records(w2, list(self.a.years))                         # ... and the same session shows it
+            self.assertEqual(got[y], record(y))
+            self.assertNotIn(y, w2._prestige_store.failed)
 
 
 if __name__ == '__main__':
