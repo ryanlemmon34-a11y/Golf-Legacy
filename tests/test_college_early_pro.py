@@ -144,8 +144,10 @@ class Decisions(unittest.TestCase):
             self.assertEqual([x['kind'] for x in t], ['turned pro'])
             self.assertEqual((t[0]['early'], t[0]['graduating'], t[0]['am_rank']), ('top 15', False, 4))
             self.assertNotIn(g.id, self.s.card_reasons.get(YEAR + 1, {}))   # no Premier card from a ranking
-            self.assertTrue(any('from college at 20' in h for h in self.s.history_of(g.id))
-                            if hasattr(self.s, 'history_of') else True)
+            line = [x for _, _, x in self.s.history[g.id] if 'from college at 20' in x]
+            self.assertEqual(len(line), 1)
+            self.assertIn('before their eligibility ended', line[0])
+            self.assertEqual(line[0].count('amateur ranking 4'), 1)         # (the ranking said once)
 
     def test_decline_stays_a_full_time_college_golfer_without_a_job(self):
         gs = college_amateurs(self.s, 3)
@@ -249,6 +251,20 @@ class Decisions(unittest.TestCase):
         self.assertEqual((g.status, g.lifestyle, g.tour), (tg.status, tg.lifestyle, tg.tour))
         self.assertEqual([r[0] for r in self.s.career_ev[YEAR][g.id]], ['turn_pro'])   # the graduating model
         self.assertTrue(all(t.get('early') is None for t in trans(self.s, g.id)))
+
+
+class Shown(unittest.TestCase):
+    """The observer's status table says an early decision was taken before college eligibility ended, and why."""
+
+    def test_decision_text(self):
+        sys.path.insert(0, str(ROOT / 'tools'))
+        import observer_history as OH
+        top = OH.decision_text({'kind': 'turned pro', 'p': 0.46, 'am_rank': 13, 'graduating': False, 'early': 'top 15'})
+        self.assertIn('before college eligibility ended (amateur top 15)', top)
+        ex = OH.decision_text({'kind': 'turned pro', 'p': 0.5, 'am_rank': 40, 'early': 'exemption',
+                               'exemption': 'won the 2027 Britannia Open'})
+        self.assertIn("a winner's exemption: won the 2027 Britannia Open", ex.replace('&#x27;', "'"))
+        self.assertNotIn('before college', OH.decision_text({'kind': 'turned pro', 'p': 0.9, 'graduating': True}))
 
 
 class Streams(unittest.TestCase):

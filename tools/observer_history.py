@@ -216,6 +216,9 @@ def decision_text(t):
         parts.append(f'via {O.esc(t["via"])}')
     if t.get('graduating'):
         parts.append('college eligibility ended')
+    if t.get('early'):                                 # (rules 2026-11-15) decided before college eligibility ended
+        parts.append('before college eligibility ended (' + (f'a winner\'s exemption: {O.esc(t["exemption"])}'
+                     if t.get('exemption') else 'amateur top 15') + ')')
     return f'<strong>{O.esc(kind)}</strong>' + (' — ' + ' · '.join(parts) if parts else '')
 
 
