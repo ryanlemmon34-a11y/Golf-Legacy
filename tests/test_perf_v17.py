@@ -63,7 +63,7 @@ class Shortcuts(unittest.TestCase):
         eds = [e for e in s.cal.editions(YEAR) if not s.is_special(e.series)]   # (what planning and entries ask)
         n = 0
         for g in s.active_golfers():
-            for ed in eds[::3]:
+            for ed in eds:                                                    # (every regular event)
                 for week in (ed.week, 30):
                     self.assertEqual(s.eligible(g, ed.series, week), eligible_before(s, g, ed.series, week),
                                      (g.id, ed.event_id))
