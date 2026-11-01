@@ -1,0 +1,1700 @@
+{
+ "definitions": {
+  "expected_decision_events": "sum of p over every golfer-winter the gate evaluates (a golfer evaluated in several winters counts in each: overcounts departures, since an early exit ends later evaluations)",
+  "expected_unique_exits": "survival-weighted per golfer: exit at winter t = p_t * prod_{s<t}(1 - p_s); total = sum over golfers of 1 - prod(1 - p_t)",
+  "evaluated_survival_weighted": "sum over golfer-winters of prod_{s<t}(1 - p_s): golfer-winters still in college to be evaluated after earlier expected exits",
+  "caveat": "fixed inputs: every input is as archived; a real early exit would also change the golfer's later amateur ranking and other golfers' rankings and fields, and every later season"
+ },
+ "model_check": {
+  "2027": {
+   "n": 1720,
+   "p_mismatch": 0,
+   "rank_mismatch": 0,
+   "wins_mismatch": 0,
+   "age_mismatch": 0,
+   "standing_mismatch": 0,
+   "college_nongrad": 0,
+   "max_dp": 0.0034863507328071197
+  },
+  "2028": {
+   "n": 2062,
+   "p_mismatch": 0,
+   "rank_mismatch": 0,
+   "wins_mismatch": 0,
+   "age_mismatch": 0,
+   "standing_mismatch": 0,
+   "college_nongrad": 0,
+   "max_dp": 0.002945693612681266
+  },
+  "2029": {
+   "n": 2392,
+   "p_mismatch": 0,
+   "rank_mismatch": 0,
+   "wins_mismatch": 0,
+   "age_mismatch": 0,
+   "standing_mismatch": 0,
+   "college_nongrad": 0,
+   "max_dp": 0.0035207648927851887
+  },
+  "2030": {
+   "n": 2583,
+   "p_mismatch": 0,
+   "rank_mismatch": 0,
+   "wins_mismatch": 0,
+   "age_mismatch": 0,
+   "standing_mismatch": 0,
+   "college_nongrad": 0,
+   "max_dp": 0.0030631751488418013
+  },
+  "2031": {
+   "n": 2855,
+   "p_mismatch": 0,
+   "rank_mismatch": 0,
+   "wins_mismatch": 0,
+   "age_mismatch": 0,
+   "standing_mismatch": 0,
+   "college_nongrad": 0,
+   "max_dp": 0.003043693774204659
+  },
+  "2032": {
+   "n": 3025,
+   "p_mismatch": 0,
+   "rank_mismatch": 0,
+   "wins_mismatch": 0,
+   "age_mismatch": 0,
+   "standing_mismatch": 0,
+   "college_nongrad": 0,
+   "max_dp": 0.0027637081969708044
+  },
+  "2033": {
+   "n": 3215,
+   "p_mismatch": 0,
+   "rank_mismatch": 0,
+   "wins_mismatch": 0,
+   "age_mismatch": 0,
+   "standing_mismatch": 0,
+   "college_nongrad": 0,
+   "max_dp": 0.0023893401555817317
+  },
+  "2034": {
+   "n": 3403,
+   "p_mismatch": 0,
+   "rank_mismatch": 0,
+   "wins_mismatch": 0,
+   "age_mismatch": 0,
+   "standing_mismatch": 0,
+   "college_nongrad": 0,
+   "max_dp": 0.0028543063873187613
+  },
+  "2035": {
+   "n": 3575,
+   "p_mismatch": 0,
+   "rank_mismatch": 0,
+   "wins_mismatch": 0,
+   "age_mismatch": 0,
+   "standing_mismatch": 0,
+   "college_nongrad": 0,
+   "max_dp": 0.0028973964842102795
+  },
+  "2036": {
+   "n": 3735,
+   "p_mismatch": 0,
+   "rank_mismatch": 0,
+   "wins_mismatch": 0,
+   "age_mismatch": 0,
+   "standing_mismatch": 0,
+   "college_nongrad": 0,
+   "max_dp": 0.0026162436088178476
+  },
+  "2037": {
+   "n": 3853,
+   "p_mismatch": 0,
+   "rank_mismatch": 0,
+   "wins_mismatch": 0,
+   "age_mismatch": 0,
+   "standing_mismatch": 0,
+   "college_nongrad": 0,
+   "max_dp": 0.003183111967394958
+  },
+  "2038": {
+   "n": 4015,
+   "p_mismatch": 0,
+   "rank_mismatch": 0,
+   "wins_mismatch": 0,
+   "age_mismatch": 0,
+   "standing_mismatch": 0,
+   "college_nongrad": 0,
+   "max_dp": 0.002657618143089402
+  },
+  "2039": {
+   "n": 4139,
+   "p_mismatch": 0,
+   "rank_mismatch": 0,
+   "wins_mismatch": 0,
+   "age_mismatch": 0,
+   "standing_mismatch": 0,
+   "college_nongrad": 0,
+   "max_dp": 0.002989340155581721
+  },
+  "2040": {
+   "n": 4292,
+   "p_mismatch": 0,
+   "rank_mismatch": 0,
+   "wins_mismatch": 0,
+   "age_mismatch": 0,
+   "standing_mismatch": 0,
+   "college_nongrad": 0,
+   "max_dp": 0.0025106598444182837
+  },
+  "2041": {
+   "n": 4373,
+   "p_mismatch": 0,
+   "rank_mismatch": 0,
+   "wins_mismatch": 0,
+   "age_mismatch": 0,
+   "standing_mismatch": 0,
+   "college_nongrad": 0,
+   "max_dp": 0.0030792351072148616
+  },
+  "2042": {
+   "n": 4444,
+   "p_mismatch": 0,
+   "rank_mismatch": 0,
+   "wins_mismatch": 0,
+   "age_mismatch": 0,
+   "standing_mismatch": 0,
+   "college_nongrad": 0,
+   "max_dp": 0.0028094770645927247
+  },
+  "2043": {
+   "n": 4511,
+   "p_mismatch": 0,
+   "rank_mismatch": 0,
+   "wins_mismatch": 0,
+   "age_mismatch": 0,
+   "standing_mismatch": 0,
+   "college_nongrad": 0,
+   "max_dp": 0.0029359482354281985
+  },
+  "2044": {
+   "n": 4584,
+   "p_mismatch": 0,
+   "rank_mismatch": 0,
+   "wins_mismatch": 0,
+   "age_mismatch": 0,
+   "standing_mismatch": 0,
+   "college_nongrad": 0,
+   "max_dp": 0.003446223939229054
+  },
+  "2045": {
+   "n": 4652,
+   "p_mismatch": 0,
+   "rank_mismatch": 0,
+   "wins_mismatch": 0,
+   "age_mismatch": 0,
+   "standing_mismatch": 0,
+   "college_nongrad": 0,
+   "max_dp": 0.0032660026875221404
+  },
+  "2046": {
+   "n": 4722,
+   "p_mismatch": 0,
+   "rank_mismatch": 0,
+   "wins_mismatch": 0,
+   "age_mismatch": 0,
+   "standing_mismatch": 0,
+   "college_nongrad": 0,
+   "max_dp": 0.0024001666600002025
+  },
+  "2047": {
+   "n": 4740,
+   "p_mismatch": 0,
+   "rank_mismatch": 0,
+   "wins_mismatch": 0,
+   "age_mismatch": 0,
+   "standing_mismatch": 0,
+   "college_nongrad": 0,
+   "max_dp": 0.002500562449379684
+  },
+  "2048": {
+   "n": 4766,
+   "p_mismatch": 0,
+   "rank_mismatch": 0,
+   "wins_mismatch": 0,
+   "age_mismatch": 0,
+   "standing_mismatch": 0,
+   "college_nongrad": 0,
+   "max_dp": 0.0028875822638984028
+  },
+  "2049": {
+   "n": 4789,
+   "p_mismatch": 0,
+   "rank_mismatch": 0,
+   "wins_mismatch": 0,
+   "age_mismatch": 0,
+   "standing_mismatch": 0,
+   "college_nongrad": 0,
+   "max_dp": 0.0027071423336102463
+  },
+  "2050": {
+   "n": 4842,
+   "p_mismatch": 0,
+   "rank_mismatch": 0,
+   "wins_mismatch": 0,
+   "age_mismatch": 0,
+   "standing_mismatch": 0,
+   "college_nongrad": 0,
+   "max_dp": 0.002604498380589959
+  },
+  "2051": {
+   "n": 4858,
+   "p_mismatch": 0,
+   "rank_mismatch": 0,
+   "wins_mismatch": 0,
+   "age_mismatch": 0,
+   "standing_mismatch": 0,
+   "college_nongrad": 0,
+   "max_dp": 0.002859376841836181
+  },
+  "2052": {
+   "n": 4875,
+   "p_mismatch": 0,
+   "rank_mismatch": 0,
+   "wins_mismatch": 0,
+   "age_mismatch": 0,
+   "standing_mismatch": 0,
+   "college_nongrad": 0,
+   "max_dp": 0.003307142333610291
+  },
+  "2053": {
+   "n": 4915,
+   "p_mismatch": 0,
+   "rank_mismatch": 0,
+   "wins_mismatch": 0,
+   "age_mismatch": 0,
+   "standing_mismatch": 0,
+   "college_nongrad": 0,
+   "max_dp": 0.002804498380589937
+  },
+  "2054": {
+   "n": 4957,
+   "p_mismatch": 0,
+   "rank_mismatch": 0,
+   "wins_mismatch": 0,
+   "age_mismatch": 0,
+   "standing_mismatch": 0,
+   "college_nongrad": 0,
+   "max_dp": 0.0030590307465144795
+  },
+  "2055": {
+   "n": 4949,
+   "p_mismatch": 0,
+   "rank_mismatch": 0,
+   "wins_mismatch": 0,
+   "age_mismatch": 0,
+   "standing_mismatch": 0,
+   "college_nongrad": 0,
+   "max_dp": 0.003053776060770952
+  },
+  "2056": {
+   "n": 4940,
+   "p_mismatch": 0,
+   "rank_mismatch": 0,
+   "wins_mismatch": 0,
+   "age_mismatch": 0,
+   "standing_mismatch": 0,
+   "college_nongrad": 0,
+   "max_dp": 0.0031211076264199278
+  },
+  "2057": {
+   "n": 4989,
+   "p_mismatch": 0,
+   "rank_mismatch": 0,
+   "wins_mismatch": 0,
+   "age_mismatch": 0,
+   "standing_mismatch": 0,
+   "college_nongrad": 0,
+   "max_dp": 0.0030094770645927027
+  },
+  "2058": {
+   "n": 4954,
+   "p_mismatch": 0,
+   "rank_mismatch": 0,
+   "wins_mismatch": 0,
+   "age_mismatch": 0,
+   "standing_mismatch": 0,
+   "college_nongrad": 0,
+   "max_dp": 0.0026723043445936456
+  },
+  "2059": {
+   "n": 4926,
+   "p_mismatch": 0,
+   "rank_mismatch": 0,
+   "wins_mismatch": 0,
+   "age_mismatch": 0,
+   "standing_mismatch": 0,
+   "college_nongrad": 0,
+   "max_dp": 0.0027359482354282205
+  },
+  "2060": {
+   "n": 4902,
+   "p_mismatch": 0,
+   "rank_mismatch": 0,
+   "wins_mismatch": 0,
+   "age_mismatch": 0,
+   "standing_mismatch": 0,
+   "college_nongrad": 0,
+   "max_dp": 0.002807095034545737
+  },
+  "2061": {
+   "n": 4881,
+   "p_mismatch": 0,
+   "rank_mismatch": 0,
+   "wins_mismatch": 0,
+   "age_mismatch": 0,
+   "standing_mismatch": 0,
+   "college_nongrad": 0,
+   "max_dp": 0.002998666879965528
+  },
+  "2062": {
+   "n": 4886,
+   "p_mismatch": 0,
+   "rank_mismatch": 0,
+   "wins_mismatch": 0,
+   "age_mismatch": 0,
+   "standing_mismatch": 0,
+   "college_nongrad": 0,
+   "max_dp": 0.0029731029341427684
+  },
+  "2063": {
+   "n": 4878,
+   "p_mismatch": 0,
+   "rank_mismatch": 0,
+   "wins_mismatch": 0,
+   "age_mismatch": 0,
+   "standing_mismatch": 0,
+   "college_nongrad": 0,
+   "max_dp": 0.0030276956554062817
+  },
+  "2064": {
+   "n": 4872,
+   "p_mismatch": 0,
+   "rank_mismatch": 0,
+   "wins_mismatch": 0,
+   "age_mismatch": 0,
+   "standing_mismatch": 0,
+   "college_nongrad": 0,
+   "max_dp": 0.0028175789173301435
+  },
+  "2065": {
+   "n": 4928,
+   "p_mismatch": 0,
+   "rank_mismatch": 0,
+   "wins_mismatch": 0,
+   "age_mismatch": 0,
+   "standing_mismatch": 0,
+   "college_nongrad": 0,
+   "max_dp": 0.00327310293414268
+  },
+  "2066": {
+   "n": 4909,
+   "p_mismatch": 0,
+   "rank_mismatch": 0,
+   "wins_mismatch": 0,
+   "age_mismatch": 0,
+   "standing_mismatch": 0,
+   "college_nongrad": 0,
+   "max_dp": 0.0032423818569106144
+  },
+  "2067": {
+   "n": 4881,
+   "p_mismatch": 0,
+   "rank_mismatch": 0,
+   "wins_mismatch": 0,
+   "age_mismatch": 0,
+   "standing_mismatch": 0,
+   "college_nongrad": 0,
+   "max_dp": 0.00276600268752214
+  },
+  "2068": {
+   "n": 4850,
+   "p_mismatch": 0,
+   "rank_mismatch": 0,
+   "wins_mismatch": 0,
+   "age_mismatch": 0,
+   "standing_mismatch": 0,
+   "college_nongrad": 0,
+   "max_dp": 0.003040434058665109
+  },
+  "2069": {
+   "n": 4834,
+   "p_mismatch": 0,
+   "rank_mismatch": 0,
+   "wins_mismatch": 0,
+   "age_mismatch": 0,
+   "standing_mismatch": 0,
+   "college_nongrad": 0,
+   "max_dp": 0.003200562449379607
+  },
+  "2070": {
+   "n": 4799,
+   "p_mismatch": 0,
+   "rank_mismatch": 0,
+   "wins_mismatch": 0,
+   "age_mismatch": 0,
+   "standing_mismatch": 0,
+   "college_nongrad": 0,
+   "max_dp": 0.0028136492671929636
+  },
+  "2071": {
+   "n": 4866,
+   "p_mismatch": 0,
+   "rank_mismatch": 0,
+   "wins_mismatch": 0,
+   "age_mismatch": 0,
+   "standing_mismatch": 0,
+   "college_nongrad": 0,
+   "max_dp": 0.0033792351072148286
+  },
+  "2072": {
+   "n": 4893,
+   "p_mismatch": 0,
+   "rank_mismatch": 0,
+   "wins_mismatch": 0,
+   "age_mismatch": 0,
+   "standing_mismatch": 0,
+   "college_nongrad": 0,
+   "max_dp": 0.0026423818569106805
+  },
+  "2073": {
+   "n": 4933,
+   "p_mismatch": 0,
+   "rank_mismatch": 0,
+   "wins_mismatch": 0,
+   "age_mismatch": 0,
+   "standing_mismatch": 0,
+   "college_nongrad": 0,
+   "max_dp": 0.003006432343090115
+  },
+  "2074": {
+   "n": 4884,
+   "p_mismatch": 0,
+   "rank_mismatch": 0,
+   "wins_mismatch": 0,
+   "age_mismatch": 0,
+   "standing_mismatch": 0,
+   "college_nongrad": 0,
+   "max_dp": 0.002347766313195554
+  },
+  "2075": {
+   "n": 4874,
+   "p_mismatch": 0,
+   "rank_mismatch": 0,
+   "wins_mismatch": 0,
+   "age_mismatch": 0,
+   "standing_mismatch": 0,
+   "college_nongrad": 0,
+   "max_dp": 0.0035640517645717518
+  },
+  "2076": {
+   "n": 4929,
+   "p_mismatch": 0,
+   "rank_mismatch": 0,
+   "wins_mismatch": 0,
+   "age_mismatch": 0,
+   "standing_mismatch": 0,
+   "college_nongrad": 0,
+   "max_dp": 0.003536291803029168
+  },
+  "2077": {
+   "n": 4911,
+   "p_mismatch": 0,
+   "rank_mismatch": 0,
+   "wins_mismatch": 0,
+   "age_mismatch": 0,
+   "standing_mismatch": 0,
+   "college_nongrad": 0,
+   "max_dp": 0.003010659844418284
+  },
+  "2078": {
+   "n": 4961,
+   "p_mismatch": 0,
+   "rank_mismatch": 0,
+   "wins_mismatch": 0,
+   "age_mismatch": 0,
+   "standing_mismatch": 0,
+   "college_nongrad": 0,
+   "max_dp": 0.0026071423336102573
+  },
+  "2079": {
+   "n": 4950,
+   "p_mismatch": 0,
+   "rank_mismatch": 0,
+   "wins_mismatch": 0,
+   "age_mismatch": 0,
+   "standing_mismatch": 0,
+   "college_nongrad": 0,
+   "max_dp": 0.002997396484210324
+  },
+  "2080": {
+   "n": 4940,
+   "p_mismatch": 0,
+   "rank_mismatch": 0,
+   "wins_mismatch": 0,
+   "age_mismatch": 0,
+   "standing_mismatch": 0,
+   "college_nongrad": 0,
+   "max_dp": 0.0028425168116589794
+  },
+  "2081": {
+   "n": 4915,
+   "p_mismatch": 0,
+   "rank_mismatch": 0,
+   "wins_mismatch": 0,
+   "age_mismatch": 0,
+   "standing_mismatch": 0,
+   "college_nongrad": 0,
+   "max_dp": 0.0030359482354282985
+  },
+  "2082": {
+   "n": 4976,
+   "p_mismatch": 0,
+   "rank_mismatch": 0,
+   "wins_mismatch": 0,
+   "age_mismatch": 0,
+   "standing_mismatch": 0,
+   "college_nongrad": 0,
+   "max_dp": 0.003292857666389759
+  },
+  "2083": {
+   "n": 4938,
+   "p_mismatch": 0,
+   "rank_mismatch": 0,
+   "wins_mismatch": 0,
+   "age_mismatch": 0,
+   "standing_mismatch": 0,
+   "college_nongrad": 0,
+   "max_dp": 0.003284824791800145
+  }
+ },
+ "exemption_cross_check": {
+  "agree": 11,
+  "archive_field_only": 0,
+  "editions_only": 5,
+  "editions_only_cases": [
+   [
+    2042,
+    19411,
+    "won the 2042 Britannia Open",
+    "won the 2043 Premier Tour Championship"
+   ],
+   [
+    2043,
+    19411,
+    "won the 2043 Premier Tour Championship",
+    "won the 2044 Premier Tour Championship"
+   ],
+   [
+    2044,
+    19411,
+    "won the 2044 Premier Tour Championship",
+    "won the 2045 Premier Tour Championship"
+   ],
+   [
+    2045,
+    19411,
+    "won the 2045 Premier Tour Championship",
+    "won the 2046 Britannia Open"
+   ],
+   [
+    2060,
+    32712,
+    "won the 2059 Tour Masters",
+    "won the 2061 Tour Masters"
+   ]
+  ]
+ },
+ "model_check_summary": {
+  "turn_pro_evaluations_checked": 253240,
+  "max_abs_dp": 0.0035640517645717518,
+  "p_mismatch": 0,
+  "rank_mismatch": 0,
+  "wins_mismatch": 0,
+  "age_mismatch": 0,
+  "standing_mismatch": 0
+ },
+ "reconstruction": {
+  "golfer_winters": 49410,
+  "golfers": 12998,
+  "money_sources": {
+   "exact": 26792,
+   "forward+bound": 21280,
+   "forward": 1338
+  },
+  "money_exact_share": 0.5422384132766647,
+  "forward_proxy_error_vs_exact": {
+   "n": 33906,
+   "median_error": -133.33333333333576,
+   "median_abs_error_after_bias": 323.3333333333321,
+   "p90_abs_error_after_bias": 5224.166666666664
+  },
+  "graduation_means_terms": {
+   "unclipped": 7114,
+   "zero": 5400,
+   "capped": 0
+  },
+  "willingness_sources": {
+   "graduation evidence": 48072,
+   "graduates average": 1338
+  },
+  "graduates_willingness": {
+   "n": 12514,
+   "mean": 0.5131964200095893,
+   "p10": 0.38,
+   "p90": 0.65
+  }
+ },
+ "A": {
+  "label": "A",
+  "evaluated_per_winter": {
+   "mean": 882.3214285714286,
+   "min": 829,
+   "max": 950
+  },
+  "golfer_winters_evaluated": 49410,
+  "golfers": 12998,
+  "golfer_winters_evaluated_survival_weighted": 48204.3436121734,
+  "evaluated_survival_weighted_per_winter": {
+   "mean": 860.7918502173821,
+   "min": 807.4797095117414,
+   "max": 925.4955567252846
+  },
+  "expected_decision_events_total": 979.0333657792303,
+  "expected_decision_events_per_winter": {
+   "mean": 17.48273867462911,
+   "min": 14.442843526036452,
+   "max": 27.64603245263977,
+   "min_winter": 2065,
+   "max_winter": 2027
+  },
+  "expected_unique_exits_total": 883.5353021822011,
+  "expected_unique_exits_per_winter": {
+   "mean": 15.777416110396448,
+   "min": 13.713752433617291,
+   "max": 27.64603245263977,
+   "min_winter": 2055,
+   "max_winter": 2027
+  },
+  "unique_exits_by_age_at_exit": {
+   "18": 214.26012165994374,
+   "19": 188.0457479810204,
+   "20": 223.07041522322834,
+   "21": 258.1590173180086
+  },
+  "unique_exits_by_rank_band_at_exit": {
+   "1-15": 71.91519081330966,
+   "16-60": 83.13159458947791,
+   "61-300": 188.94173858852022,
+   "301+": 539.4038719120581,
+   "unranked": 0.14290627883520837
+  },
+  "unique_exits_by_what_they_did_at_22": {
+   "turned pro at 22": 538.6558683605706,
+   "stayed amateur at 22": 324.02312361020927,
+   "still in college when the archive ends": 20.856310211420688
+  },
+  "decision_events_by_age": {
+   "18": {
+    "evaluated": 12391,
+    "expected_decision_events": 214.26012165994374
+   },
+   "19": {
+    "evaluated": 12361,
+    "expected_decision_events": 202.16053521297601
+   },
+   "20": {
+    "evaluated": 12337,
+    "expected_decision_events": 252.73954003367922
+   },
+   "21": {
+    "evaluated": 12321,
+    "expected_decision_events": 309.8731688726313
+   }
+  },
+  "decision_events_by_rank_band": {
+   "1-15": {
+    "evaluated": 314,
+    "expected_decision_events": 121.40558879781582
+   },
+   "16-60": {
+    "evaluated": 643,
+    "expected_decision_events": 101.25969481955332
+   },
+   "61-300": {
+    "evaluated": 3874,
+    "expected_decision_events": 204.03234943601745
+   },
+   "301+": {
+    "evaluated": 44554,
+    "expected_decision_events": 552.192750226107
+   },
+   "unranked": {
+    "evaluated": 25,
+    "expected_decision_events": 0.14298249973666363
+   }
+  },
+  "p_among_evaluated": {
+   "median": 0.010778517045709264,
+   "p90": 0.03342864942396368,
+   "max": 0.7613327148429104,
+   "mean": 0.019814478157847204,
+   "n_p_ge_0.5": 67,
+   "n_p_ge_0.2": 457
+  },
+  "via_exemption": {
+   "golfer_winters": 11,
+   "golfers": 6,
+   "with_rank_above_15": 0,
+   "expected_decision_events": 5.6277583538120375
+  },
+  "share_of_decision_events_from_rank_le_15_or_exempt": 0.12400556818733846,
+  "sensitivity": {
+   "base": {
+    "decision_events": 979.0333657792303,
+    "unique_exits": 883.5353021822011
+   },
+   "nonexact_W_minus_5000": {
+    "decision_events": 969.0636044258221,
+    "unique_exits": 874.0967422710961
+   },
+   "nonexact_W_plus_5000": {
+    "decision_events": 993.8761673838038,
+    "unique_exits": 897.5699124433809
+   },
+   "graduates_average_will_as_0.5": {
+    "decision_events": 978.6807324112883,
+    "unique_exits": 883.2032896519916
+   }
+  }
+ },
+ "B": {
+  "label": "B",
+  "evaluated_per_winter": {
+   "mean": 5.607142857142857,
+   "min": 1,
+   "max": 11
+  },
+  "golfer_winters_evaluated": 314,
+  "golfers": 142,
+  "golfer_winters_evaluated_survival_weighted": 223.07239321331974,
+  "evaluated_survival_weighted_per_winter": {
+   "mean": 3.9834355930949954,
+   "min": 0.7106937111139611,
+   "max": 9.0
+  },
+  "expected_decision_events_total": 121.40558879781582,
+  "expected_decision_events_per_winter": {
+   "mean": 2.1679569428181398,
+   "min": 0.2493528470532021,
+   "max": 3.944269744272176,
+   "min_winter": 2051,
+   "max_winter": 2031
+  },
+  "expected_unique_exits_total": 79.94728197707519,
+  "expected_unique_exits_per_winter": {
+   "mean": 1.4276300353049143,
+   "min": 0.17721350024907212,
+   "max": 3.845309580954897,
+   "min_winter": 2051,
+   "max_winter": 2027
+  },
+  "unique_exits_by_age_at_exit": {
+   "18": 27.276251892548295,
+   "19": 12.469230146541411,
+   "20": 16.41627152536602,
+   "21": 23.78552841261947
+  },
+  "unique_exits_by_rank_band_at_exit": {
+   "1-15": 79.94728197707519,
+   "16-60": 0,
+   "61-300": 0,
+   "301+": 0,
+   "unranked": 0
+  },
+  "unique_exits_by_what_they_did_at_22": {
+   "turned pro at 22": 70.46499293842163,
+   "stayed amateur at 22": 7.184878943597312,
+   "still in college when the archive ends": 2.297410095056226
+  },
+  "decision_events_by_age": {
+   "18": {
+    "evaluated": 79,
+    "expected_decision_events": 27.276251892548295
+   },
+   "19": {
+    "evaluated": 54,
+    "expected_decision_events": 19.712002450948024
+   },
+   "20": {
+    "evaluated": 76,
+    "expected_decision_events": 29.81426360978062
+   },
+   "21": {
+    "evaluated": 105,
+    "expected_decision_events": 44.60307084453888
+   }
+  },
+  "decision_events_by_rank_band": {
+   "1-15": {
+    "evaluated": 314,
+    "expected_decision_events": 121.40558879781582
+   },
+   "16-60": {
+    "evaluated": 0,
+    "expected_decision_events": 0
+   },
+   "61-300": {
+    "evaluated": 0,
+    "expected_decision_events": 0
+   },
+   "301+": {
+    "evaluated": 0,
+    "expected_decision_events": 0
+   },
+   "unranked": {
+    "evaluated": 0,
+    "expected_decision_events": 0
+   }
+  },
+  "p_among_evaluated": {
+   "median": 0.3626365492264422,
+   "p90": 0.586718163148669,
+   "max": 0.7613327148429104,
+   "mean": 0.3866420025408147,
+   "n_p_ge_0.5": 67,
+   "n_p_ge_0.2": 296
+  },
+  "via_exemption": {
+   "golfer_winters": 11,
+   "golfers": 6,
+   "with_rank_above_15": 0,
+   "expected_decision_events": 5.6277583538120375
+  },
+  "share_of_decision_events_from_rank_le_15_or_exempt": 1.0,
+  "sensitivity": {
+   "base": {
+    "decision_events": 121.40558879781582,
+    "unique_exits": 79.94728197707519
+   },
+   "nonexact_W_minus_5000": {
+    "decision_events": 121.19265363134535,
+    "unique_exits": 79.83886637460995
+   },
+   "nonexact_W_plus_5000": {
+    "decision_events": 121.6357256615569,
+    "unique_exits": 80.05613841514743
+   },
+   "graduates_average_will_as_0.5": {
+    "decision_events": 121.38204631420754,
+    "unique_exits": 79.9334983576569
+   }
+  }
+ },
+ "B_prime": {
+  "label": "B'",
+  "evaluated_per_winter": {
+   "mean": 17.089285714285715,
+   "min": 8,
+   "max": 31
+  },
+  "golfer_winters_evaluated": 957,
+  "golfers": 434,
+  "golfer_winters_evaluated_survival_weighted": 777.1026105906718,
+  "evaluated_survival_weighted_per_winter": {
+   "mean": 13.876832331976283,
+   "min": 7.387263602729932,
+   "max": 31.0
+  },
+  "expected_decision_events_total": 222.66528361736914,
+  "expected_decision_events_per_winter": {
+   "mean": 3.9761657788815916,
+   "min": 1.5684852728300651,
+   "max": 7.604591546892292,
+   "min_winter": 2057,
+   "max_winter": 2027
+  },
+  "expected_unique_exits_total": 161.22127306365297,
+  "expected_unique_exits_per_winter": {
+   "mean": 2.878951304708089,
+   "min": 1.427188268067447,
+   "max": 7.604591546892292,
+   "min_winter": 2057,
+   "max_winter": 2027
+  },
+  "unique_exits_by_age_at_exit": {
+   "18": 48.323419634570755,
+   "19": 27.34079411867524,
+   "20": 37.63865920809061,
+   "21": 47.91840010231638
+  },
+  "unique_exits_by_rank_band_at_exit": {
+   "1-15": 72.93822856151121,
+   "16-60": 88.28304450214176,
+   "61-300": 0,
+   "301+": 0,
+   "unranked": 0
+  },
+  "unique_exits_by_what_they_did_at_22": {
+   "turned pro at 22": 135.73245141917056,
+   "stayed amateur at 22": 21.420989916225583,
+   "still in college when the archive ends": 4.067831728256914
+  },
+  "decision_events_by_age": {
+   "18": {
+    "evaluated": 238,
+    "expected_decision_events": 48.323419634570755
+   },
+   "19": {
+    "evaluated": 172,
+    "expected_decision_events": 36.982982573642005
+   },
+   "20": {
+    "evaluated": 237,
+    "expected_decision_events": 56.93815252931532
+   },
+   "21": {
+    "evaluated": 310,
+    "expected_decision_events": 80.42072887984106
+   }
+  },
+  "decision_events_by_rank_band": {
+   "1-15": {
+    "evaluated": 314,
+    "expected_decision_events": 121.40558879781582
+   },
+   "16-60": {
+    "evaluated": 643,
+    "expected_decision_events": 101.25969481955332
+   },
+   "61-300": {
+    "evaluated": 0,
+    "expected_decision_events": 0
+   },
+   "301+": {
+    "evaluated": 0,
+    "expected_decision_events": 0
+   },
+   "unranked": {
+    "evaluated": 0,
+    "expected_decision_events": 0
+   }
+  },
+  "p_among_evaluated": {
+   "median": 0.18919930425182865,
+   "p90": 0.4548202894553773,
+   "max": 0.7613327148429104,
+   "mean": 0.2326700978237922,
+   "n_p_ge_0.5": 67,
+   "n_p_ge_0.2": 447
+  },
+  "via_exemption": {
+   "golfer_winters": 11,
+   "golfers": 6,
+   "with_rank_above_15": 0,
+   "expected_decision_events": 5.6277583538120375
+  },
+  "share_of_decision_events_from_rank_le_15_or_exempt": 0.5452380668665023,
+  "sensitivity": {
+   "base": {
+    "decision_events": 222.66528361736914,
+    "unique_exits": 161.22127306365297
+   },
+   "nonexact_W_minus_5000": {
+    "decision_events": 222.30152710879253,
+    "unique_exits": 160.96776388276993
+   },
+   "nonexact_W_plus_5000": {
+    "decision_events": 223.1451635357881,
+    "unique_exits": 161.571171189737
+   },
+   "graduates_average_will_as_0.5": {
+    "decision_events": 222.61770409653266,
+    "unique_exits": 161.18450877546752
+   }
+  }
+ },
+ "realised_at_graduation": {
+  "turned_pro_at_22": {
+   "mean": 112.21428571428571,
+   "min": 94,
+   "max": 132,
+   "total": 6284
+  },
+  "all_graduates": {
+   "mean": 219.83928571428572,
+   "min": 191,
+   "max": 261,
+   "total": 12311
+  },
+  "per_winter": {
+   "2027": {
+    "turned_pro": 112,
+    "graduates": 193
+   },
+   "2028": {
+    "turned_pro": 103,
+    "graduates": 198
+   },
+   "2029": {
+    "turned_pro": 124,
+    "graduates": 209
+   },
+   "2030": {
+    "turned_pro": 117,
+    "graduates": 200
+   },
+   "2031": {
+    "turned_pro": 116,
+    "graduates": 233
+   },
+   "2032": {
+    "turned_pro": 101,
+    "graduates": 200
+   },
+   "2033": {
+    "turned_pro": 106,
+    "graduates": 206
+   },
+   "2034": {
+    "turned_pro": 123,
+    "graduates": 213
+   },
+   "2035": {
+    "turned_pro": 107,
+    "graduates": 233
+   },
+   "2036": {
+    "turned_pro": 120,
+    "graduates": 215
+   },
+   "2037": {
+    "turned_pro": 110,
+    "graduates": 222
+   },
+   "2038": {
+    "turned_pro": 97,
+    "graduates": 209
+   },
+   "2039": {
+    "turned_pro": 97,
+    "graduates": 198
+   },
+   "2040": {
+    "turned_pro": 112,
+    "graduates": 233
+   },
+   "2041": {
+    "turned_pro": 106,
+    "graduates": 230
+   },
+   "2042": {
+    "turned_pro": 115,
+    "graduates": 202
+   },
+   "2043": {
+    "turned_pro": 121,
+    "graduates": 222
+   },
+   "2044": {
+    "turned_pro": 116,
+    "graduates": 235
+   },
+   "2045": {
+    "turned_pro": 113,
+    "graduates": 238
+   },
+   "2046": {
+    "turned_pro": 122,
+    "graduates": 231
+   },
+   "2047": {
+    "turned_pro": 119,
+    "graduates": 225
+   },
+   "2048": {
+    "turned_pro": 125,
+    "graduates": 248
+   },
+   "2049": {
+    "turned_pro": 109,
+    "graduates": 212
+   },
+   "2050": {
+    "turned_pro": 124,
+    "graduates": 240
+   },
+   "2051": {
+    "turned_pro": 119,
+    "graduates": 234
+   },
+   "2052": {
+    "turned_pro": 101,
+    "graduates": 220
+   },
+   "2053": {
+    "turned_pro": 132,
+    "graduates": 253
+   },
+   "2054": {
+    "turned_pro": 128,
+    "graduates": 235
+   },
+   "2055": {
+    "turned_pro": 106,
+    "graduates": 211
+   },
+   "2056": {
+    "turned_pro": 96,
+    "graduates": 191
+   },
+   "2057": {
+    "turned_pro": 127,
+    "graduates": 241
+   },
+   "2058": {
+    "turned_pro": 103,
+    "graduates": 220
+   },
+   "2059": {
+    "turned_pro": 106,
+    "graduates": 224
+   },
+   "2060": {
+    "turned_pro": 112,
+    "graduates": 213
+   },
+   "2061": {
+    "turned_pro": 107,
+    "graduates": 216
+   },
+   "2062": {
+    "turned_pro": 99,
+    "graduates": 199
+   },
+   "2063": {
+    "turned_pro": 110,
+    "graduates": 201
+   },
+   "2064": {
+    "turned_pro": 108,
+    "graduates": 219
+   },
+   "2065": {
+    "turned_pro": 108,
+    "graduates": 221
+   },
+   "2066": {
+    "turned_pro": 94,
+    "graduates": 197
+   },
+   "2067": {
+    "turned_pro": 103,
+    "graduates": 206
+   },
+   "2068": {
+    "turned_pro": 112,
+    "graduates": 222
+   },
+   "2069": {
+    "turned_pro": 109,
+    "graduates": 221
+   },
+   "2070": {
+    "turned_pro": 118,
+    "graduates": 219
+   },
+   "2071": {
+    "turned_pro": 125,
+    "graduates": 261
+   },
+   "2072": {
+    "turned_pro": 119,
+    "graduates": 243
+   },
+   "2073": {
+    "turned_pro": 119,
+    "graduates": 226
+   },
+   "2074": {
+    "turned_pro": 119,
+    "graduates": 220
+   },
+   "2075": {
+    "turned_pro": 103,
+    "graduates": 216
+   },
+   "2076": {
+    "turned_pro": 121,
+    "graduates": 238
+   },
+   "2077": {
+    "turned_pro": 96,
+    "graduates": 213
+   },
+   "2078": {
+    "turned_pro": 116,
+    "graduates": 218
+   },
+   "2079": {
+    "turned_pro": 111,
+    "graduates": 205
+   },
+   "2080": {
+    "turned_pro": 110,
+    "graduates": 218
+   },
+   "2081": {
+    "turned_pro": 113,
+    "graduates": 210
+   },
+   "2082": {
+    "turned_pro": 119,
+    "graduates": 235
+   }
+  }
+ },
+ "cardenas": {
+  "gid": 19411,
+  "born": 2023,
+  "willingness": 0.35,
+  "winters": [
+   {
+    "winter": 2041,
+    "age": 18,
+    "tour": "CO_INTL",
+    "am_end": 1,
+    "wins": 10,
+    "W": 37503.333333333336,
+    "W_source": "forward+bound",
+    "means": 0.9375833333333334,
+    "ledger_flow": -630,
+    "week1_funds_k": 46,
+    "exemption_next_season": null,
+    "p_early": 0.5652630346440074,
+    "in_A": true,
+    "in_B": true,
+    "in_B_prime": true,
+    "archived_graduation_evaluation": null
+   },
+   {
+    "winter": 2042,
+    "age": 19,
+    "tour": "CO_INTL",
+    "am_end": 1,
+    "wins": 9,
+    "W": 25918.333333333336,
+    "W_source": "forward+bound",
+    "means": 0.6479583333333334,
+    "ledger_flow": -12215,
+    "week1_funds_k": 71,
+    "exemption_next_season": "won the 2042 Britannia Open",
+    "p_early": 0.5594117452277898,
+    "in_A": true,
+    "in_B": true,
+    "in_B_prime": true,
+    "archived_graduation_evaluation": null
+   },
+   {
+    "winter": 2043,
+    "age": 20,
+    "tour": "CO_INTL",
+    "am_end": 1,
+    "wins": 9,
+    "W": 12813.333333333336,
+    "W_source": "forward+bound",
+    "means": 0.3203333333333334,
+    "ledger_flow": -12320,
+    "week1_funds_k": 58,
+    "exemption_next_season": "won the 2043 Premier Tour Championship",
+    "p_early": 0.5479026271037597,
+    "in_A": true,
+    "in_B": true,
+    "in_B_prime": true,
+    "archived_graduation_evaluation": null
+   },
+   {
+    "winter": 2044,
+    "age": 21,
+    "tour": "CO_INTL",
+    "am_end": 1,
+    "wins": 8,
+    "W": 813.3333333333358,
+    "W_source": "forward+bound",
+    "means": 0.020333333333333394,
+    "ledger_flow": -12320,
+    "week1_funds_k": 46,
+    "exemption_next_season": "won the 2044 Premier Tour Championship",
+    "p_early": 0.5404613313145551,
+    "in_A": true,
+    "in_B": true,
+    "in_B_prime": true,
+    "archived_graduation_evaluation": null
+   },
+   {
+    "winter": 2045,
+    "age": 22,
+    "tour": "CO_INTL",
+    "am_end": 1,
+    "wins": 11,
+    "W": -6186.666666666664,
+    "W_source": "forward+bound",
+    "means": 0.0,
+    "ledger_flow": -7320,
+    "week1_funds_k": 34,
+    "exemption_next_season": "won the 2045 Premier Tour Championship",
+    "p_early": null,
+    "in_A": false,
+    "in_B": null,
+    "in_B_prime": null,
+    "archived_graduation_evaluation": [
+     "turn_pro",
+     0.9453,
+     0.1527,
+     1,
+     -0.6,
+     3,
+     0,
+     -0.15,
+     0.6,
+     null,
+     22,
+     1,
+     1
+    ]
+   }
+  ],
+  "p_leave_before_22_A": 0.9602063725140699,
+  "exit_by_winter_A": {
+   "2041": 0.5652630346440074,
+   "2042": 0.24319696450482903,
+   "2043": 0.1049452696618089,
+   "2044": 0.046801103703424655
+  },
+  "p_leave_before_22_B": 0.9602063725140699,
+  "exit_by_winter_B": {
+   "2041": 0.5652630346440074,
+   "2042": 0.24319696450482903,
+   "2043": 0.1049452696618089,
+   "2044": 0.046801103703424655
+  },
+  "p_leave_before_22_B_prime": 0.9602063725140699,
+  "exit_by_winter_B_prime": {
+   "2041": 0.5652630346440074,
+   "2042": 0.24319696450482903,
+   "2043": 0.1049452696618089,
+   "2044": 0.046801103703424655
+  }
+ },
+ "top_golfer_winters": [
+  {
+   "y": 2072,
+   "gid": 43186,
+   "age": 20,
+   "rank": 1,
+   "wins": 5,
+   "means": 1.8833333333333333,
+   "msrc": "exact",
+   "will": 0.38,
+   "p": 0.7613327148429104,
+   "ex": null
+  },
+  {
+   "y": 2039,
+   "gid": 17691,
+   "age": 18,
+   "rank": 1,
+   "wins": 3,
+   "means": 1.8333333333333335,
+   "msrc": "exact",
+   "will": 0.61,
+   "p": 0.7426905453026857,
+   "ex": null
+  },
+  {
+   "y": 2080,
+   "gid": 48793,
+   "age": 21,
+   "rank": 1,
+   "wins": 4,
+   "means": 1.0211666666666668,
+   "msrc": "exact",
+   "will": 0.64,
+   "p": 0.741293036139971,
+   "ex": "won the 2080 Autumn Classic"
+  },
+  {
+   "y": 2050,
+   "gid": 24536,
+   "age": 21,
+   "rank": 1,
+   "wins": 2,
+   "means": 1.2666666666666668,
+   "msrc": "exact",
+   "will": 0.42,
+   "p": 0.7271082163411295,
+   "ex": null
+  },
+  {
+   "y": 2028,
+   "gid": 108,
+   "age": 20,
+   "rank": 2,
+   "wins": 8,
+   "means": 1.9,
+   "msrc": "exact",
+   "will": 0.55,
+   "p": 0.7211985899416592,
+   "ex": null
+  },
+  {
+   "y": 2048,
+   "gid": 22841,
+   "age": 21,
+   "rank": 2,
+   "wins": 4,
+   "means": 1.5333333333333334,
+   "msrc": "exact",
+   "will": 0.61,
+   "p": 0.7191834374075,
+   "ex": null
+  },
+  {
+   "y": 2073,
+   "gid": 43186,
+   "age": 21,
+   "rank": 2,
+   "wins": 2,
+   "means": 1.8833333333333333,
+   "msrc": "exact",
+   "will": 0.38,
+   "p": 0.715126616459432,
+   "ex": null
+  },
+  {
+   "y": 2079,
+   "gid": 48793,
+   "age": 20,
+   "rank": 1,
+   "wins": 7,
+   "means": 1.0211666666666668,
+   "msrc": "exact",
+   "will": 0.64,
+   "p": 0.711504037275165,
+   "ex": null
+  },
+  {
+   "y": 2042,
+   "gid": 17691,
+   "age": 21,
+   "rank": 3,
+   "wins": 4,
+   "means": 1.8333333333333335,
+   "msrc": "exact",
+   "will": 0.61,
+   "p": 0.7094103642645627,
+   "ex": null
+  },
+  {
+   "y": 2035,
+   "gid": 11838,
+   "age": 21,
+   "rank": 1,
+   "wins": 4,
+   "means": 0.867,
+   "msrc": "exact",
+   "will": 0.52,
+   "p": 0.6985073366421095,
+   "ex": null
+  },
+  {
+   "y": 2049,
+   "gid": 24536,
+   "age": 20,
+   "rank": 1,
+   "wins": 5,
+   "means": 1.2666666666666668,
+   "msrc": "exact",
+   "will": 0.42,
+   "p": 0.6963549298238342,
+   "ex": null
+  },
+  {
+   "y": 2064,
+   "gid": 35919,
+   "age": 21,
+   "rank": 1,
+   "wins": 4,
+   "means": 0.8599583333333334,
+   "msrc": "exact",
+   "will": 0.51,
+   "p": 0.6955031927368763,
+   "ex": null
+  },
+  {
+   "y": 2040,
+   "gid": 17691,
+   "age": 19,
+   "rank": 2,
+   "wins": 2,
+   "means": 1.8333333333333335,
+   "msrc": "exact",
+   "will": 0.61,
+   "p": 0.6943243834763566,
+   "ex": null
+  },
+  {
+   "y": 2027,
+   "gid": 108,
+   "age": 19,
+   "rank": 2,
+   "wins": 7,
+   "means": 1.9,
+   "msrc": "exact",
+   "will": 0.55,
+   "p": 0.6900632038127811,
+   "ex": null
+  },
+  {
+   "y": 2041,
+   "gid": 17691,
+   "age": 20,
+   "rank": 3,
+   "wins": 5,
+   "means": 1.8333333333333335,
+   "msrc": "exact",
+   "will": 0.61,
+   "p": 0.6775471164106907,
+   "ex": null
+  },
+  {
+   "y": 2046,
+   "gid": 21988,
+   "age": 20,
+   "rank": 1,
+   "wins": 4,
+   "means": 0.9166666666666667,
+   "msrc": "exact",
+   "will": 0.54,
+   "p": 0.6769958562385231,
+   "ex": null
+  },
+  {
+   "y": 2073,
+   "gid": 45558,
+   "age": 18,
+   "rank": 1,
+   "wins": 5,
+   "means": 1.45,
+   "msrc": "exact",
+   "will": 0.5,
+   "p": 0.6726070170677604,
+   "ex": null
+  },
+  {
+   "y": 2029,
+   "gid": 108,
+   "age": 21,
+   "rank": 4,
+   "wins": 2,
+   "means": 1.9,
+   "msrc": "exact",
+   "will": 0.55,
+   "p": 0.6705844450293991,
+   "ex": null
+  },
+  {
+   "y": 2049,
+   "gid": 23674,
+   "age": 21,
+   "rank": 4,
+   "wins": 3,
+   "means": 1.8000000000000003,
+   "msrc": "exact",
+   "will": 0.6,
+   "p": 0.6683716793639117,
+   "ex": null
+  },
+  {
+   "y": 2034,
+   "gid": 11838,
+   "age": 20,
+   "rank": 1,
+   "wins": 5,
+   "means": 0.867,
+   "msrc": "exact",
+   "will": 0.52,
+   "p": 0.6660114162707591,
+   "ex": null
+  },
+  {
+   "y": 2032,
+   "gid": 9314,
+   "age": 21,
+   "rank": 1,
+   "wins": 4,
+   "means": 0.4975833333333333,
+   "msrc": "exact",
+   "will": 0.59,
+   "p": 0.6656442894451461,
+   "ex": null
+  },
+  {
+   "y": 2062,
+   "gid": 34351,
+   "age": 21,
+   "rank": 2,
+   "wins": 8,
+   "means": 0.9833333333333332,
+   "msrc": "exact",
+   "will": 0.67,
+   "p": 0.661596033572044,
+   "ex": null
+  },
+  {
+   "y": 2038,
+   "gid": 14254,
+   "age": 21,
+   "rank": 1,
+   "wins": 3,
+   "means": 0.2821666666666667,
+   "msrc": "exact",
+   "will": 0.65,
+   "p": 0.6500593277664205,
+   "ex": null
+  },
+  {
+   "y": 2069,
+   "gid": 39997,
+   "age": 21,
+   "rank": 2,
+   "wins": 5,
+   "means": 1.35,
+   "msrc": "exact",
+   "will": 0.36,
+   "p": 0.6411628461543006,
+   "ex": null
+  },
+  {
+   "y": 2031,
+   "gid": 9314,
+   "age": 20,
+   "rank": 1,
+   "wins": 5,
+   "means": 0.5373333333333333,
+   "msrc": "exact",
+   "will": 0.59,
+   "p": 0.6370076719074156,
+   "ex": null
+  }
+ ]
+}
