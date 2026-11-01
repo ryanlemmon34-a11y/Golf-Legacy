@@ -399,6 +399,9 @@ class Season:
         self.amateur_support_on = amateur_support
         self.work_pathway_on = True                          # cash-blocked adult amateurs can take work (WP)
         self.amateur_return_on = True                        # ... and working amateurs can return (amateur_return)
+        # college amateurs aged 18-21 with a winner's exemption or ranked in the amateur top 15 may turn professional
+        # before graduation (rules 2026-11-15, careers.early_pro_gate); worlds saved before it never decide early
+        self.college_early_pro = True
         # college amateurs at home in ordinary open amateur events (rules 2026-11-11): the members' class, and
         # the rotation there counts open amateur (tier 6) starts; worlds saved before it keep the old order
         self.college_open_access = True
@@ -2173,6 +2176,7 @@ class Season:
         state.setdefault('deaths', {})
         state.setdefault('mortality_done', set())
         state.setdefault('amateur_return_on', False)          # saves from before the return: never applied
+        state.setdefault('college_early_pro', False)          # saves from before rules 2026-11-15: no early decision
         state.setdefault('college_open_access', False)        # saves from before rules 2026-11-11: the old order
         state.setdefault('college_nationals_availability', False)   # saves from before rules 2026-11-12: as played
         state.setdefault('nationals_withdrawn', defaultdict(dict))

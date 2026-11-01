@@ -15,7 +15,9 @@ cut-offs, debt cliffs or tour-level immunities; each factor shifts the odds, and
     age         a gradual shift in life priorities, never a cliff
 
 Competition rules are separate from choices: college eligibility ends at 22 (so a graduating golfer
-must decide what's next), Q-School and tour cards decide where a professional may play.
+must decide what's next), Q-School and tour cards decide where a professional may play. Since rules
+2026-11-15 a college golfer aged 18-21 with a winner's exemption or in the amateur top 15 may also
+choose to leave early (early_pro_gate), with the model other non-graduating amateurs use.
 
 Decisions: give up the chase (and take a job: part-time professional, regained amateur status or club
 professional — or join the profession as a coach or caddie, see staff.py), retire from competitive golf,
@@ -352,6 +354,32 @@ def p_turn_pro(season, g, row, year, graduating, ev=None):
     return _sig(x)
 
 
+EARLY_PRO_RANK = 15                 # (rules 2026-11-15) the amateur top 15: the band turn_pro starts on a Challenger tour
+EARLY_PRO_AGES = (18, 21)           # college eligibility ends in the season a golfer turns 22
+
+
+def early_pro_gate(season, g, row, year, exempt):
+    """Why a college amateur may decide to turn professional before their eligibility ends (rules 2026-11-15):
+    'exemption' (a winner's exemption held next season: cards.winner_exemptions, `exempt`) or 'top 15' (amateur
+    ranking at the season's end), else None. Only a college golfer (any college tour) aged 18-21 who is an amateur;
+    nothing about ability or potential decides it. Worlds started before the rule never decide early."""
+    if not getattr(season, 'college_early_pro', False) or g.status != 'amateur' or not g.tour.startswith('CO_'):
+        return None
+    if not EARLY_PRO_AGES[0] <= g.age(year) <= EARLY_PRO_AGES[1]:
+        return None
+    if exempt.get(g.id):
+        return 'exemption'
+    rank = row.get('am_end')
+    if rank and rank <= EARLY_PRO_RANK:
+        return 'top 15'
+    return None
+
+
+def early_pro_draw(season, gid, year):
+    """The early decision's draw: its own stream for each golfer and winter, so no other decision's draw moves."""
+    return random.Random(f'{season.seed}:early-pro:{year}:{gid}').random()
+
+
 def p_amateur_job(season, g, row, year, ev=None):
     """An adult amateur outside college, living on savings and family help, taking a job and playing
     alongside it (as college graduates who stay amateur do). Smooth in age, pushed by debt and a short
@@ -428,6 +456,32 @@ def decide(season, year, snap):
         # ---- amateurs: graduation (an eligibility rule) and turning professional ---------------
         if g.status == 'amateur':
             graduating = college and age >= 22                     # college eligibility ends
+            gate = None if graduating else early_pro_gate(season, g, row, year, exempt)
+            if gate:
+                # (rules 2026-11-15) an eligible college golfer decides whether to leave college now, with a draw of
+                # their own: a college golfer under 22 takes nothing from the winter's stream (no turn-pro, job or
+                # retirement evaluation), so no other golfer's draw moves. One who stays remains a full-time college
+                # golfer, as every college golfer under 22 did before
+                ev = {} if rec else None
+                p_pro = p_turn_pro(season, g, row, year, False, ev=ev)
+                u = early_pro_draw(season, g.id, year)
+                held = exempt.get(g.id)
+                if ev is not None:
+                    ev['in_exempt'] = bool(held)
+                evidence(g, 'turn_pro_college', p_pro, u, ev)
+                rank = row.get('am_end')
+                why = f'a winner\'s exemption: {held}' if gate == 'exemption' else f'amateur ranking {rank}'
+                if u < p_pro:
+                    turn_pro(season, g, year, rank or 99999, f'from college at {age}, before their eligibility ended '
+                                                             f'({why})', held)
+                    note('turned pro', g, p=round(p_pro, 4), am_rank=rank, graduating=False, early=gate,
+                         **({'exemption': held} if held else {}))
+                else:
+                    log(g.id, year, 53, f'Could have turned professional from college at {age} ({why}); stayed in '
+                                        f'college on the {TOUR_BY_KEY[g.tour].name}')
+                    note('stayed in college', g, p=round(1 - p_pro, 4), am_rank=rank, early=gate,
+                         **({'exemption': held} if held else {}))
+                continue
             if graduating or not college:
                 ev = {} if rec else None
                 p_pro = p_turn_pro(season, g, row, year, graduating, ev=ev)
