@@ -964,10 +964,34 @@ def search(w, q):
 ROLE_TITLES = {None: 'People', 'golfer': 'Golfers', 'coach': 'Coaches', 'caddie': 'Caddies'}
 
 
+def _stats_key(st):
+    """What the records' statistics hold, cheaply: the object and each season's signature as read (a season added,
+    removed or published again changes it; HistoryStats.extend reads everything again in the last two cases)."""
+    return (id(st), id(getattr(st, 'starts', None)), getattr(st, 'complete', True),
+            tuple(sorted((getattr(st, 'sig', None) or {}).items())))
+
+
 def major_champions(w):
-    """{pid}: everyone with a major win in the archived seasons (the records' statistics; none without a history)."""
+    """{pid}: everyone with a major win in the archived seasons (the records' statistics; none without a history).
+    Worked out once per reading of the history (kept with the world, one entry, until the statistics change):
+    each golfer's packed starts are tested against the codes of a major win, without unpacking them -- the same
+    set as testing every start's (kind, position)."""
     st = w.stats
-    return {pid for pid, ss in st.starts.items() if any(s[5] == 'major' and s[6] == 1 for s in ss)} if st else set()
+    if not st:
+        return set()
+    key = _stats_key(st)
+    memo = w.__dict__.get('_major_champions')
+    if memo is not None and memo[0] == key:
+        return memo[1]
+    s = st.starts
+    if hasattr(s, 'by') and hasattr(s, 'ed'):            # (history_stats.Starts: rank << POS_BITS | position + 1)
+        from golfsim.history_stats import POS_BITS
+        wins = {(r << POS_BITS) | 2 for r, e in enumerate(s.ed) if e[5] == 'major'}
+        got = {pid for pid, a in s.by.items() if not wins.isdisjoint(a)}
+    else:
+        got = {pid for pid, ss in st.starts.items() if any(x[5] == 'major' and x[6] == 1 for x in ss)}
+    w._major_champions = (key, got)
+    return got
 
 
 def people_filter(w, q, role):
@@ -2202,7 +2226,25 @@ NATION_NOTE = ('By nationality (fixed for life); each count links to the list of
 
 
 def nation_counts(w):
-    """{nation: [count for each of NATION_COUNTS]} over everyone in the history and the current world."""
+    """{nation: [count for each of NATION_COUNTS]} over everyone in the history and the current world. Counted once
+    per history and snapshot (the Nations list and every nation page ask for it): kept with the world, one entry,
+    until the published history, the snapshot or the records' statistics change. Never altered by a caller."""
+    import weakref
+    st = w.stats if w.a else None
+    key = (_stats_key(st) if st else None, getattr(w.live, 'generation', None))
+    memo = w.__dict__.get('_nation_counts')
+    if memo is not None and memo[0] == key and memo[1]() is w.a and memo[2]() is w.live:
+        return memo[3]
+    out = _nation_counts(w)
+    try:                                                 # (weak: an old history or snapshot is never kept alive)
+        refs = [weakref.ref(x) if x is not None else (lambda: None) for x in (w.a, w.live)]
+    except TypeError:
+        return out                                       # (objects without weak references: not kept)
+    w._nation_counts = (key, refs[0], refs[1], out)
+    return out
+
+
+def _nation_counts(w):
     people = [(pid, w.person(pid)) for pid in w.all_people()]
     out = {}
     for i, (_, _, role, f) in enumerate(NATION_COUNTS):
