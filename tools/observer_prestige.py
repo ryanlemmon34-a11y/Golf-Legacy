@@ -13,9 +13,15 @@ from __future__ import annotations
 
 import html
 
-import observer_data as OD
+import observer_prestige_store as PS
 
 PATHWAY_LABELS = {'juniors': 'juniors (18)', 'new_pros': 'new professionals (21-26)'}
+
+
+def nations_view(n):
+    """A nations record as the observer shows it: every field kept (components, rules, carry), the live view's
+    bookkeeping ('closed') left out."""
+    return {k: v for k, v in (n or {}).items() if k != 'closed'}
 
 
 def esc(x):
@@ -23,7 +29,20 @@ def esc(x):
 
 
 def _record(w, y):
-    return OD.season_extract(w, y, 'prestige', lambda d: d.get('prestige'))
+    """One archived season's prestige record (None: not recorded; PS.PENDING: being read in the background)."""
+    return _records(w, [y]).get(y)
+
+
+def _records(w, years):
+    """{year: record, None or PS.PENDING} from the compact prestige store (observer_prestige_store): never a whole
+    season decoded on the request, except the newest one when it is not stored yet."""
+    return PS.records(w, years)
+
+
+def pending_note(n):
+    return (f'<p class="muted pending">Prestige of {n} earlier season{"s" if n != 1 else ""} is being read from the '
+            'history in the background (shown as “…”); reload in a moment to see '
+            f'{"them" if n != 1 else "it"}.</p>') if n else ''
 
 
 def _years(w):
@@ -40,14 +59,15 @@ def latest(w):
     lv = _live(w)
     if lv:
         return lv
-    for y in reversed(_years(w)):
-        r = _record(w, y)
-        if r:
-            n = r.get('nations', {})
-            return {'events': r.get('events', {}), 'courses': r.get('courses', {}),
-                    'venue_moves': r.get('venue_moves', []),
-                    'nations': {'prestige': n.get('prestige', {}), 'multiplier': n.get('multiplier', {}),
-                                'shares': n.get('shares', {}), 'baseline_shares': n.get('baseline_shares', {})}}
+    years = _years(w)
+    if not years:
+        return None
+    # the newest season (stored, or read now: one season). Prestige is recorded from rules 2026-11-05 onward, so a
+    # newest season without the record means no season has one
+    r = _records(w, [years[-1]]).get(years[-1])
+    if r and r is not PS.PENDING:
+        return {'events': r.get('events', {}), 'courses': r.get('courses', {}),
+                'venue_moves': r.get('venue_moves', []), 'nations': nations_view(r.get('nations'))}
     return None
 
 
@@ -62,12 +82,18 @@ def pct(v, digits=2):
 
 def bars(points, unit='', digits=1, top=None, note=''):
     """Fixed-width dated bars (the observer's ratings chart style): points [(label, value or None, tip)]."""
-    vals = [v for _, v, _ in points if v is not None]
+    vals = [v for _, v, _ in points if v is not None and v is not PS.PENDING]
     if not vals:
+        if any(v is PS.PENDING for _, v, _ in points):
+            return ''
         return '<p class="muted">Not recorded yet: prestige is recorded from rules 2026-11-05, when a season ends.</p>'
     top = top or max(vals) or 1.0
     out = []
     for label, v, tip in points:
+        if v is PS.PENDING:
+            out.append(f'<div class="rbar gap" title="{esc(label)}: being read from the history"><span class="rv">…</span>'
+                       f'<span class="rb"></span><span class="ry">{esc(label)}</span></div>')
+            continue
         if v is None:
             out.append(f'<div class="rbar gap" title="{esc(label)}: not recorded"><span class="rv">—</span>'
                        f'<span class="rb"></span><span class="ry">{esc(label)}</span></div>')
@@ -82,10 +108,15 @@ def bars(points, unit='', digits=1, top=None, note=''):
 
 
 def _series(w, pick, lag):
-    """[(label, value or None, tip)] over the archived seasons (lag 1: the value belongs to the next season)."""
+    """[(label, value or None or PS.PENDING, tip)] over the archived seasons (lag 1: the value belongs to the next
+    season)."""
     pts = []
+    recs = _records(w, _years(w))
     for y in _years(w):
-        r = _record(w, y)
+        r = recs.get(y)
+        if r is PS.PENDING:
+            pts.append((str(y + lag), PS.PENDING, f'{y + lag}: being read from the history'))
+            continue
         v = pick(r) if r else None
         when = y + lag
         tip = (f'{when}: set at the end of {y}' if lag else f'end of {y}')
@@ -108,7 +139,7 @@ def event_section(w, sid):
             f'of <a href="/course/{esc(m["replaces"])}">{esc(m["replaces"])}</a>, {esc(m["city"])} (decided at the end of '
             f'{m["decided"]}: prestige {m["event_prestige"]} against the venue’s {m["course_prestige_before"]})'
             for m in moves) + '</p>'
-    return ('<h2>Prestige over time</h2>' + note
+    return ('<h2>Prestige over time</h2>' + note + pending_note(sum(1 for p in pts if p[1] is PS.PENDING))
             + bars(pts, note='One bar per season: the event’s prestige at the end of that season (after its edition, '
                              'carried into the next), then now. Five calendar years, recency-weighted, moving at most '
                              '6 points a year (rules: event prestige). “—”: not recorded.'))
@@ -120,7 +151,7 @@ def course_section(w, cid):
     if lv and cid in lv.get('courses', {}) and w.live.cursor['year'] not in {int(p[0]) for p in pts}:
         v = lv['courses'][cid]
         pts.append((f'now {w.live.cursor["year"]}', v, f'this season ({w.live.cursor["year"]}): {v:.2f}'))
-    return ('<h2>Prestige over time</h2>'
+    return ('<h2>Prestige over time</h2>' + pending_note(sum(1 for p in pts if p[1] is PS.PENDING))
             + bars(pts, note='One bar per season: the course’s prestige for that season, set when the season before it '
                              'ended, from the events it hosted in the five completed seasons before (a lag: what it '
                              'hosts counts from the next season). Separate from its class and layouts, which are its '
@@ -132,8 +163,12 @@ def nation_section(w, code):
     lv = _live(w)
     archived = _years(w)
     rows = []
+    recs = _records(w, archived)
     for y in archived:
-        r = _record(w, y)
+        r = recs.get(y)
+        if r is PS.PENDING:
+            rows.append((y + 1, PS.PENDING))
+            continue
         n = (r or {}).get('nations') or {}
         if not n.get('prestige'):
             rows.append((y + 1, None))
@@ -144,9 +179,10 @@ def nation_section(w, code):
         if nv['closed'] + 1 not in {y for y, _ in rows}:
             rows.append((nv['closed'] + 1, {'prestige': nv['prestige'], 'multiplier': nv['multiplier'],
                                             'shares': nv['shares'], 'baseline_shares': nv['baseline_shares']}))
+    pend = sum(1 for _, n in rows if n is PS.PENDING)
     base = None
     for _, n in rows:
-        if n and n.get('baseline_shares'):
+        if n and n is not PS.PENDING and n.get('baseline_shares'):
             base = n['baseline_shares']
     if base is None and lv:
         base = (lv.get('nations') or {}).get('baseline_shares')
@@ -155,21 +191,28 @@ def nation_section(w, code):
             f'{esc(PATHWAY_LABELS[k])} {pct(base.get(k, {}).get(code), 3)}' for k in ('juniors', 'new_pros'))
             + ' <span class="muted">(its expected share under the rule that sets each year’s numbers, fixed when the '
               'world began)</span></p>')
-    get = lambda n, k: n.get(k, {}).get(code) if n else None
+    get = lambda n, k: PS.PENDING if n is PS.PENDING else n.get(k, {}).get(code) if n else None
 
     def share(n, kind='juniors'):
+        if n is PS.PENDING:
+            return PS.PENDING
         v = ((n or {}).get('shares') or {}).get(kind, {}).get(code)
         return None if v is None else 100 * v
     out.append('<h3>National prestige</h3>' + bars(
-        [(str(y), get(n, 'prestige'), f'for {y} (set at the end of {y - 1}): prestige {get(n, "prestige")}') for y, n in rows],
+        [(str(y), get(n, 'prestige'), f'for {y}: being read from the history' if n is PS.PENDING
+          else f'for {y} (set at the end of {y - 1}): prestige {get(n, "prestige")}') for y, n in rows],
         top=100, note='50 = exactly the success expected of its golfers before each event; 75 = twice that, 25 = half '
                       '(five completed seasons, steadied for small samples).'))
-    sh = [(str(y), share(n), f'{y} (set at the end of {y - 1}): {share(n)}% of the juniors') for y, n in rows]
+    sh = [(str(y), share(n), f'{y}: being read from the history' if n is PS.PENDING
+           else f'{y} (set at the end of {y - 1}): {share(n)}% of the juniors') for y, n in rows]
     out.append('<h3>Share of each year’s juniors</h3>' + bars(sh, unit='%', digits=2,
                                                               note='The nation’s share of the year’s fixed number of new '
                                                                    'juniors (the number itself never depends on prestige).'))
     trs = []
     for y, n in reversed(rows):
+        if n is PS.PENDING:
+            trs.append([str(y)] + ['<span class="muted">being read…</span>'] + [''] * 5)
+            continue
         if not n:
             trs.append([str(y)] + ['<span class="muted">not recorded</span>'] + [''] * 5)
             continue
@@ -185,6 +228,7 @@ def nation_section(w, code):
                    + '</tr></thead><tbody>'
                    + ''.join('<tr>' + ''.join(f'<td{" class=n" if i else ""}>{c}</td>' for i, c in enumerate(r)) + '</tr>'
                              for r in trs) + '</tbody></table></div>')
+    out.append(pending_note(pend))
     out.append('<p class="muted">Each entrant season’s shares were set when the season before it ended, from national '
                'prestige; Juniors and New pros are the golfers the nation actually received that season (the totals '
                'come from the unchanged cohort rule; rules: national prestige and shares of new golfers). Nationality '

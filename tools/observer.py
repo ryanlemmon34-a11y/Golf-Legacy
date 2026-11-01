@@ -323,6 +323,8 @@ class World:
             self._indexer.stop()
         if self.__dict__.get('_story_cache') is not None:
             self._story_cache.stop_indexer()            # (stories' season index: built again when next needed)
+        if self.__dict__.get('_prestige_store') is not None:
+            self._prestige_store.stop_indexer()         # (prestige histories: resumed from the store when next needed)
         if self._stats_db is not None:
             self._stats_db.close()
             self._stats_db = None
