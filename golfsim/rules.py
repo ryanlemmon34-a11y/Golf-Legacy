@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import re
 
-RULES_VERSION = '2026-11-11'
+RULES_VERSION = '2026-11-12'
 RANKING_RULE = 'world-ranking-1'     # the world ranking's formula (unchanged since the world began; named now)
 VERSIONS = (
     ('2026-10-30', 'Winners\' exemptions count whatever a golfer\'s membership (a non-member champion earns a '
@@ -99,6 +99,11 @@ VERSIONS = (
                    'eligibility, field sizes (up to 1.5 times the usual field) and the calendar; no place is '
                    'reserved or guaranteed, and members can lose places in full fields. Worlds started earlier keep '
                    'the previous order.'),
+    ('2026-11-12', 'College national championship: the places are still the first 39 finishers of each of the four '
+                   'regionals (the same field limit), but a qualifier who cannot play that week -- injured, retired, '
+                   'no longer a D1 college golfer, or committed elsewhere -- withdraws, and the reason is written in '
+                   'their career history. The place is not passed to the next regional finisher (there is no reserve '
+                   'list), so the field is smaller. Worlds started earlier keep the previous field.'),
 )
 EARLIER = ('Seasons archived before rules versions were recorded were played under earlier rules. The '
            'differences that matter for reading old results: a winner without a Premier card held no '
@@ -260,8 +265,10 @@ RULES = {
     'college-postseason': (
         'College post-season',
         'Conference and regional championships and the national championship, selected from college golfers by '
-        'ranking and results; the school pays.',
-        None),
+        'ranking and results; the school pays. The national championship takes the first 39 finishers of each '
+        'regional; a qualifier who cannot play that week (injured, retired, no longer a D1 golfer, or committed '
+        'elsewhere) withdraws and the place is not passed down.',
+        '2026-11-12'),
     'club-pro': (
         'Club professionals',
         'Club professionals play their region\'s section events; the national championship is reached through '

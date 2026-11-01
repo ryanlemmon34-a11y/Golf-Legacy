@@ -402,6 +402,9 @@ class Season:
         # college amateurs at home in ordinary open amateur events (rules 2026-11-11): the members' class, and
         # the rotation there counts open amateur (tier 6) starts; worlds saved before it keep the old order
         self.college_open_access = True
+        # college national championship (rules 2026-11-12): a regional qualifier who cannot play that week withdraws
+        self.college_nationals_availability = True
+        self.nationals_withdrawn = defaultdict(dict)         # year -> gid -> why an earned national place went unplayed
         self.amateur_work_from = {}                          # gid -> (year, week) they started working as amateurs
         self.weather = WX.MODEL                              # seasonal climate with wind direction (weather.py)
         self.lib = library or default_library(calendar or SCH.DEFAULT)   # new worlds: the reference calendar
@@ -1809,7 +1812,22 @@ class Season:
             ids = []
             for k in range(1, 5):
                 ids += [gid for gid, pos in self.ctx.finishers(f'COLLEGE_REGIONAL_{k}', year) if pos is not None][:39]
-            return [ids[:s.field]]
+            ids = ids[:s.field]                          # the places the regionals earned, as before
+            if not self.college_nationals_availability:   # worlds saved before rules 2026-11-12: everyone earned plays
+                return [ids]
+            # rules 2026-11-12: a qualifier who cannot play that week (injured, retired, no longer a D1 golfer,
+            # or committed elsewhere) withdraws; the place is not passed down to the next regional finisher
+            # (there is no reserve list), so the field is smaller by one
+            can = {g.id for g in d1}
+            done = self.nationals_withdrawn.get(year, {})    # (one edition a year: a repeated selection records once)
+            for gid in ids:
+                if gid not in can and gid not in done:
+                    g = self.g.get(gid)
+                    why = ('injured' if gid in self.injured else 'retired' if g is None or g.lifestyle == 'retired'
+                           else 'no longer a D1 college golfer' if g.tour != 'CO_US_D1' else 'could not play that week')
+                    self.nationals_withdrawn[year][gid] = why
+                    self.log(gid, year, ed.week, f'Withdrew from the {s.name} ({why}); qualified through the regionals')
+            return [[gid for gid in ids if gid in can]]
         if sid == 'SMALL_COLLEGE_CHAMPIONSHIP':
             return [[g.id for g in rank([g for g in self.active_golfers() if g.tour == 'CO_US_SMALL' and free(g)])[:s.field]]]
         if sid == 'INTL_UNIVERSITY_CHAMPIONSHIP':
@@ -2156,6 +2174,8 @@ class Season:
         state.setdefault('mortality_done', set())
         state.setdefault('amateur_return_on', False)          # saves from before the return: never applied
         state.setdefault('college_open_access', False)        # saves from before rules 2026-11-11: the old order
+        state.setdefault('college_nationals_availability', False)   # saves from before rules 2026-11-12: as played
+        state.setdefault('nationals_withdrawn', defaultdict(dict))
         state.setdefault('open_am_starts', defaultdict(Counter))   # (read only with college_open_access)
         state.setdefault('amateur_work_from', {})
         state.setdefault('weather', 'classic')               # saves from before seasonal weather keep the classic
@@ -2575,7 +2595,7 @@ class Season:
         for gid in [gid for gid, (y, _) in self.prior_rounds.items() if y < year]:
             del self.prior_rounds[gid]                       # their first season is over
         for d in (self.earnings, self.level_earnings, self.played, self.open_am_starts, self.pstats, self.ledgers, self.season_rounds, self.entry_wants,
-                  self.entry_misses, self.entry_stats, self.declined, self.school_trips, self.club_trips,
+                  self.entry_misses, self.entry_stats, self.declined, self.nationals_withdrawn, self.school_trips, self.club_trips,
                   self.backer_flows, self.move_log, self.move_blocked, self.familiar_base, self.activity_counts,
                   self.block_flags, self.cash_start, self.support_start, self.overall_start, self.rank_start, self.am_start,
                   self.staff_receipts, self.injuries, self.card_log, self.career_counts, self.transitions,

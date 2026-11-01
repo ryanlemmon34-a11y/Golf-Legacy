@@ -300,7 +300,7 @@ class RulesTests(unittest.TestCase):
         dates = [v for v, _ in R.VERSIONS]
         self.assertEqual(dates, sorted(dates))
         self.assertEqual(len(dates), len(set(dates)))
-        self.assertEqual(R.RULES_VERSION, '2026-11-11')
+        self.assertGreaterEqual(R.RULES_VERSION, '2026-11-11')
         self.assertIn('2026-11-11', dates)
         self.assertEqual(R.RULES['open-amateur'][2], '2026-11-11')
         text = dict(R.VERSIONS)['2026-11-11']
