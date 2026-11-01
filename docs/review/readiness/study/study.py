@@ -4,11 +4,16 @@ Four ways of drawing how ready a new golfer is (their *readiness tempo*), everyt
 
     A0  no change (baseline)       readiness = the peak-age draw; raw potential before the 99 cap
     A1  cap order only             as A0, with potential capped at 99 *before* the youth deficit is subtracted
-    A2  independent readiness      readiness tempo = 27 + 2 e (e ~ N(0, 1), its own stream); the peak-age draw
-                                   keeps setting decline only
+    A2  independent readiness      readiness tempo = 27 + 2 e (e ~ N(0, 1), keyed by the candidate); the peak-age
+                                   draw keeps setting decline only
     A3  weakly correlated tempo    readiness tempo = 27 + 2 (rho z + sqrt(1 - rho^2) e), z = (peak - 27) / 2:
                                    the peak-age draw is the fixed input (its distribution unchanged), rho = 0.3
     A3r5 (sensitivity)             A3 with rho = 0.5
+
+What the arms can and cannot do: A2, A3 and A3r5 keep the readiness tempo's distribution N(27, 2) (the peak-age
+draw's own), so they cannot by themselves lower juniors' starting overall or how often a near-finished teenager is
+generated: they change WHO is precocious (readiness no longer, or only weakly, the same draw as decline) and so how
+early readiness goes with early decline. A1 changes only candidates whose raw potential is above 99.
 
 Every arm keeps the readiness tempo's distribution N(27, 2) -- the peak-age draw's own -- and keeps the growth law
 (development.develop_week), the decline law (development.age_year), the scouts' rule (population._keep_young, which
@@ -17,25 +22,31 @@ uses the readiness tempo; the old-age part of the deficit and all later decline 
 
 Two layers:
 
-  replay  the production random streams (`{seed}:juniors:{year}:{country}` and `{seed}:new-pros:...`) consumed
-          exactly as population._junior_draw / _new_pro_draw consume them, each nation's entrants the first k
-          passers of its stream (k = the allocation Test2 recorded; this is what entrant_rows produces when a
-          nation's profile is unchanged, as it always is). A0 reproduces Test2's cohorts; the other arms are what an
-          implementation of the arm would have generated from the same seed. The readiness noise e comes from its
-          own stream (`{seed}:readiness:{pathway}:{year}:{country}`, one value per draw), so the production stream
-          is untouched -- but a candidate whose drop/keep outcome changes consumes a different number of draws, so
-          later candidates in that nation-year differ between arms (stream-level pairing, as a real change would).
+  replay  Test2's production random streams (`{seed}:juniors:{year}:{country}`, `{seed}:new-pros:...`), consumed
+          exactly as population._junior_draw / _new_pro_draw consume them: candidate d is production's draw d, with
+          every value production drew for it (potential, peak, aging, luck, the scouts' coin and noise, age, status
+          and sampling coins). An arm changes only how those values are combined. Values production never drew for
+          a candidate (a coin an arm can need when production stopped earlier) and the readiness noise e come from
+          generators keyed by that candidate alone, so nothing an arm adds shifts another candidate or the production
+          stream. Each nation's entrants are the first k passers, k = Test2's RECORDED allocation (fixed: this layer
+          does not recompute totals, shares or national prestige); A0 reproduces Test2's rows exactly.
   paired  the same candidates under every arm: each nation-year draws a fixed number of candidates (the existing
           rule's count) from a study stream that consumes the same number of values per candidate whatever happens
-          (potential, peak, aging, luck, e, the scouts' coin and noise, the age and status coins), so candidate d is
-          the same person under every arm and only the arm decides who passes. Selection is the existing rule's
-          filter (every passer, not an allocation), so its total can differ by arm.
+          (potential, peak, aging, luck, the scouts' coin and noise, the age and status coins; e from a generator
+          keyed by the candidate), so candidate d is the same person under every arm and only the arm decides who
+          passes. Selection is RECALCULATED: the existing rule's filter over its fixed candidate count (every passer,
+          no allocation), so the pass count can differ by arm. Nation profiles are the starting ones (they never
+          change in a world); shares, carry and national prestige are not modelled here.
 
 Trajectories (bounded check): a selected entrant is built with the production builders (population._make_golfer,
 development.init_ceilings) and developed week by week with the production development_week / age_year under a
-fixed standard schedule (13 four-week blocks a year: one tournament of four rounds, two training weeks in the
-category choose_category picks, one rest week; self-coached, quality 0.3; no injuries, no quitting), from entry
-to 40. The schedule is the same for every arm, so differences come from the entry draw alone.
+fixed schedule (standard: 13 four-week blocks a year, each one tournament of four rounds, two training weeks in
+the category choose_category picks and one rest week; light: one tournament, one training week, two rest weeks),
+self-coached (coaching quality 0.3: no coach), no paid work, no injuries (so no permanent injury losses), no
+retirement or quitting, full competitive experience, from entry to 40. The schedule is the same for every arm, so
+differences come from the entry draw alone. A projection is a bounded check of the development laws on these
+entrants, not a reproduction of any realized career (real careers differ in schedule, coaching, injuries, money,
+access to events and retirement).
 """
 from __future__ import annotations
 
@@ -94,83 +105,108 @@ def deficit(age, t, peak, aging):
     return grow + decline
 
 
-# ---- replay layer: the production streams, consumed exactly as production consumes them ---------------------------
+# ---- replay layer: the production streams, each candidate's values recorded as production draws them -------------
 
-def junior_draw(crng, rr, country, mu, arm):
-    """population._junior_draw under an arm: (row or None, facts). rr: the readiness stream (one value a draw)."""
-    pot = crng.gauss(mu, P.POTENTIAL_SD)
-    peak = crng.gauss(27.0, 2.0)
-    aging = math.exp(crng.gauss(0, 0.3))
-    eps = rr.gauss(0.0, 1.0)
-    t = tempo(arm, peak, eps)
-    base = min(pot, 99.0) if arm.cap_first else pot
-    cur = base - deficit(18, t, peak, aging) + crng.gauss(0, P.CAREER_LUCK_SD)
-    f = {'pot': pot, 'peak': peak, 'aging': aging, 'tempo': t, 'cur18': cur, 'age': 18}
-    if cur < P.KEEP_OVERALL:
-        f['stage'] = 'below_keep'
-        return None, f
-    cur = min(cur, 99.0)
-    pot_s = max(min(pot, 99.0), cur)
-    if P._keep_young(cur, 18, crng.random(), crng.gauss(0, P.SCOUTING_SD)):
-        f['stage'] = 'kept'
-        return (country, 18, pot_s, peak, cur, 'amateur', aging), f
-    f['stage'] = 'scouted_out'
-    return None, f
+class _Proxy:
+    """Records the club-professional coin population._status draws (only in that branch), from the production
+    stream."""
+
+    def __init__(self, rng):
+        self.rng, self.u = rng, None
+
+    def random(self):
+        self.u = self.rng.random()
+        return self.u
 
 
-def new_pro_draw(crng, rr, country, mu, prof, arm):
-    """population._new_pro_draw under an arm."""
-    pot = crng.gauss(mu, P.POTENTIAL_SD)
-    peak = crng.gauss(27.0, 2.0)
-    aging = math.exp(crng.gauss(0, 0.3))
-    luck = crng.gauss(0, P.CAREER_LUCK_SD)
-    age = crng.choice(P.NEW_PRO_AGES)
-    eps = rr.gauss(0.0, 1.0)
-    t = tempo(arm, peak, eps)
-    base = min(pot, 99.0) if arm.cap_first else pot
-    cur18 = base - deficit(18, t, peak, aging) + luck
-    tracked = cur18 >= P.KEEP_OVERALL and P._keep_young(cur18, 18, crng.random(), crng.gauss(0, P.SCOUTING_SD))
-    cur = base - deficit(age, t, peak, aging) + luck
-    f = {'pot': pot, 'peak': peak, 'aging': aging, 'tempo': t, 'cur18': cur18, 'cur': cur, 'age': age}
-    if tracked or cur < P.KEEP_OVERALL:
-        f['stage'] = 'tracked_as_junior' if tracked else 'below_keep'
-        return None, f
-    cur = min(cur, 99.0)
-    pot_s = max(min(pot, 99.0), cur)
-    if P._status(max(age, 23), cur, prof, crng.random(), crng) != 'pro':
-        f['stage'] = 'not_pro'
-        return None, f
-    if crng.random() < P._keep_probability('pro', age, cur):
-        f['stage'] = 'kept'
-        return (country, age, pot_s, peak, cur, 'pro', aging), f
-    f['stage'] = 'sampled_out'
-    return None, f
-
-
-def replay_cohort(kind, year, seed, country, k, arm):
-    """The first k passers of a nation's production stream under an arm, and the facts of every draw consumed
-    (the existing rule's own _cand_n draws at least, as entrant_rows consumes them)."""
-    prof = NATIONS[country]
-    tag = 'juniors' if kind == 'juniors' else 'new-pros'
-    crng = random.Random(f'{seed}:{tag}:{year}:{country}')
-    rr = random.Random(f'{seed}:readiness:{tag}:{year}:{country}')
+def production_values(kind, crng, prof):
+    """One production draw (population._junior_draw / _new_pro_draw), consumed exactly as production consumes it:
+    {label: value} for every value production drew for this candidate (only those), and the production row."""
     mu = P._mu(prof)
-    need = P._cand_n(kind, prof)
-    rows, facts, d = [], [], 0
-    while d < need or len(rows) < k:
-        if kind == 'juniors':
-            row, f = junior_draw(crng, rr, country, mu, arm)
-        else:
-            row, f = new_pro_draw(crng, rr, country, mu, prof, arm)
-        f['d'] = d
-        f['in_existing_rule'] = d < need
-        if row is not None:
-            f['passer'] = len(rows)
-            f['entered'] = len(rows) < k
-            rows.append((row, f))
-        facts.append(f)
+    v = {'pot': crng.gauss(mu, P.POTENTIAL_SD), 'peak': crng.gauss(27.0, 2.0)}
+    v['aging'] = math.exp(crng.gauss(0, 0.3))
+    v['luck'] = crng.gauss(0, P.CAREER_LUCK_SD)
+    pot, peak, aging, luck = v['pot'], v['peak'], v['aging'], v['luck']
+    if kind == 'juniors':
+        cur = pot - P.age_deficit(18, peak, aging) + luck
+        if cur < P.KEEP_OVERALL:
+            return v, None
+        cur = min(cur, 99.0)
+        v['u_keep'], v['scout'] = crng.random(), crng.gauss(0, P.SCOUTING_SD)
+        if P._keep_young(cur, 18, v['u_keep'], v['scout']):
+            return v, ('', 18, max(min(pot, 99.0), cur), peak, cur, 'amateur', aging)
+        return v, None
+    v['age'] = age = crng.choice(P.NEW_PRO_AGES)
+    cur18 = pot - P.age_deficit(18, peak, aging) + luck
+    tracked = False
+    if cur18 >= P.KEEP_OVERALL:
+        v['u_keep'], v['scout'] = crng.random(), crng.gauss(0, P.SCOUTING_SD)
+        tracked = P._keep_young(cur18, 18, v['u_keep'], v['scout'])
+    cur = pot - P.age_deficit(age, peak, aging) + luck
+    if tracked or cur < P.KEEP_OVERALL:
+        return v, None
+    cur = min(cur, 99.0)
+    v['u_status'] = crng.random()
+    proxy = _Proxy(crng)
+    status = P._status(max(age, 23), cur, prof, v['u_status'], proxy)
+    if proxy.u is not None:
+        v['u_club'] = proxy.u
+    if status != 'pro':
+        return v, None
+    v['u_sample'] = crng.random()
+    if v['u_sample'] < P._keep_probability('pro', age, cur):
+        return v, ('', age, max(min(pot, 99.0), cur), peak, cur, 'pro', aging)
+    return v, None
+
+
+def candidate_tuple(kind, v, key):
+    """The candidate as every arm sees it: production's values where production drew them; any value production
+    did not draw for this candidate (an arm may need a coin production never reached) and the readiness noise e
+    from generators keyed by the candidate alone (`{key}:aux`, `{key}:readiness`), drawn in a fixed order. Nothing
+    an arm adds can move another candidate's values or the production stream."""
+    aux = random.Random(f'{key}:aux')
+    fill = {'u_keep': aux.random(), 'scout': aux.gauss(0, P.SCOUTING_SD), 'u_status': aux.random(),
+            'u_club': aux.random(), 'u_sample': aux.random()}
+    eps = random.Random(f'{key}:readiness').gauss(0.0, 1.0)
+    g = lambda k: v[k] if k in v else fill[k]
+    return (v['pot'], v['peak'], v['aging'], v['luck'], eps, g('u_keep'), g('scout'), v.get('age', 18),
+            g('u_status'), g('u_club'), g('u_sample'))
+
+
+class ReplayStream:
+    """A nation's production stream for one pathway and year, as candidates: candidate d is production's draw d
+    (the same values under every arm). `production` keeps the production row of each draw, for the identity
+    check."""
+
+    def __init__(self, kind, year, seed, country):
+        tag = 'juniors' if kind == 'juniors' else 'new-pros'
+        self.kind, self.country, self.prof = kind, country, NATIONS[country]
+        self.crng = random.Random(f'{seed}:{tag}:{year}:{country}')
+        self.keybase = f'{seed}:{tag}:{year}:{country}'
+        self.cands, self.production = [], []
+
+    def get(self, d):
+        while len(self.cands) <= d:
+            v, row = production_values(self.kind, self.crng, self.prof)
+            n = len(self.cands)
+            self.cands.append(candidate_tuple(self.kind, v, f'{self.keybase}:{n}'))
+            self.production.append(None if row is None else (self.country,) + row[1:])
+        return self.cands[d]
+
+
+def replay_entrants(stream, k, arm, need):
+    """Under an arm: the first k passers of the stream (the recorded allocation), and the outcome of each of the
+    existing rule's `need` candidates (for the recalculated pass counts). Returns (entrants, outcomes):
+    entrants [(d, row, facts)], outcomes [(d, stage, facts)] for d < need."""
+    entrants, outcomes, d = [], [], 0
+    while d < need or len(entrants) < k:
+        stage, row, f = paired_outcome(stream.kind, stream.get(d), stream.country, arm)
+        if d < need:
+            outcomes.append((d, stage, f))
+        if row is not None and len(entrants) < k:
+            entrants.append((d, row, f))
         d += 1
-    return rows[:k], facts
+    return entrants, outcomes
 
 
 # ---- paired layer: the same candidates under every arm -------------------------------------------------------------
@@ -193,12 +229,12 @@ def paired_candidates(kind, year, seed, country):
     rng = random.Random(f'{seed}:paired:{kind}:{year}:{country}')
     mu = P._mu(prof)
     out = []
-    for _ in range(n):
+    for d in range(n):
         pot = rng.gauss(mu, P.POTENTIAL_SD)
         peak = rng.gauss(27.0, 2.0)
         aging = math.exp(rng.gauss(0, 0.3))
         luck = rng.gauss(0, P.CAREER_LUCK_SD)
-        eps = rng.gauss(0.0, 1.0)
+        eps = random.Random(f'{seed}:paired:{kind}:{year}:{country}:{d}:readiness').gauss(0.0, 1.0)
         u_keep, scout = rng.random(), rng.gauss(0, P.SCOUTING_SD)
         age = rng.choice(P.NEW_PRO_AGES) if kind == 'new_pros' else 18
         u_status, u_club, u_sample = rng.random(), rng.random(), rng.random()
