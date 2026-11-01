@@ -1,0 +1,115 @@
+{
+ "code": "/dev/shm/v17/base",
+ "world": "/dev/shm/v17/w_base2",
+ "year": 2084,
+ "active": 12933,
+ "people": 47989,
+ "workers": 4,
+ "open_s": 7.6,
+ "advance_s": 215.28,
+ "worker_busy_s": 267.4,
+ "play_week_minus_record_s": 73.6,
+ "worker_utilisation": 0.908,
+ "phases": {
+  "_step": [
+   184.55,
+   52
+  ],
+  "run_week": [
+   166.97,
+   52
+  ],
+  "play_week": [
+   84.45,
+   52
+  ],
+  "_commit": [
+   28.88,
+   1
+  ],
+  "plan_block": [
+   22.66,
+   13
+  ],
+  "regular_entries": [
+   21.79,
+   52
+  ],
+  "develop_week": [
+   11.37,
+   52
+  ],
+  "record_event": [
+   10.83,
+   1456
+  ],
+  "end_of_season": [
+   6.62,
+   1
+  ],
+  "_stage_archive": [
+   6.59,
+   1
+  ],
+  "_publish_archive": [
+   5.97,
+   1
+  ],
+  "state_tables": [
+   5.08,
+   1
+  ],
+  "weekly_finances": [
+   4.38,
+   52
+  ],
+  "update_rankings": [
+   4.38,
+   52
+  ],
+  "special_field": [
+   4.19,
+   136
+  ],
+  "start_year": [
+   3.49,
+   1
+  ],
+  "record_access": [
+   2.76,
+   52
+  ],
+  "update_fame": [
+   2.22,
+   52
+  ],
+  "year_chunk": [
+   1.45,
+   1
+  ],
+  "update_fatigue": [
+   1.44,
+   52
+  ],
+  "prune_history": [
+   1.41,
+   1
+  ],
+  "snapshot_standings": [
+   0.45,
+   52
+  ],
+  "_sync": [
+   0.15,
+   1
+  ],
+  "pool.map (dispatch)": [
+   0.15,
+   52
+  ],
+  "pay_at_sites": [
+   0.02,
+   136
+  ]
+ }
+}

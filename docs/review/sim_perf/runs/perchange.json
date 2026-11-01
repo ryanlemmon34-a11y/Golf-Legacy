@@ -1,0 +1,38 @@
+{
+ "weeks": 4,
+ "seconds": 30.7,
+ "calls": {
+  "overall_rating": 151812,
+  "_seed": 67277,
+  "eligible": 144422,
+  "expected_prize": 119522,
+  "expected_prize_in_event_value": 82182,
+  "forecasts_needed_in_event_value": 62052
+ },
+ "seed": {
+  "calls": 67277,
+  "distinct": 65500,
+  "lru_hits": 1777,
+  "hit_rate": 0.0264,
+  "ns_per_call_old": 734.1,
+  "ns_per_call_hit": 158.2,
+  "cache_bytes_full": 7947908
+ },
+ "eligible": {
+  "calls": 144422,
+  "sample": 2888,
+  "ns_old_set": 570.1,
+  "ns_new_lookup": 138.5
+ },
+ "overall_rating": {
+  "calls": 151812,
+  "ns_old": 2188.9,
+  "ns_new": 1886.6
+ },
+ "forecast": {
+  "calls_needed_in_event_value": 62052,
+  "distinct_golfer_week_tier": 31390,
+  "ns_per_prize_forecast": 1001.4,
+  "tiers_with_purses": 6
+ }
+}

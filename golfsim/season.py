@@ -828,7 +828,7 @@ class Season:
         tier, st = s.tier, g.status
         mt = TOUR_BY_KEY.get(g.tour)
         mtier = mt.tier if mt else 9
-        countries = {c for c, _ in TOUR_BY_KEY[s.tour].countries} if s.tour in TOUR_BY_KEY else set()
+        countries = TOUR_COUNTRIES.get(s.tour, frozenset())   # (the same countries, worked out once per tour)
         if s.category == 'national_open' and tier >= 2:
             return st == 'pro' or (st == 'amateur' and g.country == s.host_country and self.am_pos.get(g.id, 9999) <= 300)
         if tier == 1:
