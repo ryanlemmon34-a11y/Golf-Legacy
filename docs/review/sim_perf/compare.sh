@@ -5,11 +5,11 @@
 H=/tmp/claude-0/-home-user-golf-legacy/dd633163-5093-57b8-a35e-3e668bc4257e/scratchpad/v19/perf17
 cd $H
 python3 eqcheck.py /dev/shm/v17/w_$1 /dev/shm/v17/w_$2 > runs/eq_$1_$2.txt 2>&1; echo "eqcheck rc=$?" >> runs/eq_$1_$2.txt
-PYTHONHASHSEED=0 TMPDIR=/dev/shm/v17/tmp python3 reopen.py $3 /dev/shm/v17/w_$1 runs/reopen_$1.json > /dev/null 2>runs/reopen_$1.err; echo "reopen $1 rc=$?"
-PYTHONHASHSEED=0 TMPDIR=/dev/shm/v17/tmp python3 reopen.py $4 /dev/shm/v17/w_$2 runs/reopen_$2.json > /dev/null 2>runs/reopen_$2.err; echo "reopen $2 rc=$?"
+PYTHONHASHSEED=0 TMPDIR=/dev/shm/v17/tmp python3 reopen2.py $3 /dev/shm/v17/w_$1 runs/reopen2_$1.json > /dev/null 2>runs/reopen2_$1.err; echo "reopen2 $1 rc=$?"
+PYTHONHASHSEED=0 TMPDIR=/dev/shm/v17/tmp python3 reopen2.py $4 /dev/shm/v17/w_$2 runs/reopen2_$2.json > /dev/null 2>runs/reopen2_$2.err; echo "reopen2 $2 rc=$?"
 python3 - <<PY
 import json
-a = json.load(open('runs/reopen_$1.json'))['parts']; b = json.load(open('runs/reopen_$2.json'))['parts']
+a = json.load(open('runs/reopen2_$1.json'))['parts']; b = json.load(open('runs/reopen2_$2.json'))['parts']
 diff = sorted(k for k in set(a) | set(b) if a.get(k) != b.get(k))
 print('reopen digests:', 'IDENTICAL' if not diff else 'DIFFERENT ' + str(diff), len(a), 'parts')
 PY

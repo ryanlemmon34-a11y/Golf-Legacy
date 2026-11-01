@@ -16,7 +16,7 @@
 
 - Pair 1: state pickle IDENTICAL (342,617,291 bytes decompressed); 63 history files EQUIVALENT (eqcheck rc 0).
 - Pair 2: EQUIVALENT again (eqcheck rc 0).
-- Reopen digests (pair 1): IDENTICAL, 16 parts (cursor, decision_evidence, development, diagnostics, familiarity, fatigue_injuries, finances, history, moments, performance, published_years, rankings, records, results, rounds_and_holes, staff).
+- Reopen digests (pair 1, `runs/reopen2_base.json` and `runs/reopen2_cand.json`): IDENTICAL, 16 parts (cursor, decision_evidence, development, diagnostics, familiarity, fatigue_injuries, finances, history, moments, performance, published_years, rankings, records, results, rounds_and_holes, staff).
 
 ## Season timings (seconds)
 
@@ -42,7 +42,7 @@ Call counts from four instrumented weeks of Test2 2084 (`perchange.py`, afa5e4a 
 
 ## What is kept
 
-build/v17-sim-perf now changes one line of golfsim/season.py: Season.eligible takes each tour's countries from TOUR_COUNTRIES (the frozensets the module already builds once per tour) instead of building the set on every call. Exact by construction (the same membership test on the same countries) and checked against a copy of the replaced function for every golfer, regular event and two weeks of a small world (tests/test_perf_v17.py); it is also a subset of the measured candidate, whose season was byte-identical. Its estimated saving (about 1.5 s of a roughly 210 s season here, 0.7%) is below what a season A/B can resolve on this machine, so it is kept as a simple reduction, not as a demonstrated speedup.
+build/v17-sim-perf now changes one line of golfsim/season.py: Season.eligible takes each tour's countries from TOUR_COUNTRIES (the frozensets the module already builds once per tour) instead of building the set on every call. Exact by construction (the same membership test on the same countries) and checked against a copy of the replaced function for every golfer and every regular event of a small world, in two weeks each (tests/test_perf_v17.py); it is also a subset of the measured candidate, whose season was byte-identical. Its estimated saving (about 1.5 s of a roughly 210 s season here, 0.7%) is below what a season A/B can resolve on this machine, so it is kept as a simple reduction, not as a demonstrated speedup.
 
 ## Remaining time and what would move it
 
