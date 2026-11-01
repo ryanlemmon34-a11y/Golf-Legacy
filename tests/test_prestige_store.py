@@ -55,14 +55,16 @@ class FakeArchive:
         self.world = {'seed': seed, 'first_year': FIRST, 'calendar': {'version': 2}}
         self.decoded = 0
 
-    def publish(self, y, gen, rec, pad=0):
+    def publish(self, y, gen, rec, pad=0, body=None, members=1):
         name = f'years/{y}.g{gen:06d}.json.gz'
         p = self.dir / name
         p.parent.mkdir(parents=True, exist_ok=True)
-        body = {'year': y, 'prestige': rec, 'events': [{'id': f'{y}:E{i}', 'filler': 'x' * 200} for i in range(400)],
-                'pad': 'p' * pad}
-        with gzip.open(p, 'wt') as f:
-            json.dump(body, f)
+        if body is None:
+            body = {'year': y, 'prestige': rec, 'events': [{'id': f'{y}:E{i}', 'filler': 'x' * 200} for i in range(400)],
+                    'pad': 'p' * pad}
+        raw = json.dumps(body).encode()
+        k = -(-len(raw) // members)                     # (several gzip members, as the archive writes them)
+        p.write_bytes(b''.join(gzip.compress(raw[i:i + k], mtime=0) for i in range(0, len(raw), k)))
         self.files['years'][y] = name
         if y not in self.years:
             self.years.append(y)
@@ -87,12 +89,12 @@ class StoreCase(unittest.TestCase):
         self.store_path = self.tmp / 'cache' / 'prestige.sqlite'
         self.w = self.world()
         self.reads = []
-        real = PS.read_record
+        real = PS.read_season
 
         def counted(p):
             self.reads.append(Path(p).name)
             return real(p)
-        patch = mock.patch.object(PS, 'read_record', counted)
+        patch = mock.patch.object(PS, 'read_season', counted)
         patch.start()
         self.addCleanup(patch.stop)
 
@@ -185,7 +187,7 @@ class Warm(StoreCase):
         self.warm()
         with mock.patch.object(PS, 'MEMORY', 4):
             st = PS.PrestigeStore(self.store_path, PS.world_identity(self.w))
-            st.stored({y: PS.source_identity(self.a, y) for y in self.a.years})
+            st.stored({y: (PS.source_identity(self.a, y), str(self.a.year_path(y))) for y in self.a.years})
             self.assertEqual(len(st.mem), 4)
 
 
@@ -352,6 +354,245 @@ class Damage(StoreCase):
         while w._prestige_store.indexing() and time.time() - t < 30:
             time.sleep(0.05)
         self.assertEqual(PS.records(w, list(self.a.years)), {y: record(y) for y in self.a.years})
+
+
+class ReviewFindings(StoreCase):
+    """Review of b777fdf: Windows file semantics, an unwritable job file, stopping the memory-only reader, eviction,
+    records of the wrong shape, latest()'s fallback."""
+
+    def windows_stat(self, frozen):
+        """os.stat as Windows reports it after a rewrite in place: creation time (where POSIX has the status-change
+        time) and file index unchanged."""
+        real = os.stat
+
+        def stat(p, *a, **k):
+            st = real(p, *a, **k)
+            f = frozen.get(str(p))
+            if f is None:
+                return st
+            return NS(st_size=st.st_size, st_mtime_ns=st.st_mtime_ns, st_ctime_ns=f.st_ctime_ns, st_ino=f.st_ino,
+                      st_dev=f.st_dev)
+        return stat
+
+    def test_windows_rewrite_in_place_same_size_and_mtime_is_read_again(self):
+        self.warm()
+        y = FIRST + 5
+        p = self.a.year_path(y)
+        frozen = {str(p): os.stat(p)}
+        with mock.patch.object(PS, '_stat', self.windows_stat(frozen)):
+            before = PS.source_identity(self.a, y)
+            Changes.replace_same_size_and_mtime(self, y, rewrite=True)
+            self.assertEqual(PS.source_identity(self.a, y), before)        # the stat identity cannot tell
+            got = PS.records(self.w, list(self.a.years))                     # warm, in memory: still caught
+            self.assertIs(got[y], PS.PENDING)
+            got = self.warm()
+            self.assertEqual(got[y]['events']['SMALL_OPEN'], 41.0)
+            w2 = self.world()                                                # and from the store file, next session
+            self.assertEqual(PS.records(w2, [y])[y]['events']['SMALL_OPEN'], 41.0)
+
+    def test_windows_rewrite_of_one_member_of_several(self):
+        y = FIRST + 2
+        self.a.publish(y, y - FIRST + 1, record(y), members=7)
+        self.warm()
+        p = self.a.year_path(y)
+        frozen = {str(p): os.stat(p)}
+        data = bytearray(p.read_bytes())
+        raw = gzip.decompress(bytes(data))
+        changed = raw.replace(b'"SMALL_OPEN": 40.0', b'"SMALL_OPEN": 49.0')
+        k = -(-len(raw) // 7)
+        blob = b''.join(gzip.compress(changed[i:i + k], mtime=0) for i in range(0, len(changed), k))
+        self.assertEqual(len(blob), len(data))                              # (same size: one digit changed)
+        st = os.stat(p)
+        with open(p, 'r+b') as f:
+            f.write(blob)
+        os.utime(p, ns=(st.st_atime_ns, st.st_mtime_ns))
+        with mock.patch.object(PS, '_stat', self.windows_stat(frozen)):
+            self.assertEqual(self.warm()[y]['events']['SMALL_OPEN'], 49.0)
+
+    def test_an_unwritable_job_file_falls_back_to_a_thread(self):
+        jobs = self.store_path.with_suffix('.jobs.json')
+        jobs.parent.mkdir(parents=True, exist_ok=True)
+        jobs.mkdir()                                                         # (cannot be written as a file)
+        got = PS.records(self.w, list(self.a.years))                          # no exception through the page
+        self.assertIsInstance(self.w._prestige_store.indexer, __import__('threading').Thread)
+        self.assertEqual(got[LAST], record(LAST))
+        self.assertEqual(self.warm(), {y: record(y) for y in self.a.years})
+        self.assertEqual(self.stored_sources(), {y: PS.source_identity(self.a, y) for y in self.a.years})
+
+    def test_the_memory_only_reader_stops_when_asked(self):
+        w = NS(a=self.a, live=None, session=None, archive_dir='x')
+        w._prestige_store = PS.PrestigeStore(None, PS.world_identity(w))
+        real = PS.read_season
+
+        def slow(p):
+            time.sleep(0.1)
+            return real(p)
+        with mock.patch.object(PS, 'read_season', slow):
+            PS.records(w, list(self.a.years))
+            time.sleep(0.15)
+            w._prestige_store.stop_indexer()
+            self.assertFalse(w._prestige_store.indexing())
+            n = len(w._prestige_store.mem)
+            time.sleep(0.3)
+            self.assertEqual(len(w._prestige_store.mem), n)                  # nothing read after the stop
+            self.assertLess(n, len(self.a.years))
+
+    def test_eviction_is_not_missing_history(self):
+        with mock.patch.object(PS, 'MEMORY', 2):
+            self.assertEqual(self.warm(), {y: record(y) for y in self.a.years})   # with a store: read back from it
+            self.assertLessEqual(len(self.w._prestige_store.mem), 2)
+            w = NS(a=self.a, live=None, session=None, archive_dir='x')
+            w._prestige_store = PS.PrestigeStore(None, PS.world_identity(w))  # memory only: the whole history kept
+            PS.records(w, list(self.a.years))
+            t = time.time()
+            while w._prestige_store.indexing() and time.time() - t < 30:
+                time.sleep(0.05)
+            got = PS.records(w, list(self.a.years))
+            self.assertEqual(got, {y: record(y) for y in self.a.years})
+            self.assertFalse(w._prestige_store.failed)
+
+    def test_records_of_the_wrong_shape_are_not_recorded(self):
+        bad = {FIRST + 1: {'prestige': ['not', 'a', 'record']},
+               FIRST + 2: {'prestige': {'events': {'TOUR_MASTERS': 'high'}}},
+               FIRST + 3: {'prestige': {'nations': {'prestige': [1, 2]}}},
+               FIRST + 4: ['a', 'list'],
+               LAST: {'prestige': {'courses': None}}}
+        for y, body in bad.items():
+            self.a.publish(y, 300 + y - FIRST, None, body=body)
+        got = PS.records(self.w, list(self.a.years))                          # the newest (inline): no exception
+        self.assertIsNone(got[LAST])
+        got = self.warm_partial()
+        for y in bad:
+            self.assertIsNone(got[y], y)
+        for y in set(self.a.years) - set(bad):
+            self.assertEqual(got[y], record(y))
+        html = OP.event_section(self.w, 'TOUR_MASTERS') + OP.nation_section(self.w, 'Fiji')
+        self.assertIn('not recorded', html)
+
+    def test_latest_falls_back_to_the_most_recent_recorded_season(self):
+        self.a.publish(LAST, 900, None)                                      # the newest season: no prestige record
+        first = OP.latest(self.w)
+        self.assertTrue(first['pending'])                                    # older seasons still being read
+        self.assertEqual(first['events'], {})
+        self.wait(self.w)
+        got = OP.latest(self.w)
+        self.assertFalse(got['pending'])
+        self.assertEqual(got['year'], LAST - 1)
+        self.assertEqual(got['events'], record(LAST - 1)['events'])
+        self.assertEqual(got['nations']['prestige'], record(LAST - 1)['nations']['prestige'])
+
+    def test_latest_with_a_recorded_newest_season_reads_only_it(self):
+        got = OP.latest(self.w)
+        self.assertEqual((got['year'], got['pending']), (LAST, False))
+        self.assertEqual(self.reads, [f'{LAST}.g{LAST - FIRST + 1:06d}.json.gz'])
+        self.assertIsNone(self.w._prestige_store.indexer)                    # nothing else started
+
+
+class LocksAndBytes(StoreCase):
+    """Review of the follow-up: a store file locked by another connection, malformed compression, and the background
+    check of every stored season's bytes; the lists' pending note."""
+
+    def test_a_locked_store_is_busy_not_corrupt(self):
+        import sqlite3
+        self.warm()
+        self.w._prestige_store.stop_indexer()
+        before = self.store_path.read_bytes()
+        hold = sqlite3.connect(self.store_path, timeout=1)
+        hold.execute('PRAGMA locking_mode=EXCLUSIVE')                        # another connection holds it
+        hold.execute('BEGIN EXCLUSIVE')
+        hold.execute('INSERT OR REPLACE INTO meta VALUES (?, ?)', ('held', '1'))
+        try:
+            w2 = self.world()                                                # a new session: nothing in memory
+            t = time.perf_counter()
+            got = PS.records(w2, list(self.a.years))
+            took = time.perf_counter() - t
+            self.assertLess(took, 3.0)                                       # waited a moment, not 5 s a connection
+            self.assertEqual(got[LAST], record(LAST))                        # the newest: read now
+            self.assertTrue(all(got[y] is PS.PENDING for y in range(FIRST, LAST)))   # the rest: being read
+            self.assertFalse(Path(str(self.store_path) + '.corrupt').exists())
+            self.assertFalse(w2._prestige_store._broken)
+            html = OP.event_section(w2, 'TOUR_MASTERS')                      # the page renders, pending
+            self.assertIn('being read', html)
+        finally:
+            hold.rollback()
+            hold.close()
+        self.assertEqual(self.store_path.read_bytes()[:100], before[:100])  # the same file, kept
+        w2._prestige_store.skip_until = 0.0
+        w2._prestige_store.retry_after = 0.0
+        self.assertEqual(self.warm(w2), {y: record(y) for y in self.a.years})
+        self.assertFalse(Path(str(self.store_path) + '.corrupt').exists())
+
+    def test_the_reader_waits_out_a_lock_and_is_retried_later(self):
+        import sqlite3
+        self.store_path.parent.mkdir(parents=True, exist_ok=True)
+        hold = sqlite3.connect(self.store_path, timeout=1)
+        hold.execute('PRAGMA locking_mode=EXCLUSIVE')
+        hold.execute('BEGIN EXCLUSIVE')
+        hold.execute('CREATE TABLE IF NOT EXISTS x(a)')
+        try:
+            with mock.patch.object(PS, 'READER_TIMEOUT', 0.3), mock.patch.object(PS, 'BUSY_RETRY', 0.5):
+                st = PS.PrestigeStore(self.store_path, PS.world_identity(self.w))
+                self.w._prestige_store = st
+                PS.records(self.w, list(self.a.years))
+                self.wait(self.w)
+                PS.records(self.w, list(self.a.years))
+                self.assertFalse(st.failed)                                  # a lock is no failure
+                self.assertGreater(st.retry_after, 0)
+        finally:
+            hold.rollback()
+            hold.close()
+        self.assertFalse(Path(str(self.store_path) + '.corrupt').exists())
+        st.retry_after = 0.0
+        st.skip_until = 0.0
+        self.assertEqual(self.warm(), {y: record(y) for y in self.a.years})
+
+    def test_malformed_compression_of_the_newest_season(self):
+        p = self.a.publish(LAST, 950, record(LAST))
+        data = bytearray(p.read_bytes())
+        data[20:60] = b'\xff' * 40                                          # the deflate stream damaged
+        p.write_bytes(bytes(data))
+        got = PS.records(self.w, list(self.a.years))                          # no zlib.error through the request
+        self.assertIsNone(got[LAST])
+        html = OP.event_section(self.w, 'TOUR_MASTERS')                      # renders: the rest being read
+        self.assertIn('being read', html)
+        self.assertIsNotNone(OP.latest(self.w))                              # the lists fall back (pending first)
+        got = self.warm_partial()
+        self.assertIsNone(got[LAST])
+        self.assertIn('<span class="rv">—</span><span class="rb"></span><span class="ry">2051</span>',
+                      OP.event_section(self.w, 'TOUR_MASTERS'))              # the newest: not recorded
+        self.assertEqual(got[LAST - 1], record(LAST - 1))
+        self.assertEqual(OP.latest(self.w)['year'], LAST - 1)
+
+    def test_damage_that_keeps_the_trailers_is_found_by_the_sessions_bytes_check(self):
+        """Not seen on a request (trailers as they were): the next session's background check finds it."""
+        self.warm()
+        y = FIRST + 4
+        p = self.a.year_path(y)
+        st = os.stat(p)
+        data = bytearray(p.read_bytes())
+        data[40:48] = bytes(b ^ 0x5a for b in data[40:48])                   # inside the deflate data
+        p.write_bytes(bytes(data))
+        os.utime(p, ns=(st.st_atime_ns, st.st_mtime_ns))
+        frozen = {str(p): st}
+        with mock.patch.object(PS, '_stat', ReviewFindings.windows_stat(self, frozen)):
+            self.assertEqual(PS.records(self.w, [y])[y], record(y))          # this session: as stored (documented)
+            w2 = self.world()                                                # the next session
+            PS.records(w2, list(self.a.years))
+            self.wait(w2)
+            got = PS.records(w2, list(self.a.years))
+        self.assertIsNone(got[y])                                            # found, read again: not readable now
+        self.assertEqual({k: v for k, v in got.items() if k != y}, {k: record(k) for k in self.a.years if k != y})
+
+    def test_the_lists_say_when_prestige_is_being_read(self):
+        lt = {'events': {}, 'courses': {}, 'venue_moves': [], 'nations': {}, 'pending': True, 'year': None}
+        self.assertIn('being read', OP.latest_note(lt))
+        self.assertEqual(OP.latest_note({'pending': False, 'year': LAST}), '')
+        self.assertEqual(OP.latest_note(None), '')
+        import observer as O
+        w = NS(live=None, a=None)
+        with mock.patch.object(O.OP, 'latest', lambda w: lt), \
+                mock.patch.object(O, 'nation_counts', lambda w: {'Fiji': [1, 1, 0, 0]}):
+            self.assertIn('being read', O.nations(w, {})[1])
 
 
 if __name__ == '__main__':

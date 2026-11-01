@@ -2006,14 +2006,15 @@ def tournaments(w, q):
     f = filters('/tournaments', q, [('tour', 'Tour', [('', 'any')] + sorted(((k, t.get('name', k)) for k, t in w.tours().items()),
                                                                              key=lambda x: x[1])),
                                     ('kind', 'Kind', [('', 'any')] + [(k, k) for k in kinds])])
-    pres = (OP.latest(w) or {}).get('events', {})
+    lt = OP.latest(w)
+    pres = (lt or {}).get('events', {})
     if one(q, 'sort') == 'prestige':                   # the whole list by prestige (a column click sorts the page)
         rows.sort(key=lambda x: -(pres.get(x[0]) if pres.get(x[0]) is not None else -1))
     chunk, pager = paged(rows, q, '/tournaments')
     keep = {k: v[0] for k, v in q.items() if v and v[0] and k not in ('sort', 'page')}
     by_prestige = (f'<p class="muted"><a href="/tournaments?{esc(urlencode({**keep, "sort": "prestige"}))}">List by '
                    'prestige</a> (prestige now: five calendar years, rules 2026-11-05)</p>')
-    return 'Tournaments', f + by_prestige + table(
+    return 'Tournaments', f + by_prestige + OP.latest_note(lt) + table(
         ['Tournament', 'Tour', 'Tier', 'Kind', 'Category', 'Prestige', 'Editions played'], [
         [f'<a href="/series/{quote(sid)}">{esc(s.get("name", sid))}</a>', tour_link(w, s.get('tour')), esc(s.get('tier')),
          esc(s.get('kind')), esc(s.get('category')), OP.cell(pres.get(sid)), str(counts.get(sid, 0))] for sid, s in chunk],
@@ -2056,7 +2057,8 @@ def courses_page(w, q):
                    and (not term or term in c.get('name', '').lower())), key=lambda x: (x[1].get('country', ''), x[1].get('name', '')))
     f = filters('/courses', q, [('q', 'Name contains', None),
                                 ('country', 'Country', [('', 'any')] + [(c, c) for c in sorted({c.get('country') for c in cs.values()})])])
-    pres = (OP.latest(w) or {}).get('courses', {})
+    lt = OP.latest(w)
+    pres = (lt or {}).get('courses', {})
     if one(q, 'sort') == 'prestige':                   # the whole list by prestige (a column click sorts the page)
         rows.sort(key=lambda x: -(pres.get(x[0]) if pres.get(x[0]) is not None else -1))
     chunk, pager = paged(rows, q, '/courses')
@@ -2066,7 +2068,7 @@ def courses_page(w, q):
                    'before; separate from the class, which is physical quality)</p>')
     from golfsim.course_library import course_place
     sub = lambda c: (c['subdivision'] if 'subdivision' in c else course_place(c)[1]) or 'unknown'
-    return 'Courses', f + by_prestige + table(['Course', 'City', 'State / province', 'Country', 'Class', 'Layouts',
+    return 'Courses', f + by_prestige + OP.latest_note(lt) + table(['Course', 'City', 'State / province', 'Country', 'Class', 'Layouts',
                                                'Prestige', 'Editions hosted'], [
         [course_link(w, cid), esc(c.get('city')), esc(sub(c)), nation_link(c.get('country')), esc(c.get('class')),
          esc(', '.join(c.get('layouts', {}))), OP.cell(pres.get(cid)), str(hosted.get(cid, 0)) if hosted.get(cid) else
@@ -2142,14 +2144,15 @@ def nation_count_link(code, i, n):
 def nations(w, q):
     counts = nation_counts(w)
     rows = sorted(counts.items(), key=lambda x: (-x[1][2], -x[1][1], str(x[0])))
-    nv = (OP.latest(w) or {}).get('nations') or {}
+    lt = OP.latest(w)
+    nv = (lt or {}).get('nations') or {}
     get = lambda k, n: (nv.get(k) or {}).get(n)
     share = lambda kind, n, key='shares': ((nv.get(key) or {}).get(kind) or {}).get(n)
     k = len(NATION_COUNTS)
     return 'Nations', (f'<p class="muted">{esc(NATION_NOTE)} Where people live can change. Prestige: national '
                        'prestige as last settled (50 = the success expected of its golfers before each event). Shares: '
                        'each nation’s share of the next season’s new juniors and new professionals (the numbers '
-                       'themselves never depend on prestige), against its starting share.</p>' +
+                       'themselves never depend on prestige), against its starting share.</p>' + OP.latest_note(lt) +
                        table(['Nation', *(label for label, *_ in NATION_COUNTS), 'Prestige', 'Multiplier',
                               'Share of juniors', 'Starting share', 'Share of new pros'], [
                            [nation_link(n)] + [nation_count_link(n, i, x) for i, x in enumerate(r)] +

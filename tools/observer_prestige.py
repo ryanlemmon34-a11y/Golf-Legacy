@@ -54,21 +54,46 @@ def _live(w):
 
 
 def latest(w):
-    """{'events', 'courses', 'nations'}: the newest values known (the live world's, else the last archived
-    season's record), or None."""
+    """{'events', 'courses', 'venue_moves', 'nations'}: the newest values known -- the live world's, else the most
+    recent archived season that recorded them ('year': that season) -- or None if no season did.
+
+    The newest season is read now if it is not stored yet (one season). Only if it has no record (none archived, or
+    its file not readable) are older seasons consulted, from the store; while one of those newer than any recorded
+    season is still being read in the background, the values are empty and 'pending' is True (never an older
+    season's values passed off as the newest)."""
     lv = _live(w)
     if lv:
         return lv
     years = _years(w)
     if not years:
         return None
-    # the newest season (stored, or read now: one season). Prestige is recorded from rules 2026-11-05 onward, so a
-    # newest season without the record means no season has one
-    r = _records(w, [years[-1]]).get(years[-1])
-    if r and r is not PS.PENDING:
-        return {'events': r.get('events', {}), 'courses': r.get('courses', {}),
-                'venue_moves': r.get('venue_moves', []), 'nations': nations_view(r.get('nations'))}
+    recs = _records(w, [years[-1]])
+    if not _has_values(recs.get(years[-1])):
+        recs = _records(w, years)
+    for y in reversed(years):
+        r = recs.get(y)
+        if r is PS.PENDING:
+            return {'events': {}, 'courses': {}, 'venue_moves': [], 'nations': {}, 'pending': True, 'year': None}
+        if _has_values(r):
+            return {'events': r.get('events', {}), 'courses': r.get('courses', {}),
+                    'venue_moves': r.get('venue_moves', []), 'nations': nations_view(r.get('nations')),
+                    'pending': False, 'year': y}
     return None
+
+
+def latest_note(lt):
+    """A line for the Tournaments, Courses and Nations lists when latest() could not give the newest values: being read
+    (pending), or the most recent season that recorded them is not the newest."""
+    if not lt:
+        return ''
+    if lt.get('pending'):
+        return ('<p class="muted pending">Prestige values are being read from the history in the background (the newest '
+                'season has none recorded); reload in a moment.</p>')
+    return ''
+
+
+def _has_values(r):
+    return bool(r) and r is not PS.PENDING
 
 
 def cell(v, digits=1):
