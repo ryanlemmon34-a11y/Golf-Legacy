@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import re
 
-RULES_VERSION = '2026-11-13'
+RULES_VERSION = '2026-11-14'
 RANKING_RULE = 'world-ranking-1'     # the world ranking's formula (unchanged since the world began; named now)
 VERSIONS = (
     ('2026-10-30', 'Winners\' exemptions count whatever a golfer\'s membership (a non-member champion earns a '
@@ -105,6 +105,13 @@ VERSIONS = (
                    'about every fifth year. The total each year is unchanged, nobody is given a minimum place, no '
                    'nation gets more than about one golfer ahead of its share, and talent is untouched. Worlds started '
                    'earlier keep the year-by-year rounding.'),
+    ('2026-11-14', 'National prestige counts visible success first: winning majors and big events raises a nation\'s '
+                   'prestige directly, in proportion to the fame they carry and against an even share of the fame on '
+                   'offer in the events its golfers entered (so entering more golfers of the same quality gains '
+                   'nothing). Doing better than the golfers\' ability predicted still counts, for a third of the '
+                   'weight, so a dominant champion\'s nation is no longer marked down for winning \'only\' what was '
+                   'expected. The population rule, the share bounds and the yearly step are unchanged; the weights '
+                   'are provisional. Worlds started earlier keep the earlier measure.'),
 )
 EARLIER = ('Seasons archived before rules versions were recorded were played under earlier rules. The '
            'differences that matter for reading old results: a winner without a Premier card held no '
@@ -407,10 +414,12 @@ RULES = {
         'except qualifying stages each starter earns the fame points of their finish, and is expected, before '
         'the event, to take half of an equal share of the fame the event hands out plus half by current Overall '
         '(softmax, 4 points per e-fold). Over the last five completed seasons (weights 1.0 to 0.6 by age), '
-        'R = (actual + 150) / (expected + 150), prestige = 50 + 25 x log2 R within 0-100, and the multiplier '
+        'R = (actual + 150) / (expected + 150); since rules 2026-11-14 also Q = (actual + 150) / (an equal share of '
+        'the fame on offer in the starts made + 150), visible achievement with ability ignored, and prestige = 50 + '
+        '25 x (2/3 log2 Q + 1/3 log2 R) (before: 50 + 25 x log2 R) within 0-100, and the multiplier '
         'moves toward 4 ^ ((prestige - 50) / 50) -- between 0.25 and 4 -- by at most 10% a year. Set at each '
         'season\'s end for the next season\'s entrants.',
-        '2026-11-13'),
+        '2026-11-14'),
     'amateur-return': (
         'Returning from work to full-time amateur golf',
         'Each winter a working (part-time) amateur outside college who did not turn professional may return to '
