@@ -1,0 +1,89 @@
+{
+ "code": "/dev/shm/v17/wt_int",
+ "seed": 11,
+ "arm": "off",
+ "winters": 2,
+ "checks": {
+  "generated_vs_allocated": {
+   "2028 juniors": {
+    "generated": 287,
+    "allocated": 287,
+    "total": 287,
+    "added": 287,
+    "by_nation_equal": true
+   },
+   "2028 new_pros": {
+    "generated": 419,
+    "allocated": 419,
+    "total": 419,
+    "added": 419,
+    "by_nation_equal": true
+   },
+   "2029 juniors": {
+    "generated": 301,
+    "allocated": 301,
+    "total": 301,
+    "added": 301,
+    "by_nation_equal": true
+   },
+   "2029 new_pros": {
+    "generated": 467,
+    "allocated": 467,
+    "total": 467,
+    "added": 467,
+    "by_nation_equal": true
+   }
+  },
+  "reopen": {
+   "carry_on": true,
+   "achievement_on": true,
+   "prestige": true,
+   "multiplier": true,
+   "achievement": true,
+   "carry": true,
+   "history": true
+  },
+  "reopen_cursor": [
+   {
+    "year": 2029,
+    "week": 2,
+    "phase": "week"
+   },
+   {
+    "year": 2029,
+    "week": 2,
+    "phase": "week"
+   }
+  ],
+  "archive": {
+   "2027": {
+    "has_achievement": false,
+    "has_carry": false,
+    "rules": {
+     "achievement": false,
+     "achievement_weight": null,
+     "carry": false
+    },
+    "prestige_equal": true,
+    "achievement_equal": true,
+    "carry_equal": true,
+    "allocated_equal": true
+   },
+   "2028": {
+    "has_achievement": false,
+    "has_carry": false,
+    "rules": {
+     "achievement": false,
+     "achievement_weight": null,
+     "carry": false
+    },
+    "prestige_equal": true,
+    "achievement_equal": true,
+    "carry_equal": true,
+    "allocated_equal": true
+   }
+  }
+ },
+ "problems": [],
+ "ok": true
+}

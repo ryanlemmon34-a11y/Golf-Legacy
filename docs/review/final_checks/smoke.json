@@ -1,0 +1,110 @@
+{
+ "pages": {
+  "series_first": {
+   "path": "/series/TOUR_MASTERS",
+   "status": 200,
+   "seconds": 1.362,
+   "width": 1920,
+   "pending": true
+  },
+  "series_after": {
+   "path": "/series/TOUR_MASTERS",
+   "status": 200,
+   "seconds": 0.095,
+   "width": 1920,
+   "pending": false
+  },
+  "tournaments_by_prestige": {
+   "path": "/tournaments?sort=prestige&dir=desc",
+   "status": 200,
+   "seconds": 0.361,
+   "width": 1920,
+   "first_values": [
+    97.5,
+    97.5,
+    97.5,
+    97.5,
+    93.7,
+    93.7,
+    93.6,
+    93.6
+   ]
+  },
+  "tournaments_page2": {
+   "path": "/tournaments?sort=prestige&dir=desc&page=2",
+   "status": 200,
+   "seconds": 0.566,
+   "width": 1920
+  },
+  "courses_by_prestige": {
+   "path": "/courses?sort=prestige&dir=desc",
+   "status": 200,
+   "seconds": 0.104,
+   "width": 1920,
+   "first_values": [
+    97.4,
+    97.4,
+    97.4,
+    97.3,
+    97.3,
+    97.3,
+    97.3,
+    93.2
+   ]
+  },
+  "nations": {
+   "path": "/nations",
+   "status": 200,
+   "seconds": 0.178,
+   "width": 1920,
+   "measure": "50 = as expected: visible success against an even share of the fame on offer, and success against what its golfers' ability predicted; rules: national prestige"
+  },
+  "nation": {
+   "path": "/nation/USA",
+   "status": 200,
+   "seconds": 0.173,
+   "width": 1920,
+   "achievement_columns": true,
+   "pending": false,
+   "row_widths": [
+    9
+   ]
+  },
+  "early_pro_golfer": {
+   "path": "/golfer/365",
+   "status": 200,
+   "seconds": 0.13,
+   "width": 1920,
+   "status_label": true
+  },
+  "early_pro_season_stayed": {
+   "path": "/golfer/365?tab=season&year=2027",
+   "status": 200,
+   "seconds": 1.332,
+   "width": 1920,
+   "line": "Could have turned professional from college at 20 (amateur ranking 12); stayed in college on the US College Division I"
+  },
+  "early_pro_season_turned": {
+   "path": "/golfer/365?tab=season&year=2028",
+   "status": 200,
+   "seconds": 0.094,
+   "width": 1920,
+   "line": "Turned professional from college at 21, before their eligibility ended (amateur ranking 13), starting on the Challenger Tour Americas, with backers putting up $46,000 a season for a share of winnings"
+  },
+  "rules": {
+   "path": "/rules",
+   "status": 200,
+   "seconds": 0.093,
+   "width": 1920,
+   "has_early_pro_rule": true,
+   "versions": [
+    "2026-11-12",
+    "2026-11-13",
+    "2026-11-14",
+    "2026-11-15"
+   ]
+  }
+ },
+ "problems": [],
+ "ok": true
+}
