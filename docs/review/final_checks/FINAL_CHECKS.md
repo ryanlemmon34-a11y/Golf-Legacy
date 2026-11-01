@@ -40,22 +40,23 @@ Reopened saved state equal to the running session: carry_on True, achievement_on
 
 ## 2. Wide-screen UI smoke (`smoke.js`, Chromium 1920x1080, full-page screenshots in `shots/`)
 
-The observer serving the arm-on world (2 archived seasons, live 2029). The prestige store was removed first, so the first tournament page shows the cold (pending) state. Tables are found by their exact header text (`textContent`: the page uppercases headers in CSS, so `innerText` reads them in capitals).
+The observer (build 18a8e23) serving the arm-on world (2 archived seasons, live 2029), its prestige store removed first so the run starts cold. Tables are found by their exact header text (`textContent`: the page uppercases headers in CSS, so `innerText` reads them in capitals). Every check below is an assertion (a failure is listed under problems); value lists must be non-empty, so no ordering check can pass on an empty column.
 
 Result: ok = True, problems = none.
 
-| page | path | seconds | width px | what was checked |
+| page | path | seconds | width px | asserted |
 |---|---|---|---|---|
-| series_first | `/series/TOUR_MASTERS` | 1.362 | 1920 | pending (being read) = True |
-| series_after | `/series/TOUR_MASTERS` | 0.095 | 1920 | pending = False; prestige history shown |
-| tournaments_by_prestige | `/tournaments?sort=prestige&dir=desc` | 0.361 | 1920 | Prestige column descending, whole-list text: first values [97.5, 97.5, 97.5, 97.5, 93.7, 93.7, 93.6, 93.6] |
-| tournaments_page2 | `/tournaments?sort=prestige&dir=desc&page=2` | 0.566 | 1920 | page 2 never above page 1 |
-| courses_by_prestige | `/courses?sort=prestige&dir=desc` | 0.104 | 1920 | descending: first values [97.4, 97.4, 97.4, 97.3, 97.3, 97.3, 97.3, 93.2] |
-| nations | `/nations` | 0.178 | 1920 | measure: 50 = as expected: visible success against an even share of the fame on offer, and success against what its golfers' ability predicted; rules: national prestige |
-| nation | `/nation/USA` | 0.173 | 1920 | Achievement columns True; prestige rows [9] cells wide |
-| early_pro_golfer | `/golfer/365` | 0.13 | 1920 | status table names the early decision: True |
-| early_pro_season_stayed | `/golfer/365?tab=season&year=2027` | 1.332 | 1920 | line: Could have turned professional from college at 20 (amateur ranking 12); stayed in college on the US College Division I |
-| early_pro_season_turned | `/golfer/365?tab=season&year=2028` | 0.094 | 1920 | line (ranking once): Turned professional from college at 21, before their eligibility ended (amateur ranking 13), starting on the Challenger Tour Americas, with backers putting up $46,000 a season for a share of winnings |
-| rules | `/rules` | 0.093 | 1920 | early-pro rule True; versions ['2026-11-12', '2026-11-13', '2026-11-14', '2026-11-15'] |
+| series_first | `/series/TOUR_MASTERS` | 1.389 | 1920 | cold store: pending = True (asserted); ready 2.117 s later (polled every 2 s, limit 120 s) |
+| series_after | `/series/TOUR_MASTERS` | 0.093 | 1920 | pending = False (asserted false); 3 prestige bars (at least 2 asserted) |
+| tournaments_by_prestige | `/tournaments?sort=prestige&dir=desc` | 0.324 | 1920 | 100 values (non-empty asserted), descending: [97.5, 97.5, 97.5, 97.5, 93.7, 93.7, 93.6, 93.6] |
+| tournaments_page2 | `/tournaments?sort=prestige&dir=desc&page=2` | 0.596 | 1920 | 100 values (non-empty asserted), descending: [56.5, 56.1, 56.1, 56, 55.9, 55.6, 55.5, 55.4]; boundary page 1 min / page 2 max [56.5, 56.5] (page 2 never above page 1) |
+| courses_by_prestige | `/courses?sort=prestige&dir=desc` | 0.101 | 1920 | 100 values (non-empty asserted), descending: [97.4, 97.4, 97.4, 97.3, 97.3, 97.3, 97.3, 93.2] |
+| courses_page2 | `/courses?sort=prestige&dir=desc&page=2` | 0.102 | 1920 | 100 values (non-empty asserted), descending: [51.2, 50.9, 50.7, 50.6, 50.5, 50.5, 49.9, 49.8]; boundary [51.2, 51.2] |
+| nations | `/nations` | 0.16 | 1920 | measure: 50 = as expected: visible success against an even share of the fame on offer, and success against what its golfers' ability predicted; rules: national prestige |
+| nation | `/nation/USA` | 0.178 | 1920 | Achievement columns True; prestige rows [9] cells wide (asserted [9]) |
+| early_pro_golfer | `/golfer/365` | 0.115 | 1920 | status table names the early decision: True |
+| early_pro_season_stayed | `/golfer/365?tab=season&year=2027` | 1.209 | 1920 | line: Could have turned professional from college at 20 (amateur ranking 12); stayed in college on the US College Division I |
+| early_pro_season_turned | `/golfer/365?tab=season&year=2028` | 0.101 | 1920 | line (ranking exactly once, asserted): Turned professional from college at 21, before their eligibility ended (amateur ranking 13), starting on the Challenger Tour Americas, with backers putting up $46,000 a season for a share of winnings |
+| rules | `/rules` | 0.09 | 1920 | early-pro rule True; versions ['2026-11-12', '2026-11-13', '2026-11-14', '2026-11-15'] |
 
-Earlier smoke runs (the same script before its table lookup was corrected) found one real defect, fixed in build/v17-early-pro dcc0c64: the early decision's history line repeated the amateur ranking, and the status table did not name the early decision.
+Earlier smoke runs found one real defect, fixed in build/v17-early-pro dcc0c64: the early decision's history line repeated the amateur ranking, and the status table did not name the early decision. Independent review also ran a 148-case ordering matrix on the sorted lists (passing).

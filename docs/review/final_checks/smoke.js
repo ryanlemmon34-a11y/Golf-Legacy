@@ -38,12 +38,25 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const nums = (xs) => (xs || []).map((x) => parseFloat(x)).filter((x) => !Number.isNaN(x));
   const desc = (xs) => xs.every((v, i) => i === 0 || xs[i - 1] >= v);
 
+  // pending -> ready: with a cold prestige store (removed before the run) the first view must say seasons are being
+  // read, and a later view must be complete (polled every 2 s, up to 120 s)
   let html = await visit('series_first', '/series/TOUR_MASTERS');
   res.pages.series_first.pending = html.includes('being read');
-  await sleep(8000);
+  if (!res.pages.series_first.pending) bad('series: the first view (cold store) is not pending');
+  const t0 = Date.now();
+  let ready = false;
+  for (let k = 0; k < 60 && !ready; k++) {
+    await sleep(2000);
+    const r = await pg.goto(base + '/series/TOUR_MASTERS', { waitUntil: 'load' });
+    ready = !(await pg.content()).includes('being read');
+  }
+  res.pages.series_first.ready_after_s = ready ? (Date.now() - t0) / 1000 : null;
   html = await visit('series_after', '/series/TOUR_MASTERS');
   res.pages.series_after.pending = html.includes('being read');
+  if (res.pages.series_after.pending) bad('series: still pending after 120 s');
   if (!html.includes('Prestige over time')) bad('series: no prestige history');
+  res.pages.series_after.bars = (html.match(/class="rbar[^"]*"/g) || []).length;
+  if (res.pages.series_after.bars < 2) bad('series: fewer than two prestige bars on the complete view');
 
   html = await visit('tournaments_by_prestige', '/tournaments?sort=prestige&dir=desc');
   const t1 = nums(await column('Prestige'));
@@ -53,13 +66,28 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   if (!html.includes('sorts the whole list')) bad('tournaments: whole-list sorting text missing');
   html = await visit('tournaments_page2', '/tournaments?sort=prestige&dir=desc&page=2');
   const t2 = nums(await column('Prestige'));
+  res.pages.tournaments_by_prestige.count = t1.length;
+  res.pages.tournaments_page2.count = t2.length;
+  res.pages.tournaments_page2.first_values = t2.slice(0, 8);
+  if (!t2.length) bad('tournaments: no prestige values read on page 2');
+  if (!desc(t2)) bad('tournaments: page 2 not descending');
   if (t1.length && t2.length && Math.max(...t2) > Math.min(...t1)) bad('tournaments: page 2 above page 1');
+  res.pages.tournaments_page2.boundary = [t1.length ? Math.min(...t1) : null, t2.length ? Math.max(...t2) : null];
 
   html = await visit('courses_by_prestige', '/courses?sort=prestige&dir=desc');
   const c1 = nums(await column('Prestige'));
   res.pages.courses_by_prestige.first_values = c1.slice(0, 8);
   if (!c1.length) bad('courses: no prestige values read');
   if (!desc(c1)) bad('courses: prestige not descending');
+  res.pages.courses_by_prestige.count = c1.length;
+  html = await visit('courses_page2', '/courses?sort=prestige&dir=desc&page=2');
+  const c2 = nums(await column('Prestige'));
+  res.pages.courses_page2.count = c2.length;
+  res.pages.courses_page2.first_values = c2.slice(0, 8);
+  if (!c2.length) bad('courses: no prestige values read on page 2');
+  if (!desc(c2)) bad('courses: page 2 not descending');
+  if (c1.length && c2.length && Math.max(...c2) > Math.min(...c1)) bad('courses: page 2 above page 1');
+  res.pages.courses_page2.boundary = [c1.length ? Math.min(...c1) : null, c2.length ? Math.max(...c2) : null];
 
   html = await visit('nations', '/nations');
   const m = html.match(/Prestige: national prestige as last settled \(([^)]*)\)/);

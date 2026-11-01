@@ -3,21 +3,23 @@
   "series_first": {
    "path": "/series/TOUR_MASTERS",
    "status": 200,
-   "seconds": 1.362,
+   "seconds": 1.389,
    "width": 1920,
-   "pending": true
+   "pending": true,
+   "ready_after_s": 2.117
   },
   "series_after": {
    "path": "/series/TOUR_MASTERS",
    "status": 200,
-   "seconds": 0.095,
+   "seconds": 0.093,
    "width": 1920,
-   "pending": false
+   "pending": false,
+   "bars": 3
   },
   "tournaments_by_prestige": {
    "path": "/tournaments?sort=prestige&dir=desc",
    "status": 200,
-   "seconds": 0.361,
+   "seconds": 0.324,
    "width": 1920,
    "first_values": [
     97.5,
@@ -28,18 +30,34 @@
     93.7,
     93.6,
     93.6
-   ]
+   ],
+   "count": 100
   },
   "tournaments_page2": {
    "path": "/tournaments?sort=prestige&dir=desc&page=2",
    "status": 200,
-   "seconds": 0.566,
-   "width": 1920
+   "seconds": 0.596,
+   "width": 1920,
+   "count": 100,
+   "first_values": [
+    56.5,
+    56.1,
+    56.1,
+    56,
+    55.9,
+    55.6,
+    55.5,
+    55.4
+   ],
+   "boundary": [
+    56.5,
+    56.5
+   ]
   },
   "courses_by_prestige": {
    "path": "/courses?sort=prestige&dir=desc",
    "status": 200,
-   "seconds": 0.104,
+   "seconds": 0.101,
    "width": 1920,
    "first_values": [
     97.4,
@@ -50,19 +68,41 @@
     97.3,
     97.3,
     93.2
+   ],
+   "count": 100
+  },
+  "courses_page2": {
+   "path": "/courses?sort=prestige&dir=desc&page=2",
+   "status": 200,
+   "seconds": 0.102,
+   "width": 1920,
+   "count": 100,
+   "first_values": [
+    51.2,
+    50.9,
+    50.7,
+    50.6,
+    50.5,
+    50.5,
+    49.9,
+    49.8
+   ],
+   "boundary": [
+    51.2,
+    51.2
    ]
   },
   "nations": {
    "path": "/nations",
    "status": 200,
-   "seconds": 0.178,
+   "seconds": 0.16,
    "width": 1920,
    "measure": "50 = as expected: visible success against an even share of the fame on offer, and success against what its golfers' ability predicted; rules: national prestige"
   },
   "nation": {
    "path": "/nation/USA",
    "status": 200,
-   "seconds": 0.173,
+   "seconds": 0.178,
    "width": 1920,
    "achievement_columns": true,
    "pending": false,
@@ -73,28 +113,28 @@
   "early_pro_golfer": {
    "path": "/golfer/365",
    "status": 200,
-   "seconds": 0.13,
+   "seconds": 0.115,
    "width": 1920,
    "status_label": true
   },
   "early_pro_season_stayed": {
    "path": "/golfer/365?tab=season&year=2027",
    "status": 200,
-   "seconds": 1.332,
+   "seconds": 1.209,
    "width": 1920,
    "line": "Could have turned professional from college at 20 (amateur ranking 12); stayed in college on the US College Division I"
   },
   "early_pro_season_turned": {
    "path": "/golfer/365?tab=season&year=2028",
    "status": 200,
-   "seconds": 0.094,
+   "seconds": 0.101,
    "width": 1920,
    "line": "Turned professional from college at 21, before their eligibility ended (amateur ranking 13), starting on the Challenger Tour Americas, with backers putting up $46,000 a season for a share of winnings"
   },
   "rules": {
    "path": "/rules",
    "status": 200,
-   "seconds": 0.093,
+   "seconds": 0.09,
    "width": 1920,
    "has_early_pro_rule": true,
    "versions": [
