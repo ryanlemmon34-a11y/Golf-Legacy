@@ -27,6 +27,24 @@ PRESTIGE_NOTE_BEFORE = ('50 = exactly the success expected of its golfers before
                         'count visible success first.')
 
 
+def achievement_mode(n):
+    """Whether a nations record (archived or live) was settled with visible achievement (rules 2026-11-14), read from
+    the record itself: its 'rules' block when the archive kept one, else whether it carries the achievement
+    component (the live view has it exactly when the rule is on, even before the first season closes)."""
+    if not n:
+        return False
+    r = n.get('rules')
+    if isinstance(r, dict) and 'achievement' in r:
+        return bool(r['achievement'])
+    return 'achievement' in n
+
+
+def nations_view(n):
+    """A nations record as the observer shows it: every field kept (components, rules, carry), the live view's
+    bookkeeping ('closed') left out."""
+    return {k: v for k, v in (n or {}).items() if k != 'closed'}
+
+
 def esc(x):
     return html.escape('' if x is None else str(x))
 
@@ -52,11 +70,8 @@ def latest(w):
     for y in reversed(_years(w)):
         r = _record(w, y)
         if r:
-            n = r.get('nations', {})
             return {'events': r.get('events', {}), 'courses': r.get('courses', {}),
-                    'venue_moves': r.get('venue_moves', []),
-                    'nations': {'prestige': n.get('prestige', {}), 'multiplier': n.get('multiplier', {}),
-                                'shares': n.get('shares', {}), 'baseline_shares': n.get('baseline_shares', {})}}
+                    'venue_moves': r.get('venue_moves', []), 'nations': nations_view(r.get('nations'))}
     return None
 
 
@@ -151,8 +166,7 @@ def nation_section(w, code):
     if lv and (lv.get('nations') or {}).get('closed') is not None:
         nv = lv['nations']
         if nv['closed'] + 1 not in {y for y, _ in rows}:
-            rows.append((nv['closed'] + 1, {'prestige': nv['prestige'], 'multiplier': nv['multiplier'],
-                                            'shares': nv['shares'], 'baseline_shares': nv['baseline_shares']}))
+            rows.append((nv['closed'] + 1, nations_view(nv)))
     base = None
     for _, n in rows:
         if n and n.get('baseline_shares'):
@@ -169,7 +183,7 @@ def nation_section(w, code):
     def share(n, kind='juniors'):
         v = ((n or {}).get('shares') or {}).get(kind, {}).get(code)
         return None if v is None else 100 * v
-    achieved = any(n and n.get('achievement') for _, n in rows)
+    achieved = any(achievement_mode(n) for _, n in rows)
     out.append('<h3>National prestige</h3>' + bars(
         [(str(y), get(n, 'prestige'), f'for {y} (set at the end of {y - 1}): prestige {get(n, "prestige")}') for y, n in rows],
         top=100, note=PRESTIGE_NOTE if achieved else PRESTIGE_NOTE_BEFORE))

@@ -123,6 +123,80 @@ class ObserverText(unittest.TestCase):
         self.assertIn('exactly the success expected', html)
 
 
+class ObserverProjections(unittest.TestCase):
+    """The live nation detail, latest() and the Nations list keep the record's mode and components, and choose their
+    wording from the record itself (review of 96509ea)."""
+    NEW_LIVE = {'prestige': {'Argentina': 73.6}, 'ratio': {'Argentina': 0.789}, 'achievement': {'Argentina': 3.002},
+                'multiplier': {'Argentina': 1.92}, 'shares': {'juniors': {'Argentina': 0.0187}, 'new_pros': {}},
+                'baseline_shares': {'juniors': {'Argentina': 0.0076}, 'new_pros': {}}, 'closed': 2055}
+    OLD_LIVE = {k: v for k, v in NEW_LIVE.items() if k != 'achievement'}
+
+    def setUp(self):
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
+        import observer_prestige as OP
+        self.OP = OP
+
+    def detail(self, live, years=(), recs=None):
+        from unittest import mock
+        OP = self.OP
+        with mock.patch.object(OP, '_years', lambda w: list(years)), \
+                mock.patch.object(OP, '_record', lambda w, y: (recs or {}).get(y)), \
+                mock.patch.object(OP, '_live', lambda w: {'nations': live} if live else None):
+            return OP.nation_section(object(), 'Argentina')
+
+    def test_live_only_new_formula_detail_shows_its_components(self):
+        html = self.detail(self.NEW_LIVE)
+        self.assertIn('>Achievement</th>', html)
+        self.assertIn('<td class=n>3.002</td><td class=n>0.789</td>', html)
+        self.assertIn('Visible success first', html)
+        self.assertNotIn('exactly the success expected', html)
+
+    def test_live_only_new_formula_before_its_first_season_closes(self):
+        live = dict(self.NEW_LIVE, achievement={}, ratio={})
+        html = self.detail(live)
+        self.assertIn('Visible success first', html)                         # the mode, not the values, decides
+
+    def test_live_only_old_world_detail_keeps_the_earlier_wording(self):
+        html = self.detail(self.OLD_LIVE)
+        self.assertNotIn('>Achievement</th>', html)
+        self.assertIn('exactly the success expected', html)
+
+    def test_latest_from_the_archive_keeps_rules_and_components(self):
+        from unittest import mock
+        OP = self.OP
+        n = dict(self.NEW_LIVE, rules={'achievement': True, 'achievement_weight': 0.666667, 'carry': True},
+                 carry={'juniors': {'Argentina': 0.25}}, season={'Argentina': [1.0, 2.0, 3.0]})
+        n.pop('closed')
+        with mock.patch.object(OP, '_years', lambda w: [2055]), \
+                mock.patch.object(OP, '_record', lambda w, y: {'nations': n, 'events': {}, 'courses': {}}), \
+                mock.patch.object(OP, '_live', lambda w: None):
+            got = OP.latest(object())['nations']
+        self.assertEqual(got, n)
+        self.assertTrue(OP.achievement_mode(got))
+        self.assertFalse(OP.achievement_mode(dict(n, rules={'achievement': False})))   # the record's own rules win
+        self.assertFalse(OP.achievement_mode({'prestige': {}, 'ratio': {}}))         # archived before the rule
+
+    def nations_list(self, nv):
+        from unittest import mock
+        import observer as O
+        with mock.patch.object(O, 'nation_counts', lambda w: {'Argentina': [0] * len(O.NATION_COUNTS)}), \
+                mock.patch.object(O.OP, 'latest', lambda w: {'nations': nv}):
+            return O.nations(object(), {})[1]
+
+    def test_old_world_list_keeps_the_earlier_wording(self):
+        html = self.nations_list(self.OLD_LIVE)
+        self.assertIn('50 = the success expected of its golfers before each event', html)
+        self.assertNotIn('visible success', html)
+        html = self.nations_list({'prestige': {'Argentina': 41.5}, 'ratio': {'Argentina': 0.79}})   # archived, old
+        self.assertNotIn('visible success', html)
+
+    def test_new_world_list_describes_the_mixed_measure(self):
+        for nv in (self.NEW_LIVE, dict(self.OLD_LIVE, rules={'achievement': True})):
+            html = self.nations_list(nv)
+            self.assertIn('visible success against an even share of the fame on offer', html)
+            self.assertNotIn('settled before rules 2026-11-14', html)
+
+
 class InTheWorld(unittest.TestCase):
     def test_close_season_uses_achievement_and_records_it(self):
         pt = PT.Participation(nations(), 2027)
