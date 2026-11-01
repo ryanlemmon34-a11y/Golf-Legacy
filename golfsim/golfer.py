@@ -79,9 +79,12 @@ class Caddie:
             raise ValueError(f'missing caddie skills: {sorted(missing)}')
 
 
+_OVERALL_TOTAL = None                      # (set below, once OVERALL_WEIGHTS is final)
+
+
 def overall_rating(attrs, weights=None):
     w = weights or OVERALL_WEIGHTS
-    total = sum(w.values())
+    total = _OVERALL_TOTAL if w is OVERALL_WEIGHTS else sum(w.values())   # (the same sum, worked out once)
     return sum(attrs[k] * w[k] for k in w) / total
 
 
@@ -130,3 +133,6 @@ def archetype_golfer(archetype, overall, name=None):
         shift = overall - overall_rating(attrs)
         attrs = {k: max(1., min(99., v + shift)) for k, v in attrs.items()}
     return Golfer(name or f'{archetype} {overall:g}', attrs, dict(personality), archetype=archetype)
+
+
+_OVERALL_TOTAL = sum(OVERALL_WEIGHTS.values())
