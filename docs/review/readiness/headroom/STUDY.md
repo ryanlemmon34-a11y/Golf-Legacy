@@ -139,8 +139,8 @@ The plan conditioned bounded paired fresh worlds on promising generation results
 
 So these effects remain untested: access, earnings, survival, ranking and competition feedback, the starting world
 (the transform was applied to entrant cohorts only), and national-share recalculation. Such runs can be done if Ryan
-wants them; the runner pattern (substituting the cohort draw functions after world creation) is described in the
-run notes.
+wants them: the cohort draw functions would be substituted at run time, after the starting world is created, so that
+`golfsim` stays unchanged and the arms differ only in entrant generation.
 
 ## 5. Recommendation for review (no decision taken, nothing implemented)
 
