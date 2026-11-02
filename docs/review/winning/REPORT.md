@@ -82,8 +82,9 @@ a golfer-clustered bootstrap.
   started.
 - His verified ledger: 164 major starts, 39 wins.
 - Without him:
-  - in the 132 majors where he was not (and did not tie for) the best entrant, the best entrant won **9.8%**;
-  - in the 64 majors he did not enter, **14.8%**;
+  - of the 136 majors where he was not (and did not tie for) the best entrant, 132 had a unique best entrant, who
+    won 13 of them (**9.8%**);
+  - of the 64 majors he did not enter, 61 had a unique best entrant, who won 9 of them (**14.8%**);
   - removing him changes the all-level rates by less than 0.2 points.
 
 **What moves the rate** (professional tiers 0–4, unique best):
@@ -169,11 +170,16 @@ identical (mean pre-event Overall 55.6–56.1 across all levels).
 Overall, Power Hitters are 0.9–1.2 with wide intervals. The major-only sample (228 editions) is too small to rank
 archetypes.
 
-**Stable splits.** The ordering holds:
+**A broad pattern, not an identical order.** At the extremes, Aggressive Shotmaker is above 1 and Strategic
+Technician and Precision Ball-Striker are below it. That holds:
 
 - for initial seeded golfers and for later entrants;
 - at ages 25–35;
-- at every level from club pro to Premier.
+- at most levels from club pro to Premier.
+
+The middle of the order is not identical at every level. At Premier, for example, Strategic Technician (0.976)
+sits above Effortless Power (0.941), and the middle archetypes' intervals overlap widely
+(`arch_level_*.csv`).
 
 **Interpretation, to be tested in section 4.** Aggressive Shotmakers win about a quarter more than their Overall
 predicts, yet make the *fewest* cuts and gain much less in top-10s (1.08) than in wins (1.26). That is the
@@ -268,22 +274,28 @@ All 228,604 recorded rounds carry seasonal conditions. Every course's metadata w
 
 Wetness follows the climate tables (`wx_coverage_climate_month.csv`).
 
-Professional tiers 0–4, within-course associations (course fixed effects; covariates: field depth, field size,
-rounds; cluster-robust by course):
+Professional tiers 0–4, within-course associations:
+
+- course fixed effects;
+- covariates: field depth, field size, rounds, year (era), the field's mean Overall and its top-10 mean Overall;
+- cluster-robust by course;
+- non-causal.
 
 | Outcome | Per 1 mph of mean wind | Per wet round |
 |---|---|---|
-| Field's average score per round | **+0.115** (±0.003) | **+0.28** (±0.01) |
-| SD of finishers' totals | **+0.037** (±0.002) | **+0.089** (±0.012) |
-| Best entrant wins (probability) | **+0.0005** (±0.0004) | −0.002 (±0.002) |
-| log(winner's Overall rank) | −0.003 (±0.002) | +0.007 (±0.009) |
+| **Cut survivors'** average score per round | **+0.114** (±0.003) | **+0.27** (±0.01) |
+| SD of **cut survivors'** totals | **+0.037** (±0.002) | **+0.085** (±0.011) |
+| Best entrant wins (probability) | +0.0006 (±0.0004) | −0.002 (±0.002) |
+| log(winner's Overall rank) | −0.003 (±0.002) | +0.008 (±0.009) |
 
-The "per wet round" column is the change in the event's average score per round for each wet round it had.
+**Survivor-only measures.** The scoring rows use only the golfers who finished (made the cut). Who survives can
+itself depend on the weather, so these are not whole-field effects. The controlled all-starter rounds 1–2
+comparison is in 5b. The "per wet round" column is the change in the event's average for each wet round it had.
 
-The descriptive picture is that wind and rain raise everyone's scores and spread the field, but hardly change
-whether the best player wins. By wind band, the professional best-entrant win rate is 10.1% below 6 mph and
-12.1% at 22 mph or more. These bands are confounded by course and field, and the within-course estimate is close
-to zero.
+The descriptive picture is that windier and wetter events score higher and more spread among survivors, but the
+best entrant's win rate hardly differs. By wind band, the professional best-entrant win rate is 10.1% below
+6 mph and 12.1% at 22 mph or more. These bands are confounded by course and field, and the within-course
+estimate is close to zero.
 
 ### 5b. Matched counterfactuals
 
@@ -296,18 +308,24 @@ paired shot seeds, and a re-randomised calm floor.*
 ### Day-to-day volatility (`volatility.py`, `results/volatility.json`)
 
 Majors and Premier editions. The residual is a golfer's round minus that round's field mean (everyone who played
-it). The SD is pooled within each event (ability and time adjusted) per golfer-season.
+it). Three definitions, each a median over golfer-seasons, kept separate because they measure different things:
 
-| Variant | Golfer-seasons | Median SD | Overall 80–85 | 85–90 | 90+ |
+| Definition | Golfer-seasons | Median SD | Overall 80–85 | 85–90 | 90+ |
 |---|---|---|---|---|---|
-| Rounds 1–4, within event | 16,897 | **3.39** | 3.22 | 3.10 | 2.98 |
-| Rounds 1–2, every starter (no cut selection) | 16,203 | **3.28** | 3.12 | 3.02 | 2.82 |
+| A. Rounds 1–4, about the golfer's season mean | 16,897 | 3.48 | 3.33 | 3.21 | 3.20 |
+| B. Rounds 1–4, about the golfer's own mean in each event | 16,897 | 3.39 | 3.22 | 3.10 | 2.98 |
+| C. Rounds 1–2 only (every starter), about the event mean | 16,203 | 3.28 | 3.12 | 3.02 | 2.82 |
 
-As a **rough comparison only** (different metrics): Data Golf's residual SDs, actual minus predicted strokes
-gained, are 2.72 for the best PGA Tour players and 2.75 for the middle, rising to 3.23 for the weakest
-([Data Golf, 2026-02-18](https://datagolf.com/model-talk/2026-offseason-tweaks)). Test2's elite golfers look
-roughly 5–15% more volatile day to day, and its field as a whole more than that. Data Golf's prediction adjusts
-ability, time and course differently, and this world's Overall bands do not map onto their skill groups.
+Definition A keeps week-to-week form and course fit inside the spread. B and C remove each golfer's event mean,
+which also strips out shared event-level form and course fit, so they are not pure round-to-round noise either.
+
+**The real-golf figure is a different measurement.** Data Golf publishes residual SDs (actual minus a model's
+predicted strokes gained) of 2.72 for the best PGA Tour players, 2.75 for the middle and up to 3.23 for the
+weakest ([Data Golf, 2026-02-18](https://datagolf.com/model-talk/2026-offseason-tweaks)). Their prediction
+adjusts ability, time and course in its own way, and this world's Overall bands do not map onto their skill
+groups. **No calibrated ratio between the two is claimed.**
+
+The within-world pattern is clear: higher-Overall golfers are steadier in all three definitions.
 
 ## 7. Limitations
 
@@ -338,9 +356,13 @@ ability, time and course differently, and this world's Overall bands do not map 
   rivals whose totals changed is reported.
 - **Gusts** are seeded by the conditions and the golfer, not by the shot seed. Replicates within one weather
   scenario share their gusts, so weather intervals bootstrap over scenarios.
+- **Same-seed weather contrasts are repeated production comparisons, not "identical luck with only the weather
+  changed".** A different wind or wetness changes which draws are consumed, so every later shot, and even later
+  rounds' pin sheets (drawn from the same stream), follow a different path.
 - **Fixed-field (tier 2) estimates** freeze rivals' scores, including their pressure and cut responses to the
-  subject, and treat playoffs as an equal share. They are conditional approximations and are validated against
-  full production events (tier 3). Win effects are ranked only where precision allows.
+  subject, and treat playoffs as an equal share. They are conditional approximations. **Their rankings are
+  screening only** unless full production events (tier 3) support the treatment effects as well as the baseline
+  rates.
 - **+5 points** is a fixed step on a nonlinear, partly flat rating scale. −5, the equal-SD arms and several
   subjects show the dependence on level. Clipped arms are excluded and listed.
 - **Indirect pathways** (development, availability, injuries, access, career decisions) are not in the fixed-field
