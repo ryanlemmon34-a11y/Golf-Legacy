@@ -378,11 +378,79 @@ best entrant's win rate hardly differs. By wind band, the professional best-entr
 6 mph and 12.1% at 22 mph or more. These bands are confounded by course and field, and the within-course
 estimate is close to zero.
 
-### 5b. Matched counterfactuals
+### 5b. Matched counterfactuals (controlled; `exp_weather.py`, `results/experiments/weather_cf*.{json,csv}`)
 
-*Pending. The design is the same real fields, golfer states and courses with only the conditions changed: calm,
-10, 20 and 28 mph, each dry and wet, in seasonal mode. There are 12 independent direction and gust scenarios,
-paired shot seeds, and a re-randomised calm floor.*
+**Design.**
+
+- **Events.** Four verified 2027 events:
+  - Britannia Open and Scotland Open (links);
+  - France Open (sheltered woodland, Premier);
+  - CH Europe 01 (woodland, tier 2).
+- **Held fixed:** the field, every golfer's captured state and the course.
+- **Varied:** only the shared round conditions. All arms stay in the seasonal model; the classic default is
+  never used. Arms:
+  - calm (0 mph);
+  - 10, 20 and 28 mph;
+  - each dry and wet;
+  - plus a second calm arm with independent shot seeds, which serves as the noise floor.
+- **Scenarios.** Wind direction and gustiness come from 12 independently drawn seasonal scenarios per event.
+  Each scenario × arm is played with 30 paired shot seeds; intervals bootstrap over scenarios.
+- **These are repeated production comparisons, not "identical luck with only the weather changed".**
+  - Same-seed arms do share each golfer's week form and the round-1 pin sheet, which are drawn before any shot.
+  - After that, a weather change alters which draws are consumed, so later shots and the later rounds' pins
+    differ.
+  - Gusts are seeded by the conditions.
+
+**Common penalty and spread.** All starters, rounds 1–2, so nobody is selected out. Δ strokes per round against
+calm, [scenario interval]:
+
+| Event | 10 mph | 20 mph | 28 mph | Calm, wet | 28 mph, wet | 36-hole SD, calm → 28 mph |
+|---|---|---|---|---|---|---|
+| Britannia Open (links) | +1.52 [1.40, 1.64] | +3.09 | **+4.43** | +0.34 | +5.06 | 5.94 → **7.82** (+32%) |
+| Scotland Open (links) | +1.54 | +3.09 | **+4.44** | +0.41 | +5.06 | 5.47 → 6.96 (+27%) |
+| France Open (sheltered woodland) | +0.48 | +0.94 | +1.33 | +0.66 | +1.99 | 5.57 → 5.87 (+5%) |
+| CH Europe 01 (woodland) | +0.62 | +1.27 | +1.78 | +0.75 | +2.58 | 5.51 → 5.77 (+5%) |
+
+Wind costs every golfer three times as much on exposed links as on sheltered woodland, and on links it spreads
+the field strongly.
+
+**Who wins.**
+
+- **The best entrant's win rate does not measurably move.** At the Britannia Open the two calm arms, with
+  identical conditions and independent seeds, give 5.8% and 11.9%. The weather arms all fall between 8.6% and
+  10.8%, inside that sampling band. The other events behave the same way (France 8.1–11.9%; CH Europe 2.5–4.4%;
+  Scotland 5.8–10.3%).
+- **The median winner's Overall rank improves slightly in wind on links** (14 → 12 at Britannia; 13 → 11–12 at
+  Scotland) and on woodland (19 → 13–16 at France).
+- **The distribution of winners** (total-variation distance from calm, against the calm-versus-calm floor of
+  0.27–0.35 with the same samples):
+  - within the floor for most arms;
+  - modestly above it only in strong wind on the Scotland Open links (0.35–0.38 against 0.27).
+- **Same winner as calm, seed for seed:** 4–9% in every weather arm, against 1–2% for two calm runs with
+  independent seeds. The extra comes from the shared week form and first-round pins. In other words, almost any
+  change of conditions produces a different winner in a given replay, but the *chances* of each golfer hardly
+  move except in strong links wind.
+
+**Who gains relative to calm.** This is the correlation, across the real field, between an attribute and the
+change in finishing percentile (negative means the attribute helps):
+
+- **Links, 20–28 mph:**
+  - ball_flight −0.81 to −0.90;
+  - long_irons −0.38 to −0.45;
+  - Overall −0.35 to −0.46: better players gain.
+- **Sheltered woodland, 20–28 mph:** ball_flight −0.5 to −0.6.
+- **Wet but calm:** little relative change, with no consistent attribute.
+
+These correlations are confounded by how attributes cluster in real profiles. injury_resistance, which has **no
+shot effect at all**, shows −0.31 to −0.38 at Britannia in strong wind. Only ball_flight's role is also a
+documented mechanism (`ATTRIBUTE_MAP.md`; section 4c: +5 ball_flight is worth −0.17 strokes per round on links
+against −0.03 on sheltered woodland).
+
+**Answer to "how much did weather impact who won?"** In this engine, weather mostly moves everyone together and
+widens the spread on exposed links. It reorders the field in favour of ball-flight-strong (and higher-Overall)
+golfers in strong links wind, and in any single tournament it changes the winner almost as surely as a re-roll
+would. It does not measurably change how often the best entrant wins. No counterfactual is claimed for any
+specific historic edition beyond these verified 2027 events.
 
 ## 6. Skill, depth, volatility
 
