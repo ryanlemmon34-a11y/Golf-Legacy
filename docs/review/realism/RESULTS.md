@@ -35,6 +35,11 @@ The plan and targets are in `PLAN.md`; how to test is in `TESTING.md`. Main `18a
 | Seed 2027, mixed version | main `18a8e23` (no fix) for 30 seasons, against the realism run continued from its verified 2048 checkpoint on realism + fix `c528575` for 2049–2056 (`results/runaway_2049/`) | Evidence that the fixed build crosses the failure point and completes. From 2049 the arms differ in the engine fix as well as the realism rules, so it is **not** a single-version causal comparison. |
 | Seed 3031, same-fix pair | main + fix `46013a5` (engine `2abe4dc8`) against realism + fix `c528575` (engine `f0529419`), both carrying the identical engine fix; 30 single-version seasons each (2027–2056), no restarts | **A causal pair for the realism rules alone**, a second paired seed. Not the same engine as the seed-2027 clean pair (that pair has no fix). |
 
+**Run data.** The run directories (saves, run states, analysis exports, history archives) were held in RAM and
+were lost when the container restarted on 2026-11-02 at 12:06 UTC. Only the committed logs, manifests, provenance and
+tables remain. They are listed with their SHA-256 hashes in `results/EVIDENCE_runs.md`, along with what was lost and
+the disk gap.
+
 **Scripts.**
 - Comparison: `compare_worlds.py`, sha256 `dff42fc2…6bbf`. Both arms are always compared on the identical covered
   seasons.

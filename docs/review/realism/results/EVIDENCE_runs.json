@@ -1,0 +1,106 @@
+{
+ "kind": "evidence manifest, seed-3031 same-fix pair (and the seed-2027 run data lost with it)",
+ "written": "2026-11-02",
+ "durable_location": {
+  "remote": "origin (GitHub)",
+  "branch": "build/realism-youth-aging-longirons",
+  "commit_with_these_files": "f985cad"
+ },
+ "loss": {
+  "what": "every run directory, all held in RAM (/dev/shm tmpfs)",
+  "when": "container restart, system boot 2026-11-02 12:06:05 UTC",
+  "hashes_recorded_before_loss": "none for the seed-3031 run files"
+ },
+ "seed3031_arms": {
+  "mainfix": {
+   "label": "main + fix (dev-1)",
+   "commit": "46013a575753bcf0a6ee79aec5637bb55be9d5bb",
+   "engine": "2abe4dc851f0d6e79b5f74a903568a8bf2f0346c",
+   "dirty": false,
+   "started": "2026-11-02 09:00:01",
+   "years_completed": 30,
+   "holes": 178555856,
+   "minutes": 167.9,
+   "run_dir_lost": "/dev/shm/fw/mainfix_3031",
+   "log_lost": "/dev/shm/fw/mainfix_3031.log"
+  },
+  "realfix": {
+   "label": "realism + fix (dev-2)",
+   "commit": "c528575f962220bb75f5076ea60ada564398d092",
+   "engine": "f0529419945617bc2c8431b04146f681360bd3c9",
+   "dirty": false,
+   "started": "2026-11-02 09:00:01",
+   "years_completed": 30,
+   "holes": 178402048,
+   "minutes": 166.4,
+   "run_dir_lost": "/dev/shm/fw/realfix_3031",
+   "log_lost": "/dev/shm/fw/realfix_3031.log"
+  }
+ },
+ "seed3031_surviving_files": {
+  "results/seed3031_logs/mainfix_3031.log": {
+   "sha256": "4eac44ba1650f61b2462156618db4ad5096f60c10da92a9065d6014877bfe368",
+   "bytes": 3301
+  },
+  "results/seed3031_logs/realfix_3031.log": {
+   "sha256": "f911d4ca97a3488121ad727564f12afee034362865ad8faaf7aa95b485986107",
+   "bytes": 3300
+  },
+  "results/seed3031_logs/manifest_mainfix.json": {
+   "sha256": "37547d0027a0710ff840cbc807b402c4de246029b74cb1444996a36ec8876b6d",
+   "bytes": 1629
+  },
+  "results/seed3031_logs/manifest_realfix.json": {
+   "sha256": "76866ed8e2a71c09262aef25ab4812f87350c3b87ec1b4e71fc11b32d65bf663",
+   "bytes": 1629
+  },
+  "results/world_seed3031_samefix30.md": {
+   "sha256": "2da12e6e76fc11b84b0857ac0d13e36212c8f4d8c8c707922c79a68b230d96fd",
+   "bytes": 7648
+  },
+  "compare_worlds.py": {
+   "sha256": "dff42fc262937f814fe64f8d225ae4adacbd11af04929bdac8c1a237c3186bbf",
+   "bytes": 16341
+  }
+ },
+ "seed2027_surviving_files": {
+  "results/world_seed2027_s22.md": {
+   "sha256": "8845e693f98c47112182b0c23a8c30e17f27588140fc4914cfa21dc005f6edd1",
+   "bytes": 6986
+  },
+  "results/world_seed2027_mixed30.md": {
+   "sha256": "bf2563cdcae555364e04e52aebe7562344d69688f2096f58680dbc0934d11ae3",
+   "bytes": 7762
+  },
+  "results/runaway_2049/PROVENANCE_mixed.json": {
+   "sha256": "be1b0fb435b7c42dd69954aad2f7d2ea643fa1f13e98750710ba664206289f91",
+   "bytes": 1918
+  },
+  "results/runaway_2049/mixed_continuation.log": {
+   "sha256": "680cc6ea8ccb6cf77ae14c7785f61cc02dbaa338eac0d1bcbe1416f35d289cb6",
+   "bytes": 1980
+  },
+  "results/runaway_2049/original_run_extract.log": {
+   "sha256": "3a76732c28896441ddd25a19c4dad70e7beb5d2928c0ab217ef3e5576289b7b9",
+   "bytes": 1390
+  },
+  "results/runaway_2049/hole17_state.pkl": {
+   "sha256": "acedf03c40b7fe8ce1a403d013782510a876ba046c6cf45f44ce38ef8e406490",
+   "bytes": 12339
+  }
+ },
+ "seed2027_mixed_checkpoint_hashes_recorded_before_loss": {
+  "save": "/dev/shm/fw/dev2_2027/seed_2027.save",
+  "save_sha256": "95e03eecd848fca0c789025b3d92c3815eb8d5e977c56781215347ca18cd640e",
+  "state": "/dev/shm/fw/dev2_2027/seed_2027.state.pkl",
+  "state_sha256": "35cd232326eb506d1b786754028e6a37eec1295115eb0dafc332f59e4698e9f2",
+  "save_note": "seed 2027 after 2048",
+  "state_last_season": 2048,
+  "state_seasons": 22
+ },
+ "disk": {
+  "free_bytes": 2329825280,
+  "floor_bytes": 3000000000,
+  "below_floor_bytes": 670174720
+ }
+}
