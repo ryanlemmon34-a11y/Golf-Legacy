@@ -1,0 +1,33 @@
+test_recording_changes_no_outcome (tests.test_upsets.HeavyEquivalenceTests.test_recording_changes_no_outcome) ... skipped 'whole-season run: set GOLF_HEAVY_TESTS=1'
+test_calibration_against_the_balance_report (tests.test_upsets.ModelTests.test_calibration_against_the_balance_report)
+Model 1 against the engine's measured upset test (reports/BALANCE_REPORT.md section 6): per-start win ... ok
+test_degenerate_fields (tests.test_upsets.ModelTests.test_degenerate_fields) ... ok
+test_deterministic (tests.test_upsets.ModelTests.test_deterministic) ... ok
+test_large_and_weak_fields (tests.test_upsets.ModelTests.test_large_and_weak_fields) ... ok
+test_missing_overall_is_the_fields_lowest (tests.test_upsets.ModelTests.test_missing_overall_is_the_fields_lowest) ... ok
+test_monotonic_in_overall (tests.test_upsets.ModelTests.test_monotonic_in_overall) ... ok
+test_odds_text (tests.test_upsets.ModelTests.test_odds_text) ... ok
+test_ties_share_a_chance_and_rank (tests.test_upsets.ModelTests.test_ties_share_a_chance_and_rank) ... ok
+test_uses_no_random_numbers (tests.test_upsets.ModelTests.test_uses_no_random_numbers) ... ok
+test_version_and_sum (tests.test_upsets.ModelTests.test_version_and_sum) ... ok
+test_every_stored_chance_is_reproduced_from_the_snapshot_alone (tests.test_upsets.NoHindsightTests.test_every_stored_chance_is_reproduced_from_the_snapshot_alone) ... ok
+test_play_site_estimate_is_made_before_play_and_changes_nothing (tests.test_upsets.NoHindsightTests.test_play_site_estimate_is_made_before_play_and_changes_nothing)
+The worker's estimate is computed from the field before any shot, uses no random numbers and leaves ... ok
+test_record_leaves_the_estimate_unchanged (tests.test_upsets.NoHindsightTests.test_record_leaves_the_estimate_unchanged) ... ok
+test_snapshot_size_per_edition (tests.test_upsets.NoHindsightTests.test_snapshot_size_per_edition)
+Archive growth (docs/HISTORY_AND_PERSISTENCE.md): about 11 bytes per entrant for the snapshot and about ... ok
+test_b2_unrecorded_seasons_say_so (tests.test_upsets.PageTests.test_b2_unrecorded_seasons_say_so) ... ok
+test_drama_never_enters_the_ranking (tests.test_upsets.PageTests.test_drama_never_enters_the_ranking) ... ok
+test_entries_link_to_the_result_and_the_golfer_and_explain (tests.test_upsets.PageTests.test_entries_link_to_the_result_and_the_golfer_and_explain) ... ok
+test_first_win_counts_unrecorded_editions_too (tests.test_upsets.PageTests.test_first_win_counts_unrecorded_editions_too) ... ok
+test_live_season_rows (tests.test_upsets.PageTests.test_live_season_rows) ... ok
+test_majors_only_and_filters (tests.test_upsets.PageTests.test_majors_only_and_filters) ... ok
+test_ranking_lowest_chance_first_with_stable_ties (tests.test_upsets.PageTests.test_ranking_lowest_chance_first_with_stable_ties) ... ok
+test_rows_from_the_record (tests.test_upsets.PageTests.test_rows_from_the_record) ... ok
+test_status_and_age_at_the_event (tests.test_upsets.PageTests.test_status_and_age_at_the_event) ... ok
+test_tied_chances_share_a_rank (tests.test_upsets.PageTests.test_tied_chances_share_a_rank) ... ok
+
+----------------------------------------------------------------------
+Ran 25 tests in 0.138s
+
+OK (skipped=1)

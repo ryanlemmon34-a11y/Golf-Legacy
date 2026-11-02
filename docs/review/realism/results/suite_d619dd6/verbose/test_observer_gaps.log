@@ -1,0 +1,35 @@
+test_names_both_ways_and_unknown_sort (tests.test_observer_gaps.UnitDirectorySort.test_names_both_ways_and_unknown_sort) ... ok
+test_prestige_ascending_missing_still_last (tests.test_observer_gaps.UnitDirectorySort.test_prestige_ascending_missing_still_last) ... ok
+test_prestige_descending_first_missing_last (tests.test_observer_gaps.UnitDirectorySort.test_prestige_descending_first_missing_last) ... ok
+test_not_recorded_without_them (tests.test_observer_gaps.UnitPrestigeParts.test_not_recorded_without_them) ... ok
+test_parts_from_the_running_world (tests.test_observer_gaps.UnitPrestigeParts.test_parts_from_the_running_world) ... ok
+test_a_replay_shows_nothing_beyond_the_round (tests.test_observer_gaps.UnitRoundConditions.test_a_replay_shows_nothing_beyond_the_round) ... ok
+test_each_round_as_recorded (tests.test_observer_gaps.UnitRoundConditions.test_each_round_as_recorded) ... ok
+test_not_recorded (tests.test_observer_gaps.UnitRoundConditions.test_not_recorded) ... ok
+test_the_one_line_keeps_direction_gusts_and_knockout_days (tests.test_observer_gaps.UnitRoundConditions.test_the_one_line_keeps_direction_gusts_and_knockout_days)
+Seasonal weather's five-value rows (wind, wet, pins, bearing, gustiness) at a match-play site: two stroke-play ... ok
+test_a_golfers_first_major_with_each_coach_and_caddie (tests.test_observer_gaps.UnitTeamNews.test_a_golfers_first_major_with_each_coach_and_caddie) ... ok
+test_only_inside_the_window (tests.test_observer_gaps.UnitTeamNews.test_only_inside_the_window) ... ok
+test_retirement_into_a_staff_role_archived_once (tests.test_observer_gaps.UnitTeamNews.test_retirement_into_a_staff_role_archived_once) ... ok
+test_retirement_into_a_staff_role_from_the_snapshot (tests.test_observer_gaps.UnitTeamNews.test_retirement_into_a_staff_role_from_the_snapshot) ... ok
+test_the_same_item_whoever_is_followed (tests.test_observer_gaps.UnitTeamNews.test_the_same_item_whoever_is_followed) ... ok
+test_marked_read_at_week_one_reads_the_winter (tests.test_observer_gaps.UnitWinterBoundary.test_marked_read_at_week_one_reads_the_winter) ... ok
+test_tour_and_status_changes_read_the_same_way (tests.test_observer_gaps.UnitWinterBoundary.test_tour_and_status_changes_read_the_same_way) ... ok
+test_and_after_reopening_from_the_history (tests.test_observer_gaps.UnitWinterDeathAndDeparture.test_and_after_reopening_from_the_history) ... ok
+test_cleared_together_at_the_season_end_cursor (tests.test_observer_gaps.UnitWinterDeathAndDeparture.test_cleared_together_at_the_season_end_cursor) ... ok
+test_next_seasons_week_one_is_not_hidden (tests.test_observer_gaps.UnitWinterDeathAndDeparture.test_next_seasons_week_one_is_not_hidden) ... ok
+test_the_winter_reads_the_season_end_ranking (tests.test_observer_gaps.UnitWinterDeathAndDeparture.test_the_winter_reads_the_season_end_ranking) ... ok
+test_coaches_and_caddies_prestige_both_ways (tests.test_observer_gaps.WorldGaps.test_coaches_and_caddies_prestige_both_ways) ... ok
+test_conditions_archived (tests.test_observer_gaps.WorldGaps.test_conditions_archived) ... ok
+test_conditions_current_season (tests.test_observer_gaps.WorldGaps.test_conditions_current_season) ... ok
+test_conditions_not_recorded (tests.test_observer_gaps.WorldGaps.test_conditions_not_recorded) ... ok
+test_first_shared_majors_each_once (tests.test_observer_gaps.WorldGaps.test_first_shared_majors_each_once) ... ok
+test_golfers_prestige_both_ways (tests.test_observer_gaps.WorldGaps.test_golfers_prestige_both_ways) ... ok
+test_prestige_parts_not_recorded_in_the_history_alone (tests.test_observer_gaps.WorldGaps.test_prestige_parts_not_recorded_in_the_history_alone) ... ok
+test_prestige_parts_on_the_profile (tests.test_observer_gaps.WorldGaps.test_prestige_parts_on_the_profile) ... ok
+test_retirement_into_a_staff_role_each_once (tests.test_observer_gaps.WorldGaps.test_retirement_into_a_staff_role_each_once) ... skipped 'no golfer became a coach or caddie in this small world'
+
+----------------------------------------------------------------------
+Ran 29 tests in 104.695s
+
+OK (skipped=1)

@@ -26,8 +26,9 @@ check, section 2) and one is untested (injuries per start).** The plan and targe
   - main `18a8e23`, started 05:42 UTC;
   - branch `d619dd6`, started 06:00 UTC.
 
-  Comparison: `compare_worlds.py` as committed alongside each results file (both arms on identical covered seasons).
-- **Item 4:** `diag_access.py` (sha256 `0e584dbd…1e38`) on existing long-run outputs (read only):
+  Comparison: `compare_worlds.py` (sha256 `dff42fc2…6bbf` for the 20-season interim), both arms on identical
+  covered seasons.
+- **Item 4:** `diag_access.py` (sha256 `65dea982…5f02`) on existing long-run outputs (read only):
   - commit `473690a`: seeds 360013 (45 seasons), 2027 and 3031 (10 each);
   - commit `c0d1ea5`: seeds 4207 (released configuration, 10) and 5309 (5).
 
@@ -138,49 +139,61 @@ Two readings worth a separate look (not acted on):
 - the few mini-tour professionals in the world top 100 each season, whose recorded reasons (money, schedule,
   entry) would need checking before anything is called a defect.
 
-## Full-scale worlds (seed 2027): interim after 10 seasons, final at 30
+## Full-scale worlds (seed 2027): interim after 20 seasons, final at 30
 
-Both runs are compared on the identical covered seasons. Ratings are season-end values, after the season and its
-winter, and these definitions apply:
+Both runs are compared on the identical covered seasons, and the season times are for those seasons only. Ratings
+are recorded after the season and its winter; ages are the age in the completed season (season minus birth year).
+These definitions apply:
 - **First observed rating:** a junior's first record comes after their first season and winter, so it is not their
   entry rating.
-- **Maximum:** the highest observed season-end rating, not a complete-career peak.
-- **Censoring:** "last observed age at 85+" is cut off at the run's end.
-- **Majors:** counted from the majors' winner ledger, which reconciles with the season snapshots (40 = 40 in each
+- **Highest observed:** the highest such record, not a complete-career peak.
+- **Censoring:** careers still running at the end are censored, and the latest junior classes are early in their
+  careers.
+- **One paired world:** every count is descriptive, not a rate, and no significance is claimed.
+- **Majors:** counted from the majors' winner ledger, which reconciles with the season snapshots (80 = 80 in each
   arm).
-- **Retirements:** taken from the recorded career transitions, from play and into staff jobs separately. Deaths are
-  not in this export.
+- **Exits:** taken from the recorded career transitions. Retired from play, became a coach or caddie when retiring,
+  and became a coach or caddie when they stopped chasing are counted apart. Deaths are not in this export.
 
-Interim tables after 10 seasons are in `results/world_seed2027_interim_s10.md`. They are one seed, paired against
-main, early and censored:
+Tables: `results/world_seed2027_interim_s20.md`. The earlier 10-season interim (`…_s10.md`) used definitions since
+corrected and is superseded.
 
-| realized, seasons 2027–2036 | main (dev-1) | branch (dev-2) |
+| realized, seasons 2027–2046 (one paired seed) | main (dev-1) | branch (dev-2) |
 |---|---|---|
-| Yearly season-end Overall change at ages 35–39 / 40–44 / 45–49 | −0.47 / −0.73 / −0.89 | −0.57 / −0.90 / −1.11 |
-| Golfer-seasons with starts that had an injury, ages 35–39 / 40–44 (a proxy, not per start) | 7.5% / 8.2% | 8.3% / 9.4% |
-| Share of Premier wins / majors won at 40+ | 11.9% / 10.0% (4 of 40) | 9.2% / 5.0% (2 of 40) |
-| Top-20 mean age | 31.3 | 30.6 |
-| Golfers at 80+ / 85+ at season end, 2036 | 39 / 5 | 35 / 5 |
-| Juniors (2028–2036): highest observed 75+ / 80+ | 45 / 9 | 46 / 8 |
-| Retirements from play at 25–34, golfers whose highest observed rating was 65+ | 22 | 46 |
-| Season time, median (cloud, two runs sharing 4 CPUs; relative only) | 284 s | 283 s |
+| Yearly change of the post-winter rating at ages 35–39 / 40–44 / 45–49 | −0.49 / −0.78 / −0.99 | −0.58 / −0.94 / −1.13 |
+| Careers seen from 28 or younger to 38 or older: rating at 40 / 45 relative to the highest observed (median) | −3.0 / −7.4 | −3.4 / −8.2 |
+| Age at the highest observed rating, same careers: median (10th–90th percentile) | 30 (27–34) | 30 (27–34) |
+| Golfer-seasons with starts that had an injury, ages 35–39 / 40–44 / 45–49 (a proxy, not per start) | 6.2% / 8.0% / 9.3% | 6.8% / 9.2% / 11.0% |
+| Share of Premier wins (snapshots) / majors (ledger) won at 40+ | 10.6% / 10.0% (8 of 80) | 9.4% / 7.5% (6 of 80) |
+| Top-20 mean age, all seasons / last 10 | 30.2 / 29.1 | 29.9 / 29.2 |
+| Stock of golfers at 80+ / 85+ in the season snapshot, 2036 / 2046 (not eventual supply; may include that winter's retirees) | 39 / 5; 48 / 15 | 35 / 5; 45 / 14 |
+| Juniors arriving 2028–2046: highest observed SO FAR at 75+ / 80+ / 85+ / 90+ (censored) | 107 / 40 / 11 / 1 | 106 / 39 / 10 / 2 |
+| Most majors by one golfer; distinct major winners | 9; 42 | 7; 44 |
+| Season time over the 20 common seasons: median (total) (cloud, two runs sharing 4 CPUs; relative only) | 304 s (6,005 s) | 308 s (6,129 s) |
 
-Watch items:
-- **Fewer golfers at 80+ in 2036 (35 against 39).** The older 80+ golfers decline sooner. This is the
-  longevity-for-supply trade-off, seen in one seed and early.
-- **Early retirements doubled (22 → 46).** These are marginal golfers, highest observed rating about 66.5, with no
-  injury link (median 0 injury weeks). Their retirement chance is slightly higher, 0.067 against 0.058, consistent
-  with faster decline feeding the career decision's progress input. That is about 2.8 standard errors on one seed.
-  It is checked again at 30 seasons and on the second seed before any conclusion.
+**Recorded exits at ages 25–34** among each arm's golfers whose highest observed rating was 65+: retired from play
+119 against 130; became a coach or caddie when retiring 15 against 15; when they stopped chasing 114 against 93.
+These are descriptive counts, not rates, from one dependent paired world. The 10-season gap (22 against 46 from
+play) has narrowed, and its mechanism is unresolved: no decision traces were examined that would establish one.
+
+**The snapshot 80+ stock is lower in some seasons** (2036: 35 against 39; 2046: 45 against 48). This is a stock,
+not eventual supply, and it may include golfers who retire that winter. No age or exit explanation is offered
+without direct evidence.
 
 ## Regression
 
-The full suite runs one module at a time at low priority on `d619dd6` (results when complete).
-`tests/test_realism_pass1.py` has 12 tests, all passing.
+The full suite ran on `d619dd6` (frozen checkout), one module at a time at low priority. Logs and summary are in
+`results/suite_d619dd6/`.
+- **90 modules, 1,145 tests, 4 skipped, 0 failures.**
+- `test_long_run_safeguards` first errored twice (2 of 18). The harness's own 3 GB free-disk safeguard tripped
+  because its temporary folder was on the main disk, which had 2.3 GB free. Re-run with the temporary folder in RAM
+  (`TMPDIR=/dev/shm/...`), it passed 18 of 18. Both runs are in the summary.
+- The four skips, with their messages as the tests print them, are listed in `results/suite_d619dd6/SKIPS.md`.
+- `tests/test_realism_pass1.py`: 12 tests, all passing.
 
 Cost of the new code: up to about 0.5 s more to generate a full world (about 1.8 s against 2.1–2.3 s), and at most
-about 0.1 s for one winter's aging of 6,449 golfers (noisy timings). Season time is compared in the paired world
-runs; it is a cloud figure, relative only. The 120 s target refers to Ryan's machine.
+about 0.1 s for one winter's aging of 6,449 golfers (noisy timings). Season time in the paired world runs is in the
+table above; it is a cloud figure, relative only. The 120 s target refers to Ryan's machine.
 
 ## Limits and censoring
 

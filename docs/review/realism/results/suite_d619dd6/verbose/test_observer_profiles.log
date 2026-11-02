@@ -1,0 +1,17 @@
+test_golfer_profile_shows_this_seasons_partnership (tests.test_observer_profiles.LivePartnerships.test_golfer_profile_shows_this_seasons_partnership) ... ok
+test_live_end_state_overrides_the_archive_once (tests.test_observer_profiles.LivePartnerships.test_live_end_state_overrides_the_archive_once) ... ok
+test_seven_new_clients_show_at_once (tests.test_observer_profiles.LivePartnerships.test_seven_new_clients_show_at_once) ... ok
+test_a_golfer_who_became_staff_keeps_one_identity (tests.test_observer_profiles.ProfilesAndStatsTests.test_a_golfer_who_became_staff_keeps_one_identity) ... skipped 'no golfer became staff in this short world (checked on the 50-season copy)'
+test_coach_clients_are_current_assignments (tests.test_observer_profiles.ProfilesAndStatsTests.test_coach_clients_are_current_assignments) ... ok
+test_moments_show_their_venue (tests.test_observer_profiles.ProfilesAndStatsTests.test_moments_show_their_venue) ... ok
+test_new_worlds_take_a_starting_year_and_a_random_or_explicit_seed (tests.test_observer_profiles.ProfilesAndStatsTests.test_new_worlds_take_a_starting_year_and_a_random_or_explicit_seed) ... ok
+test_ratings_ages_honors_and_season_rows (tests.test_observer_profiles.ProfilesAndStatsTests.test_ratings_ages_honors_and_season_rows) ... ok
+test_removed_worlds_can_be_restored_and_are_deleted_only_deliberately (tests.test_observer_profiles.ProfilesAndStatsTests.test_removed_worlds_can_be_restored_and_are_deleted_only_deliberately) ... ok
+test_shortlists_persist_per_world_across_types (tests.test_observer_profiles.ProfilesAndStatsTests.test_shortlists_persist_per_world_across_types) ... ok
+test_statistics_reconcile_with_results_and_money_paid (tests.test_observer_profiles.ProfilesAndStatsTests.test_statistics_reconcile_with_results_and_money_paid) ... ok
+test_stats_pages_sort_filter_and_drill_down (tests.test_observer_profiles.ProfilesAndStatsTests.test_stats_pages_sort_filter_and_drill_down) ... ok
+
+----------------------------------------------------------------------
+Ran 12 tests in 47.777s
+
+OK (skipped=1)

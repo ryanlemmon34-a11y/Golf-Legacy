@@ -31,11 +31,15 @@ def q(xs, p):
     return xs[min(len(xs) - 1, max(0, int(round(p * (len(xs) - 1)))))] if xs else float('nan')
 
 
-def season_times(log):
+def season_times(log, years):
+    """Seconds per season from a long_world log (cumulative times), for the given seasons only."""
     if not log or not Path(log).exists():
-        return []
-    t = [int(m.group(1)) for m in re.finditer(r'done \(\d+/\d+\).*?, (\d+) s', Path(log).read_text())]
-    return [b - a for a, b in zip([0] + t, t)]
+        return {}
+    cum = {int(m.group(1)): int(m.group(2))
+           for m in re.finditer(r': (\d{4}) done \(\d+/\d+\).*?, (\d+) s', Path(log).read_text())}
+    ys = sorted(cum)
+    per = {y: cum[y] - (cum[ys[i - 1]] if i else 0) for i, y in enumerate(ys)}
+    return {y: t for y, t in per.items() if y in years}
 
 
 def table(rows, head):
@@ -145,8 +149,8 @@ def analyse(data, debug, only=None):
             band = min(65, t['age'] // 5 * 5)
             if t.get('kind') == 'retired':
                 ret[(band, 'play')] += 1
-            elif t.get('via') == 'retirement' and t.get('kind') in ('became coach', 'became caddie'):
-                ret[(band, 'staff')] += 1
+            elif t.get('kind') in ('became coach', 'became caddie'):
+                ret[(band, 'staff, retiring' if t.get('via') == 'retirement' else 'staff, stopped chasing')] += 1
     res['ret'] = ret
     # item 4: access of high-Overall golfers and field gaps
     acc = {}
@@ -181,13 +185,16 @@ def main():
     p = out.append
     ys = sorted(common)
     p(f'Seed {a.seed}, full scale. Both arms compared on the identical covered seasons {ys[0]}-{ys[-1]} ({len(ys)}). '
-      'Ratings are season-end values (after the season and its winter); a golfer\'s "maximum" is the highest observed '
-      'season-end rating, not a complete-career peak; careers still running at the end are censored.\n')
-    p('### Golfers at 80+ / 85+ / 90+ Overall at season end (golfers in that season\'s snapshot)\n')
+      'Ratings are recorded after the season and its winter; ages are the age in the completed season (season minus '
+      'birth year). A golfer\'s "highest observed" rating is the highest such record, not a complete-career peak; '
+      'careers still running at the end are censored. One paired world: counts are descriptive, not rates.\n')
+    p('### Stock of golfers at 80+ / 85+ / 90+ Overall in each season\'s snapshot (not eventual supply; a snapshot may '
+      'include golfers who retire that winter)\n')
     pick = [y for y in ys if (y - ys[0]) % 5 == 4 or y == ys[-1]]
     p(table([[y] + ['/'.join(map(str, arms[k]['elite'][y])) for k in arms] for y in pick], ['season'] + list(arms)))
-    p('\n### Juniors arriving from the second season: first observed season-end Overall and highest observed season-end '
-      'Overall (not their entry rating: the first record is after their first season and winter)\n')
+    p('\n### Juniors arriving from the second season: first observed rating and highest observed rating SO FAR (censored: '
+      'the latest classes are early in their careers; the first record is after their first season and winter, not '
+      'their entry rating)\n')
     p(table([[k, *[f'{x:.2f}' if isinstance(x, float) else x for x in r['entry']],
               *[r['entr_max'][t] for t in (75, 80, 85, 90)]] for k, r in arms.items()],
             ['arm', 'juniors', 'mean first observed', 'first observed 75+', '80+', '85+', 'largest first observed',
@@ -231,11 +238,13 @@ def main():
     bks = sorted(set(arms['main (dev-1)']['inj']) | set(arms['branch (dev-2)']['inj']))
     p(table([[f'{b}-{b + 4}' if b < 55 else '55+'] + [f"{arms[k]['inj'].get(b, (0, 0, 0))[1]:.2f} / {100 * arms[k]['inj'].get(b, (0, 0, 0))[2]:.1f}%" for k in arms]
              for b in bks], ['age'] + list(arms)))
-    p('\n### Retirements by age (recorded career transitions; golfers whose highest observed rating was 65+): from play, '
-      'and into a coaching or caddie job. Deaths are not in this export.\n')
+    p('\n### Recorded career exits by age at the transition (descriptive counts among each arm\'s golfers whose highest '
+      'observed rating was 65+; not rates): retired from play; became a coach or caddie when retiring; became a coach '
+      'or caddie when they stopped chasing. Deaths are not in this export.\n')
     bks = sorted({b for r in arms.values() for b, _ in r['ret']})
-    p(table([[f'{b}-{b + 4}' if b < 65 else '65+'] + [f"{arms[k]['ret'][(b, 'play')]} / {arms[k]['ret'][(b, 'staff')]}" for k in arms]
-             for b in bks], ['age'] + [f'{k}: play / staff' for k in arms]))
+    kinds = ('play', 'staff, retiring', 'staff, stopped chasing')
+    p(table([[f'{b}-{b + 4}' if b < 65 else '65+'] + [' / '.join(str(arms[k]['ret'][(b, x)]) for x in kinds) for k in arms]
+             for b in bks], ['age'] + [f'{k}: play / staff retiring / staff stopped chasing' for k in arms]))
     p('\n### Item 4 diagnostic (partial): world top-100 by Overall not on the Premier Tour; Premier MEMBERS\' Overall gaps\n')
     p('Diagnostic only: being off the Premier Tour (amateur, college, another tour, eligibility, scheduling) does not '
       'establish blocked access, and member gaps are not tournament-field gaps.\n')
@@ -260,10 +269,11 @@ def main():
           f"seasons); {sum(mw.values())} majors, {len(mw)} winners, most by one golfer: "
           + ', '.join(f'{c} (born {r["born"].get(int(g), "?")})' for g, c in top3))
     for k, log in (('main (dev-1)', a.log_main), ('branch (dev-2)', a.log_branch)):
-        t = season_times(log)
+        t = season_times(log, common)
         if t:
-            p(f'- season time, {k} (cloud, 2 workers, two runs sharing 4 CPUs; relative only): median {S.median(t):.0f} s, '
-              f'max {max(t)} s over {len(t)} seasons')
+            v = list(t.values())
+            p(f'- season time, {k}, the {len(v)} common seasons (cloud, 2 workers, two runs sharing 4 CPUs; relative '
+              f'only): median {S.median(v):.0f} s, max {max(v)} s, total {sum(v)} s')
     print('\n'.join(out))
 
 
