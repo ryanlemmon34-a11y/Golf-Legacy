@@ -326,10 +326,66 @@ mid_irons and wedges gain a little more going up than they lose going down: +5 g
 These are strokes per round from a single golfer's production rounds. They are not win probabilities; winning
 impact is section 4e.
 
-### 4d. Fixed-Overall archetype profiles
+### 4d. Fixed-Overall archetype profiles (controlled; `rounds_arch.json`, `fixed_arch_*.json`)
 
-*Pending (queued): the subject's 21 attributes are replaced by each native archetype profile at exactly the same
-Overall, with the archetype's aggression and big_stage and with those set neutral.*
+**Design.**
+
+- The rank-10 and rank-40 subjects' 21 attributes are replaced by each native archetype template
+  (`golfer.archetype_golfer`) at **exactly the subject's own Overall**.
+- Each profile is run twice: with the archetype's aggression and big_stage, and with both set to 50 ("neutral").
+- Everything else about the subject is unchanged.
+- **Reference.** The flat profile (every attribute equal to the Overall), which is identical to All-Rounder.
+- **Clipping.** One profile is clipped (Elite Putter at Britannia rank 10).
+
+**Round scoring.** Three events, 8,000 paired samples; Δ strokes per round and SD against the flat profile, R1,
+averaged over events and subjects:
+
+| Profile (same Overall) | Δ mean strokes per round | Links / woodland / tier-2 | Round SD vs flat | Under contention (R4P) | Archive O/E_ovr (section 3) |
+|---|---|---|---|---|---|
+| Short-Game Artist | **−0.29** | −0.38 / −0.25 / −0.22 | 0.979 | −0.36 | 0.99 |
+| Precision Ball-Striker | −0.21 | −0.23 / −0.32 / −0.07 | **0.965** | −0.19 | **0.90** |
+| Elite Putter | −0.11 | −0.14 / −0.10 / −0.08 | 0.996 | −0.17 | 0.99 |
+| Aggressive Shotmaker | −0.06 | **−0.33** / +0.08 / +0.07 | **1.056** (neutral 1.038) | +0.03 | **1.26** |
+| Strategic Technician | ±0.00 | +0.04 / −0.09 / +0.07 | 0.981 | −0.17 | **0.82** |
+| Flat / All-Rounder | 0 | 0 | 1 | 0 | 1.02 |
+| Effortless Power | +0.07 | −0.20 / +0.16 / +0.24 | 1.014 | −0.08 | 1.05 |
+| Power Hitter | **+0.36** | +0.43 / +0.30 / +0.35 | 1.045 | +0.40 | 0.97 |
+
+**What it shows:**
+
+- **Overall does not equalise expected scoring across shapes on real courses.** At the same Overall the profiles
+  differ by up to about 0.65 strokes per round: Short-Game Artist against Power Hitter. The Overall weights
+  were measured in calm, pressure-free conditions on one test course.
+- **Course matters.** The ball-flight-heavy profiles gain on links: Aggressive Shotmaker −0.33, Effortless Power
+  −0.20. On woodland they lose.
+- **Spread.** The archive's win-over-Overall ordering lines up better with the profiles' **round-score spread**
+  than with their mean:
+  - Aggressive Shotmaker has the widest spread (+5.6%, of which about 1.8 points come from aggression 85 rather
+    than 50) and the largest archive excess (1.26), despite an average mean;
+  - Precision Ball-Striker has the narrowest spread (−3.5%) and under-wins (0.90) despite a better mean;
+  - Strategic Technician is narrow (−1.9%) and under-wins most (0.82);
+  - Power Hitter has the worst mean but a wide spread, and lands near neutral (0.97).
+
+  This is a directional consistency between a controlled mechanism and an archive association, not a formal
+  decomposition. The archive covers every course, level and development path; these are three 2027 events and
+  template profiles.
+
+**Winning, at the same Overall** (rank-10 subject; tier 2, a conditional approximation).
+
+- **Links (Britannia):** Aggressive Shotmaker is best. Effortless Power and Short-Game Artist follow.
+  Precision Ball-Striker, Elite Putter, Power Hitter, All-Rounder and Strategic Technician are 1.0–1.8 points
+  lower.
+- **Sheltered woodland (France):** Short-Game Artist and Precision Ball-Striker are best (+0.4 points against
+  the subject's own profile). Aggressive Shotmaker is mid. Power Hitter and Effortless Power are lowest (about
+  −0.5).
+- **Aggression 85 against 50** for the Shotmaker adds +0.5 (links) and +0.3 (woodland) points of win
+  probability, while costing cuts and top-10s on links. That is the high-variance signature seen in the
+  archive.
+- **Full-event check (Britannia):** Strategic Technician −1.5 ± 0.65 against −1.8 fixed-field (agrees);
+  Aggressive Shotmaker −0.9 ± 0.7 against +0.2 (1.5 SE apart). Archetype win rankings are therefore screening
+  only.
+- **Base profile.** The baseline here is the subject's own profile (a native Elite Putter with ball_flight 95).
+  Real golfers vary around their template: noise at creation, then development.
 
 ### 4e. Winning impact (tier 2 fixed-field screening, tier 3 full-event validation)
 
