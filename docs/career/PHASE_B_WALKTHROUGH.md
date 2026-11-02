@@ -24,8 +24,13 @@ python tools/observer_app.py --worlds <an empty or test library folder> --open
    events they cannot enter with the reason, training (with a category) and rest; a fallback for event weeks; the
    selected-entry and qualifying policies. An ineligible or stale submission comes back with the reason and changes
    nothing.
-5. **Advance through planned period** plays the four weeks. Cancelling keeps every completed week (each week is saved
-   as it finishes). Re-submitting the same form says "Already applied"; a form from an older page is refused.
+5. **Advance through planned period** plays the four weeks. One advance request is one save (the session's existing
+   transaction rule): weeks are played in memory and committed together when the request ends.
+   - **Stop** (cancel) takes effect between weeks: the request ends normally and the completed weeks are saved.
+   - **An error** (or the observer being killed) during the request rolls the whole request back to the last save,
+     in memory and on disk: none of its weeks are kept, and the world is never half-written. The job says so and
+     names the date the world is at.
+   - Re-submitting the same form says "Already applied"; a form from an older page is refused.
 6. **Return golfer to AI control** (asks for confirmation). The AI plans the rest of the current block for the golfer
    and the world continues normally.
 
@@ -41,6 +46,11 @@ Reloading the page, restarting the observer, or reopening the world at any point
      start is left to the normal planner.
   3. A keyed request blocked by a pending choice is recorded, so replaying it later returns the recorded outcome
      instead of advancing; commands carry an expected career version and are refused if it moved.
+- Review fixes (after `f486c1f`): the transaction rule above is described as it is and tested; career posts are
+  refused unless they come from this observer's own pages (an `Origin` of another site or `null`, or
+  `Sec-Fetch-Site: cross-site`, is refused for every POST) and carry the full command identity (world id, date,
+  phase, career version except when starting, operation key); pages send `Referrer-Policy: same-origin` and
+  `X-Frame-Options: DENY`.
 - Phase B observer routes: `/career`, `/career/plan`, `/career/start`, plan submission (POST `/career/plan`), `/career/decide`,
   `/career/end`, `/career/advance` (background job), `/career/new` (background job). Each POST carries world, date,
   phase, career version and an operation key; the page is always redrawn from the committed generation. Forms are
@@ -50,7 +60,7 @@ Reloading the page, restarting the observer, or reopening the world at any point
 
 ```
 python -m unittest tests.test_career_foundation      # 25 tests: Phase A + the three defects (ParkedDefects)
-python -m unittest tests.test_observer_career        # 6 tests: the slice over HTTP
+python -m unittest tests.test_observer_career        # 9 tests: the slice over HTTP, guards, rollback
 python -m unittest tests.test_session tests.test_development tests.test_access_ledger   # regressions
 ```
 
@@ -64,7 +74,10 @@ python -m unittest tests.test_session tests.test_development tests.test_access_l
   training and rest planned and played, repeated and stale submits, confirmed handback); save and reload between
   requests and across an observer restart; an interrupted advance keeps the completed weeks on disk; refusals (other
   world, second career, unknown decision); no placeholder or disabled controls and no potential or ceiling on the
-  pages; views change nothing.
+  pages; views change nothing. `Guards`: posts from another origin, a `null` origin or a cross-site fetch are
+  refused (403) on start, end, advance and new career, and the observer's own page still works; a form missing
+  any identity field, with a malformed date or phase, a stale version or a stale date changes nothing and starts
+  no job; an error in week 3 of a planned period leaves memory and disk at the last save.
 
 ## Limits (by design for this slice)
 

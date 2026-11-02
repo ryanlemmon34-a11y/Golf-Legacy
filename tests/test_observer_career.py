@@ -14,6 +14,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 from urllib.parse import urlencode
+from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -229,6 +230,92 @@ class ObserverCareer(unittest.TestCase):
             CA.planner(s.season, s.cursor, 2028, 5)
         self.assertEqual((F.digest(s), s.season.career.version, s.generation), before)
         s.close()
+
+
+class Guards(unittest.TestCase):
+    """Career posts come only from this observer's own pages, with the full command identity those pages carry."""
+
+    def raw_post(self, srv, path, data, headers=None):
+        try:
+            r = urlopen(Request(srv.base + path, data=urlencode(data).encode(), headers=headers or {}), timeout=300)
+            return r.status, r.read().decode()
+        except HTTPError as e:
+            return e.code, ''
+
+    def test_other_origins_cannot_post(self):
+        srv = Server(self)
+        f = fields(srv.get('/career'), '/career/start')
+        gen = srv.session().generation
+        port = srv.httpd.server_address[1]
+        for path, data in (('/career/start', f), ('/career/end', dict(f, version='0', confirm='yes')),
+                           ('/career/advance', dict(f, version='0', mode='period')),
+                           ('/career/new', {'name': 'x', 'seed': '1', 'start_year': '2027'})):
+            for h in ({'Origin': 'https://example.com'}, {'Origin': 'null'},
+                      {'Origin': f'http://127.0.0.1:{port + 1}'}, {'Sec-Fetch-Site': 'cross-site'}):
+                self.assertEqual(self.raw_post(srv, path, data, h)[0], 403, (path, h))
+        self.assertIsNone(srv.session().season.career)                   # nothing changed
+        self.assertEqual(srv.session().generation, gen)
+        self.assertFalse((srv.lib / 'x').exists())
+        code, page = self.raw_post(srv, '/career/start', f, {'Origin': f'http://127.0.0.1:{port}',
+                                                             'Sec-Fetch-Site': 'same-origin'})
+        self.assertEqual((code, banners(page)[0][0]), (200, 'ok'))      # the observer's own page still works
+        self.assertIsNotNone(srv.session().season.career)
+
+    def test_command_identity_is_required(self):
+        srv = Server(self)
+        start_and_reach_the_plan(self, srv)
+        page = srv.get('/career')
+        adv, end = fields(page, '/career/advance'), dict(fields(page, '/career/end'), confirm='yes')
+        car = srv.session().season.career
+        before = (srv.session().generation, dict(srv.session().cursor), car.version, car.status)
+        job0 = srv.app.job()
+        for name in ('world', 'op', 'version', 'year', 'week', 'phase'):
+            for path, f in (('/career/advance', dict(adv, mode='period')), ('/career/end', end)):
+                bad = {k: v for k, v in f.items() if k != name}
+                p = srv.post(path, bad)
+                self.assertTrue(banners(p), (path, name))
+                self.assertIn(banners(p)[0][0], ('warn', 'err'), (path, name))
+        for path, f in (('/career/advance', dict(adv, mode='period', phase='later')),
+                        ('/career/end', dict(end, year='x'))):
+            self.assertEqual(banners(srv.post(path, f))[0][0], 'err', path)
+        p = srv.post('/career/end', dict(end, version=str(car.version - 1)))             # stale version
+        self.assertEqual(banners(p)[0][0], 'warn')
+        p = srv.post('/career/end', dict(end, week=str(int(end['week']) + 1)))            # stale date
+        self.assertEqual(banners(p)[0][0], 'warn')
+        self.assertEqual(srv.app.job(), job0)                            # no advance was started
+        car = srv.session().season.career
+        self.assertEqual((srv.session().generation, srv.session().cursor, car.version, car.status), before)
+
+    def test_a_failed_advance_keeps_nothing_of_that_request(self):
+        """Transaction semantics: one advance request is one commit. Stopping it between weeks commits the weeks
+        played (test_an_interrupted_advance_keeps_every_completed_week); an error rolls the whole request back to
+        the last save, in memory and on disk."""
+        srv = Server(self)
+        pl = start_and_reach_the_plan(self, srv)
+        srv.post('/career/plan', dict(fields(pl, '/career/plan'), w1='rest', w2='rest', w3='rest', w4='rest',
+                                      selected='accept', qualifying='skip'))
+        s = srv.session()
+        before = (s.generation, dict(s.cursor), s.season.career.version)
+        real, played = Session._part_play, []
+
+        def failing(sess):
+            if len(played) == 2:
+                raise RuntimeError('simulated failure in week 3')
+            r = real(sess)
+            played.append(r['completed'])
+            return r
+        f = fields(srv.get('/career'), '/career/advance')
+        with mock.patch.object(Session, '_part_play', failing):
+            srv.post('/career/advance', dict(f, mode='period'))
+            j = srv.job()
+        self.assertEqual(j['state'], 'failed')
+        self.assertIn('Nothing after the last save was kept', j['message'])
+        self.assertEqual(len(played), 2)                                 # two weeks had been played in memory
+        s = srv.session()
+        self.assertEqual((s.generation, s.cursor, s.season.career.version), before)
+        d = Session.open(srv.lib / 'demo')
+        self.assertEqual((d.generation, d.cursor), before[:2])          # and nothing of them is on disk
+        d.close()
 
 
 if __name__ == '__main__':

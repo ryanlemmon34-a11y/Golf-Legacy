@@ -215,24 +215,30 @@ class App:
     # -- career mode (docs/career/PHASE_AB_PLAN.md): commands and advances through the session ------------------
     # Every rule lives in golfsim/career.py; these only read forms, call the session's career API (which checks the
     # date, the career version and the operation key, commits, and refuses stale or repeated submissions) and report.
-    def _career_world(self, form):
+    CURSOR_PHASES = ('start', 'week', 'planned', 'end')
+
+    def _career_world(self, form, need_version=True):
+        """The open world and the command identity every career form carries (observer_career.hidden): the world's
+        id, the date the page was drawn at, the career version (not for 'start': there is no career yet) and an
+        operation key. All are required and checked here, so a form that lacks them (or one not drawn by this
+        observer for this world) changes nothing. Returns (world, (expected cursor, version, op), None) or
+        (None, None, notice)."""
         w = self.world
         if w is None or w.read_only:
-            return None, ('warn', 'Open a world (not read-only) to play a career.')
-        if O.one(form, 'world') not in (None, w.live.world_id):
-            return None, ('warn', 'That form belongs to another world: nothing was changed.')
-        return w, None
-
-    @staticmethod
-    def _form_cursor(form):
-        if O.one(form, 'year') is None:
-            return None
-        return {'year': int(O.one(form, 'year')), 'week': int(O.one(form, 'week')), 'phase': O.one(form, 'phase')}
-
-    @staticmethod
-    def _form_version(form):
-        v = O.one(form, 'version')
-        return int(v) if v not in (None, '') else None
+            return None, None, ('warn', 'Open a world (not read-only) to play a career.')
+        if O.one(form, 'world') != w.live.world_id:
+            return None, None, ('warn', 'That form belongs to another world (or to none): nothing was changed.')
+        op = O.one(form, 'op') or ''
+        try:
+            expected = {'year': int(O.one(form, 'year')), 'week': int(O.one(form, 'week')),
+                        'phase': O.one(form, 'phase')}
+            version = int(O.one(form, 'version')) if need_version else None
+        except (TypeError, ValueError):
+            expected = None
+        if expected is None or expected['phase'] not in self.CURSOR_PHASES or not 1 <= len(op) <= 64:
+            return None, None, ('err', 'That form was incomplete (it lacks the date, career version or operation key '
+                                       'every career page carries): nothing was changed.')
+        return w, (expected, version, op), None
 
     def career_command(self, form, kind):
         """(renderer thread) One career command from a form -- 'start' (a new career at a season start), 'plan' (a
@@ -240,9 +246,10 @@ class App:
         an advance. Refused while another operation runs or holds the world. Returns (notice, page to show)."""
         from golfsim import career as CA
         from golfsim.session import Busy, StaleCursor
-        w, notice = self._career_world(form)
+        w, ident, notice = self._career_world(form, need_version=kind != 'start')
         if notice:
             return notice, '/career'
+        expected, version, op = ident
         run = self.jobs.running()
         if run is not None:
             return ('warn', f'{esc(run.title)} is running: one operation at a time.'), '/career'
@@ -256,18 +263,18 @@ class App:
             stay = '/career/plan?block=' + quote(O.one(form, 'block') or '')
         elif kind == 'decide':
             body = {'schema': CA.SCHEMA, 'type': 'decide', 'decision': O.one(form, 'decision'),
-                    'answer': O.one(form, 'answer'), 'version': self._form_version(form)}
+                    'answer': O.one(form, 'answer'), 'version': version}
         elif kind == 'end':
             if O.one(form, 'confirm') != 'yes':
                 return ('warn', 'Tick the box to confirm that the AI decides for this golfer from now on: nothing was '
                                 'changed.'), '/career'
-            body = {'schema': CA.SCHEMA, 'type': 'end_control', 'version': self._form_version(form)}
+            body = {'schema': CA.SCHEMA, 'type': 'end_control', 'version': version}
         else:
             return ('err', 'Unknown career command.'), '/career'
         if not w.session_lock.acquire(blocking=False):
             return ('warn', 'The world is busy saving: try again in a moment. Nothing was changed.'), stay
         try:
-            res = w.session.career_action(body, expected=self._form_cursor(form), op_key=O.one(form, 'op'))
+            res = w.session.career_action(body, expected=expected, op_key=op)
         except CA.StaleCareer:
             return ('warn', 'This page was drawn before a later decision or plan: nothing was changed. The page now '
                             'shows the current state.'), '/career'
@@ -296,19 +303,18 @@ class App:
     def career_advance(self, form):
         """(renderer thread) Start 'advance to the next decision' or 'advance through the planned period' (a job).
         Returns a notice, or None if it started (or is the running one)."""
-        w, notice = self._career_world(form)
+        w, ident, notice = self._career_world(form)
         if notice:
             return notice
+        expected, version, op = ident
         mode = O.one(form, 'mode')
         if mode not in ('next', 'period'):
             return ('err', 'Unknown advance.')
-        op = O.one(form, 'op')
         run = self.jobs.running()
         if run is not None:
-            if op and run.op_key == op:
+            if run.op_key == op:
                 return None
             return ('warn', f'{esc(run.title)} is still running: one operation at a time.')
-        expected, version = self._form_cursor(form), self._form_version(form)
         title = 'Advance to the next decision' if mode == 'next' else 'Advance through the planned period'
         self.start('career-advance', title, lambda job: self._run_career_advance(job, w, mode, expected, version, op),
                    op=op, world_dir=w.path, cancellable=True)
@@ -773,6 +779,8 @@ def make_handler(app):
             self.send_header('Content-Type', ctype)
             self.send_header('Content-Length', str(len(data)))
             self.send_header('Cache-Control', 'no-store')
+            self.send_header('Referrer-Policy', 'same-origin')     # (this observer's own forms name their origin)
+            self.send_header('X-Frame-Options', 'DENY')            # (no other page may frame these controls)
             for k, v in headers:
                 self.send_header(k, v)
             self.end_headers()
@@ -798,10 +806,16 @@ def make_handler(app):
             host = (self.headers.get('Host') or '').rsplit(':', 1)[0].strip('[]')
             if host not in ('localhost', '127.0.0.1', '::1'):
                 return False
-            origin = self.headers.get('Origin')
-            if self.command == 'POST' and origin and origin != 'null':
-                o = urlparse(origin)
-                return o.hostname in ('localhost', '127.0.0.1', '::1') and o.port == self.server.server_address[1]
+            if self.command == 'POST':
+                # a browser names the page a form came from: another site's page (or an opaque one, 'null': a
+                # sandboxed frame, a data: or file: page) may not post here. Clients that send no Origin are local
+                # programs, not a browser on another site (every browser sends it with a form POST).
+                if (self.headers.get('Sec-Fetch-Site') or '').lower() in ('cross-site', 'same-site'):
+                    return False
+                origin = self.headers.get('Origin')
+                if origin is not None:
+                    o = urlparse(origin)
+                    return o.hostname in ('localhost', '127.0.0.1', '::1') and o.port == self.server.server_address[1]
             return True
 
         def do_GET(self):
