@@ -134,9 +134,12 @@ def main(path):
           f'| {wq(amax80, .5)} ({wq(amax80, .1)}-{wq(amax80, .9)}) |')
     # decline from own max
     p('\nDecline from the projected maximum, golfers whose maximum is 70+ (median; by aging-rate tercile).\n')
-    p('| arm | aging rate | n | max | max to 40 | max to 45 | max to 50 | Overall at 45: p90 | largest one-year drop '
-      'before 50: p99 |')
-    p('|---|---|---|---|---|---|---|---|---|')
+    p('Cliff check: each golfer\'s own largest one-year loss before 50, then its 99th percentile and maximum across '
+      'golfers (a rare severe drop cannot hide among ordinary years); the pooled 99th percentile of every annual '
+      'change is shown separately.\n')
+    p('| arm | aging rate | n | max | max to 40 | max to 45 | max to 50 | Overall at 45: p90 | per-golfer largest '
+      'one-year loss before 50: p99 across golfers | largest of all | pooled annual losses: p99 |')
+    p('|---|---|---|---|---|---|---|---|---|---|---|')
     top = [x for _, x in recs if max(x['A0']) >= 70]
     rates = sorted(x['aging'] for x in top)
     cuts = (rates[len(rates) // 3], rates[2 * len(rates) // 3])
@@ -149,9 +152,10 @@ def main(path):
             d45 = [x[arm][45 - 18] - max(x[arm][:45 - 18 + 1]) for x in grp]
             d50 = [x[arm][50 - 18] - max(x[arm]) for x in grp]
             o45 = [x[arm][45 - 18] for x in grp]
-            drops = [x[arm][i] - x[arm][i + 1] for x in grp for i in range(len(x[arm]) - 1)]
+            drops = [x[arm][i] - x[arm][i + 1] for x in grp for i in range(len(x[arm]) - 1)]   # ages 18-49 -> 19-50
+            own = [max(x[arm][i] - x[arm][i + 1] for i in range(len(x[arm]) - 1)) for x in grp]
             p(f'| {arm} | {tname} | {len(grp)} | {S.median(mx):.1f} | {S.median(d40):+.1f} | {S.median(d45):+.1f} | '
-              f'{S.median(d50):+.1f} | {q(o45, .9):.1f} | {q(drops, .99):.2f} |')
+              f'{S.median(d50):+.1f} | {q(o45, .9):.1f} | {q(own, .99):.2f} | {max(own):.2f} | {q(drops, .99):.2f} |')
     # rare careers
     p('\nRare careers (each golfer listed, all four arms: Overall at 18 / 20 / 23 / 27 / 35 / 40 / 45, max at age).\n')
     rare = [(s, x) for s, x in recs if x['pot'] >= 92 or (x['pot'] >= 80 and x['aging'] <= 0.62)
