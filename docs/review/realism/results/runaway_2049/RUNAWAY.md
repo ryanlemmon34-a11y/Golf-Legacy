@@ -20,7 +20,12 @@ realism changes. The branch world's different history simply produced this playe
 - **The hole:** a 359-yard par 4 bending right (dogleg 0.67) with a 221-yard landing limit, out of bounds left and
   trees right.
 - **The player:** a 25-year-old amateur who carries the driver about 302 yards, aggression 0.82, ball flight 0.62.
-- **The plan:** the club plan drawn for this hole is a 3-wood (about 278 yards).
+- **The plan:** with only the actual execution instrumented (a pass-through spy on the tee plans play_hole uses,
+  and the hole's penalties), the player hit **the driver on all 30 tee attempts, with 30 out-of-bounds
+  penalties**, before the guard stopped the hole.
+- **Correction:** an earlier version of this note said "a 3-wood, 29 re-tees". That was wrong. It came from
+  calling the planner before play_hole had made its mishit draw, which changed the random stream and the plan cache.
+  `replay.py` now instruments the execution only.
 
 **The mechanism (engine code, both builds).**
 1. **The plan model** (`_tee_plan`) prices a tee shot that runs through the dogleg as a *narrower* fairway, and it
@@ -31,18 +36,25 @@ realism changes. The branch world's different history simply produced this playe
    - for a long hitter the shift (25–35 yards) exceeds the corridor (half fairway plus rough, 22.5 yards), so most
      tee shots go out of bounds.
 3. **The plan is cached** for the hole and the round (`pl.plans`), so every stroke-and-distance re-tee hits the same
-   club again. Here 29 consecutive re-tees went out of bounds and reached the 60-stroke guard.
+   club again. Here 30 tee shots with the driver all went out of bounds and reached the 60-stroke guard.
 
-**Proposed minimal fix, not applied (`d619dd6` stays frozen), for review.**
-- **The change:** after an out-of-bounds tee shot, the re-tee uses the most conservative club ('iron'). Real
-  players reload with less club.
-- **What it changes:** only tee shots after an OB on the same hole. It takes no extra random draws, so every other
-  shot and hole is unchanged.
-- **Tests it needs:**
-  - this fixture finishes the hole;
-  - rounds without an OB re-tee are identical shot for shot.
-- **A broader fix, a separate balance question:** price the outside-of-the-dogleg shift in `_tee_plan` itself.
-  Either fix also applies to main, which has the same latent defect.
+**The fix (separate branch, for review before it is integrated anywhere).**
+- **Branch:** `fix/engine-dogleg-retee` at `e99cb20`, from main `18a8e23`.
+- **The planner:** it now prices a run-through the way play puts the ball, with trouble costed on its own side.
+- **A reload re-plans:** no driver bonus, and a lay-up short of the corner (down to 25% of a driver) is available.
+- **Noise:** the hole's judgement noise is drawn once, with the same draws as before, and kept. A cached plan and a
+  fresh one therefore agree, and a reload draws nothing.
+- **The guard:** 60 strokes, unchanged.
 
-Until a fix is approved, a long world on either build can stop this way, rarely: once in 22 full-scale seasons of
-this run, and never in the main run's seasons so far.
+Replayed with `replay.py`:
+
+| build | outcome on this hole |
+|---|---|
+| main `18a8e23` | runaway: 30 tee shots, all driver, 30 penalties |
+| realism `d619dd6` | runaway: 30 tee shots, all driver, 30 penalties |
+| fix `e99cb20` | 4 strokes: one iron tee shot, no penalty |
+
+Tests: `tests/test_tee_plan.py` on the fix branch.
+
+Until the fix is integrated, a long world on either build can stop this way, rarely: once in 22 full-scale seasons
+of this run, and not in the main run's 30 seasons of the same seed.
