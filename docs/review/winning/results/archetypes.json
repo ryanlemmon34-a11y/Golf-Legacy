@@ -1,0 +1,49 @@
+{
+ "provenance": {
+  "scripts_commit": "02b8ca718a11d8b99ce1d06c30bac932dfc21746",
+  "scripts_dirty": true,
+  "boot": 500
+ },
+ "starts_without_label": 0,
+ "clogit": {
+  "coef": [
+   0.09638763852750286,
+   -0.0014455087208060109,
+   0.1448012382968712,
+   -0.0012104566651250726,
+   0.17507233693103008,
+   -0.0014153963888237653,
+   0.21608982715676178,
+   -0.0017380610283608859
+  ],
+  "loglik": -298065.6285470793,
+  "iterations": 8,
+  "terms": "per rounds 1..4: (x, x^2), x = Overall - field best"
+ },
+ "population_share": {
+  "Effortless Power": 0.1272919530506503,
+  "All-Rounder": 0.12672094744633605,
+  "Precision Ball-Striker": 0.1265517606006133,
+  "Elite Putter": 0.12574812308343025,
+  "Strategic Technician": 0.12483874378767051,
+  "Aggressive Shotmaker": 0.12390821613619542,
+  "Power Hitter": 0.12259701808184413,
+  "Short-Game Artist": 0.12234323781326002
+ },
+ "tables": [
+  "arch_age_25_35.csv",
+  "arch_all.csv",
+  "arch_clogit_calibration.csv",
+  "arch_initial_golfers.csv",
+  "arch_later_entrants.csv",
+  "arch_level_Amateur.csv",
+  "arch_level_Club pro.csv",
+  "arch_level_College.csv",
+  "arch_level_Majors.csv",
+  "arch_level_Premier.csv",
+  "arch_level_Tiers 2-4.csv",
+  "arch_majors_premier_without_cardenas.csv",
+  "arch_overall_mix_of_starts.csv",
+  "arch_without_cardenas.csv"
+ ]
+}

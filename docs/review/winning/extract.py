@@ -3,12 +3,15 @@
 Usage: python extract.py SAVE_DIR OUT_DIR [--procs N]
 
 Writes to OUT_DIR:
-  editions.csv.gz   one row per archived edition (every event, every year), with its classification:
+  editions.csv.gz   one row per archived edition (gap12: the true gap between the first and second highest
+                    pre-event Overall, 0 when the best are tied; gap_next_distinct: best minus the next lower
+                    distinct value) (every event, every year), with its classification:
                     primary = one site, stroke play, not a qualifying event, a stored pre-event estimate whose
                     entrant list reconciles exactly with every starter at that site (made cut, missed cut,
                     withdrawn), and exactly one champion. Every excluded edition carries its reason.
-  starts.npz        one row per starter of a primary edition: edition index, golfer id, pre-event Overall (as
-                    stored, 0.1), finishing position (0 = no position: missed cut / withdrew), total strokes.
+  starts.npz        one row per starter of a primary edition: edition index, golfer id, pre-event Overall in exact
+                    integer tenths (ovr10, as stored: no float rounding in tie groups), finishing position (0 = no position: missed cut / withdrew), total strokes,
+                    rounds played (scores recorded), which separates a missed cut from a withdrawal.
   audit.json        coverage counts (formats, estimates, reconciliation, conditions, creation records, ratings).
 
 Pre-event Overall is the value the engine stored in the edition's estimate (golfsim/upsets.py), computed in the
@@ -34,7 +37,7 @@ import common as C  # noqa: E402
 
 COLS = ['idx', 'year', 'week', 'eid', 'series', 'tour', 'tier', 'category', 'kind', 'rounds', 'match_play',
         'n_sites', 'primary', 'reason', 'n', 'n_made', 'cut_top', 'course', 'layout', 'city', 'par', 'prestige',
-        'playoff_holes', 'n_playoff', 'winner', 'w_ovr', 'w_rank', 'max_ovr', 'n_max', 'next_ovr', 'gap12',
+        'playoff_holes', 'n_playoff', 'winner', 'w_ovr', 'w_rank', 'max_ovr', 'n_max', 'next_ovr', 'gap12', 'gap_next_distinct',
         'top_ids', 'top_best_pos', 'top_won', 'mean_ovr', 'sd_ovr', 'top10_mean_ovr', 'model', 'fav', 'fav_p',
         'w_p', 'w_p_rank', 'margin', 'win_total', 'sd_made', 'cond_rows', 'cond_len', 'wind_mean', 'wind_max',
         'wet_rounds', 'gust_mean', 'pins', 'cardenas_in', 'cardenas_won']
@@ -123,7 +126,9 @@ def year_rows(arg):
             pls = (e.get('playoffs') or [{}])[0].get('players') if e.get('playoffs') else None
             r.update(n=len(ids), n_made=len(made), winner=win, w_ovr=ov[win], w_rank=1 + sum(1 for o in ovs if o > ov[win]),
                      max_ovr=mx, n_max=len(top), next_ovr=(max(below) if below else None),
-                     gap12=(round(mx - max(below), 1) if below else None), top_ids=';'.join(map(str, top)),
+                     gap12=(0.0 if len(top) > 1 else round(mx - max(below), 1) if below else None),
+                     gap_next_distinct=(round(mx - max(below), 1) if below else None),
+                     top_ids=';'.join(map(str, top)),
                      top_best_pos=(min(tops) if tops else 0), top_won=int(win in top),
                      mean_ovr=round(float(np.mean(ovs)), 2), sd_ovr=round(float(np.std(ovs)), 2),
                      top10_mean_ovr=round(float(np.mean(srt[:10])), 2), model=u.get('model'),
@@ -132,8 +137,9 @@ def year_rows(arg):
                      sd_made=(round(float(np.std(made)), 3) if len(made) > 1 else None),
                      n_playoff=(len(pls) if pls else (1 if not e.get('playoff') else None)),
                      cardenas_in=int(C.CARDENAS in ov), cardenas_won=int(win == C.CARDENAS))
+            sc = (e.get('scores') or [{}])[0]
             for g, p, t in fin:
-                starts.append((g, ov[g], p or 0, t if t is not None else -1))
+                starts.append((g, ov[g], p or 0, t if t is not None else -1, len(sc.get(str(g)) or ())))
             aud[('reconcile', 'mc_or_wd_rows')] += sum(1 for _, p, _ in fin if p is None)
         rows.append((r, starts if prim else None))
         starts = []
@@ -155,7 +161,7 @@ def main():
     a = ap.parse_args()
     save, out = Path(a.save), Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
-    world = json.loads((save / 'archive' / f'world.g{C.manifest(save)["generation"]:06d}.json').read_text())
+    world = json.loads(C.archive_file(save, 'world').read_text())
     layouts = {(cid, lk): lv.get('par') for cid, c in world['courses'].items() for lk, lv in c['layouts'].items()}
     yf = C.year_files(save)
     jobs = [(y, str(p), layouts) for y, p in yf.items()]
@@ -165,7 +171,7 @@ def main():
     buf = io.StringIO()
     w = csv.DictWriter(buf, COLS, extrasaction='raise')
     w.writeheader()
-    E, G, O, P, T = [], [], [], [], []
+    E, G, O, P, T, R = [], [], [], [], [], []
     idx = 0
     for y, rows, au in res:
         aud.update(au)
@@ -173,13 +179,15 @@ def main():
             r['idx'] = idx
             w.writerow(r)
             if st:
-                for g, o, p, t in st:
-                    E.append(idx); G.append(g); O.append(o); P.append(p); T.append(t)
+                for g, o, p, t, rp in st:
+                    E.append(idx); G.append(g); O.append(o); P.append(p); T.append(t); R.append(rp)
             idx += 1
     with gzip.open(out / 'editions.csv.gz', 'wt', encoding='utf-8') as f:
         f.write(buf.getvalue())
     np.savez_compressed(out / 'starts.npz', edition=np.array(E, np.int32), gid=np.array(G, np.int32),
-                        ovr=np.array(O, np.float32), pos=np.array(P, np.int16), total=np.array(T, np.int16))
+                        ovr10=np.array([round(o * 10) for o in O], np.int16), pos=np.array(P, np.int16),
+                        total=np.array(T, np.int16),
+                        rounds_played=np.array(R, np.int8))
     prov = {'save_meta': C.save_meta(save), 'scripts_commit': C.git_head(), 'scripts_dirty': C.git_dirty(),
             'year_files': {y: {'name': Path(p).name, 'sha256': C.sha256(p)} for y, p in yf.items()},
             'editions': idx, 'starts': len(E)}

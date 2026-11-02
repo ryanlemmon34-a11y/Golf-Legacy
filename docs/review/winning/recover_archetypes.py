@@ -87,7 +87,7 @@ def main():
     out.mkdir(parents=True, exist_ok=True)
     meta = C.save_meta(save)
     seed = int(meta['world_id'].split('-')[0])
-    people = C.load_json_gz(save / 'archive' / f'people.g{meta["generation"]:06d}.json.gz')
+    people = C.load_json_gz(C.archive_file(save, 'people'))
     style = {c: p.style for c, p in NATIONS.items()}
     rows, stat = [], Counter()
     seen = set()
