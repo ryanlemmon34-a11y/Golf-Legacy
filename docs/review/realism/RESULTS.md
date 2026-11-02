@@ -1,6 +1,7 @@
 # Realism pass 1: results
 
-**Status: experimental, ready to test, not validated as long-career balance.** The plan and targets are in
+**Status: experimental, ready to test, not validated as long-career balance. One planned gate is unmet (the cliff
+check, section 2) and one is untested (injuries per start).** The plan and targets are in
 `PLAN.md`; how to test is in `TESTING.md`. Main `18a8e23` is unchanged.
 
 ## Provenance
@@ -25,7 +26,7 @@
   - main `18a8e23`, started 05:42 UTC;
   - branch `d619dd6`, started 06:00 UTC.
 
-  Comparison: `compare_worlds.py` (below, when complete).
+  Comparison: `compare_worlds.py` as committed alongside each results file (both arms on identical covered seasons).
 - **Item 4:** `diag_access.py` (sha256 `0e584dbd…1e38`) on existing long-run outputs (read only):
   - commit `473690a`: seeds 360013 (45 seasons), 2027 and 3031 (10 each);
   - commit `c0d1ea5`: seeds 4207 (released configuration, 10) and 5309 (5).
@@ -45,7 +46,7 @@ dev-2 (this branch).
 | Potential 80+: median headroom (10th percentile) | median ±0.3 | 10.28 (5.79) | 10.28 (6.09) | yes |
 | Entrants per seed at 80+ / 85+ / 90+ | (lower at the top, by design) | 3.2 / 0.6 / 0.2 | 2.8 / 0.6 / 0.2 | — |
 | Largest entry | — | 96.07 | 94.25 | — |
-| Eventual supply, readiness alone (arm R): reach 80+ / 85+ / 90+ per seed | within −3% | 39.6 / 9.0 / 2.2 | 39.4 / 9.0 / 2.2 | yes |
+| Eventual supply, readiness alone (arm R; controlled projection): reach 80+ / 85+ / 90+ per seed | within −3% | 39.6 / 9.0 / 2.2 | 39.4 / 9.0 / 2.2 | yes |
 | The 99-potential prodigy (seed 386509): entry → maximum | within 1 point | 96 → 97.7 at 26 | 94 → 97.2 at 27 | yes |
 
 All juniors: the share entering within 5 points of potential goes from 15.5% to 8.4%. The entry Overall change has
@@ -53,35 +54,49 @@ mean −0.33 and median −0.03; the largest change is −4.55, for a junior who
 
 ## 2. Individualized, attribute-specific aging
 
-Projection, arm G (aging only), golfers whose maximum is 70+, by aging-rate tercile. Full tables are in
-`results/projection_d619dd6.md`.
+The shipped rules are arm **B**, readiness and aging together. Arm **G** (aging only) is shown for attribution.
+Everything here is a controlled projection: one schedule, no access, money, injuries or retirement. It is not
+realized supply. Full tables are in `results/projection_d619dd6.md`.
 
-| measure | target | dev-1 | dev-2 | met |
-|---|---|---|---|---|
-| Decline from maximum to 40 / 45 / 50, low tercile | ×1.1–1.4 | −1.6 / −4.3 / −8.1 | −1.8 / −5.0 / −9.5 (×1.13 / 1.16 / 1.17) | yes |
-| … middle tercile | ×1.1–1.4 | −2.3 / −6.1 / −11.4 | −2.8 / −7.2 / −13.6 (×1.22 / 1.18 / 1.19) | yes |
-| … high tercile | ×1.1–1.4 | −3.6 / −8.9 / −16.2 | −4.1 / −10.4 / −19.1 (×1.14 / 1.17 / 1.18) | yes |
-| Age at maximum, 80+ golfers: median (10th–90th percentile) | within 1 year | 32 (29–35) | 31 (29–34); with readiness too: 32 (29–34) | yes |
-| Reach 80+ / 85+ / 90+ per seed | within −3% | 39.6 / 9.0 / 2.2 | 39.4 / 9.0 / 2.2 | yes |
-| Golfer-years at 85+ per seed | −3% to −15% | 159.2 | 150.4 (−5.5%) | yes |
-| Last season at 85+: median age (90th percentile) | median −1 to −3 years | 39 (48) | 38 (46) | yes |
-| Low aging-rate golfers last longest; ordering by tercile kept | kept | yes | yes | yes |
-| Physical attributes at 45, aging rate 1: power / stamina | −25 to −30 / −28 to −34 | −19 / −19 | −27 / −31 (power about −13 yards from 85) | yes |
-| Green reading after peak + 8 | matures to 48 | declined (shadowed) | matures (test) | yes |
+| measure (projection) | target | dev-1 (A0) | dev-2 shipped (B) | aging only (G) | met |
+|---|---|---|---|---|---|
+| Decline from maximum to 40 / 45 / 50, low tercile | ×1.1–1.4 | −1.6 / −4.3 / −8.1 | −1.8 / −5.0 / −9.5 | same as B | yes |
+| … middle tercile | ×1.1–1.4 | −2.3 / −6.1 / −11.4 | −2.8 / −7.2 / −13.6 (×1.22 / 1.18 / 1.19) | same | yes |
+| … high tercile | ×1.1–1.4 | −3.6 / −8.9 / −16.2 | −4.1 / −10.4 / −19.1 (×1.14 / 1.17 / 1.18) | same | yes |
+| Age at maximum, golfers reaching 80+: median (10th–90th percentile) | within 1 year | 32 (29–35) | 32 (29–34) | 31 (29–34) | yes |
+| Reach 80+ / 85+ / 90+ per seed (20 classes a seed) | within −3% | 39.6 / 9.0 / 2.2 | 39.2 / 9.0 / 2.2 (−1.0% / 0 / 0) | 39.4 / 9.0 / 2.2 | yes |
+| Golfer-years at 85+ per seed | −3% to −15% | 159.2 | 150.0 (−5.8%) | 150.4 (−5.5%) | yes |
+| Last season at 85+: median age (90th percentile) | median −1 to −3 years | 39 (48) | 38 (46) | 38 (46) | yes |
+| Low aging-rate golfers last longest; ordering by tercile kept | kept | yes | yes | yes | yes |
+| Physical attributes at 45, aging rate 1: power / stamina | −25 to −30 / −28 to −34 | −19 / −19 | −27 / −31 (power about −13 yards from 85) | same | yes |
+| Green reading after peak + 8 | matures to 48 | declined (shadowed) | matures (unit test) | same | yes |
 
-**Cliff check, corrected.** `PLAN.md` set "largest one-year drop before 50, 99th percentile ≤ 2.5". The first
-summary pooled every annual change, which can hide one golfer's rare severe drop. The corrected metric takes each
-golfer's own largest one-year loss before 50, then the 99th percentile and the maximum across golfers:
+The 90+ tail is tiny: 11 golfers over five seeds reach 90+ in the projection. It is a controlled projection, not
+realized supply.
 
-| tercile | dev-1: per-golfer p99 / largest | dev-2 (G): per-golfer p99 / largest | pooled p99, dev-1 → dev-2 |
+**Cliff check: the planned gate is not met.**
+- `PLAN.md` set "largest one-year drop before 50, 99th percentile ≤ 2.5".
+- The first summary pooled every annual change. The corrected metric takes each golfer's own largest one-year loss
+  over the ages 18→19 through 49→50 (so through 50), then the 99th percentile across golfers.
+- On that metric the high tercile under dev-2 is **2.57, against the ≤ 2.5 gate (dev-1 2.51): unmet.**
+
+| tercile | dev-1: per-golfer p99 / sample maximum | dev-2 (B): per-golfer p99 / sample maximum | pooled p99, dev-1 → dev-2 |
 |---|---|---|---|
-| low | 1.14 / 1.22 | 1.67 / 1.81 | 1.00 → 1.32 |
-| middle | 1.46 / 1.56 | 1.98 / 2.09 | 1.30 → 1.67 |
+| low | 1.14 / 1.22 | 1.68 / 1.82 | 1.00 → 1.32 |
+| middle | 1.46 / 1.56 | 1.98 / 2.10 | 1.30 → 1.67 |
 | high | 2.51 / 2.89 | 2.57 / 2.88 | 2.03 → 2.19 |
 
-No golfer's worst year is worse than dev-1's worst (2.88 against 2.89). The high-tercile per-golfer p99 is 2.57,
-just above the 2.5 written in the plan; dev-1 itself is 2.51 on this metric. The yearly loss grows smoothly with
-age, and a unit test bounds its year-to-year change.
+The sample maxima (2.88 against 2.89) are the largest single values among the selected controlled projections.
+They do not show that no individual golfer gets a worse year, and the per-golfer p99 rises in every tercile. What
+holds is the absence of steps: the yearly loss grows smoothly with age and a unit test bounds its year-to-year
+change. The gate is reported as unmet, for Ryan to decide whether to:
+- accept 2.57;
+- soften the steepest physical shape;
+- restate the gate on the new metric.
+
+**Injuries per start: untested.** The planned realized gate, "injuries per start rise with age", cannot be computed
+from the long-run export, which has weeks injured per golfer-season but not injury episodes per start. The world
+comparison shows weeks injured per golfer-season with starts as a proxy only.
 
 ## 3. Long irons, 25–60
 
@@ -98,43 +113,65 @@ long irons. Values are mean strokes per round.
 Within 25–60, each point of long irons now helps a little: about 0.13 strokes a round from 25 to 50. From 60 up,
 rounds are identical shot for shot (tested). Mid irons and wedges keep the shared table (tested).
 
-## 4. Diagnostic only: access and field gaps (no change made)
+## 4. Diagnostic only, partial: access and Premier membership gaps (no change made)
 
-**Off-Premier counts are not defects.** The table counts high-Overall golfers who are not on the Premier Tour. That
-count is a diagnostic only. Amateur status, college, an alternative or senior tour, eligibility and scheduling
-choices are ordinary reasons to be elsewhere, so none of them is automatically an access defect. No field-strength
-tuning or opposition boost is proposed or authorized.
+- **No change is proposed or authorized.** This section makes no field-strength tuning or opposition boost.
+- **Off-Premier counts are not access defects.** The table counts high-Overall golfers who are not on the Premier
+  Tour. Being off it (amateur, college, an alternative or senior tour, eligibility, scheduling choices) does not
+  establish blocked access.
+- **Membership gaps, not field gaps.** The gaps are between Premier Tour members (membership), not tournament fields
+  or majors.
+- **Later seasons are not proof the starting population has gone.** A run's later seasons do not establish that.
+- **Item 4 is partial.**
 
 Read-only, existing long runs (`results/item4_existing_seeds.md`):
 
-| run | seeds (seasons) | world top-100 by Overall not on Premier (mean per season) | where | Premier best − 10th / − 20th |
+| run | seeds (seasons) | world top-100 by Overall not on Premier (mean per season) | where | Premier members: best − 10th / − 20th |
 |---|---|---|---|---|
 | 473690a | 360013 (45) | 18.5 | amateur 11.5, Challenger 4.8, mini 1.9 | 9.2 / 11.5 (second half 11.9 / 14.3) |
 | 473690a | 2027 (10), 3031 (10) | 11.5, 11.9 | mostly amateurs, about 4 Challenger, about 2 mini | 4.9–10.2 / 7.6–12.4 |
 | c0d1ea5 released configuration | 4207 (10) | 13.4 | amateur 6.9, Challenger 4.1, mini 1.3, club pro 1.0 | 6.2 / 10.3 |
 | c0d1ea5 | 5309 (5) | 6.0 | Challenger 4.2, amateur 1.8 | 9.2 / 11.9 |
 
-What the readings show:
-- The top of Premier fields can sit 10–14 Overall points above the 20th-best member, most in the oldest run's
-  second half. That is a dominance signal, and the right next step is a separate study of field strength; this pass
-  makes no change for it.
-- A handful of mini-tour professionals in the world top 100 each season is the one group worth following up. Their
-  recorded reasons (money, schedule, entry) would need checking before calling anything a defect.
+Two readings worth a separate look (not acted on):
+- the spread among the top Premier members, widest in the oldest run;
+- the few mini-tour professionals in the world top 100 each season, whose recorded reasons (money, schedule,
+  entry) would need checking before anything is called a defect.
 
-The same diagnostic for the two full-scale runs is in the world comparison below.
+## Full-scale worlds (seed 2027): interim after 10 seasons, final at 30
 
-## Full-scale worlds (seed 2027, 30 seasons): pending
+Both runs are compared on the identical covered seasons. Ratings are season-end values, after the season and its
+winter, and these definitions apply:
+- **First observed rating:** a junior's first record comes after their first season and winter, so it is not their
+  entry rating.
+- **Maximum:** the highest observed season-end rating, not a complete-career peak.
+- **Censoring:** "last observed age at 85+" is cut off at the run's end.
+- **Majors:** counted from the majors' winner ledger, which reconciles with the season snapshots (40 = 40 in each
+  arm).
+- **Retirements:** taken from the recorded career transitions, from play and into staff jobs separately. Deaths are
+  not in this export.
 
-They run, and are monitored, through completion. The comparison will be added from `compare_worlds.py`:
-- elite supply over time and realized maxima of juniors;
-- top-20 and top-50 ages;
-- wins, Premier wins and majors by age;
-- age at maximum and decline;
-- year-on-year change by age;
-- injuries and retirements by age;
-- the item-4 diagnostic;
-- dominance;
-- season times.
+Interim tables after 10 seasons are in `results/world_seed2027_interim_s10.md`. They are one seed, paired against
+main, early and censored:
+
+| realized, seasons 2027–2036 | main (dev-1) | branch (dev-2) |
+|---|---|---|
+| Yearly season-end Overall change at ages 35–39 / 40–44 / 45–49 | −0.47 / −0.73 / −0.89 | −0.57 / −0.90 / −1.11 |
+| Golfer-seasons with starts that had an injury, ages 35–39 / 40–44 (a proxy, not per start) | 7.5% / 8.2% | 8.3% / 9.4% |
+| Share of Premier wins / majors won at 40+ | 11.9% / 10.0% (4 of 40) | 9.2% / 5.0% (2 of 40) |
+| Top-20 mean age | 31.3 | 30.6 |
+| Golfers at 80+ / 85+ at season end, 2036 | 39 / 5 | 35 / 5 |
+| Juniors (2028–2036): highest observed 75+ / 80+ | 45 / 9 | 46 / 8 |
+| Retirements from play at 25–34, golfers whose highest observed rating was 65+ | 22 | 46 |
+| Season time, median (cloud, two runs sharing 4 CPUs; relative only) | 284 s | 283 s |
+
+Watch items:
+- **Fewer golfers at 80+ in 2036 (35 against 39).** The older 80+ golfers decline sooner. This is the
+  longevity-for-supply trade-off, seen in one seed and early.
+- **Early retirements doubled (22 → 46).** These are marginal golfers, highest observed rating about 66.5, with no
+  injury link (median 0 injury weeks). Their retirement chance is slightly higher, 0.067 against 0.058, consistent
+  with faster decline feeding the career decision's progress input. That is about 2.8 standard errors on one seed.
+  It is checked again at 30 seasons and on the second seed before any conclusion.
 
 ## Regression
 
@@ -149,7 +186,7 @@ runs; it is a cloud figure, relative only. The 120 s target refers to Ryan's mac
 
 - **Projections are controlled.** One fixed schedule, self-coached, no injuries, money, access limits or
   retirement. They isolate the development laws and are not realized careers.
-- **One full-scale seed is evidence, not proof.**
+- **Full-scale worlds: one paired seed is evidence, not proof.** A second seed is added only if time allows.
   - It is one paired seed of 30 seasons, run against main.
   - Juniors entering in 2028–2056 are seen only up to age 46 at most; most are censored well before their decline.
   - Golfers in the starting world are seen from their starting age.

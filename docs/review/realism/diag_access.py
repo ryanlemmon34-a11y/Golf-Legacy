@@ -35,12 +35,15 @@ def main(specs):
                      f'{S.mean(r["access"][y][3] for y in late if r["access"][y][3] is not None):.2f}',
                      f'{max(r["access"][y][3] for y in late if r["access"][y][3] is not None):.2f}',
                      f"{S.mean(r['access'][y][0] for y in late):.1f}"])
-    print('### World top-100 by Overall who are not on the Premier Tour, and Premier Overall gaps (season-end; '
-          'all seasons)\n')
+    print('### World top-100 by Overall who are not on the Premier Tour, and Premier Tour MEMBERS\' Overall gaps '
+          '(season-end; all seasons)\n')
+    print('Diagnostic only (item 4 partial): being off the Premier Tour (amateur, college, another tour, eligibility, '
+          'scheduling) does not establish blocked access; member gaps are not tournament-field or major-field gaps; a '
+          'later era of a run does not establish that the starting population is gone.\n')
     print(table(rows, ['run', 'seed', 'seasons', 'top-100 not on Premier (mean)', 'where (mean per season)',
-                       'Premier best minus 10th', 'best minus 20th', 'best Overall', 'top-20 mean age']))
-    print('\n### Second half of each run (the world past its starting population)\n')
-    print(table(gaps, ['run', 'seed', 'seasons', 'best minus 10th', 'best minus 20th', 'largest best-minus-20th',
+                       'Premier members: best minus 10th', 'best minus 20th', 'best Overall', 'top-20 mean age']))
+    print('\n### Second half of each run (later seasons; not a claim that the starting population has gone)\n')
+    print(table(gaps, ['run', 'seed', 'seasons', 'members: best minus 10th', 'best minus 20th', 'largest best-minus-20th',
                        'top-100 not on Premier']))
 
 
