@@ -106,6 +106,236 @@ striking_consistency 0.989 · driving_accuracy 0.993 · resilience 0.996 · mid_
 | France Open (Premier, woodland) | 40 | ball_flight | +5 | 94.6 | +4.4 |
 | France Open (Premier, woodland) | 40 | long_irons | +5 | 95.2 | +3.8 |
 
+### Tier 2: fixed-field conditional estimates (approximation; see validation)
+
+#### fixed_2027_BRITANNIA_OPEN_s0: subject vs fixed production field replicates (conditional approximation); 500 field replicates x 16 subject replays; production winner rate of each subject in the same replicates: {'1': 0.098, '9': 0.044}
+
+| Subject rank | Arm | Win | Δ win (pp) ± SE | Δ top-10 (pp) ± SE | Δ made cut (pp) ± SE | clipped |
+|---|---|---|---|---|---|---|
+| 1 | ball_flight-5 | 7.33% | -1.46 ± 0.31 | -2.97 ± 0.55 | -0.73 ± 0.32 | False |
+| 1 | driving_accuracy-5 | 7.40% | -1.38 ± 0.28 | -3.50 ± 0.49 | -1.21 ± 0.31 | False |
+| 1 | mid_irons-5 | 7.81% | -0.98 ± 0.29 | -2.05 ± 0.50 | -0.15 ± 0.26 | False |
+| 1 | chipping-5 | 8.03% | -0.76 ± 0.22 | -2.76 ± 0.37 | -0.54 ± 0.21 | False |
+| 1 | power-5 | 8.07% | -0.72 ± 0.31 | -2.05 ± 0.56 | +0.29 ± 0.34 | False |
+| 1 | wedges-5 | 8.21% | -0.58 ± 0.26 | -1.41 ± 0.46 | -0.01 ± 0.23 | False |
+| 1 | short_putting-5 | 8.32% | -0.47 ± 0.15 | -1.30 ± 0.24 | -0.25 ± 0.13 | False |
+| 1 | management-5 | 8.40% | -0.39 ± 0.25 | -1.06 ± 0.47 | -0.31 ± 0.23 | False |
+| 1 | long_irons-5 | 8.41% | -0.38 ± 0.26 | -1.56 ± 0.46 | -0.78 ± 0.25 | False |
+| 1 | stamina-5 | 8.42% | -0.37 ± 0.17 | -1.51 ± 0.31 | -0.10 ± 0.15 | False |
+| 1 | lag_putting-5 | 8.47% | -0.31 ± 0.12 | -0.83 ± 0.22 | -0.27 ± 0.11 | False |
+| 1 | bunker-5 | 8.51% | -0.28 ± 0.16 | -1.11 ± 0.28 | +0.06 ± 0.16 | False |
+| 1 | recovery_rate-5 | 8.51% | -0.28 ± 0.11 | -0.27 ± 0.21 | -0.12 ± 0.06 | False |
+| 1 | green_reading-5 | 8.55% | -0.23 ± 0.13 | -0.84 ± 0.21 | -0.26 ± 0.11 | False |
+| 1 | composure-5 | 8.56% | -0.22 ± 0.10 | -0.26 ± 0.15 | -0.16 ± 0.08 | False |
+| 1 | focus-5 | 8.62% | -0.17 ± 0.10 | -0.38 ± 0.18 | -0.14 ± 0.09 | False |
+| 1 | recovery_play-5 | 8.64% | -0.15 ± 0.16 | -0.76 ± 0.32 | +0.20 ± 0.15 | False |
+| 1 | putting_consistency-5 | 8.70% | -0.09 ± 0.10 | -0.25 ± 0.19 | -0.10 ± 0.09 | False |
+| 1 | resilience-5 | 8.70% | -0.09 ± 0.10 | -0.64 ± 0.22 | -0.06 ± 0.13 | False |
+| 1 | striking_consistency-5 | 8.72% | -0.07 ± 0.23 | -0.36 ± 0.39 | -0.39 ± 0.21 | False |
+| 1 | focus+5 | 8.76% | -0.03 ± 0.06 | -0.04 ± 0.10 | -0.01 ± 0.05 | True |
+| 1 | striking_consistency+5 | 8.77% | -0.02 ± 0.23 | +0.66 ± 0.39 | +0.75 ± 0.22 | False |
+| 1 | base | 8.79% | +0.00 ± 0.00 | +0.00 ± 0.00 | +0.00 ± 0.00 | False |
+| 1 | green_reading+5 | 8.79% | +0.00 ± 0.00 | +0.00 ± 0.00 | +0.00 ± 0.00 | True |
+| 1 | injury_resistance+5 | 8.79% | +0.00 ± 0.00 | +0.00 ± 0.00 | +0.00 ± 0.00 | False |
+| 1 | injury_resistance-5 | 8.79% | +0.00 ± 0.00 | +0.00 ± 0.00 | +0.00 ± 0.00 | False |
+| 1 | management+5 | 8.79% | +0.00 ± 0.00 | +0.00 ± 0.00 | +0.00 ± 0.00 | True |
+| 1 | recovery_rate+5 | 8.81% | +0.02 ± 0.12 | +0.11 ± 0.22 | +0.06 ± 0.06 | False |
+| 1 | recovery_play+5 | 8.86% | +0.07 ± 0.18 | +1.15 ± 0.33 | +0.44 ± 0.17 | False |
+| 1 | putting_consistency+5 | 8.90% | +0.11 ± 0.10 | +0.43 ± 0.17 | +0.12 ± 0.09 | False |
+| 1 | resilience+5 | 8.93% | +0.14 ± 0.10 | +0.47 ± 0.21 | +0.31 ± 0.13 | False |
+| 1 | lag_putting+5 | 9.01% | +0.22 ± 0.11 | +0.69 ± 0.18 | +0.12 ± 0.08 | False |
+| 1 | composure+5 | 9.03% | +0.25 ± 0.11 | +0.24 ± 0.13 | +0.11 ± 0.07 | True |
+| 1 | stamina+5 | 9.12% | +0.33 ± 0.17 | +1.32 ± 0.34 | +0.56 ± 0.15 | False |
+| 1 | chipping+5 | 9.21% | +0.42 ± 0.18 | +1.57 ± 0.32 | +0.65 ± 0.16 | True |
+| 1 | bunker+5 | 9.24% | +0.45 ± 0.16 | +0.62 ± 0.27 | +0.34 ± 0.16 | False |
+| 1 | long_irons+5 | 9.71% | +0.93 ± 0.29 | +2.35 ± 0.49 | +1.00 ± 0.27 | False |
+| 1 | power+5 | 9.73% | +0.95 ± 0.30 | +2.00 ± 0.60 | +0.54 ± 0.33 | False |
+| 1 | short_putting+5 | 9.77% | +0.98 ± 0.18 | +2.50 ± 0.30 | +0.65 ± 0.14 | False |
+| 1 | wedges+5 | 9.82% | +1.04 ± 0.29 | +2.15 ± 0.48 | +0.92 ± 0.27 | False |
+| 1 | ball_flight+5 | 9.86% | +1.07 ± 0.32 | +3.75 ± 0.54 | +1.52 ± 0.31 | False |
+| 1 | driving_accuracy+5 | 9.87% | +1.09 ± 0.30 | +3.09 ± 0.54 | +1.36 ± 0.30 | False |
+| 1 | mid_irons+5 | 10.15% | +1.36 ± 0.34 | +3.35 ± 0.54 | +1.49 ± 0.28 | False |
+| 10 | ball_flight-5 | 2.48% | -0.83 ± 0.19 | -2.93 ± 0.51 | -2.56 ± 0.42 | False |
+| 10 | driving_accuracy-5 | 2.53% | -0.78 ± 0.19 | -2.90 ± 0.49 | -2.51 ± 0.38 | False |
+| 10 | power-5 | 2.63% | -0.68 ± 0.21 | -2.51 ± 0.55 | -1.25 ± 0.47 | False |
+| 10 | management-5 | 2.79% | -0.51 ± 0.18 | -0.33 ± 0.43 | -0.59 ± 0.29 | False |
+| 10 | chipping-5 | 2.89% | -0.41 ± 0.14 | -2.39 ± 0.39 | -1.60 ± 0.27 | False |
+| 10 | mid_irons-5 | 2.91% | -0.40 ± 0.17 | -2.27 ± 0.45 | -1.44 ± 0.33 | False |
+| 10 | short_putting-5 | 2.96% | -0.35 ± 0.10 | -1.61 ± 0.26 | -1.07 ± 0.21 | False |
+| 10 | wedges-5 | 2.98% | -0.33 ± 0.17 | -1.49 ± 0.45 | -0.89 ± 0.33 | False |
+| 10 | green_reading-5 | 3.00% | -0.31 ± 0.09 | -0.97 ± 0.22 | -0.73 ± 0.17 | False |
+| 10 | recovery_play-5 | 3.07% | -0.24 ± 0.12 | -0.89 ± 0.33 | -0.79 ± 0.23 | False |
+| 10 | composure-5 | 3.10% | -0.20 ± 0.07 | -0.24 ± 0.14 | -0.16 ± 0.09 | False |
+| 10 | striking_consistency-5 | 3.12% | -0.18 ± 0.15 | -0.44 ± 0.38 | -0.30 ± 0.27 | False |
+| 10 | stamina-5 | 3.13% | -0.17 ± 0.12 | -0.88 ± 0.31 | -0.46 ± 0.22 | False |
+| 10 | striking_consistency+5 | 3.14% | -0.17 ± 0.14 | +0.46 ± 0.37 | +0.51 ± 0.25 | False |
+| 10 | recovery_rate-5 | 3.15% | -0.16 ± 0.08 | -0.51 ± 0.22 | -0.14 ± 0.07 | False |
+| 10 | bunker-5 | 3.16% | -0.15 ± 0.08 | -0.86 ± 0.22 | -0.24 ± 0.17 | False |
+| 10 | focus-5 | 3.16% | -0.14 ± 0.09 | -0.78 ± 0.22 | -0.45 ± 0.14 | False |
+| 10 | putting_consistency-5 | 3.19% | -0.12 ± 0.08 | -0.50 ± 0.19 | -0.21 ± 0.13 | False |
+| 10 | wedges+5 | 3.21% | -0.10 ± 0.18 | +1.76 ± 0.42 | +0.97 ± 0.30 | False |
+| 10 | resilience-5 | 3.22% | -0.09 ± 0.07 | -0.33 ± 0.20 | +0.07 ± 0.16 | False |
+| 10 | long_irons-5 | 3.22% | -0.08 ± 0.15 | -1.16 ± 0.38 | -0.91 ± 0.25 | False |
+| 10 | lag_putting-5 | 3.23% | -0.08 ± 0.06 | -0.43 ± 0.15 | -0.60 ± 0.12 | False |
+| 10 | stamina+5 | 3.28% | -0.02 ± 0.12 | +0.84 ± 0.32 | +0.71 ± 0.20 | False |
+| 10 | bunker+5 | 3.30% | -0.01 ± 0.10 | +0.89 ± 0.28 | +0.30 ± 0.20 | False |
+| 10 | base | 3.31% | +0.00 ± 0.00 | +0.00 ± 0.00 | +0.00 ± 0.00 | False |
+| 10 | injury_resistance+5 | 3.31% | +0.00 ± 0.00 | +0.00 ± 0.00 | +0.00 ± 0.00 | False |
+| 10 | injury_resistance-5 | 3.31% | +0.00 ± 0.00 | +0.00 ± 0.00 | +0.00 ± 0.00 | False |
+| 10 | short_putting+5 | 3.31% | +0.00 ± 0.00 | +0.00 ± 0.00 | +0.00 ± 0.00 | True |
+| 10 | recovery_rate+5 | 3.34% | +0.04 ± 0.07 | +0.43 ± 0.20 | +0.20 ± 0.07 | False |
+| 10 | lag_putting+5 | 3.35% | +0.04 ± 0.04 | +0.19 ± 0.11 | +0.16 ± 0.07 | True |
+| 10 | focus+5 | 3.36% | +0.06 ± 0.08 | +0.45 ± 0.22 | +0.18 ± 0.14 | False |
+| 10 | putting_consistency+5 | 3.38% | +0.07 ± 0.08 | +0.40 ± 0.18 | +0.38 ± 0.13 | False |
+| 10 | resilience+5 | 3.39% | +0.08 ± 0.06 | -0.11 ± 0.19 | +0.16 ± 0.15 | False |
+| 10 | green_reading+5 | 3.40% | +0.09 ± 0.07 | +0.51 ± 0.19 | +0.38 ± 0.13 | True |
+| 10 | composure+5 | 3.43% | +0.12 ± 0.07 | +0.31 ± 0.15 | +0.24 ± 0.09 | False |
+| 10 | recovery_play+5 | 3.45% | +0.14 ± 0.12 | +0.92 ± 0.34 | +0.47 ± 0.22 | False |
+| 10 | driving_accuracy+5 | 3.66% | +0.35 ± 0.22 | +3.55 ± 0.52 | +1.98 ± 0.37 | False |
+| 10 | management+5 | 3.66% | +0.36 ± 0.19 | +0.79 ± 0.43 | -0.11 ± 0.29 | False |
+| 10 | long_irons+5 | 3.68% | +0.37 ± 0.17 | +1.32 ± 0.42 | +0.80 ± 0.29 | False |
+| 10 | mid_irons+5 | 3.69% | +0.38 ± 0.18 | +1.84 ± 0.47 | +0.43 ± 0.31 | False |
+| 10 | ball_flight+5 | 3.71% | +0.40 ± 0.20 | +2.54 ± 0.48 | +1.39 ± 0.37 | True |
+| 10 | chipping+5 | 3.77% | +0.46 ± 0.15 | +2.59 ± 0.39 | +0.80 ± 0.29 | False |
+| 10 | power+5 | 3.79% | +0.49 ± 0.23 | +2.17 ± 0.53 | +0.61 ± 0.39 | False |
+
+#### fixed_2027_PT_FRANCE_OPEN_s0: subject vs fixed production field replicates (conditional approximation); 500 field replicates x 16 subject replays; production winner rate of each subject in the same replicates: {'1': 0.092, '16': 0.022}
+
+| Subject rank | Arm | Win | Δ win (pp) ± SE | Δ top-10 (pp) ± SE | Δ made cut (pp) ± SE | clipped |
+|---|---|---|---|---|---|---|
+| 1 | driving_accuracy-5 | 8.09% | -1.73 ± 0.30 | -4.95 ± 0.54 | -2.16 ± 0.34 | False |
+| 1 | power-5 | 8.81% | -1.02 ± 0.33 | -2.88 ± 0.61 | -1.03 ± 0.40 | False |
+| 1 | mid_irons-5 | 8.81% | -1.01 ± 0.31 | -2.48 ± 0.57 | -1.60 ± 0.34 | False |
+| 1 | chipping-5 | 9.11% | -0.72 ± 0.21 | -2.01 ± 0.39 | -0.95 ± 0.22 | False |
+| 1 | short_putting-5 | 9.20% | -0.63 ± 0.15 | -1.46 ± 0.28 | -0.71 ± 0.15 | False |
+| 1 | green_reading-5 | 9.30% | -0.53 ± 0.13 | -1.09 ± 0.23 | -0.55 ± 0.12 | False |
+| 1 | wedges-5 | 9.39% | -0.44 ± 0.24 | -1.01 ± 0.43 | -1.11 ± 0.24 | False |
+| 1 | lag_putting-5 | 9.40% | -0.43 ± 0.12 | -1.10 ± 0.22 | -0.49 ± 0.13 | False |
+| 1 | ball_flight-5 | 9.48% | -0.35 ± 0.20 | -0.65 ± 0.37 | -0.15 ± 0.19 | False |
+| 1 | composure-5 | 9.53% | -0.30 ± 0.11 | -0.33 ± 0.15 | -0.36 ± 0.09 | False |
+| 1 | stamina-5 | 9.55% | -0.28 ± 0.19 | -1.21 ± 0.32 | -0.59 ± 0.16 | False |
+| 1 | management-5 | 9.56% | -0.27 ± 0.27 | +0.05 ± 0.49 | -0.43 ± 0.27 | False |
+| 1 | long_irons-5 | 9.62% | -0.20 ± 0.22 | -0.99 ± 0.37 | -0.75 ± 0.21 | False |
+| 1 | focus-5 | 9.65% | -0.18 ± 0.10 | -0.38 ± 0.18 | -0.15 ± 0.10 | False |
+| 1 | bunker-5 | 9.70% | -0.13 ± 0.14 | -0.74 ± 0.23 | -0.34 ± 0.13 | False |
+| 1 | putting_consistency-5 | 9.71% | -0.11 ± 0.10 | -0.35 ± 0.17 | -0.18 ± 0.10 | False |
+| 1 | resilience-5 | 9.73% | -0.10 ± 0.10 | -0.50 ± 0.20 | -0.31 ± 0.12 | False |
+| 1 | recovery_rate-5 | 9.75% | -0.08 ± 0.13 | -0.41 ± 0.21 | -0.15 ± 0.07 | False |
+| 1 | recovery_play-5 | 9.77% | -0.06 ± 0.17 | -0.09 ± 0.29 | -0.24 ± 0.18 | False |
+| 1 | striking_consistency+5 | 9.79% | -0.04 ± 0.23 | +0.39 ± 0.41 | +0.26 ± 0.25 | False |
+| 1 | base | 9.83% | +0.00 ± 0.00 | +0.00 ± 0.00 | +0.00 ± 0.00 | False |
+| 1 | green_reading+5 | 9.83% | +0.00 ± 0.00 | +0.00 ± 0.00 | +0.00 ± 0.00 | True |
+| 1 | injury_resistance+5 | 9.83% | +0.00 ± 0.00 | +0.00 ± 0.00 | +0.00 ± 0.00 | False |
+| 1 | injury_resistance-5 | 9.83% | +0.00 ± 0.00 | +0.00 ± 0.00 | +0.00 ± 0.00 | False |
+| 1 | management+5 | 9.83% | +0.00 ± 0.00 | +0.00 ± 0.00 | +0.00 ± 0.00 | True |
+| 1 | focus+5 | 9.89% | +0.06 ± 0.06 | +0.25 ± 0.09 | +0.09 ± 0.06 | True |
+| 1 | ball_flight+5 | 9.91% | +0.08 ± 0.20 | +0.96 ± 0.36 | +0.29 ± 0.20 | False |
+| 1 | bunker+5 | 10.03% | +0.20 ± 0.12 | +0.59 ± 0.23 | +0.07 ± 0.13 | False |
+| 1 | lag_putting+5 | 10.05% | +0.22 ± 0.10 | +0.84 ± 0.19 | +0.21 ± 0.11 | False |
+| 1 | striking_consistency-5 | 10.05% | +0.22 ± 0.23 | -0.30 ± 0.39 | -0.76 ± 0.24 | False |
+| 1 | composure+5 | 10.07% | +0.24 ± 0.10 | +0.34 ± 0.15 | +0.04 ± 0.09 | True |
+| 1 | resilience+5 | 10.11% | +0.28 ± 0.10 | +0.53 ± 0.20 | +0.10 ± 0.14 | False |
+| 1 | putting_consistency+5 | 10.13% | +0.30 ± 0.09 | +0.29 ± 0.17 | +0.01 ± 0.09 | False |
+| 1 | recovery_rate+5 | 10.16% | +0.33 ± 0.12 | +0.68 ± 0.19 | +0.09 ± 0.08 | False |
+| 1 | recovery_play+5 | 10.25% | +0.42 ± 0.18 | +0.59 ± 0.31 | +0.10 ± 0.18 | False |
+| 1 | stamina+5 | 10.31% | +0.48 ± 0.18 | +1.18 ± 0.32 | +0.47 ± 0.19 | False |
+| 1 | long_irons+5 | 10.41% | +0.58 ± 0.26 | +1.51 ± 0.44 | +0.61 ± 0.24 | False |
+| 1 | power+5 | 10.43% | +0.60 ± 0.35 | +2.35 ± 0.64 | +0.57 ± 0.37 | False |
+| 1 | chipping+5 | 10.58% | +0.75 ± 0.17 | +1.24 ± 0.32 | +0.47 ± 0.18 | True |
+| 1 | wedges+5 | 10.79% | +0.96 ± 0.27 | +1.76 ± 0.47 | +0.50 ± 0.26 | False |
+| 1 | short_putting+5 | 10.79% | +0.96 ± 0.17 | +2.20 ± 0.28 | +0.59 ± 0.15 | False |
+| 1 | mid_irons+5 | 11.04% | +1.21 ± 0.36 | +3.67 ± 0.59 | +1.62 ± 0.37 | False |
+| 1 | driving_accuracy+5 | 11.90% | +2.07 ± 0.32 | +3.35 ± 0.53 | +1.60 ± 0.35 | False |
+| 10 | mid_irons-5 | 1.73% | -0.59 ± 0.18 | -1.45 ± 0.45 | -1.82 ± 0.44 | False |
+| 10 | driving_accuracy-5 | 1.77% | -0.55 ± 0.17 | -1.84 ± 0.41 | -1.79 ± 0.41 | False |
+| 10 | power-5 | 1.94% | -0.38 ± 0.20 | -1.90 ± 0.48 | -1.01 ± 0.53 | False |
+| 10 | long_irons-5 | 1.95% | -0.37 ± 0.12 | -0.51 ± 0.29 | -0.95 ± 0.27 | False |
+| 10 | short_putting-5 | 2.06% | -0.26 ± 0.09 | -1.00 ± 0.22 | -1.29 ± 0.18 | False |
+| 10 | striking_consistency+5 | 2.06% | -0.26 ± 0.13 | +0.34 ± 0.33 | +0.25 ± 0.31 | False |
+| 10 | lag_putting-5 | 2.08% | -0.24 ± 0.07 | -0.64 ± 0.17 | -0.44 ± 0.16 | False |
+| 10 | stamina-5 | 2.10% | -0.22 ± 0.10 | -0.40 ± 0.26 | -0.99 ± 0.23 | False |
+| 10 | green_reading-5 | 2.10% | -0.22 ± 0.09 | -0.95 ± 0.19 | -0.95 ± 0.17 | False |
+| 10 | ball_flight-5 | 2.11% | -0.21 ± 0.12 | -0.30 ± 0.27 | -0.61 ± 0.26 | False |
+| 10 | chipping-5 | 2.17% | -0.16 ± 0.11 | -0.83 ± 0.29 | -1.62 ± 0.29 | False |
+| 10 | bunker-5 | 2.18% | -0.14 ± 0.07 | -0.27 ± 0.18 | -0.39 ± 0.18 | False |
+| 10 | focus-5 | 2.19% | -0.14 ± 0.07 | -0.21 ± 0.18 | -0.40 ± 0.16 | False |
+| 10 | composure-5 | 2.21% | -0.11 ± 0.06 | -0.25 ± 0.13 | -0.18 ± 0.11 | False |
+| 10 | recovery_rate-5 | 2.24% | -0.08 ± 0.07 | -0.24 ± 0.18 | -0.10 ± 0.09 | False |
+| 10 | wedges-5 | 2.24% | -0.08 ± 0.10 | -0.66 ± 0.29 | -0.49 ± 0.26 | False |
+| 10 | putting_consistency+5 | 2.27% | -0.06 ± 0.06 | +0.16 ± 0.17 | +0.35 ± 0.14 | False |
+| 10 | putting_consistency-5 | 2.27% | -0.05 ± 0.06 | -0.29 ± 0.16 | -0.55 ± 0.14 | False |
+| 10 | focus+5 | 2.28% | -0.05 ± 0.07 | +0.75 ± 0.19 | +0.26 ± 0.16 | False |
+| 10 | recovery_play+5 | 2.29% | -0.04 ± 0.09 | +1.03 ± 0.28 | +0.38 ± 0.26 | False |
+| 10 | power+5 | 2.29% | -0.03 ± 0.20 | +2.26 ± 0.52 | +2.00 ± 0.54 | True |
+| 10 | striking_consistency-5 | 2.29% | -0.03 ± 0.14 | +0.11 ± 0.35 | -0.96 ± 0.33 | False |
+| 10 | management+5 | 2.30% | -0.02 ± 0.15 | +0.78 ± 0.38 | +0.18 ± 0.36 | False |
+| 10 | ball_flight+5 | 2.31% | -0.01 ± 0.11 | +0.88 ± 0.32 | -0.09 ± 0.28 | False |
+| 10 | resilience-5 | 2.32% | -0.01 ± 0.05 | +0.09 ± 0.15 | -0.59 ± 0.17 | False |
+| 10 | base | 2.32% | +0.00 ± 0.00 | +0.00 ± 0.00 | +0.00 ± 0.00 | False |
+| 10 | injury_resistance+5 | 2.32% | +0.00 ± 0.00 | +0.00 ± 0.00 | +0.00 ± 0.00 | False |
+| 10 | injury_resistance-5 | 2.32% | +0.00 ± 0.00 | +0.00 ± 0.00 | +0.00 ± 0.00 | False |
+| 10 | management-5 | 2.34% | +0.02 ± 0.15 | -0.44 ± 0.39 | -0.19 ± 0.38 | False |
+| 10 | resilience+5 | 2.36% | +0.04 ± 0.05 | +0.14 ± 0.14 | +0.04 ± 0.16 | False |
+| 10 | short_putting+5 | 2.36% | +0.04 ± 0.06 | +0.73 ± 0.19 | +0.79 ± 0.15 | False |
+| 10 | stamina+5 | 2.36% | +0.04 ± 0.10 | +1.01 ± 0.27 | +0.46 ± 0.24 | False |
+| 10 | bunker+5 | 2.36% | +0.04 ± 0.06 | +0.25 ± 0.16 | +0.05 ± 0.16 | False |
+| 10 | recovery_rate+5 | 2.37% | +0.04 ± 0.06 | +0.43 ± 0.16 | -0.11 ± 0.08 | False |
+| 10 | composure+5 | 2.37% | +0.05 ± 0.05 | +0.21 ± 0.13 | +0.12 ± 0.12 | False |
+| 10 | green_reading+5 | 2.38% | +0.06 ± 0.06 | +0.89 ± 0.20 | +0.81 ± 0.16 | False |
+| 10 | lag_putting+5 | 2.39% | +0.06 ± 0.07 | +0.46 ± 0.17 | +0.47 ± 0.15 | False |
+| 10 | recovery_play-5 | 2.40% | +0.08 ± 0.09 | +0.12 ± 0.24 | -0.86 ± 0.22 | False |
+| 10 | wedges+5 | 2.47% | +0.15 ± 0.13 | +1.41 ± 0.33 | +0.94 ± 0.31 | False |
+| 10 | long_irons+5 | 2.48% | +0.16 ± 0.13 | +1.46 ± 0.34 | +0.79 ± 0.29 | False |
+| 10 | chipping+5 | 2.48% | +0.16 ± 0.11 | +2.20 ± 0.29 | +1.82 ± 0.31 | False |
+| 10 | driving_accuracy+5 | 2.63% | +0.31 ± 0.18 | +3.35 ± 0.43 | +2.94 ± 0.43 | False |
+| 10 | mid_irons+5 | 2.75% | +0.43 ± 0.19 | +3.29 ± 0.45 | +3.01 ± 0.47 | False |
+
+#### fixed_arch_2027_BRITANNIA_OPEN: subject vs fixed production field replicates (conditional approximation); 500 field replicates x 16 subject replays; production winner rate of each subject in the same replicates: {'9': 0.044}
+
+| Subject rank | Arm | Win | Δ win (pp) ± SE | Δ top-10 (pp) ± SE | Δ made cut (pp) ± SE | clipped |
+|---|---|---|---|---|---|---|
+| 10 | arch:Power Hitter:neutral | 1.47% | -1.84 ± 0.23 | -10.34 ± 0.59 | -8.99 ± 0.59 | False |
+| 10 | arch:Strategic Technician | 1.49% | -1.82 ± 0.22 | -9.00 ± 0.59 | -5.24 ± 0.60 | False |
+| 10 | arch:Strategic Technician:neutral | 1.56% | -1.75 ± 0.23 | -9.00 ± 0.60 | -6.04 ± 0.59 | False |
+| 10 | arch:All-Rounder | 1.62% | -1.68 ± 0.22 | -8.40 ± 0.59 | -5.00 ± 0.54 | False |
+| 10 | arch:All-Rounder:neutral | 1.62% | -1.68 ± 0.22 | -8.40 ± 0.59 | -5.00 ± 0.54 | False |
+| 10 | arch:Uniform | 1.62% | -1.68 ± 0.22 | -8.40 ± 0.59 | -5.00 ± 0.54 | False |
+| 10 | arch:Power Hitter | 1.85% | -1.45 ± 0.23 | -10.60 ± 0.60 | -10.32 ± 0.61 | False |
+| 10 | arch:Elite Putter | 1.88% | -1.43 ± 0.23 | -6.56 ± 0.57 | -3.21 ± 0.54 | True |
+| 10 | arch:Elite Putter:neutral | 1.88% | -1.43 ± 0.23 | -6.56 ± 0.57 | -3.21 ± 0.54 | True |
+| 10 | arch:Precision Ball-Striker | 2.29% | -1.02 ± 0.22 | -4.64 ± 0.59 | -1.05 ± 0.56 | False |
+| 10 | arch:Precision Ball-Striker:neutral | 2.29% | -1.02 ± 0.22 | -4.64 ± 0.59 | -1.05 ± 0.56 | False |
+| 10 | arch:Effortless Power:neutral | 2.66% | -0.65 ± 0.24 | -3.52 ± 0.60 | -3.51 ± 0.54 | False |
+| 10 | arch:Short-Game Artist | 2.75% | -0.56 ± 0.23 | -2.01 ± 0.59 | -0.71 ± 0.53 | False |
+| 10 | arch:Short-Game Artist:neutral | 2.75% | -0.56 ± 0.23 | -2.01 ± 0.59 | -0.71 ± 0.53 | False |
+| 10 | arch:Effortless Power | 2.94% | -0.37 ± 0.25 | -3.20 ± 0.59 | -2.76 ± 0.55 | False |
+| 10 | arch:Aggressive Shotmaker:neutral | 2.96% | -0.35 ± 0.23 | -0.75 ± 0.59 | -2.96 ± 0.55 | False |
+| 10 | base | 3.31% | +0.00 ± 0.00 | +0.00 ± 0.00 | +0.00 ± 0.00 | False |
+| 10 | arch:Aggressive Shotmaker | 3.50% | +0.19 ± 0.24 | -1.84 ± 0.59 | -3.79 ± 0.56 | False |
+
+#### fixed_arch_2027_PT_FRANCE_OPEN: subject vs fixed production field replicates (conditional approximation); 500 field replicates x 16 subject replays; production winner rate of each subject in the same replicates: {'16': 0.022}
+
+| Subject rank | Arm | Win | Δ win (pp) ± SE | Δ top-10 (pp) ± SE | Δ made cut (pp) ± SE | clipped |
+|---|---|---|---|---|---|---|
+| 10 | arch:Effortless Power:neutral | 1.76% | -0.56 ± 0.21 | -1.10 ± 0.55 | +0.43 ± 0.62 | False |
+| 10 | arch:Power Hitter | 1.82% | -0.50 ± 0.19 | -2.38 ± 0.50 | -2.36 ± 0.60 | False |
+| 10 | arch:Effortless Power | 1.83% | -0.50 ± 0.21 | -0.90 ± 0.54 | +0.31 ± 0.62 | False |
+| 10 | arch:Power Hitter:neutral | 1.86% | -0.47 ± 0.20 | -1.79 ± 0.52 | -2.12 ± 0.61 | False |
+| 10 | arch:Strategic Technician:neutral | 1.98% | -0.34 ± 0.19 | +2.59 ± 0.54 | +2.53 ± 0.64 | False |
+| 10 | arch:All-Rounder | 2.23% | -0.10 ± 0.19 | +1.09 ± 0.53 | +2.69 ± 0.62 | False |
+| 10 | arch:All-Rounder:neutral | 2.23% | -0.10 ± 0.19 | +1.09 ± 0.53 | +2.69 ± 0.62 | False |
+| 10 | arch:Uniform | 2.23% | -0.10 ± 0.19 | +1.09 ± 0.53 | +2.69 ± 0.62 | False |
+| 10 | arch:Elite Putter | 2.25% | -0.07 ± 0.22 | +1.96 ± 0.55 | +3.90 ± 0.62 | False |
+| 10 | arch:Elite Putter:neutral | 2.25% | -0.07 ± 0.22 | +1.96 ± 0.55 | +3.90 ± 0.62 | False |
+| 10 | arch:Aggressive Shotmaker:neutral | 2.25% | -0.07 ± 0.20 | +0.15 ± 0.51 | +0.11 ± 0.64 | False |
+| 10 | base | 2.32% | +0.00 ± 0.00 | +0.00 ± 0.00 | +0.00 ± 0.00 | False |
+| 10 | arch:Strategic Technician | 2.42% | +0.09 ± 0.21 | +1.07 ± 0.53 | +3.39 ± 0.61 | False |
+| 10 | arch:Aggressive Shotmaker | 2.52% | +0.20 ± 0.20 | +0.80 ± 0.52 | +0.21 ± 0.61 | False |
+| 10 | arch:Precision Ball-Striker | 2.73% | +0.41 ± 0.20 | +5.31 ± 0.57 | +7.27 ± 0.59 | False |
+| 10 | arch:Precision Ball-Striker:neutral | 2.73% | +0.41 ± 0.20 | +5.31 ± 0.57 | +7.27 ± 0.59 | False |
+| 10 | arch:Short-Game Artist | 2.75% | +0.43 ± 0.22 | +4.59 ± 0.57 | +6.16 ± 0.62 | False |
+| 10 | arch:Short-Game Artist:neutral | 2.75% | +0.43 ± 0.22 | +4.59 ± 0.57 | +6.16 ± 0.62 | False |
+
 ### Weather counterfactuals
 
 12 scenarios x 30 paired shot seeds per arm and event; intervals bootstrap the scenarios (clusters)
