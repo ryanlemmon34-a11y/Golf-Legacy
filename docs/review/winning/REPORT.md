@@ -309,7 +309,45 @@ gained, are 2.72 for the best PGA Tour players and 2.75 for the middle, rising t
 roughly 5–15% more volatile day to day, and its field as a whole more than that. Data Golf's prediction adjusts
 ability, time and course differently, and this world's Overall bands do not map onto their skill groups.
 
-## 7. Limitations (to be completed)
+## 7. Limitations
+
+**Archive (one world, seed 386509)**
+
+- Every interval describes stability within this world. A different seed, calendar or population could differ.
+  No seed-to-seed variation was measured.
+- Pre-event Overall is exact to the stored 0.1. Full pre-event attributes come only from the replay's compact
+  capture for verified seasons (2027–2037), quantized to 0.1, plus exact full tasks for 163 selected events. No
+  end-of-season or current rating is ever used as a pre-event value.
+- The archetype and attribute "O/E" and odds ratios are associations. Archetypes also differ in personality,
+  development, scheduling and access, and the Overall-only win model is pooled and slightly over-confident for
+  strong favourites.
+- Cárdenas dominates the major sample (92 of 224 majors as the best entrant). Major-only rates and rankings are
+  imprecise; the clustered intervals over 9 golfers are not reliable.
+- The weather associations are non-causal. Conditions follow course, climate and season. Within-course
+  regressions with era, field-strength and depth covariates reduce, but do not remove, confounding. The
+  finishers' scoring statistics are cut survivors.
+- The volatility comparison with Data Golf is rough: their metric is a model residual, and this world's Overall
+  bands do not map onto their skill groups.
+
+**Controlled experiments**
+
+- Early-era events only (2027: three events for the attribute grid, four for weather). They are not all-era
+  evidence and not counterfactuals for Cárdenas or any later historic event.
+- **Shared random stream.** One shot stream per site serves the whole field, and draws are conditional, so any
+  change shifts later draws for everyone. Paired seeds are matched designs, not identical paths. The share of
+  rivals whose totals changed is reported.
+- **Gusts** are seeded by the conditions and the golfer, not by the shot seed. Replicates within one weather
+  scenario share their gusts, so weather intervals bootstrap over scenarios.
+- **Fixed-field (tier 2) estimates** freeze rivals' scores, including their pressure and cut responses to the
+  subject, and treat playoffs as an equal share. They are conditional approximations and are validated against
+  full production events (tier 3). Win effects are ranked only where precision allows.
+- **+5 points** is a fixed step on a nonlinear, partly flat rating scale. −5, the equal-SD arms and several
+  subjects show the dependence on level. Clipped arms are excluded and listed.
+- **Indirect pathways** (development, availability, injuries, access, career decisions) are not in the fixed-field
+  experiments. injury_resistance's value lies there.
+- Morning and afternoon (tee-wave) weather is out of scope.
+
+**Nothing here recommends a parameter change.** The findings are for review first.
 
 ## 8. Reproduce
 
