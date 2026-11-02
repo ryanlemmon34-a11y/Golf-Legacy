@@ -15,6 +15,88 @@ Scope of the evidence:
 - **Controlled experiments** use verified early-era events (2027). They are not all-era evidence and not
   Cárdenas-specific counterfactuals.
 
+## 0. Answers in brief
+
+### 1. How often does the golfer with the best Overall win?
+
+Section 2.
+
+- **Overall rates:**
+  - about **12%** of all events (professional tiers 10.3%, Premier 12.3%);
+  - **21% of majors**, where Cárdenas dominates: he was the best entrant in 92 majors and won 34. Without him,
+    the best entrant won 9.8% (13/132 unique-best majors where he was not the best entrant) or 14.8% (9/61
+    where he did not play).
+- **It depends strongly on the field:**
+  - from 7% when the next golfer is within 1 Overall to 22% with a 5+ lead;
+  - from 15% with nobody within 2 Overall to 4% with nine or more;
+  - lower in bigger fields.
+- **The winner's Overall rank:** the median winner is the 10th-best entrant (12th at professional level).
+- **Day-to-day spread:** higher-Overall golfers are steadier. Real tour figures use a different metric, so no
+  calibrated comparison is claimed.
+
+### 2. Which archetypes win most?
+
+Section 3, with the mechanism in 4d.
+
+- **Raw win shares mostly follow opportunity.** Power Hitters' 29% of major wins is Cárdenas.
+- **Against what their Overall predicts** (an association):
+  - **Aggressive Shotmakers** win about a quarter more (1.26);
+  - **Strategic Technicians** win less (0.82) and **Precision Ball-Strikers** less (0.90);
+  - the rest are near 1.
+- **This is a broad pattern, not an identical order at every level.**
+- **Controlled, at the same Overall:** archetype shapes differ by up to about 0.65 strokes per round, and their
+  round-score spread differs by −3.5% to +5.6%. The archive's ordering lines up better with spread (variance,
+  partly from aggression) than with the mean. Which shape is best depends on the course: ball-flight profiles
+  on windy links, short-game and precision profiles on sheltered woodland.
+
+### 3. Which attributes matter most and least?
+
+Section 4.
+
+- **Most, per point, for direct scoring:** driving_accuracy (−0.18 strokes per round per +5) and mid_irons
+  (−0.15), then power, chipping, wedges, short_putting, green_reading, long_irons and ball_flight (−0.08 to
+  −0.12).
+- **For a favourite's win chance** (validated in direction where tested): +1 to +3 points per +5.
+- **Context:**
+  - ball_flight is among the strongest on windy links and nearly worthless on sheltered woodland;
+  - composure counts only under pressure;
+  - recovery_rate counts only from round 2.
+- **Least:** putting_consistency, resilience, management, focus and bunker (−0.02 to −0.03 strokes per round).
+- **striking_consistency** lowers average scores slightly but did not raise win chances in any tested cell. It
+  buys cuts, not wins.
+- **injury_resistance** has no direct shot effect: its value is availability.
+- **Rankings among neighbouring attributes are not robust.** Only the tiers are.
+
+### 4. How much did weather change who won?
+
+Section 5.
+
+- **Clear scoring effects.** Wind and rain raise everyone's scores, and on links the field-average penalty is
+  about 2.5–3.3 times the woodland one: +4.4 strokes per round at 28 mph on links. On links they also widen the
+  field's spread.
+- **The field is reordered towards ball-flight-strong golfers** in links wind.
+- **No consistent change in how often the favourite wins** was resolved, either in the 57-year history (a
+  within-course association) or in the controlled 2027 tests. Modest probability changes remain uncertain.
+  In any single tournament, different conditions almost always produce a different winner, as any re-roll
+  would.
+
+### What the evidence says overall
+
+**Skill dominates over many events but not single ones.** The best entrant wins about 1 in 8, the top 10 by
+Overall win about half, and the winner is typically the 10th-best entrant.
+
+**Field depth and gaps matter more than level.** In this engine, variance (aggression and shot-making shapes)
+converts into wins at the top of big fields beyond what Overall captures. Consistency converts into cuts and
+top-10s rather than wins.
+
+### Deviations from the published plan, all disclosed
+
+- **Replay range.** The replay was verified for 2027–2037 and stopped there to free CPU. Controlled tests use
+  2027 events.
+- **Events.** The attribute grid used three events (the parkland USA Open was dropped for time).
+- **Winning impact.** This was measured by a fixed-field conditional approximation, validated against full
+  production events at one event. The original isolated-stream harness idea was not built.
+
 ## 1. Data and provenance
 
 **Save.** Test2: world `386509-1793467568`, generation 70 (2084 start), checkpoint sha256 `c55bbd2f…`, engine
