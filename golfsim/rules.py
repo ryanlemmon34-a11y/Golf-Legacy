@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import re
 
-RULES_VERSION = '2026-11-15'
+RULES_VERSION = '2026-11-16'
 RANKING_RULE = 'world-ranking-1'     # the world ranking's formula (unchanged since the world began; named now)
 VERSIONS = (
     ('2026-10-30', 'Winners\' exemptions count whatever a golfer\'s membership (a non-member champion earns a '
@@ -125,6 +125,15 @@ VERSIONS = (
                    'starts; those who stay remain full-time college golfers. Unchanged: the model, graduation in the '
                    'season they turn 22, everyone else\'s decisions and draws. Worlds started earlier keep the old '
                    'rule (no decision before 22).'),
+    ('2026-11-16', 'Development rules dev-2 for new worlds (golfsim/realism.py): an 18-year-old entrant keeps at least '
+                   'about 4.5 points to grow between their entry Overall and their potential (19-year-olds about 2.25), '
+                   'applied after the scouts have chosen, so every class keeps exactly its golfers, potentials and '
+                   'paths; each attribute ages on its own schedule after the golfer\'s own peak age, at their own '
+                   'aging rate and per-golfer pace (strength, stamina, recovery and resistance to injury decline more '
+                   'steeply in the late thirties and forties; part of the physical loss is conditioning that training '
+                   'can win back; green reading matures with experience until 48). Worlds started earlier keep dev-1. '
+                   'Long irons rated 25 to 60 now play a little better with each point (they had played alike); from '
+                   '60 up nothing changes, nor for mid irons and wedges.'),
 )
 EARLIER = ('Seasons archived before rules versions were recorded were played under earlier rules. The '
            'differences that matter for reading old results: a winner without a Premier card held no '

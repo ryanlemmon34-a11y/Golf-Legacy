@@ -33,6 +33,7 @@ from .golfer import ARCHETYPES, OVERALL_WEIGHTS, Golfer, overall_rating
 from .names import make_name
 from .nations import STYLES, nations as starting_nations
 from .ratings import ATTRIBUTE_KEYS, PERSONALITY_KEYS
+from . import realism as RZ
 
 # ---- talent model (tuned by tools/world_report.py against the real world ranking) ------------------
 CANDIDATES_PER_POOL = 900      # candidate golfers per unit of nation pool
@@ -115,6 +116,7 @@ class World:
     seed: int
     nations: dict
     golfers: list = field(default_factory=list)
+    dev_rules: str = RZ.LEGACY      # the development rules it was created with (realism.py; saves from before: dev-1)
 
     def __post_init__(self):
         self.by_id = {g.id: g for g in self.golfers}
@@ -226,11 +228,20 @@ def candidates(year, seed, profiles, scale=1.0):
     return out
 
 
-def _make_golfer(i, row, year, seed, profiles, taken, in_use=None):
+def _make_golfer(i, row, year, seed, profiles, taken, in_use=None, rules=RZ.LEGACY, seen=None):
+    """A golfer from a kept row. `rules` (realism.py): under the current rules a teenager's entry level is set by the
+    readiness floor AFTER selection; `seen` (a list) then receives the Overall the existing rule would have given
+    them (what the scouts and colleges judged), from the same random stream."""
     country, age, pot, peak, cur, status, aging = row
     prof = profiles[country]
     grng = random.Random(f'{seed}:golfer:{i}')
     arch = _pick_archetype(prof.style, grng)
+    if rules == RZ.CURRENT:
+        if seen is not None:
+            twin = random.Random()
+            twin.setstate(grng.getstate())
+            seen.append(overall_rating(_build_attrs(cur, arch, prof.style, age, peak, twin)))
+        cur = RZ.entry_overall(cur, pot, age)     # after selection: who is kept is the existing rule's (realism.py)
     attrs = _build_attrs(cur, arch, prof.style, age, peak, grng)
     pers = _personality(arch, cur, grng)
     g = Golfer(make_name(country, grng, taken, in_use), attrs, pers, archetype=arch, id=i, country=country,
@@ -244,15 +255,17 @@ def _make_golfer(i, row, year, seed, profiles, taken, in_use=None):
     return g
 
 
-def generate_world(year=2027, seed=2027, nation_profiles=None, scale=1.0):
-    """Generate every competitive golfer in the world. `scale` multiplies the number of candidates."""
+def generate_world(year=2027, seed=2027, nation_profiles=None, scale=1.0, dev_rules=RZ.CURRENT):
+    """Generate every competitive golfer in the world. `scale` multiplies the number of candidates.
+    `dev_rules`: the world's development rules (realism.py): new worlds play the current ones; RZ.LEGACY gives
+    the rules of worlds created before them."""
     from .development import init_ceilings
     from .finance import SELF_FUNDED_SEASONS, backer_deal, initial_backing, initial_cash, seeded_losses
     profiles = nation_profiles or starting_nations()
     taken = set()
-    golfers = [_make_golfer(i, row, year, seed, profiles, taken)
+    golfers = [_make_golfer(i, row, year, seed, profiles, taken, rules=dev_rules)
                for i, row in enumerate(candidates(year, seed, profiles, scale), 1)]
-    world = World(year, seed, profiles, golfers)
+    world = World(year, seed, profiles, golfers, dev_rules)
     _assign_memberships(world, random.Random(f'{seed}:tours'))
     rng = random.Random(f'{seed}:careers')
     for g in golfers:
@@ -626,18 +639,20 @@ def expected_shares(kind, profiles):
 
 
 def junior_class(year, seed, profiles, start_id, taken, in_use=None, baseline=None, shares=None, report=None,
-                 carry=None):
+                 carry=None, rules=RZ.LEGACY):
     """This year's 18-year-olds from every nation (amateurs: college or amateur golf), by the cohort-share
     rule (entrant_rows: the total from the baseline profiles, split by `shares`). Names: see
     names.make_name (`taken`: every name used so far; `in_use`: those of people active now)."""
     rows = entrant_rows('juniors', year, seed, profiles, baseline, shares, report, carry)
     rows.sort(key=lambda r: -r[4])
-    golfers = [_make_golfer(start_id + i, row, year, f'{seed}:j{year}', profiles, taken, in_use)
+    seen = [] if rules == RZ.CURRENT else None
+    golfers = [_make_golfer(start_id + i, row, year, f'{seed}:j{year}', profiles, taken, in_use, rules, seen)
                for i, row in enumerate(rows)]
     rng = random.Random(f'{seed}:junior-tours:{year}')
     am_series = {c: k for k, t in TOUR_BY_KEY.items() if t.tier == 6 for c, _ in t.countries}
-    for g in golfers:
-        g.tour = _college_or_series(g, profiles[g.country], rng, am_series)
+    for n, g in enumerate(golfers):
+        # colleges recruit on what the scouts saw (the existing rule's level), as the scouts' rule kept them
+        g.tour = _college_or_series(g, profiles[g.country], rng, am_series, seen[n] if seen is not None else None)
     return golfers
 
 
@@ -646,7 +661,7 @@ NEW_PRO_AGES = (21, 22, 23, 24, 25, 26)
 
 
 def new_professionals(year, seed, profiles, start_id, taken, in_use=None, baseline=None, shares=None, report=None,
-                      carry=None):
+                      carry=None, rules=RZ.LEGACY):
     """This year's new professionals from outside the tracked amateur game.
 
     The junior class follows one route into professional golf in detail (college and national amateur
@@ -663,18 +678,19 @@ def new_professionals(year, seed, profiles, start_id, taken, in_use=None, baseli
     (entrant_rows), like the junior class."""
     rows = entrant_rows('new_pros', year, seed, profiles, baseline, shares, report, carry)
     rows.sort(key=lambda r: -r[4])
-    golfers = [_make_golfer(start_id + i, row, year, f'{seed}:p{year}', profiles, taken, in_use)
+    golfers = [_make_golfer(start_id + i, row, year, f'{seed}:p{year}', profiles, taken, in_use, rules)
                for i, row in enumerate(rows)]
     for g in golfers:
         g.turned_pro = year
     return golfers
 
 
-def _college_or_series(g, prof, rng, am_series):
+def _college_or_series(g, prof, rng, am_series, seen=None):
     region = COUNTRIES[g.country].region
-    if g.overall >= 30:
+    level = g.overall if seen is None else seen
+    if level >= 30:
         if g.country == 'USA' or rng.random() < prof.pathway / 100 * 0.45:
-            return 'CO_US_D1' if g.overall >= 44 else 'CO_US_SMALL'
+            return 'CO_US_D1' if level >= 44 else 'CO_US_SMALL'
         if rng.random() < 0.6:
             return 'CO_INTL'
     return am_series.get(g.country, AMATEUR_BY_REGION[region])

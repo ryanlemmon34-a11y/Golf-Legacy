@@ -195,7 +195,7 @@ class Player:
         self.drive = ip(R.DRIVE_DISTANCE, a['power'])
         # Accuracy is angular: the same rating sprays a longer drive further offline.
         self.sigma = ip(R.DRIVE_SIGMA, a['driving_accuracy']) * self.drive / TOUR_DRIVE
-        self.m_long = ip(R.APPROACH_MULT, a['long_irons'])
+        self.m_long = ip(R.LONG_IRON_MULT, a['long_irons'])
         self.m_mid = ip(R.APPROACH_MULT, a['mid_irons'])
         self.m_wedge = ip(R.APPROACH_MULT, a['wedges'])
         self.contact = ip(R.CONTACT_FLOOR, (a['mid_irons'] + a['wedges'] + a['striking_consistency']) / 3)

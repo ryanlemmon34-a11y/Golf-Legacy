@@ -636,7 +636,8 @@ def add_new_professionals(season, year):
     start = season.world.next_id
     taken = {g.name for g in season.world.golfers} | season.staff.taken
     args = _cohort_args(season, 'new_pros', year)
-    arrivals = new_professionals(year, season.seed, season.world.nations, start, taken, names_in_use(season), **args)
+    arrivals = new_professionals(year, season.seed, season.world.nations, start, taken, names_in_use(season),
+                                 rules=season.dev_rules, **args)
     season.participation.record(year, 'new_pros', args['report'])
     season.world.next_id = start + len(arrivals)
     rng = random.Random(f'{season.seed}:new-pros:{year}')
@@ -666,7 +667,8 @@ def add_juniors(season, year):
     start = season.world.next_id                     # ids come from the world's single person registry
     taken = {g.name for g in season.world.golfers} | season.staff.taken
     args = _cohort_args(season, 'juniors', year)
-    juniors = junior_class(year, season.seed, season.world.nations, start, taken, names_in_use(season), **args)
+    juniors = junior_class(year, season.seed, season.world.nations, start, taken, names_in_use(season),
+                           rules=season.dev_rules, **args)
     season.participation.record(year, 'juniors', args['report'])
     season.world.next_id = start + len(juniors)
     rng = random.Random(f'{season.seed}:juniors:{year}')

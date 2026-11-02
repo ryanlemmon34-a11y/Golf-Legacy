@@ -31,6 +31,7 @@ from __future__ import annotations
 import math
 import random
 
+from . import realism as RZ
 from .golfer import OVERALL_WEIGHTS, overall_rating
 from .ratings import ATTRIBUTE_KEYS
 
@@ -291,10 +292,13 @@ def choose_category(g, rng, insight=0.0, gaps=None):
     return max(scores, key=lambda c: scores[c] / top + rng.gauss(0, noise))
 
 
-def age_year(g, age, rng, experience=1.0, acc=None):
+def age_year(g, age, rng, experience=1.0, acc=None, rules=None):
     """One year older: physical decline after the prime, then technique; the mental game matures with
     competitive experience (`experience`, 0-1, from the season's competitive rounds) — a year without
-    competition matures nothing."""
+    competition matures nothing. `rules`: the world's development rules (realism.py); 'dev-2' ages each
+    attribute on its own schedule (_age_year_v2), anything else plays the rules below unchanged."""
+    if rules == RZ.CURRENT:
+        return _age_year_v2(g, age, rng, experience, acc)
     a, c = g.attrs, g.ceilings
     rate = g.aging_rate
     x_phys = age - (g.peak_age + 3)
@@ -319,6 +323,46 @@ def age_year(g, age, rng, experience=1.0, acc=None):
             c[k] = max(1.0, min(99.0, c[k] + d))
             if a[k] > c[k]:
                 c[k] = a[k]
+
+
+def _age_year_v2(g, age, rng, experience, acc):
+    """'dev-2' aging (realism.py): each attribute from its own onset after the golfer's peak age, at its own rate,
+    times the golfer's aging rate and their category factor; part of the physical decline is conditioning that
+    training can win back (the ceiling falls by the rest); green reading and the mental game mature with
+    competitive experience until 48 and decline after 55."""
+    a, c = g.attrs, g.ceilings
+    rate = g.aging_rate
+    prof = RZ.profile(g)
+    for k, cat in CATEGORY_OF.items():
+        d = 0.0
+        if k in RZ.EXPERIENCE_KEYS:
+            if age < 48:
+                d = 0.35 * (0.6 + 0.8 * rng.random()) * (1.0 if cat == 'mental' else 0.5) * \
+                    (experience if cat == 'mental' else 0.5 + 0.5 * experience)
+            elif age > 55:
+                d = -0.2 * (age - 55) ** 0.7
+            if d:
+                was = a[k]
+                a[k] = max(1.0, min(99.0, a[k] + d))
+                if acc is not None:
+                    note(acc, 4, k, a[k] - was)
+                c[k] = max(1.0, min(99.0, c[k] + d))
+                if a[k] > c[k]:
+                    c[k] = a[k]
+            continue
+        onset, coef, power = RZ.AGING[k]
+        x = age - (g.peak_age + onset)
+        if x <= 0:
+            continue
+        d = coef * rate * prof[cat] * x ** power
+        was = a[k]
+        a[k] = max(1.0, a[k] - d)
+        if acc is not None:
+            note(acc, 4, k, a[k] - was)
+        drop = d * (1.0 - RZ.MAINTAIN) if cat == 'physical' else d
+        c[k] = max(1.0, min(99.0, c[k] - drop))
+        if a[k] > c[k]:
+            c[k] = a[k]
 
 
 def serious_injury(g, weeks, rng, acc=None):

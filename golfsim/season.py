@@ -50,6 +50,7 @@ from . import work_pathway as WP
 from .course_library import Venue, course_place, default_library, event_level, library_version
 from .engine import Conditions
 from . import weather as WX
+from . import realism as RZ
 from .golfer import Caddie
 from .geography import CITY_BY_NAME, COUNTRIES
 from .population import CHALLENGER_BY_COUNTRY, CHALLENGER_BY_REGION
@@ -410,6 +411,8 @@ class Season:
         self.nationals_withdrawn = defaultdict(dict)         # year -> gid -> why an earned national place went unplayed
         self.amateur_work_from = {}                          # gid -> (year, week) they started working as amateurs
         self.weather = WX.MODEL                              # seasonal climate with wind direction (weather.py)
+        # development rules (realism.py): the world's own, fixed when it was created (dev-2 for new worlds)
+        self.dev_rules = getattr(world, 'dev_rules', RZ.LEGACY)
         self.lib = library or default_library(calendar or SCH.DEFAULT)   # new worlds: the reference calendar
         self.cal = self.lib.calendar
         self.calendar_version = self.cal.version
@@ -2170,6 +2173,7 @@ class Season:
         state.setdefault('am_support_seasons', {})
         state.setdefault('am_support_held', {})
         state.setdefault('amateur_support_on', True)
+        state.setdefault('dev_rules', RZ.LEGACY)             # saves from before rules 2026-11-16: dev-1 unchanged
         state.setdefault('work_pathway_on', False)           # saves from before the pathway: never applied
         state.setdefault('work_pathway_min_age', WP.MIN_AGE_BEFORE)  # saves from before rules 2026-11-10: 21
         state.setdefault('mortality_on', False)              # saves from before deaths: nobody dies (no migration)
@@ -2676,7 +2680,8 @@ class Season:
             for g in self.world.golfers:
                 if g.lifestyle != 'retired':
                     acc = self.dev_record(year, g.id)
-                    D.age_year(g, g.age(year + 1), rng, self.year_experience(g.id, year), acc=acc)
+                    D.age_year(g, g.age(year + 1), rng, self.year_experience(g.id, year), acc=acc,
+                               rules=self.dev_rules)
                     acc[D.OV_POST] = g.overall               # as next season starts
                     acc[D.CEIL_POST] = overall_rating(g.ceilings) if g.ceilings else 0.0
             self.juniors_added[year + 1] = careers.add_juniors(self, year + 1)

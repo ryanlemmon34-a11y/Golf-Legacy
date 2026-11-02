@@ -112,6 +112,12 @@ DRIVE_SIGMA = ((0, 34), (10, 30), (25, 24.5), (40, 21.5), (50, 20.2), (60, 19.0)
 # Iron/wedge skill -> multiplier on tour-average proximity to the hole.
 APPROACH_MULT = ((0, 1.30), (10, 1.16), (25, 1.05), (40, 1.05), (50, 1.05), (60, 1.05),
                  (75, 1.0), (85, 0.945), (90, 0.905), (100, 0.84))
+# Long irons only (rules 2026-11-16): the shared table is flat from 25 to 60, so a long-irons rating anywhere in
+# that range played the same long approaches. Here each point from 25 to 60 is worth a small, steady improvement
+# (0.001 a point); from 60 up, and at 10 and below, it is the shared table exactly. Mid irons and wedges keep
+# APPROACH_MULT.
+LONG_IRON_MULT = ((0, 1.30), (10, 1.16), (25, 1.085), (40, 1.07), (50, 1.06), (60, 1.05),
+                  (75, 1.0), (85, 0.945), (90, 0.905), (100, 0.84))
 
 # Chipping / bunker skill -> multiplier on tour-average proximity.
 SHORT_MULT = ((0, 1.55), (10, 1.36), (25, 1.18), (40, 1.14), (50, 1.12), (60, 1.09),
