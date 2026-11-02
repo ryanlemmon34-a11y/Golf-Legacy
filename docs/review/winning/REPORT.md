@@ -247,15 +247,96 @@ variance" profile (Aggressive Shotmaker) wins more.
 injury_resistance shows ×1.05 even though it has **no shot effect at all**. That is the clearest sign that these
 associations mix in correlated traits and careers. Mechanisms come from the controlled experiments below.
 
-### 4c. Controlled experiments
+### 4c. Direct scoring value of each attribute (controlled, tier 1)
 
-*Pending:*
+Design (`exp_attrs.py rounds`; full tables in `results/experiments/SUMMARY.md` and `rounds_grid.json`):
 
-- tier 1: round scoring (grid running);
-- tier 2: fixed-field conditional estimates;
-- tier 3: full-event validation;
-- fixed-Overall archetype profiles;
-- equal-SD perturbations.
+- **Events.** Three verified 2027 events, using each event's real course and seasonal conditions (a new draw per
+  sample):
+  - Britannia Open: major, links, typical wind 19 mph;
+  - France Open: Premier, sheltered woodland, 6 mph;
+  - CH Europe 01: tier 2, woodland.
+- **Subjects.** The Overall-rank 1, 10 and 40 golfers of each field, with their own captured caddie, familiarity
+  and fatigue.
+- **Rounds.** One production round per sample, 8,000 paired samples per arm.
+- **Contexts:**
+  - R1: round 1, no pressure;
+  - R4: round 4, in-week fatigue;
+  - R4P: round 4 under final-round contention pressure.
+- **Arms.** One attribute ±5 points, nothing else changed. Clipped arms are excluded and listed: 19 of 189 +5
+  cells, mostly the rank-1 subject's attributes already at 94–99.
+
+**Zero checks hold exactly.**
+
+- injury_resistance gives Δ = 0 in every sample of every cell.
+- Moving long_irons within its flat 25–60 band gives identical rounds (pilot).
+- composure and recovery_rate are exactly 0 where the code says they cannot act (no pressure; round 1).
+
+**Δ strokes per round for +5 points**, mean over the unclipped subject-event cells (negative is better; ± is the
+RMS paired SE). The −5 arms mirror these within about 0.03, so the response is close to linear in this range.
+mid_irons and wedges gain a little more going up than they lose going down: +5 gives −0.15 and −0.09, −5 gives
++0.12 and +0.07.
+
+| Attribute | R1 | R4 | R4 + contention | Britannia (links, wind) | France (sheltered) | CH Europe (tier 2) |
+|---|---|---|---|---|---|---|
+| driving_accuracy | **−0.18** ± .02 | −0.20 | −0.17 | −0.18 | −0.18 | −0.19 |
+| mid_irons | **−0.15** ± .02 | −0.14 | −0.14 | −0.13 | **−0.19** | −0.13 |
+| power | **−0.12** ± .03 | −0.14 | −0.12 | −0.07 | −0.12 | **−0.17** |
+| chipping | −0.11 ± .01 | −0.11 | −0.11 | −0.12 | −0.10 | −0.11 |
+| wedges | −0.09 ± .02 | −0.09 | −0.09 | −0.09 | −0.08 | −0.11 |
+| ball_flight | −0.09 ± .02 | −0.10 | −0.08 | **−0.17** | **−0.03** | −0.07 |
+| short_putting | −0.08 ± .01 | −0.08 | −0.08 | −0.09 | −0.08 | −0.08 |
+| green_reading | −0.08 ± .01 | −0.08 | −0.07 | −0.07 | −0.07 | −0.08 |
+| long_irons | −0.08 ± .02 | −0.08 | −0.09 | −0.07 | −0.06 | −0.09 |
+| stamina | −0.05 ± .01 | −0.06 | −0.06 | −0.06 | −0.04 | −0.06 |
+| recovery_play | −0.05 ± .01 | −0.05 | −0.05 | −0.05 | −0.04 | −0.06 |
+| striking_consistency | −0.04 ± .02 | −0.05 | −0.05 | −0.04 | −0.02 | −0.06 |
+| lag_putting | −0.04 ± .01 | −0.04 | −0.04 | −0.04 | −0.03 | −0.04 |
+| bunker | −0.03 ± .01 | −0.04 | −0.03 | −0.05 | −0.03 | −0.03 |
+| focus | −0.03 ± .01 | −0.04 | −0.05 | −0.04 | −0.03 | −0.03 |
+| management | −0.03 ± .02 | −0.03 | −0.03 | −0.02 | −0.03 | −0.03 |
+| resilience | −0.03 ± .01 | −0.03 | −0.03 | −0.03 | −0.02 | −0.04 |
+| putting_consistency | −0.02 ± .01 | −0.02 | −0.03 | −0.02 | −0.01 | −0.02 |
+| recovery_rate | **0** | −0.06 | −0.06 | 0 | 0 | 0 |
+| composure | **0** | **0** | **−0.10** | 0 | 0 | 0 |
+| injury_resistance | **0** | **0** | **0** | 0 | 0 | 0 |
+
+**What this shows about direct scoring:**
+
+- **Largest per point, in every context:** driving_accuracy and mid_irons. Power, chipping and wedges are next.
+- **Context matters:**
+  - ball_flight is the single most valuable attribute on the windy links (−0.17) and nearly irrelevant on
+    sheltered woodland (−0.03);
+  - power is worth less on links (−0.07) than on the parkland and woodland courses (−0.12 to −0.17);
+  - composure is worth −0.10 per round under final-round contention pressure and nothing otherwise;
+  - recovery_rate acts only from round 2.
+- **Smallest per point:** putting_consistency, resilience, management, focus and bunker (−0.02 to −0.03), and
+  lag_putting (−0.04).
+- **injury_resistance** has no direct scoring value by construction. Its value is availability, which this design
+  cannot see; that is not "worthless".
+- **Variance.** +5 on one attribute barely changes a round's spread. The largest change, from
+  striking_consistency, is 1.1% less spread, with slightly fewer exceptional low rounds. The archetype variance
+  pattern in section 3 therefore cannot come from any one +5 change; the fixed-Overall profiles below test shape
+  and aggression.
+- **Rankings among neighbours are not robust.** The per-event, per-subject ranks of the middle attributes move by
+  several places (`SUMMARY.md`, rank table). Only the broad tiers are stable: top, middle, small, situational,
+  zero.
+
+These are strokes per round from a single golfer's production rounds. They are not win probabilities; winning
+impact is section 4e.
+
+### 4d. Fixed-Overall archetype profiles
+
+*Pending (queued): the subject's 21 attributes are replaced by each native archetype profile at exactly the same
+Overall, with the archetype's aggression and big_stage and with those set neutral.*
+
+### 4e. Winning impact (tier 2 fixed-field screening, tier 3 full-event validation)
+
+*Pending (queued).*
+
+### 4f. Equal-SD perturbations
+
+*Pending (queued).*
 
 ## 5. How much does weather change who wins?
 
