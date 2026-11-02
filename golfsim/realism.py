@@ -9,9 +9,11 @@ evidence: docs/review/realism/PLAN.md and RESULTS.md.
    that, an entrant aged 18 or 19 keeps at least about READY_FLOOR points (18; half at 19) between their entry
    Overall and their potential: a smooth floor on youth headroom (softplus), so the near-finished teenage tail
    becomes "very good and still growing" while every potential, every prodigy (potential is untouched) and every
-   cohort count and identity stays exactly as it was. Typical entrants (about 10 points of headroom at 18) move by
-   about 0.01; a junior with 5 points by about 0.6; one already at potential by 4.5. The scouts' and colleges' judgement keeps reading the existing rule's level, so who is kept
-   and where they go is unchanged (population.junior_class).
+   cohort count and identity stays exactly as it was. Every decision the existing rule takes on the entry level
+   (the starting world's memberships, a junior's college or series) is taken on the existing rule's attributes,
+   with the same random streams; the readiness attributes, built from the same draws, are swapped in afterwards
+   (population._make_golfer, _apply_ready). Typical entrants (about 10 points of headroom at 18) move by
+   about 0.01; a junior with 5 points by about 0.6; one already at potential by 4.5.
 
 2. Attribute-specific, individual aging (population.age_deficit, which sets generated golfers' level for their
    age and the scouts' rule, is unchanged). Each attribute declines from its own onset after the golfer's own peak

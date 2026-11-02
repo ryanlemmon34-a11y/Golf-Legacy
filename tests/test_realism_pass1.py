@@ -85,8 +85,8 @@ class Readiness(unittest.TestCase):
 
     def test_cohorts_counts_and_identities_are_exact(self):
         """The production junior class and new professionals under both rules: the same golfers (count, id, name,
-        nation, peak age, aging rate, archetype, college or series, personality), the same potential (to the 0.1
-        the entry rounding allows), new professionals entirely unchanged; only juniors' entry level moves, down,
+        nation, peak age, aging rate, archetype, college or series, personality), exactly the same potential, new
+        professionals entirely unchanged; only juniors' entry level moves, down,
         and only where headroom was short."""
         nations = starting_nations()
         for seed, year in ((11, 2031), (386509, 2036), (7, 2031), (11, 2044)):     # (incl. formerly-flipped routes)
@@ -94,7 +94,7 @@ class Readiness(unittest.TestCase):
             b = P.junior_class(year, seed, nations, 1, set(), rules=RZ.CURRENT)
             self.assertEqual([ident(g) for g in a], [ident(g) for g in b], (seed, year))
             for x, y in zip(a, b):
-                self.assertLessEqual(abs(x.potential - y.potential), 0.1 + 1e-9)
+                self.assertEqual(x.potential, y.potential)
                 self.assertLessEqual(y.overall, x.overall + 0.15)        # (attribute rounding)
                 if x.potential - x.overall >= 9:
                     self.assertLess(abs(y.overall - x.overall), 0.15)
@@ -106,19 +106,35 @@ class Readiness(unittest.TestCase):
             nb = P.new_professionals(year, seed, nations, 1, set(), rules=RZ.CURRENT)
             self.assertEqual([(ident(g), g.potential, g.attrs) for g in na], [(ident(g), g.potential, g.attrs) for g in nb])
 
-    def test_a_new_world_keeps_every_golfer_and_records_its_rules(self):
-        a = P.generate_world(seed=5, scale=0.05, dev_rules=RZ.LEGACY)
-        b = P.generate_world(seed=5, scale=0.05)
+    def test_a_full_size_new_world_keeps_every_initial_decision(self):
+        """The full-size starting world (seed 2027) under both rules: every golfer keeps their identity, status, tour
+        or college, lifestyle, money, backing, potential and personality, and everyone aged 20 or more keeps every
+        attribute and ceiling, so the shared membership and career random streams are unchanged (an earlier draft
+        assigned memberships on the lowered teenage ratings and moved four paths: reviewer probe of debb655).
+        Only teenagers' attributes (lower entry, same potential) and their ceilings differ."""
+        a = P.generate_world(seed=2027, dev_rules=RZ.LEGACY)
+        b = P.generate_world(seed=2027)
         self.assertEqual((a.dev_rules, b.dev_rules), (RZ.LEGACY, RZ.CURRENT))
         self.assertEqual(len(a.golfers), len(b.golfers))
-        moved = 0
+        self.assertGreater(len(a.golfers), 5000)
+
+        def path(g):
+            return (ident(g), g.status, g.tour, g.lifestyle, round(g.cash, 6), g.backing, g.backer,
+                    getattr(g, 'backer_patience', None), g.potential, g.turned_pro, g.height_cm, g.hand, g.hometown)
+        teens = 0
         for x, y in zip(a.golfers, b.golfers):
-            self.assertEqual((x.id, x.name, x.country, x.born, x.peak_age, x.aging_rate),
-                             (y.id, y.name, y.country, y.born, y.peak_age, y.aging_rate))
-            if abs(x.overall - y.overall) > 0.15:
-                moved += 1
-                self.assertIn(x.age(2027), (18, 19))
-        self.assertGreater(moved, 0)
+            self.assertEqual(path(x), path(y), x.name)
+            if x.age(2027) >= 20:
+                self.assertEqual((x.attrs, x.ceilings), (y.attrs, y.ceilings), x.name)
+            else:
+                teens += 1
+                self.assertLessEqual(y.overall, x.overall + 0.15)
+        self.assertGreater(teens, 100)
+        named = {g.name: g for g in b.golfers}
+        for name in ('Brett King', 'Stewart Whitaker', 'Syafiq Fernandez', 'Tariq Al Thani'):
+            if name in named:                                                 # (the reviewer's four)
+                old = next(g for g in a.golfers if g.id == named[name].id)
+                self.assertEqual(named[name].tour, old.tour, name)
 
     def test_saves_from_before_play_the_rules_they_had(self):
         from golfsim.season import Season
