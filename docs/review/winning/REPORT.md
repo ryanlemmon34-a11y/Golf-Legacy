@@ -274,10 +274,12 @@ sits above Effortless Power (0.941), and the middle archetypes' intervals overla
 (`arch_level_*.csv`).
 
 **Interpretation, tested in sections 4d and 4e.** Aggressive Shotmakers win about a quarter more than their Overall
-predicts, yet make the *fewest* cuts and gain much less in top-10s (1.08) than in wins (1.26). That is the
-signature of **higher score variance** at an equal mean: more very low weeks and more bad ones. Precision
-Ball-Strikers show the reverse: the most cuts made, fewer wins. Big fields reward variance at the top. The
-controlled fixed-Overall profiles in section 4 test this directly.
+predicts, yet make the *fewest* cuts and gain much less in top-10s (1.08) than in wins (1.26). That pattern is
+consistent with **higher score variance** than golfers of the same Overall: more very low weeks and more bad ones.
+Equal Overall does not hold the expected score equal, though: the controlled profiles (4d) show mean differences at
+fixed Overall, small on average and larger by course, so the extra wins come from a mix of mean and spread, not
+variance alone. Precision Ball-Strikers show the reverse: the most cuts made, fewer wins. Big fields reward variance
+at the top. Sections 4d and 4e test this directly.
 
 ## 4. Which attributes matter most and least?
 
