@@ -21,9 +21,13 @@ from golfsim import staff as ST                                        # noqa: E
 from golfsim.season import Season                                      # noqa: E402
 from golfsim.session import Session, StaleCursor, UnsupportedCareer    # noqa: E402
 
-# digests of the fixture world under main 18a8e23 (all AI): after its first season, and after 12 more weeks
-MAIN_SEASON1 = '25ca649704b1447f4d4767609aa8ba82d4133cf646185cd4c5d9715a4f1ce42b'
-MAIN_2028_W12 = '6d82605695fe90648a02df645d78a52a6cdd145cb882da4231a013e44374d4cb'
+# digests of the fixture world (all AI) after its first season, and after 12 more weeks advanced one committed week
+# at a time, under the engine this branch builds on: main 18a8e23 + the reviewed engine fix fix/engine-dogleg-retee
+# (e99cb20; tee plans priced as played, reload after out of bounds re-plans), computed with the same procedure on
+# that fix branch (46013a5). For reference, main 18a8e23 alone gives 25ca6497...e42b and 6d826056...d4cb; the fix
+# changes play in this small world's first season, so the reference moved with it.
+MAIN_SEASON1 = '4d9be6cb11b25ac9d2d42c3a5242ab9650c3d3ff92859d18fb64e24a56a92097'
+MAIN_2028_W12 = '1ce3067674f215e25afd2e66eb46ff148e3c14747276a596c9c17dacfea76e7a'
 
 REST = {'kind': 'rest'}
 POLICY = {'selected': 'accept', 'qualifying': 'skip'}
@@ -60,8 +64,8 @@ def golfer(s):
 
 class AllAI(unittest.TestCase):
     def test_all_ai_worlds_equal_main(self):
-        """Without a career the engine and session behave exactly as main: the same world after a season and after
-        twelve more weeks advanced one committed week at a time."""
+        """Without a career the engine and session behave exactly as the engine this branch builds on (main + the
+        engine fix): the same world after a season and after twelve more weeks advanced one committed week at a time."""
         s = Session.open(F.copy_of(F.first_boundary()))
         self.assertEqual(F.digest(s), MAIN_SEASON1)
         for _ in range(12):
