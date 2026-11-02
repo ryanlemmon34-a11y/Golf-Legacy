@@ -87,23 +87,34 @@ def count(season, g, year, week, why):
 
 
 def decide(season, year, week):
-    """At a monthly plan: every candidate whose count has reached WEEKS takes a job from this block on."""
+    """At a monthly plan: every candidate whose count has reached WEEKS takes a job from this block on. For a golfer
+    under the player's control (career mode) it is the player's decision, before the block is played."""
     if not season.work_pathway_on:
         return
+    car = getattr(season, 'career', None)
     for gid, n in sorted(season.cash_blocked.items()):
         if n < WEEKS:
             continue
         g = season.g.get(gid)
         if g is None or not tracked(g) or why_not(season, g, year):
             continue
-        g.lifestyle = 'part_time'
-        AR.started_work(season, g, year, week)
-        season.cash_blocked.pop(gid, None)
-        rec = {'gid': gid, 'year': year, 'week': week, 'age': g.age(year), 'weeks_blocked': n,
-               'am_rank': season.am_pos.get(gid), 'cash': round(g.cash), 'reason': REASON}
-        season.work_pathway[year].append(rec)
-        season.log(gid, year, week, f'Could not afford to play for {n} weeks with no family money left: took a job '
-                                    f'at {g.age(year)} and kept playing as an amateur')
+        if car is not None and car.controls(gid):
+            car.job_offer(year, week, n)
+            continue
+        take_job(season, g, year, week, n)
+
+
+def take_job(season, g, year, week, n):
+    """The pathway's consequence: a part-time job from this block on (the AI's decision, or the player's yes)."""
+    gid = g.id
+    g.lifestyle = 'part_time'
+    AR.started_work(season, g, year, week)
+    season.cash_blocked.pop(gid, None)
+    rec = {'gid': gid, 'year': year, 'week': week, 'age': g.age(year), 'weeks_blocked': n,
+           'am_rank': season.am_pos.get(gid), 'cash': round(g.cash), 'reason': REASON}
+    season.work_pathway[year].append(rec)
+    season.log(gid, year, week, f'Could not afford to play for {n} weeks with no family money left: took a job '
+                                f'at {g.age(year)} and kept playing as an amateur')
 
 
 def init(season):

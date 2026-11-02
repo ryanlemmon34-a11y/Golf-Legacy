@@ -655,6 +655,11 @@ def approach(season, c, g, why, when, rng, students=None, shares=None, arrangeme
     the partnership kept, if any). `students` and `shares` (coach -> count) are kept up to date when given. True
     if the player said yes."""
     st = season.staff
+    car = getattr(season, 'career', None)
+    if car is not None and car.controls(g.id):
+        rng.random()                                  # (the draw the AI's answer takes: every stream stays aligned)
+        car.staff_offer(season, 'coach', c, g, why, when, arrangement)   # the player answers: nothing happens yet
+        return False
     cur = st.coach(g.id)
     p, yes, no = golfer_answers(season, st, g, c, when[0], arrangement)
     if rng.random() >= p:
@@ -764,6 +769,11 @@ def caddie_offer(season, k, g, why, when, rng):
     golfer's current caddie's stint (recorded as leaving for the approach) and opens the new one, started by the
     caddie, with both reasons; a no is recorded with both reasons (on the partnership kept, if any). True if yes."""
     st = season.staff
+    car = getattr(season, 'career', None)
+    if car is not None and car.controls(g.id):
+        rng.random()                                  # (the draw the AI's answer takes: every stream stays aligned)
+        car.staff_offer(season, 'caddie', k, g, why, when)   # the player answers: nothing happens yet
+        return False
     cur = st.caddie(g.id)
     p, yes, no = golfer_takes_caddie(season, st, g, k, when[0])
     if rng.random() >= p:
@@ -919,11 +929,15 @@ def start_of_season(season, year):
 
     def priority(g):
         return (-season.player_prestige(g.id), g.id)
+    car = getattr(season, 'career', None)
     for g in sorted((g for g in active if g.id not in st.coach_of and g.status in ('pro', 'amateur')), key=priority):
         t = TOUR_BY_KEY.get(g.tour)
         p_want = 0.35 + 0.5 * g.personality['coachability'] / 100 + (0.3 if t and t.tier <= 2 else 0.0)
         if g.lifestyle == 'part_time':
             p_want *= 0.5                             # a full-time job leaves little time for individual coaching
+        if car is not None and car.controls(g.id):
+            rng.random()                              # (the AI's draw) -- looking for a coach is the player's choice,
+            continue                                  # not offered in this build (offers to them are decisions)
         if rng.random() > p_want:
             continue
         budget = coach_budget(season, g, year)
@@ -974,6 +988,8 @@ def start_of_season(season, year):
                        key=lambda k: (-k.reputation - rng.gauss(0, 8), k.id))
     turned_down = {}                                  # caddie -> bags they have said no to this winter
     for g in sorted((g for g in active if wants_caddie(g) and g.id not in st.caddie_of), key=priority):
+        if car is not None and car.controls(g.id):
+            continue                                  # hiring a caddie: the player's choice, not offered in this build
         budget = caddie_budget(season, g, year)
         events = max(1, season.target_events(g))
         level = results_level(season, g, year)
