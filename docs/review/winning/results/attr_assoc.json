@@ -1,0 +1,496 @@
+{
+ "years": [
+  2027,
+  2028,
+  2029,
+  2030,
+  2031,
+  2032,
+  2033,
+  2034,
+  2035,
+  2036
+ ],
+ "starts": 1260504,
+ "editions": 14323,
+ "provenance": {
+  "scripts_commit": "b771884e3be810f5276457fb6e87ca83de01751a",
+  "scripts_dirty": true,
+  "scripts_sha256": {
+   "archetypes.py": "d7ec7a7aeb2b77bdb71c89d86ef575e95b0108c985fa064fd178cafe3a2d5e64",
+   "attr_assoc.py": "439b3a790b9727ab438c67c1e50fb6183e46520bd9138c0e951d47dc683d797c",
+   "common.py": "b2de674275fba76e39f7b9999c83ac98c2f95658518729c0e034f330992514f7",
+   "exp_attrs.py": "9f21a8af910ab21f2cbda58c0d7861bb85a44cba8f0d854e8c11ae7959857ac5",
+   "exp_fixed.py": "8e846dd2244ef0d4e1745f461bf7f856063e36ade4272f626a5a6677ccbabacf",
+   "exp_weather.py": "a609faba0b09e7226da0f6f1ec33783b1c4183f48c5d1387c6d6c9941252270c",
+   "extract.py": "5e59fd20cc5ad113f3921d74dee6eed7f75b6403dd82ea4ca117b9a9910eff08",
+   "favourite.py": "56f87ae72ee8ebce8a996d18818cb7154a616abb1c7a19ff52d0004c64fb4635",
+   "harness.py": "de6fe351ec3121fcfc95205d3ff0624897688b5d59cb72d1ba43e44f6d64cc5f",
+   "recover_archetypes.py": "88dfdacce88a464c411efad28ba3e01a2091bf9289c870f6281d2490a4de22b5",
+   "replay.py": "bca8d429119cff38ec67172b76825d6b7257260b44966bf18639a6d53d199f23",
+   "summarise.py": "61ba3b462c1933c62c004a2e8cf2083950008f8099819ab8aab9c3e425a5e45e",
+   "volatility.py": "f4b19983129f3996e0ad2710cd7ce0f46799e21e42d25fde458ee95e262155a9",
+   "weather_desc.py": "7d2d5e029ab2183a47a66a910ea993ccc9368e99a8775567a622f970e18cd1ea"
+  },
+  "inputs_sha256": {
+   "MANIFEST.json": "57de6ac708c4ec790d943ddb57f429e17771320f185eb1d7f0ac5555324562e1",
+   "editions.csv.gz": "a018b14b81764620465271f9bbacde74c635cf07aaa0d0fdd5d3d46900222309"
+  }
+ },
+ "models": {
+  "all": [
+   {
+    "variable": "ball_flight",
+    "unit": "10 attribute points above own Overall",
+    "coef": 0.1385937388456318,
+    "se": 0.011330328910183244,
+    "odds_ratio": 1.148657350337774,
+    "z_sd": 0.7608878895048204,
+    "overall_weight": 0.035035035035035036
+   },
+   {
+    "variable": "fam",
+    "unit": "10 rounds of course familiarity vs field mean",
+    "coef": 0.11865727222700027,
+    "se": 0.01631293913243253,
+    "odds_ratio": 1.1259839461801426,
+    "z_sd": 0.5257653394635438,
+    "overall_weight": null
+   },
+   {
+    "variable": "power",
+    "unit": "10 attribute points above own Overall",
+    "coef": 0.11257428006348286,
+    "se": 0.00821542075007738,
+    "odds_ratio": 1.1191553847583986,
+    "z_sd": 1.0842778095040086,
+    "overall_weight": 0.14614614614614613
+   },
+   {
+    "variable": "recovery_play",
+    "unit": "10 attribute points above own Overall",
+    "coef": 0.067292338860236,
+    "se": 0.011691523002954474,
+    "odds_ratio": 1.0696081204924681,
+    "z_sd": 0.7423444892643195,
+    "overall_weight": 0.02002002002002002
+   },
+   {
+    "variable": "aggression",
+    "unit": "10 trait points",
+    "coef": 0.05679690482718956,
+    "se": 0.004461801378445064,
+    "odds_ratio": 1.0584408243427947,
+    "z_sd": 1.9346353587153649,
+    "overall_weight": null
+   },
+   {
+    "variable": "injury_resistance",
+    "unit": "10 attribute points above own Overall",
+    "coef": 0.05173262029470052,
+    "se": 0.01347626291712059,
+    "odds_ratio": 1.0530941288683264,
+    "z_sd": 0.7107918835708048,
+    "overall_weight": 0.0
+   },
+   {
+    "variable": "recovery_rate",
+    "unit": "10 attribute points above own Overall",
+    "coef": 0.04538339422781439,
+    "se": 0.013767390098776143,
+    "odds_ratio": 1.0464289778405755,
+    "z_sd": 0.7046359318717634,
+    "overall_weight": 0.01201201201201201
+   },
+   {
+    "variable": "long_irons",
+    "unit": "10 attribute points above own Overall",
+    "coef": 0.03340639349275402,
+    "se": 0.010689244168411632,
+    "odds_ratio": 1.0339706528148147,
+    "z_sd": 0.8116085622159653,
+    "overall_weight": 0.06806806806806806
+   },
+   {
+    "variable": "stamina",
+    "unit": "10 attribute points above own Overall",
+    "coef": 0.030371342987623222,
+    "se": 0.01297592957940314,
+    "odds_ratio": 1.0308372570751407,
+    "z_sd": 0.737496177009057,
+    "overall_weight": 0.045045045045045036
+   },
+   {
+    "variable": "wedges",
+    "unit": "10 attribute points above own Overall",
+    "coef": 0.023498253178445977,
+    "se": 0.016331245439668924,
+    "odds_ratio": 1.023776512390189,
+    "z_sd": 0.5308921164287556,
+    "overall_weight": 0.051051051051051045
+   },
+   {
+    "variable": "big_stage",
+    "unit": "10 trait points",
+    "coef": 0.016112852471156465,
+    "se": 0.005586442354428067,
+    "odds_ratio": 1.0162433645100444,
+    "z_sd": 1.5579660217612872,
+    "overall_weight": null
+   },
+   {
+    "variable": "mid_irons",
+    "unit": "10 attribute points above own Overall",
+    "coef": -0.035951606064599406,
+    "se": 0.013156985829644573,
+    "odds_ratio": 0.9646869773527696,
+    "z_sd": 0.661962845757959,
+    "overall_weight": 0.0980980980980981
+   },
+   {
+    "variable": "short_putting",
+    "unit": "10 attribute points above own Overall",
+    "coef": -0.03972984493354,
+    "se": 0.009909722135014152,
+    "odds_ratio": 0.9610490363512819,
+    "z_sd": 0.8895530266801174,
+    "overall_weight": 0.06806806806806806
+   },
+   {
+    "variable": "chipping",
+    "unit": "10 attribute points above own Overall",
+    "coef": -0.042179768326801835,
+    "se": 0.010800036744580502,
+    "odds_ratio": 0.958697421649212,
+    "z_sd": 0.8062770428098215,
+    "overall_weight": 0.06406406406406406
+   },
+   {
+    "variable": "bunker",
+    "unit": "10 attribute points above own Overall",
+    "coef": -0.04841726444693591,
+    "se": 0.01156621474391245,
+    "odds_ratio": 0.9527361611983244,
+    "z_sd": 0.7601831956686256,
+    "overall_weight": 0.025025025025025023
+   },
+   {
+    "variable": "resilience",
+    "unit": "10 attribute points above own Overall",
+    "coef": -0.054878448997859736,
+    "se": 0.01461481049344862,
+    "odds_ratio": 0.9466002011640033,
+    "z_sd": 0.6357134569447622,
+    "overall_weight": 0.015015015015015013
+   },
+   {
+    "variable": "driving_accuracy",
+    "unit": "10 attribute points above own Overall",
+    "coef": -0.06508469290527451,
+    "se": 0.010629733395474582,
+    "odds_ratio": 0.936988103772137,
+    "z_sd": 0.8252906171335366,
+    "overall_weight": 0.11411411411411411
+   },
+   {
+    "variable": "putting_consistency",
+    "unit": "10 attribute points above own Overall",
+    "coef": -0.06997836763393057,
+    "se": 0.014079429724230255,
+    "odds_ratio": 0.9324139900085441,
+    "z_sd": 0.6200976646942967,
+    "overall_weight": 0.016016016016016016
+   },
+   {
+    "variable": "green_reading",
+    "unit": "10 attribute points above own Overall",
+    "coef": -0.07263582759815829,
+    "se": 0.012035609367356944,
+    "odds_ratio": 0.9299394266428468,
+    "z_sd": 0.7433435980034159,
+    "overall_weight": 0.050050050050050046
+   },
+   {
+    "variable": "fatigue",
+    "unit": "0.1 season fatigue",
+    "coef": -0.08382172985731795,
+    "se": 0.015639425290132538,
+    "odds_ratio": 0.919595177847078,
+    "z_sd": 0.8544774845534191,
+    "overall_weight": null
+   },
+   {
+    "variable": "lag_putting",
+    "unit": "10 attribute points above own Overall",
+    "coef": -0.08681266048634458,
+    "se": 0.011164425913921075,
+    "odds_ratio": 0.9168488415613243,
+    "z_sd": 0.7822764107158321,
+    "overall_weight": 0.045045045045045036
+   },
+   {
+    "variable": "composure",
+    "unit": "10 attribute points above own Overall",
+    "coef": -0.0916176479294532,
+    "se": 0.012987716401518901,
+    "odds_ratio": 0.9124539615178159,
+    "z_sd": 0.6979316759521932,
+    "overall_weight": 0.035035035035035036
+   },
+   {
+    "variable": "management",
+    "unit": "10 attribute points above own Overall",
+    "coef": -0.12000890738736623,
+    "se": 0.010388986735747157,
+    "odds_ratio": 0.8869125366084494,
+    "z_sd": 0.8897940740315452,
+    "overall_weight": 0.038038038038038034
+   },
+   {
+    "variable": "focus",
+    "unit": "10 attribute points above own Overall",
+    "coef": -0.1386225572730408,
+    "se": 0.01214457309828252,
+    "odds_ratio": 0.8705565516938419,
+    "z_sd": 0.7584899350700521,
+    "overall_weight": 0.026026026026026022
+   },
+   {
+    "variable": "striking_consistency",
+    "unit": "10 attribute points above own Overall",
+    "coef": -0.1486279628024418,
+    "se": 0.012903523577700578,
+    "odds_ratio": 0.8618897102909757,
+    "z_sd": 0.66431025170647,
+    "overall_weight": 0.028028028028028024
+   }
+  ],
+  "pro_tiers_0_4": [
+   {
+    "variable": "ball_flight",
+    "unit": "10 attribute points above own Overall",
+    "coef": 0.14965802775104825,
+    "se": 0.015991827454393818,
+    "odds_ratio": 1.1614369955870087,
+    "z_sd": 0.751600924016588,
+    "overall_weight": 0.035035035035035036
+   },
+   {
+    "variable": "fam",
+    "unit": "10 rounds of course familiarity vs field mean",
+    "coef": 0.10667231710974988,
+    "se": 0.020209828052995194,
+    "odds_ratio": 1.1125696247108903,
+    "z_sd": 0.6221389701821854,
+    "overall_weight": null
+   },
+   {
+    "variable": "power",
+    "unit": "10 attribute points above own Overall",
+    "coef": 0.10215618775707598,
+    "se": 0.011631937316169341,
+    "odds_ratio": 1.1075564449764057,
+    "z_sd": 1.0502164261261904,
+    "overall_weight": 0.14614614614614613
+   },
+   {
+    "variable": "recovery_play",
+    "unit": "10 attribute points above own Overall",
+    "coef": 0.09040854489129446,
+    "se": 0.01673275607523191,
+    "odds_ratio": 1.0946213943451688,
+    "z_sd": 0.7382116911237955,
+    "overall_weight": 0.02002002002002002
+   },
+   {
+    "variable": "aggression",
+    "unit": "10 trait points",
+    "coef": 0.06718116024209876,
+    "se": 0.0062474946832550985,
+    "odds_ratio": 1.069489209549983,
+    "z_sd": 1.9351649256632562,
+    "overall_weight": null
+   },
+   {
+    "variable": "wedges",
+    "unit": "10 attribute points above own Overall",
+    "coef": 0.06425437104624482,
+    "se": 0.023296465899332954,
+    "odds_ratio": 1.0663636162938532,
+    "z_sd": 0.5211113852559738,
+    "overall_weight": 0.051051051051051045
+   },
+   {
+    "variable": "recovery_rate",
+    "unit": "10 attribute points above own Overall",
+    "coef": 0.053843993435543726,
+    "se": 0.01949408027782306,
+    "odds_ratio": 1.055319952472011,
+    "z_sd": 0.6496341705661308,
+    "overall_weight": 0.01201201201201201
+   },
+   {
+    "variable": "injury_resistance",
+    "unit": "10 attribute points above own Overall",
+    "coef": 0.05226347252642104,
+    "se": 0.019305956121339004,
+    "odds_ratio": 1.0536533146462252,
+    "z_sd": 0.6584556647372264,
+    "overall_weight": 0.0
+   },
+   {
+    "variable": "stamina",
+    "unit": "10 attribute points above own Overall",
+    "coef": 0.04598811355836065,
+    "se": 0.018513282206936824,
+    "odds_ratio": 1.0470619650420283,
+    "z_sd": 0.6831056258529961,
+    "overall_weight": 0.045045045045045036
+   },
+   {
+    "variable": "big_stage",
+    "unit": "10 trait points",
+    "coef": 0.02200440665741354,
+    "se": 0.007829989538721055,
+    "odds_ratio": 1.0222482891585147,
+    "z_sd": 1.5674012687773884,
+    "overall_weight": null
+   },
+   {
+    "variable": "long_irons",
+    "unit": "10 attribute points above own Overall",
+    "coef": 0.02167731307999929,
+    "se": 0.015054373409650799,
+    "odds_ratio": 1.0219139729879252,
+    "z_sd": 0.8105017125345751,
+    "overall_weight": 0.06806806806806806
+   },
+   {
+    "variable": "chipping",
+    "unit": "10 attribute points above own Overall",
+    "coef": -0.019150467730859464,
+    "se": 0.015166365327731158,
+    "odds_ratio": 0.9810317375172605,
+    "z_sd": 0.8087899134244169,
+    "overall_weight": 0.06406406406406406
+   },
+   {
+    "variable": "bunker",
+    "unit": "10 attribute points above own Overall",
+    "coef": -0.021727128678627496,
+    "se": 0.016347700144675157,
+    "odds_ratio": 0.9785072051793575,
+    "z_sd": 0.7535138589106053,
+    "overall_weight": 0.025025025025025023
+   },
+   {
+    "variable": "short_putting",
+    "unit": "10 attribute points above own Overall",
+    "coef": -0.0331002813928503,
+    "se": 0.01395912368803488,
+    "odds_ratio": 0.9674415383394344,
+    "z_sd": 0.8903352948261853,
+    "overall_weight": 0.06806806806806806
+   },
+   {
+    "variable": "mid_irons",
+    "unit": "10 attribute points above own Overall",
+    "coef": -0.057883714723418286,
+    "se": 0.018871101806784665,
+    "odds_ratio": 0.9437596864123224,
+    "z_sd": 0.6602481487188562,
+    "overall_weight": 0.0980980980980981
+   },
+   {
+    "variable": "resilience",
+    "unit": "10 attribute points above own Overall",
+    "coef": -0.06508515760193238,
+    "se": 0.020640033122669262,
+    "odds_ratio": 0.9369876683569979,
+    "z_sd": 0.6102704081911934,
+    "overall_weight": 0.015015015015015013
+   },
+   {
+    "variable": "driving_accuracy",
+    "unit": "10 attribute points above own Overall",
+    "coef": -0.06741127993571079,
+    "se": 0.015054693928792983,
+    "odds_ratio": 0.93481065339834,
+    "z_sd": 0.8164569432633673,
+    "overall_weight": 0.11411411411411411
+   },
+   {
+    "variable": "putting_consistency",
+    "unit": "10 attribute points above own Overall",
+    "coef": -0.06916686295203923,
+    "se": 0.020067268118531465,
+    "odds_ratio": 0.933170955425846,
+    "z_sd": 0.6151980510580801,
+    "overall_weight": 0.016016016016016016
+   },
+   {
+    "variable": "green_reading",
+    "unit": "10 attribute points above own Overall",
+    "coef": -0.07018802285220961,
+    "se": 0.017004524529479922,
+    "odds_ratio": 0.9322185250407836,
+    "z_sd": 0.7242957536874907,
+    "overall_weight": 0.050050050050050046
+   },
+   {
+    "variable": "lag_putting",
+    "unit": "10 attribute points above own Overall",
+    "coef": -0.0714091149545912,
+    "se": 0.015607512532854815,
+    "odds_ratio": 0.9310808950790002,
+    "z_sd": 0.7829351541571253,
+    "overall_weight": 0.045045045045045036
+   },
+   {
+    "variable": "composure",
+    "unit": "10 attribute points above own Overall",
+    "coef": -0.09794993437953156,
+    "se": 0.01839525918941662,
+    "odds_ratio": 0.9066942968301411,
+    "z_sd": 0.6758117119678354,
+    "overall_weight": 0.035035035035035036
+   },
+   {
+    "variable": "fatigue",
+    "unit": "0.1 season fatigue",
+    "coef": -0.11362663336602767,
+    "se": 0.01870556159598852,
+    "odds_ratio": 0.8925911574313308,
+    "z_sd": 0.9073315439413433,
+    "overall_weight": null
+   },
+   {
+    "variable": "focus",
+    "unit": "10 attribute points above own Overall",
+    "coef": -0.11890423035140509,
+    "se": 0.017297290051717158,
+    "odds_ratio": 0.887892829874588,
+    "z_sd": 0.7340704937255805,
+    "overall_weight": 0.026026026026026022
+   },
+   {
+    "variable": "management",
+    "unit": "10 attribute points above own Overall",
+    "coef": -0.12848554971873916,
+    "se": 0.014712939531007612,
+    "odds_ratio": 0.8794262702835534,
+    "z_sd": 0.8653266264556468,
+    "overall_weight": 0.038038038038038034
+   },
+   {
+    "variable": "striking_consistency",
+    "unit": "10 attribute points above own Overall",
+    "coef": -0.17012762845441756,
+    "se": 0.01881120420029645,
+    "odds_ratio": 0.8435571478307402,
+    "z_sd": 0.6513851296624442,
+    "overall_weight": 0.028028028028028024
+   }
+  ]
+ }
+}

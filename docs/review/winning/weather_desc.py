@@ -18,7 +18,10 @@ golfers in a round sharing one set. Outcomes per primary edition:
 Confounding is shown, not assumed away:
   - by level and by links versus other courses;
   - within-course comparisons: course-demeaned regressions of each outcome on mean wind and wet rounds, with
-    field depth (true first-second gap), field size and rounds as covariates.
+    field depth (true first-second gap), field size, rounds, year (era), mean field Overall and the top-10
+    mean Overall (absolute ability) as covariates. These are still associations, not causal effects:
+    weather is not randomised. The finishers' scoring measures are cut survivors, whose identities can
+    change with conditions.
 """
 from __future__ import annotations
 
@@ -148,7 +151,7 @@ def main():
     for k in tabs:
         tabs[k].to_csv(out / f'wx_{k}.csv', index=False, float_format='%.4f')
     # within-course regressions (associations; course fixed effects)
-    covs = ['wind_mean', 'wet_rounds', 'gap12', 'n', 'rounds']
+    covs = ['wind_mean', 'wet_rounds', 'gap12', 'n', 'rounds', 'year', 'mean_ovr', 'top10_mean_ovr']
     reg = {}
     for lab, df in (('pro', pro), ('all', e), ('pro_links', pro[pro.links]), ('pro_other', pro[~pro.links])):
         reg[lab] = {y: within(df, y, covs) for y in ['best_won', 'w_rank_log', 'margin', 'to_par_per_round',

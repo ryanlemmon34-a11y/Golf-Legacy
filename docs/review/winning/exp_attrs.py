@@ -69,9 +69,26 @@ def subject_ids(t, ranks):
 
 
 def arm_task(t, gid, arm):
-    """arm: 'base', '<attr><+|-><d>', or '<attr>=<v>' (set: for the flat-band check)."""
+    """arm: 'base', '<attr><+|-><d>', '<attr>=<v>' (set: for the flat-band check), 'arch:<Archetype>' (the
+    subject's 21 attributes replaced by that native archetype's profile at exactly the subject's Overall, with the
+    archetype's aggression/big_stage) or 'arch:<Archetype>:neutral' (the same attributes, aggression and big_stage
+    50), or 'arch:Uniform' (every attribute equal to the Overall). Everything else about the subject (id, caddie,
+    familiarity, fatigue, other traits) is unchanged. Clipped = any profile attribute at the 1/99 bound."""
     if arm == 'base':
         return t, False
+    if arm.startswith('arch:'):
+        from golfsim.golfer import ARCHETYPES, archetype_golfer, uniform_golfer
+        parts = arm.split(':')
+        t2 = copy.deepcopy(t)
+        g = next(g for g in t2['golfers'] if g.id == gid)
+        ov = g.overall
+        prof = uniform_golfer(ov) if parts[1] == 'Uniform' else archetype_golfer(parts[1], ov)
+        g.attrs = dict(prof.attrs)
+        traits = {} if parts[1] == 'Uniform' else ARCHETYPES[parts[1]][1]
+        for k in ('aggression', 'big_stage'):
+            g.personality[k] = 50.0 if (len(parts) > 2 or parts[1] == 'Uniform') else float(traits.get(k, 50.0))
+        assert abs(g.overall - ov) < 1e-6, (arm, g.overall, ov)
+        return t2, any(v in (1.0, 99.0) for v in g.attrs.values())
     if '=' in arm:
         k, v = arm.split('=')
         t2 = copy.deepcopy(t)

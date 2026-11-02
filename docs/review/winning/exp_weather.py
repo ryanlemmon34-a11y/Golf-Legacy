@@ -2,6 +2,9 @@
 
 Usage: python exp_weather.py CAPDIR SAVE OUT --events E1,E2 --scen 12 --reps 40 [--procs 3]
 
+Uncertainty: the reps of one scenario share its weather and gusts, so intervals are bootstrapped over
+scenarios (clusters), not over runs.
+
 Design:
   - Events: verified captured tasks (harness: both no-op checks pass first).
   - Scenarios s = 1..S: draw_conditions for the course and week with an independent weather seed gives each round
@@ -17,8 +20,10 @@ Design:
     calm (s, r) against calm (s, r+1), with the same conditions and an independent shot seed.
 
 Measures per event and arm:
-  - field: the finishers' mean score per round (common penalty), the SD of totals, the winning margin and
-    playoffs;
+  - field: ALL starters' rounds 1-2 (recorded with on_round; nobody is selected out), giving the mean score per
+    round against par (the common penalty) and the SD of 36-hole totals (dispersion). Cut-survivor
+    statistics are also given but labelled: survivors' identities change with the weather;
+  - the winning margin and playoffs;
   - winner: the winner's Overall rank, the best entrant's win rate, and the share of wins taken by the top 5 by
     Overall;
   - the win distribution's total-variation distance from calm, against the calm-half versus calm-half floor;
@@ -66,9 +71,17 @@ def job(args):
                 cond[k].gust = base[k].gust
             for arm, seed in ((arm_name(w, wet), f'{t["seed"]}:wxrep:{s}:{r}'),) + (
                     ((RESEED, f'{t["seed"]}:wxrep2:{s}:{r}'),) if (w, wet) == (0, False) else ()):
-                board, playoff, _ = H.play(t, seed=seed, cond=cond)
+                early = {}
+
+                def on_round(g, rd, st, early=early):
+                    if rd <= 2:
+                        early.setdefault(g.id, []).append(st.score)
+                board, playoff, _ = H.play(t, seed=seed, cond=cond, on_round=on_round)
                 fin = H.finish_of(board, t['golfers'])
-                out.append((s, r, arm, playoff, [(x[0], x[1] or 0, x[2] if x[2] is not None else -1) for x in fin]))
+                r12 = [v for v in early.values() if len(v) == 2]
+                out.append((s, r, arm, playoff, [(x[0], x[1] or 0, x[2] if x[2] is not None else -1) for x in fin],
+                            float(np.mean([sum(v) for v in r12])) / 2 - t['course'].par,
+                            float(np.std([sum(v) for v in r12]))))
     return name, out
 
 
@@ -83,15 +96,16 @@ def analyse(name, runs, t, arch):
     top5 = {g.id for g in order[:5]}
     R = t['rounds']
     by = defaultdict(dict)
-    for s, r, arm, playoff, fin in runs:
-        by[arm][(s, r)] = (playoff, fin)
+    for s, r, arm, playoff, fin, r12_mean, r12_sd in runs:
+        by[arm][(s, r)] = (playoff, fin, r12_mean, r12_sd)
     rows = []
     calm = by['0mph']
     pct = {}
     for arm, d in by.items():
         winners, wr, sdv, mean_rd, margins, playoffs, same = [], [], [], [], [], [], []
+        scen = defaultdict(lambda: defaultdict(list))
         P = defaultdict(list)
-        for key, (playoff, fin) in d.items():
+        for key, (playoff, fin, r12_mean, r12_sd) in d.items():
             w = fin[0][0]
             winners.append(w)
             wr.append(ovr_rank[w])
@@ -102,15 +116,37 @@ def analyse(name, runs, t, arch):
             margins.append(others[0] - fin[0][2] if others else np.nan)
             playoffs.append(playoff > 0)
             same.append(calm[key][1][0][0] == w)
+            sc = scen[key[0]]
+            sc['best'].append(w in best)
+            sc['same'].append(same[-1])
+            sc['r12_mean'].append(r12_mean - calm[key][2])
+            sc['r12_sd'].append(r12_sd - calm[key][3])
+            sc['wrank'].append(ovr_rank[w])
             for gid, pos, tot in fin:
                 P[gid].append((pos if pos >= 1 else n) / n)
         pct[arm] = {gid: float(np.mean(v)) for gid, v in P.items()}
         c = Counter(winners)
+        # scenario-cluster bootstrap: the reps of one scenario share its weather and gusts
+        rng = np.random.default_rng(7)
+        keys = sorted(scen)
+        def boot(metric):
+            per = np.array([np.mean(scen[k][metric]) for k in keys])
+            bs = per[rng.integers(0, len(per), size=(2000, len(per)))].mean(1)
+            return [float(np.percentile(bs, 2.5)), float(np.percentile(bs, 97.5))]
+        r12m = [v[2] for v in d.values()]
+        r12s = [v[3] for v in d.values()]
         rows.append({'event': name, 'arm': arm, 'runs': len(d), 'best_entrant_win': float(np.mean([w in best for w in winners])),
                      'top5_overall_win_share': float(np.mean([w in top5 for w in winners])),
                      'winner_overall_rank_median': float(np.median(wr)), 'winner_overall_rank_mean': float(np.mean(wr)),
-                     'distinct_winners': len(c), 'field_mean_to_par_per_round': float(np.mean(mean_rd)),
-                     'field_sd_total': float(np.mean(sdv)), 'margin': float(np.nanmean(margins)),
+                     'best_entrant_win_ci_scen': boot('best'), 'same_winner_ci_scen': boot('same'),
+                     'all_starters_r1r2_to_par_per_round': float(np.mean(r12m)),
+                     'all_starters_r1r2_vs_calm': float(np.mean(r12m) - np.mean([v[2] for v in calm.values()])),
+                     'all_starters_r1r2_vs_calm_ci_scen': boot('r12_mean'),
+                     'all_starters_36hole_sd': float(np.mean(r12s)),
+                     'all_starters_36hole_sd_vs_calm_ci_scen': boot('r12_sd'),
+                     'distinct_winners': len(c),
+                     'cut_survivors_mean_to_par_per_round': float(np.mean(mean_rd)),
+                     'cut_survivors_sd_total': float(np.mean(sdv)), 'margin': float(np.nanmean(margins)),
                      'playoff_rate': float(np.mean(playoffs)), 'same_winner_as_calm': float(np.mean(same)),
                      'win_counts': dict(c.most_common(10))})
     # win-distribution distance from calm vs a calm-half floor

@@ -1,0 +1,124 @@
+{
+ "note": "rough comparison only; see the docstring",
+ "golfer_seasons": {},
+ "A_season": {
+  "golfer_seasons": 16897,
+  "median": 3.483358411062233,
+  "p10": 2.9570811573269355,
+  "p90": 4.082792733960995,
+  "by_overall_band": {
+   "(0, 70]": [
+    3167,
+    3.667556207949788
+   ],
+   "(70, 75]": [
+    7541,
+    3.5084796758245034
+   ],
+   "(75, 80]": [
+    4245,
+    3.4336011692231363
+   ],
+   "(80, 85]": [
+    1567,
+    3.3334989717587957
+   ],
+   "(85, 90]": [
+    300,
+    3.214282134144911
+   ],
+   "(90, 100]": [
+    77,
+    3.204352631273469
+   ]
+  }
+ },
+ "B_within_event": {
+  "golfer_seasons": 16897,
+  "median": 3.390890933209065,
+  "p10": 2.8024397510097243,
+  "p90": 4.057351437642335,
+  "by_overall_band": {
+   "(0, 70]": [
+    3167,
+    3.5822732588162274
+   ],
+   "(70, 75]": [
+    7541,
+    3.419626755172096
+   ],
+   "(75, 80]": [
+    4245,
+    3.3514198710630345
+   ],
+   "(80, 85]": [
+    1567,
+    3.2155772602676076
+   ],
+   "(85, 90]": [
+    300,
+    3.095459145995942
+   ],
+   "(90, 100]": [
+    77,
+    2.9818366521802897
+   ]
+  }
+ },
+ "C_precut_within_event": {
+  "golfer_seasons": 16203,
+  "median": 3.2823656411282416,
+  "p10": 2.5232669908138274,
+  "p90": 4.120738059292153,
+  "by_overall_band": {
+   "(0, 70]": [
+    3176,
+    3.4134752397598347
+   ],
+   "(70, 75]": [
+    7066,
+    3.304617969034081
+   ],
+   "(75, 80]": [
+    4037,
+    3.247837277533706
+   ],
+   "(80, 85]": [
+    1548,
+    3.117367471447949
+   ],
+   "(85, 90]": [
+    299,
+    3.019894416158937
+   ],
+   "(90, 100]": [
+    77,
+    2.8249691636816365
+   ]
+  }
+ },
+ "provenance": {
+  "scripts_commit": "b771884e3be810f5276457fb6e87ca83de01751a",
+  "scripts_dirty": true,
+  "scripts_sha256": {
+   "archetypes.py": "d7ec7a7aeb2b77bdb71c89d86ef575e95b0108c985fa064fd178cafe3a2d5e64",
+   "attr_assoc.py": "439b3a790b9727ab438c67c1e50fb6183e46520bd9138c0e951d47dc683d797c",
+   "common.py": "b2de674275fba76e39f7b9999c83ac98c2f95658518729c0e034f330992514f7",
+   "exp_attrs.py": "9f21a8af910ab21f2cbda58c0d7861bb85a44cba8f0d854e8c11ae7959857ac5",
+   "exp_fixed.py": "8e846dd2244ef0d4e1745f461bf7f856063e36ade4272f626a5a6677ccbabacf",
+   "exp_weather.py": "e50f24cb85d4b0ddf2c98dbae8376f641ce20c28cfd2dba66cbbafbe96f490ce",
+   "extract.py": "5e59fd20cc5ad113f3921d74dee6eed7f75b6403dd82ea4ca117b9a9910eff08",
+   "favourite.py": "56f87ae72ee8ebce8a996d18818cb7154a616abb1c7a19ff52d0004c64fb4635",
+   "harness.py": "de6fe351ec3121fcfc95205d3ff0624897688b5d59cb72d1ba43e44f6d64cc5f",
+   "recover_archetypes.py": "88dfdacce88a464c411efad28ba3e01a2091bf9289c870f6281d2490a4de22b5",
+   "replay.py": "bca8d429119cff38ec67172b76825d6b7257260b44966bf18639a6d53d199f23",
+   "summarise.py": "61ba3b462c1933c62c004a2e8cf2083950008f8099819ab8aab9c3e425a5e45e",
+   "volatility.py": "4df58e36621f5869a63ba0b9e4dfc8b48c834b22c91b28bb6a45079228335163",
+   "weather_desc.py": "7d2d5e029ab2183a47a66a910ea993ccc9368e99a8775567a622f970e18cd1ea"
+  },
+  "inputs_sha256": {
+   "editions.csv.gz": "a018b14b81764620465271f9bbacde74c635cf07aaa0d0fdd5d3d46900222309",
+   "starts.npz": "b931a8961de8bb4bd4e82f967ffcb8e841db418464e5ada5bf8d5b69b829171e"
+  }
+ }
+}

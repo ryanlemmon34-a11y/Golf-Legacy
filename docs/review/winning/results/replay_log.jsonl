@@ -1,0 +1,12 @@
+{"event": "created", "cursor": {"year": 2027, "week": 1, "phase": "start"}, "seconds": 4.2, "engine": "1949ff63f33ce610a7cd4fe70c089b0b4fbf5b9e", "python": "3.13.17", "selected_tasks": 538}
+{"event": "season", "year": 2027, "verified": true, "played": 1457, "archived": 1457, "captured": 1434, "problems": [], "seconds": 140.2}
+{"event": "season", "year": 2028, "verified": true, "played": 1460, "archived": 1460, "captured": 1437, "problems": [], "seconds": 153.9}
+{"event": "season", "year": 2029, "verified": true, "played": 1459, "archived": 1459, "captured": 1436, "problems": [], "seconds": 155.0}
+{"event": "season", "year": 2030, "verified": true, "played": 1457, "archived": 1457, "captured": 1434, "problems": [], "seconds": 160.4}
+{"event": "season", "year": 2031, "verified": true, "played": 1461, "archived": 1461, "captured": 1438, "problems": [], "seconds": 162.7}
+{"event": "season", "year": 2032, "verified": true, "played": 1460, "archived": 1460, "captured": 1437, "problems": [], "seconds": 171.8}
+{"event": "season", "year": 2033, "verified": true, "played": 1458, "archived": 1458, "captured": 1435, "problems": [], "seconds": 217.8}
+{"event": "season", "year": 2034, "verified": true, "played": 1462, "archived": 1462, "captured": 1439, "problems": [], "seconds": 252.4}
+{"event": "season", "year": 2035, "verified": true, "played": 1463, "archived": 1463, "captured": 1440, "problems": [], "seconds": 243.9}
+{"event": "season", "year": 2036, "verified": true, "played": 1460, "archived": 1460, "captured": 1437, "problems": [], "seconds": 259.3}
+{"event": "season", "year": 2037, "verified": true, "played": 1461, "archived": 1461, "captured": 1438, "problems": [], "seconds": 278.1}
