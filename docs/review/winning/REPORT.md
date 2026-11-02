@@ -46,7 +46,7 @@ Section 3, with the mechanism in 4d.
 - **This is a broad pattern, not an identical order at every level.**
 - **Controlled, at the same Overall:** archetype shapes differ by up to about 0.65 strokes per round, and their
   round-score spread differs by −3.5% to +5.6%. The archive's ordering lines up better with spread (variance,
-  partly from aggression) than with the mean. Which shape is best depends on the course: ball-flight profiles
+  partly from aggression) than with the mean. That is a directional observation, not an established mechanism. Which shape is best depends on the course: ball-flight profiles
   on windy links, short-game and precision profiles on sheltered woodland.
 
 ### 3. Which attributes matter most and least?
@@ -56,14 +56,21 @@ Section 4.
 - **Most, per point, for direct scoring:** driving_accuracy (−0.18 strokes per round per +5) and mid_irons
   (−0.15), then power, chipping, wedges, short_putting, green_reading, long_irons and ball_flight (−0.08 to
   −0.12).
-- **For a favourite's win chance** (validated in direction where tested): +1 to +3 points per +5.
+- **For a favourite's win chance, the evidence comes in tiers:**
+  - **full Britannia events support** +5 driving_accuracy (9.0% → 11.8%, +2.8 points, SE 0.84) and +5
+    short_putting (9.0% → 10.33%, +1.33 points, SE 0.44);
+  - **power's** +0.8 points (SE 0.85) is unresolved;
+  - **mid_irons, wedges, long_irons and ball_flight** have win effects only from the fixed-field conditional
+    screening. Their round-scoring effects above have separate controlled support.
 - **Context:**
   - ball_flight is among the strongest on windy links and nearly worthless on sheltered woodland;
   - composure counts only under pressure;
   - recovery_rate counts only from round 2.
 - **Least:** putting_consistency, resilience, management, focus and bunker (−0.02 to −0.03 strokes per round).
-- **striking_consistency** lowers average scores slightly but did not raise win chances in any tested cell. It
-  buys cuts, not wins.
+- **striking_consistency** lowers average scores slightly (−0.04 strokes per round per +5). Its fixed-field win
+  estimates are small and non-positive, mostly unresolved and not validated in full events:
+  - favourite: −0.02 and −0.04 points (SE 0.23);
+  - rank 10: −0.17 ± 0.14 and −0.26 ± 0.13 points, among many tests.
 - **injury_resistance** has no direct shot effect: its value is availability.
 - **Rankings among neighbouring attributes are not robust.** Only the tiers are.
 
@@ -85,9 +92,12 @@ Section 5.
 **Skill dominates over many events but not single ones.** The best entrant wins about 1 in 8, the top 10 by
 Overall win about half, and the winner is typically the 10th-best entrant.
 
-**Field depth and gaps matter more than level.** In this engine, variance (aggression and shot-making shapes)
-converts into wins at the top of big fields beyond what Overall captures. Consistency converts into cuts and
-top-10s rather than wins.
+**Field depth and gaps matter more than level.**
+
+**Variance is a plausible mechanism, not an established one.** The archive associations and the fixed-Overall
+profiles are consistent with score variance (aggression and shot-making shapes) adding wins at the top of big
+fields beyond what Overall captures. But the controlled win evidence for it is fixed-field screening, not
+validated in full events.
 
 ### Deviations from the published plan, all disclosed
 
@@ -399,9 +409,9 @@ mid_irons and wedges gain a little more going up than they lose going down: +5 g
   cannot see; that is not "worthless".
 - **Variance.** +5 on one attribute barely changes a round's spread. The largest change, from
   striking_consistency, is 1.1% less spread, with slightly fewer exceptional low rounds. Small changes in round SD
-  cannot rule out larger effects in the winning tail. The fixed-Overall profiles (4d) and the winning experiments
-  (4e) take this further: whole-profile shape and aggression change the spread by −3.5% to +5.6%, and
-  striking_consistency's win effect is ≤ 0 in every tested cell.
+  cannot rule out larger effects in the winning tail. In the fixed-Overall profiles (4d), whole-profile shape and
+  aggression change the spread by −3.5% to +5.6%. striking_consistency's fixed-field win estimates (4e) are
+  small and non-positive but mostly unresolved.
 - **Rankings among neighbours are not robust.** The per-event, per-subject ranks of the middle attributes move by
   several places (`SUMMARY.md`, rank table). Only the broad tiers are stable: top, middle, small, situational,
   zero.
@@ -462,10 +472,10 @@ averaged over events and subjects:
   the subject's own profile). Aggressive Shotmaker is mid. Power Hitter and Effortless Power are lowest (about
   −0.5).
 - **Aggression 85 against 50** for the Shotmaker adds +0.5 (links) and +0.3 (woodland) points of win
-  probability, while costing cuts and top-10s on links. That is the high-variance signature seen in the
-  archive.
-- **Full-event check (Britannia):** Strategic Technician −1.5 ± 0.65 against −1.8 fixed-field (agrees);
-  Aggressive Shotmaker −0.9 ± 0.7 against +0.2 (1.5 SE apart). Archetype win rankings are therefore screening
+  probability, while costing cuts and top-10s on links. This resembles the archive's pattern, but it is
+  fixed-field screening with per-arm SEs of about 0.2 points.
+- **Full-event check (Britannia; informal):** Strategic Technician −1.5 ± 0.65 against −1.8 fixed-field;
+  Aggressive Shotmaker −0.9 ± 0.7 against +0.2 (1.5 combined SE apart). Archetype win rankings remain screening
   only.
 - **Base profile.** The baseline here is the subject's own profile (a native Elite Putter with ball_flight 95).
   Real golfers vary around their template: noise at creation, then development.
@@ -500,9 +510,11 @@ averaged over events and subjects:
 | **striking_consistency** | **−0.02** ± .23 | **−0.04** ± .23 |
 | injury_resistance | 0 (exact) | 0 (exact) |
 
-For the rank-10 subject (base win 3.3% and 2.3%), the gains are smaller, and **striking_consistency +5 lowers the
-win rate** (Britannia −0.17 ± .14; France −0.26 ± .13) while raising cuts (+0.25–0.5 points) and top-10s
-(+0.3–0.5 points). That is the variance mechanism at attribute level: steadier play buys cuts, not wins.
+For the rank-10 subject (base win 3.3% and 2.3%) the fixed-field gains are smaller.
+
+striking_consistency +5 gives small negative win point estimates there (Britannia −0.17 ± .14; France −0.26 ± .13
+points), with small gains in cuts (+0.25–0.5) and top-10s (+0.3–0.5). Among this many tests these are not
+resolved and they were not checked in full events, so they do not establish a variance mechanism.
 
 **Tier 3: full production events, paired seeds**, 1,500 per arm, Britannia
 (`results/experiments/events_validation_*.json`).
@@ -512,37 +524,45 @@ win rate** (Britannia −0.17 ± .14; France −0.26 ± .13) while raising cuts 
   - Rank-10: 4.0% against 3.3% (fixed-field about 1.4 SE low).
 - **Treatment effects, full against fixed-field, in points:**
 
-  | Arm | Full | Fixed-field | Difference |
+  | Arm | Full | Fixed-field | Informal difference / combined SE |
   |---|---|---|---|
-  | Power +5, favourite | +0.8 ± 0.85 | +0.95 | agrees |
-  | Short putting +5, favourite | +1.3 ± 0.44 | +1.0 | agrees |
-  | Strategic Technician profile, rank 10 | −1.5 ± 0.65 | −1.8 | agrees |
-  | Driving accuracy +5, favourite | **+2.8 ± 0.84** | +1.1 | 1.9 SE (full larger) |
-  | Putting consistency +5, favourite | **−0.4 ± 0.25** | +0.1 | 1.9 SE (opposite sign; both small) |
-  | Aggressive Shotmaker profile, rank 10 | −0.9 ± 0.7 | +0.2 | 1.5 SE |
-  | Power +5, rank 10 | −0.1 ± 0.6 | +0.5 | 0.8 SE |
+  | Driving accuracy +5, favourite | **+2.8 ± 0.84** | +1.09 ± 0.30 | 1.9 (full larger) |
+  | Short putting +5, favourite | **+1.33 ± 0.44** | +0.98 ± 0.18 | 0.7 |
+  | Power +5, favourite | +0.8 ± 0.85 | +0.95 ± 0.30 | 0.2 |
+  | Putting consistency +5, favourite | −0.4 ± 0.25 | +0.11 ± 0.10 | 1.9 (opposite sign; both small) |
+  | Power +5, rank 10 | −0.1 ± 0.6 | +0.49 ± 0.23 | 0.8 |
+  | Strategic Technician profile, rank 10 | −1.5 ± 0.65 | −1.82 ± 0.22 | 0.5 |
+  | Aggressive Shotmaker profile, rank 10 | −0.9 ± 0.7 | +0.19 ± 0.24 | 1.5 |
 
-- **Overall.** Across these seven comparisons χ² ≈ 11.1 on 7 df (approximate p ≈ 0.13), so there is no
-  systematic contradiction. But full events (SE 0.6–0.85 points) cannot confirm the fixed-field fine rankings,
-  and two comparisons differ by about 1.9 SE.
+- **These comparisons are informal.**
+  - The arms share baseline arms and seed streams, and the two methods share field replicates. Those
+    covariances are not accounted for, so the combined-SE ratios are descriptive only.
+  - A small difference would not prove equivalence.
+  - Full events (SE 0.6–0.85 points) cannot confirm the fixed-field fine rankings.
+  - Two comparisons differ by about 1.9 combined SE.
 - **Stream divergence in full events.** A +5 change alters 3–46% of rivals' totals, and an archetype profile 58%,
   through the shared stream.
-- **Clipping as a no-op check.** short_putting +5 at rank 10 was clipped at 99, so the arm reproduced the
-  baseline exactly.
+- **A clipped control.** short_putting +5 at rank 10 was clipped at 99, so the arm equals the baseline exactly.
+  It is a no-op control, not an informative treatment, and is excluded from the comparisons.
 
 **What is supported, and what is only screening:**
 
-- **Supported (tier 2 in both events; tier 3 where tested at Britannia):**
-  - the shot-making attributes give the largest win gains for a favourite, about +1 to +3 points of win
-    probability per +5 at a 9% baseline: driving_accuracy, mid_irons, wedges, short_putting, power and
-    long_irons. Full events tested driving_accuracy, power and short_putting, all positive;
-  - ball_flight's win value is course-dependent (links, not sheltered woodland);
-  - injury_resistance is zero;
-  - **striking_consistency does not raise win chances in any tested cell** (every estimate ≤ 0), even though it
-    lowers average scores slightly.
-- **Small and inconsistent:** putting_consistency's win effect is +0.1 to +0.3 fixed-field but −0.4 ± 0.25 in
-  full events.
-- **Screening only:** the order within the top group, and every small difference among the middle attributes.
+- **Supported by full production events** (tier 3, Britannia favourite, 1,500 paired events per arm):
+  - +5 driving_accuracy raises the win rate from 9.0% to 11.8% (+2.8 points, SE 0.84);
+  - +5 short_putting raises it from 9.0% to 10.33% (+1.33 points, SE 0.44).
+- **Unresolved in full events:**
+  - power +5 (+0.8 points, SE 0.85);
+  - putting_consistency +5 (−0.4 ± 0.25 points full; +0.1 and +0.3 fixed-field).
+- **Conditional screening only** (tier 2):
+  - the win effects of mid_irons, wedges, long_irons and ball_flight (fixed-field +0.6 to +1.4 points, except
+    ball_flight on woodland, +0.08);
+  - ball_flight's course dependence in winning (+1.07 links against +0.08 woodland);
+  - the order within the top group and every middle-group difference.
+
+  Their round-scoring effects have separate controlled support (4c, 4f).
+- **striking_consistency:** small, non-positive fixed-field point estimates (favourite −0.02 and −0.04 ± 0.23;
+  rank 10 −0.17 ± 0.14 and −0.26 ± 0.13), mostly unresolved amid many tests and not validated in full events.
+- **Exact:** injury_resistance is zero in every arm.
 
 ### 4f. Equal-SD perturbations (controlled; `rounds_sd.json`)
 
