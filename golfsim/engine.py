@@ -263,7 +263,8 @@ class Player:
             # mean speed stays what the steady wind gave (tests: test_weather.GustTests).
             self.gust_comp = 1 - GUST_CONVEXITY * self.gust * self.gust
         self.reach_fw = self.drive * 0.90       # 3-wood from a fairway
-        self.plans = {}
+        self.plans = {}                         # (hole, re-tee) -> tee club plan (a cache of _tee_plan)
+        self.plan_noise = {}                    # hole -> the day's judgement noise for its tee clubs
 
     def gust_draw(self):
         """This shot's gust: the wind's strength relative to the round's mean, minus 1 (mean 0, within +/-0.9)."""
@@ -377,44 +378,91 @@ def _gusted(pl, wind_f, g):
     return (1 + (wind_f - 1) * pl.gust_comp * (1 + g)) / wind_f
 
 
-def _tee_plan(pl, hole, rng):
-    """Choose a tee club for this hole today: (name, distance factor, spread factor)."""
-    key = hole.number
-    if key in pl.plans:
-        return pl.plans[key]
-    clubs = (('driver', 1.0, 1.0), ('3-wood', 0.92, 0.87), ('iron', 0.80, 0.72))
-    best, best_v = None, 1e9
+TEE_CLUBS = (('driver', 1.0, 1.0), ('3-wood', 0.92, 0.87), ('iron', 0.80, 0.72))
+
+
+def _tee_plan(pl, hole, rng, retee=False):
+    """Choose a tee club for this hole today: (name, distance factor, spread factor).
+
+    The day's judgement noise for the hole's clubs is drawn once, at its first tee shot, from the shot stream (the
+    same draws, in the same order, as before this function kept them); the choice is then a pure function of the
+    player, the hole, that noise and the situation, so a cached plan and a fresh evaluation agree (`pl.plans` is a
+    cache only). The expected value of each club models the tee shot as play_hole plays it: a shot that runs through
+    a dogleg is pushed toward the bend's outside, so trouble there is priced on that side (it had been priced as a
+    narrower fairway with the two sides' average cost, so a long hitter could keep choosing a club that runs out of
+    bounds through the corner). `retee`: the player has just hit this hole's tee shot out of bounds and reloads:
+    no driver bonus from aggression or ego, and a lay-up short of the landing limit is an option."""
+    key = (hole.number, bool(retee))
+    plan = pl.plans.get(key)
+    if plan is not None:
+        return plan
+    noise = pl.plan_noise.get(hole.number)
+    if noise is None:
+        noise = pl.plan_noise[hole.number] = tuple(rng.gauss(0, pl.noise * 0.25) for _ in TEE_CLUBS)
     dirf = pl.hw[hole.number][0] if pl.hw else 1.0
     dfac = wind_distance(pl, hole)
     wind_f = 1 + pl.wind * hole.wind_exposure * (0.55 - 0.40 * pl.bfc) * pl.wind_skill * dirf
-    for name, df, sf in clubs:
-        carry = pl.drive * df * pl.roll * dfac
-        sigma = pl.sigma * sf * wind_f
-        half = hole.fairway_width / 2
-        extra_rough = 0.0
-        if hole.landing_limit and carry > hole.landing_limit:
-            over = carry - hole.landing_limit
-            if hole.dogleg:
-                half = max(4.0, half - over * hole.dogleg * (1 - 0.6 * pl.bfc))
-                carry = hole.landing_limit + over * (1 - hole.dogleg) * 0.6
-            else:
-                extra_rough = min(0.7, over / 25)
-                carry = hole.landing_limit + over * 0.35
-        p_fw = math.erf(half / (sigma * 1.4142)) * (1 - extra_rough)
-        p_out = 1 - math.erf((half + hole.rough_width) / (sigma * 1.4142))
-        p_rough = max(0.0, 1 - p_fw - p_out)
-        rem = max(5.0, hole.plays - carry)
-        side = (_SIDE_COST[hole.left] + _SIDE_COST[hole.right]) / 2
-        v = (p_fw * baseline('fairway', rem) + p_rough * baseline('rough', rem)
-             + p_out * (baseline('rough', rem) + side))
-        if name == 'driver':
+    clubs = list(zip(TEE_CLUBS, noise))
+    if retee and hole.landing_limit:
+        reach = pl.drive * pl.roll * dfac
+        # a club that stops short of the corner, however short the corner and however long the hitter
+        lay = max(0.25, min(TEE_CLUBS[-1][1], (hole.landing_limit - 10) / reach)) if reach > 0 else TEE_CLUBS[-1][1]
+        if lay < TEE_CLUBS[-1][1]:
+            clubs.append((('lay-up', lay, 0.65), 0.0))
+    best, best_v = None, 1e9
+    for (name, df, sf), eps in clubs:
+        v = _tee_value(pl, hole, df, sf, dfac, wind_f)
+        if name == 'driver' and not retee:
             # Aggressive players lean to driver; poor course managers overuse it (ego).
             v -= 0.06 * pl.aggr + 0.10 * (1 - pl.mgmt) ** 2
-        v += rng.gauss(0, pl.noise * 0.25)
+        v += eps
         if v < best_v:
             best, best_v = (name, df, sf), v
     pl.plans[key] = best
     return best
+
+
+def _tee_outcome(pl, hole, df, sf, dfac, wind_f):
+    """Where a tee shot with this club finishes, as play_hole plays it: (remaining yards, chance of the fairway,
+    of the rough, of leaving the corridor on the dogleg's outside, on its inside). On a straight hole, or short of a
+    dogleg, the two sides are equally likely (each half of the corridor-leaving chance)."""
+    carry = pl.drive * df * pl.roll * dfac
+    sigma = pl.sigma * sf * wind_f
+    half = hole.fairway_width / 2
+    s2 = sigma * 1.4142
+    extra_rough = 0.0
+    shift = 0.0
+    if hole.landing_limit and carry > hole.landing_limit:
+        over = carry - hole.landing_limit
+        if hole.dogleg:
+            shift = over * hole.dogleg * (1 - 0.6 * pl.bfc)          # toward the bend's outside, as played
+            carry = hole.landing_limit + over * (1 - hole.dogleg) * 0.6
+        else:
+            extra_rough = min(0.7, over / 25)
+            carry = hole.landing_limit + over * 0.35
+    rem = max(5.0, hole.plays - carry)
+    if not shift:
+        p_fw = math.erf(half / s2) * (1 - extra_rough)
+        p_out = 1 - math.erf((half + hole.rough_width) / s2)
+        return rem, p_fw, max(0.0, 1 - p_fw - p_out), p_out / 2, p_out / 2
+    corridor = half + hole.rough_width
+    p_fw = 0.5 * (math.erf((half - shift) / s2) + math.erf((half + shift) / s2))
+    p_outside = 0.5 * (1 - math.erf((corridor - shift) / s2))
+    p_inside = 0.5 * (1 - math.erf((corridor + shift) / s2))
+    return rem, p_fw, max(0.0, 1 - p_fw - p_outside - p_inside), p_outside, p_inside
+
+
+def _tee_value(pl, hole, df, sf, dfac, wind_f):
+    """Expected strokes after a tee shot with this club (_tee_outcome), trouble priced on the side it happens."""
+    rem, p_fw, p_rough, p_outside, p_inside = _tee_outcome(pl, hole, df, sf, dfac, wind_f)
+    if p_outside == p_inside:                                         # (straight: the sides' average, as before)
+        side = (_SIDE_COST[hole.left] + _SIDE_COST[hole.right]) / 2
+        return (p_fw * baseline('fairway', rem) + p_rough * baseline('rough', rem)
+                + (p_outside + p_inside) * (baseline('rough', rem) + side))
+    outside, inside = (hole.left, hole.right) if hole.bend == 'R' else (hole.right, hole.left)
+    return (p_fw * baseline('fairway', rem) + p_rough * baseline('rough', rem)
+            + p_outside * (baseline('rough', rem) + _SIDE_COST[outside])
+            + p_inside * (baseline('rough', rem) + _SIDE_COST[inside]))
 
 
 def _side_hazard(hole, lat, beyond, rng):
@@ -569,7 +617,7 @@ def play_hole(pl, hole, hidx, rng, st, pressure=0.0, state=None, pin=None):
 
         # ------------------------------------------------------- tee shot
         if lie == 'tee' and par >= 4:
-            club, df, sf = _tee_plan(pl, hole, rng)
+            club, df, sf = _tee_plan(pl, hole, rng, retee=teed)     # (teed: reloading after out of bounds)
             if pl.gust:                                 # this drive's gust: spread and carry vary around the plan
                 g = pl.gust_draw()
                 total = (pl.drive * df * pl.roll * (1 + rng.gauss(0, 0.035 + (dist_sd - 0.035) * (1 + g)))
