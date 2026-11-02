@@ -305,9 +305,10 @@ mid_irons and wedges gain a little more going up than they lose going down: +5 g
 
 - **Largest per point, in every context:** driving_accuracy and mid_irons. Power, chipping and wedges are next.
 - **Context matters:**
-  - ball_flight is the single most valuable attribute on the windy links (−0.17) and nearly irrelevant on
-    sheltered woodland (−0.03);
-  - power is worth less on links (−0.07) than on the parkland and woodland courses (−0.12 to −0.17);
+  - ball_flight is **among the strongest** on the tested windy links, not uniquely the strongest. At Britannia,
+    driving_accuracy is −0.175 and ball_flight −0.172, from different unclipped cells with overlapping
+    uncertainty. On sheltered woodland ball_flight is nearly irrelevant (−0.03);
+  - power is worth less on links (−0.07) than on the two woodland courses (−0.12 to −0.17);
   - composure is worth −0.10 per round under final-round contention pressure and nothing otherwise;
   - recovery_rate acts only from round 2.
 - **Smallest per point:** putting_consistency, resilience, management, focus and bunker (−0.02 to −0.03), and
@@ -315,9 +316,9 @@ mid_irons and wedges gain a little more going up than they lose going down: +5 g
 - **injury_resistance** has no direct scoring value by construction. Its value is availability, which this design
   cannot see; that is not "worthless".
 - **Variance.** +5 on one attribute barely changes a round's spread. The largest change, from
-  striking_consistency, is 1.1% less spread, with slightly fewer exceptional low rounds. The archetype variance
-  pattern in section 3 therefore cannot come from any one +5 change; the fixed-Overall profiles below test shape
-  and aggression.
+  striking_consistency, is 1.1% less spread, with slightly fewer exceptional low rounds. Small changes in round SD
+  cannot rule out larger effects in the winning tail, so the variance explanation of the archetype pattern
+  (section 3) stays **pending**: the fixed-Overall profiles (4d) and the winning experiments (4e) test it.
 - **Rankings among neighbours are not robust.** The per-event, per-subject ranks of the middle attributes move by
   several places (`SUMMARY.md`, rank table). Only the broad tiers are stable: top, middle, small, situational,
   zero.
@@ -530,5 +531,10 @@ python favourite.py $D $O
 python archetypes.py $D $SAVE $O
 python weather_desc.py $D $SAVE $O
 python replay.py <c0d1ea5 checkout> $SAVE <work> --seasons N --capture <cap> --editions $D/editions.csv.gz
-python exp_attrs.py rounds <cap> $SAVE <exp> --events 2027_BRITANNIA_OPEN,2027_USA_OPEN,2027_PT_FRANCE_OPEN,2027_CH_EUROPE_01 --ranks 1,10,40 --n 16000 --deltas 5,-5
+python volatility.py $SAVE $D $O
+python attr_assoc.py <cap> $D $O
+./run_experiments.sh $SAVE <cap> <exp> rounds weather fixed validate archetypes sd
+#   rounds: exp_attrs.py rounds, events 2027_BRITANNIA_OPEN,2027_PT_FRANCE_OPEN,2027_CH_EUROPE_01,
+#           ranks 1,10,40, n 8000, deltas 5,-5 (exact configurations of every step: run_experiments.sh)
+python summarise.py <exp> <exp>/SUMMARY.md
 ```
