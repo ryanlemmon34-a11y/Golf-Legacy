@@ -21,7 +21,8 @@ import pandas as pd
 
 EV = {'2027_BRITANNIA_OPEN_s0.pkl': 'Britannia Open (major, links)', '2027_USA_OPEN_s0.pkl': 'USA Open (major, parkland)',
       '2027_PT_FRANCE_OPEN_s0.pkl': 'France Open (Premier, woodland)',
-      '2027_CH_EUROPE_01_s0.pkl': 'CH Europe 01 (tier 2, woodland)'}
+      '2027_CH_EUROPE_01_s0.pkl': 'CH Europe 01 (tier 2, woodland)',
+      '2027_PT_SCOTLAND_OPEN_s0.pkl': 'Scotland Open (Premier, links)'}
 
 
 def arm_parts(arm):
