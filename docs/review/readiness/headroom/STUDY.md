@@ -57,20 +57,28 @@ The parameters are test points, not approved tunings.
 ## 3. Findings
 
 **H1. Near-finished high-potential entrants: B2 makes them rarer; B1 barely touches them.** Paired layer, five
-seeds; selected juniors with stored potential 80+:
+seeds; 574 selected juniors with stored potential 80+. Gap = stored potential minus entry overall, counted from the
+exact entrant records (`results/H1_ROWS.md`, from `h1_rows.py`):
 
 | measure | A0 | B1 | B2 |
 |---|---|---|---|
-| entrants with headroom ≤ 3 (count, five seeds) | 7 | 6 | 2 |
-| share ≤ 3 | 1.2% | 1.0% | 0.3% |
-| share ≤ 5 | 6.4% | 6.3% | 5.4% |
-| 10th-percentile headroom | 5.65 | 5.67 | 6.07 |
-| median headroom | 11.12 | 11.12 | 11.12 |
+| entrants with gap ≤ 3 (count, five seeds) | 7 | 6 | 2 |
+| share gap ≤ 3 | 1.22% | 1.05% | 0.35% |
+| entrants with gap ≤ 5 | 37 | 36 | 31 |
+| share gap ≤ 5 | 6.45% | 6.27% | 5.40% |
 
-- The case was already rare under A0: 7 such entrants in 285 cohorts, about 1.4 per 57 seasons.
-- Of A0's 7, 4 come from an early peak-age draw and 3 from large positive career luck without one. Production stores
-  such luck as potential: stored potential is max(capped raw potential, entry overall). The tempo transform cannot
-  reach the luck-driven cases, which is why headroom ≤ 5 falls only from 6.4% to 5.4%.
+- **Already rare under A0:** 7 such entrants in 285 cohorts, about 1.4 per 57 seasons.
+- **All seven are touched, and all are luck plus tempo.** Their peak-age draws are 22.3–24.3, below both knees, and
+  every one also has positive career luck (+0.64 to +3.58). None is a luck-only case beyond the transform's reach.
+  Stored potential equals raw potential for all seven: no promotion is involved.
+- **What B2 does to them:** it widens each gap by 0.4–2.1 points, and five cross above 3. The two that remain
+  (gaps 2.52 and 2.89) have strong luck, +3.24 and +3.58.
+- **What B1 does:** it widens the gaps by at most 0.8 and moves only one, the Denmark candidate, from 2.83 to 3.60.
+- **Gap ≤ 5:** 33 of A0's 37 are touched by B2 and 4 are not; those 4 are near-finished from luck alone. B2 moves 6 of
+  the touched ones above 5. The other 27 stay within 5, because the transform adds little room for draws just below
+  the knee (24–25.5). None of the 37 has its stored potential promoted to the entry overall.
+- An earlier draft split the seven into "4 early-draw and 3 luck-only" cases using a peak < 24 band instead of the
+  arms' actual knees. That was wrong, and the corrected rows are above.
 - Entry tail, five-seed totals (A0 / B1 / B2): 80+ is 31 / 31 / 27; 85+ is 8 / 8 / 7; 90+ is 2 / 2 / 2.
 - Mean entry overall: 46.46 / 46.40 / 46.26, inside the ≤ 0.3 hypothesised.
 - Replay (Test2): the 80+/85+/90+ entry counts are unchanged at 8 / 1 / 1. Cárdenas enters at 96.09 (A0), 94.63 (B1),
@@ -153,10 +161,14 @@ wants them: the cohort draw functions would be substituted at run time, after th
      shift slightly toward physical and mental; and a few candidates reach elite levels later.
    - Adopting it would need a rules-versioned change for fresh worlds, plus a decision on the junior total and on how
      potential is stored.
-3. **A different mechanism is needed if the goal is clearly more room for every near-finished elite entrant.** About
-   half of the remaining cases come from career luck, which production also stores as potential. Options include how
-   entry luck is applied to young entrants, or how much of it is stored as potential. Each is a separate,
-   approval-requiring design question with its own side effects. Neither was tested here.
+3. **A different setting or mechanism is needed if the goal is clearly more room for every near-finished elite
+   entrant.** Under B2 the remaining near-finished cases combine a moderately early draw with strong positive career
+   luck. The transform adds little room just below the knee, and 4 of 37 gap-≤-5 cases are untouched (luck alone).
+   Options:
+   - a stronger or later knee, with larger selection side effects;
+   - changing how entry luck is applied to young entrants.
+
+   Each is a separate, approval-requiring design question, and neither was tested here.
 4. **Fresh worlds.** Run bounded fresh worlds only after Ryan picks a candidate and settles the junior-total question.
 
 ## 6. Limitations

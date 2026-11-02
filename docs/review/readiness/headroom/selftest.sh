@@ -42,7 +42,7 @@ expect 'R3 runner, stale stamp (study.py edited)' 2 'stale validation: study.py'
 expect 'R4 runner, current passing stamp' 0 'validation stamp ok' $R
 if [ -n "$RUNDIR" ]; then
   expect 'R5 report, failed stamp' 2 'validation did not pass' python3 -I "$HERE/report.py" "$RUNDIR" "$T/r.md" "$T/r.json" --stamp "$T/n1_stamp.json"
-  expect 'R6 report, current passing stamp' 0 'Starting-ability study' python3 -I "$HERE/report.py" "$RUNDIR" "$T/r.md" "$T/r.json"
+  expect 'R6 report, current passing stamp' 0 'Headroom study: results' python3 -I "$HERE/report.py" "$RUNDIR" "$T/r.md" "$T/r.json"
 fi
 echo
 echo "selftest: $fails case(s) not as stated"

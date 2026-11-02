@@ -6,9 +6,9 @@ Arms: A0 no change; A1 cap order only (reference); B1 mild (knee 24.5, slope 0.5
 
 ## 1. Candidate level: every generated junior candidate, before selection (paired layer, five seeds)
 
-The same candidates under every arm. Entry overall at 18 before the scouts' filter; headroom = capped raw potential minus entry overall.
+The same candidates under every arm. Entry overall at 18 before the scouts' filter. Here "latent headroom" is CAPPED RAW POTENTIAL minus entry overall (a candidate-level quantity, not the stored-potential gap of an entrant), counted in 0.5-point bins (each value floored to the bin below): the shares are of values BELOW 3.0 and 5.0 (bins wholly under the limit), and the median and 10th percentile are bin midpoints (approximate). Exact stored-potential gaps of selected entrants are in section 2 and H1_ROWS.md.
 
-| arm | candidates per seed | 80+ at 18 per seed | 85+ | 90+ | raw potential 80+: median headroom | 10th pct | share <= 3 | share <= 5 | raw potential 90+: median headroom | share <= 5 |
+| arm | candidates per seed | 80+ at 18 per seed | 85+ | 90+ | raw potential 80+: median latent headroom (bin midpoint) | 10th pct (bin midpoint) | share below 3.0 | share below 5.0 | raw potential 90+: median (bin midpoint) | share below 5.0 |
 |---|---|---|---|---|---|---|---|---|---|---|
 | A0 no change | 574,731 | 6.2 | 1.6 | 0.4 | 11.25 | 5.75 | 1.2% | 6.4% | 11.25 | 7.7% |
 | A1 cap order | 574,731 | 6.2 | 1.6 | 0.4 | 11.25 | 5.75 | 1.2% | 6.4% | 11.25 | 7.7% |
