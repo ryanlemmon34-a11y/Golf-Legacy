@@ -1,0 +1,6 @@
+test_tee_plan rc=0 2s Ran 11 tests in 1.784s OK 
+test_engine rc=0 23s Ran 20 tests in 22.469s OK 
+test_career_foundation rc=0 310s Ran 25 tests in 309.978s OK 
+test_observer_career rc=0 58s Ran 9 tests in 57.942s OK 
+test_session rc=0 458s Ran 25 tests in 457.282s OK 
+ALLDONE

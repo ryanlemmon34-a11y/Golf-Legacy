@@ -1,0 +1,9 @@
+test_tee_plan rc=0 2s Ran 11 tests in 1.640s OK 
+test_realism_pass1 rc=0 16s Ran 12 tests in 15.692s OK 
+test_engine rc=0 22s Ran 20 tests in 21.995s OK 
+test_aggression_visible rc=0 1s Ran 14 tests in 0.239s OK 
+test_weather rc=0 5s Ran 33 tests in 4.791s OK 
+test_playoffs rc=0 25s Ran 5 tests in 25.156s OK 
+test_golf_stats rc=0 119s Ran 13 tests in 119.036s OK 
+test_realism rc=0 87s Ran 40 tests in 81.941s OK 
+ALLDONE

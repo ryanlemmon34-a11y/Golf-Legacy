@@ -1,0 +1,8 @@
+......./dev/shm/fix/tests/test_tee_plan.py:72: ResourceWarning: unclosed file <_io.BufferedReader name='/dev/shm/fix/tests/fixtures/runaway_2049_hole17.pkl'>
+  d = pickle.load(open(FIXTURE, 'rb'))
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+....
+----------------------------------------------------------------------
+Ran 11 tests in 1.775s
+
+OK

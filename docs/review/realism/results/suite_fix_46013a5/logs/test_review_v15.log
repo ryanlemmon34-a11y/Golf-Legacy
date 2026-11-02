@@ -1,0 +1,7 @@
+/usr/lib/python3.13/multiprocessing/popen_fork.py:73: DeprecationWarning: This process (pid=2587) is multi-threaded, use of fork() may lead to deadlocks in the child.
+  self.pid = os.fork()
+.......
+----------------------------------------------------------------------
+Ran 7 tests in 33.074s
+
+OK
