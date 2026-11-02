@@ -27,7 +27,7 @@ winning also depends on variance, conditions and field.
 | driving_accuracy | .114 | D | `R.DRIVE_SIGMA` → `pl.sigma`: the tee shot's lateral spread (`engine.py:197`); lay-ups use 0.55·sigma. | |
 | long_irons | .068 | D | `R.APPROACH_MULT` → `m_long`, approach proximity from ≥200 yd effective (blended 180–200; `engine.py:198`, `approach_mult`). Also feeds the par-5 go/lay-up value. | **`APPROACH_MULT` is flat (1.05) from 25 to 60:** a change wholly inside 25–60 changes no shot parameter (exact zero, the second sanity check) even though Overall moves. |
 | mid_irons | .098 | D | `m_mid` for 140–180 yd (blended 115–140 and 180–200). Also the contact floor, below. | The contact floor is not flat in 25–60, so long_irons' flatness does not carry over. |
-| wedges | .051 | D | `m_wedge` ≤115 yd (blended to 140). Also the contact floor and the par-5 lay-up value (`engine.py:463`). | |
+| wedges | .051 | D | `m_wedge` ≤115 yd (blended to 140). Also the contact floor and the par-5 lay-up value (`engine.py:467`). | |
 | ball_flight | .035 | C (wind, firm greens, doglegs) | Effects listed below the table. | Matters little in calm air. |
 | chipping | .064 | D | `R.SHORT_MULT` → `m_chip` (chip proximity and chip-in chance) and `R.CHIP_FAIL` (duffs and thins). | |
 | bunker | .025 | D (C: in sand) | `m_sand` (sand proximity, holed bunker shots, fairway-bunker approaches `lie_m = 1.25 + 0.5·m_sand`) and `R.BUNKER_FAIL` (×1.25 on wet sand). | |
@@ -37,7 +37,7 @@ winning also depends on variance, conditions and field.
 | green_reading | .050 | D (C: slope) | `R.READ_SHIFT`: make shift scaled by slope and distance. `read_n` lowers the hard-green penalty and the gain from the caddie's reading. | |
 | striking_consistency | .028 | D, **variance** | Effects listed below the table. | Acts on **variance** as well as on the mean. |
 | putting_consistency | .016 | D, **variance** | `R.PUTT_LAPSE` (lapses on putts ≤8 ft, more under pressure and fatigue). `R.PUTT_FORM_SD` is the SD of the day's putting form; the week's putting form SD is scaled the same way. | Mostly variance. |
-| composure | .035 | **C (pressure)** | `pressure_effect = press·(1 − 0.85·composure)(1 − 0.25·big_stage)(1 − 0.07·caddie)` (`engine.py:269`). Pressure widens dispersion (+15%·press) and raises error rates (×(1 + 0.9·press)), chip and bunker fails, and the putting shift. | **No effect without pressure.** |
+| composure | .035 | **C (pressure)** | `pressure_effect = press·(1 − 0.85·composure)(1 − 0.25·big_stage)(1 − 0.07·caddie)` (`engine.py:273`). Pressure widens dispersion (+15%·press) and raises error rates (×(1 + 0.9·press)), chip and bunker fails, and the putting shift. | **No effect without pressure.** |
 | resilience | .015 | C (after bogeys) | `tilt_decay = (0.88 − 0.62·resilience)…` (`engine.py:223`). After a bogey or worse, "tilt" builds up (dispersion, errors, putting) and decays by this factor each hole. | |
 | management | .038 | D (decisions), C (wind) | Effects listed below the table. | |
 | focus | .026 | D (C: wet) | `R.MENTAL_ERROR` adds to the per-shot error chance (`err_p`, with fatigue and pressure terms). In wet rounds its rain discomfort is reduced by focus (`engine.py:216`). | |
@@ -49,7 +49,7 @@ winning also depends on variance, conditions and field.
   - the effective approach distance `de = dist·(298/drive)^0.5`, so shorter hitters play longer clubs;
   - the fairway-bunker reach.
 - Lateral spread in yards grows with distance: accuracy is angular, so `sigma ∝ drive/298` (`engine.py:197`).
-- Indirect: season fatigue cuts distance by 3% per unit of tiredness (`engine.py:231`).
+- Indirect: season fatigue cuts distance by 3% per unit of tiredness (`engine.py:232`).
 
 **stamina: effects.**
 
@@ -74,7 +74,7 @@ winning also depends on variance, conditions and field.
   - the dispersion factor `wind_f = 1 + wind·exposure·(0.55 − 0.40·bfc)…`;
   - it wins back 35%·bfc of the headwind distance loss (`_hole_wind`, `wind_distance`);
   - it reduces gusts (×(1 − 0.30·bfc)).
-- Dogleg shaping (`engine.py:595`).
+- Dogleg shaping (`engine.py:590`).
 - Approaches to firm or downwind greens (`firm_m` amplification 1.4 − 0.8·bfc).
 
 **striking_consistency: effects.**
@@ -89,7 +89,7 @@ winning also depends on variance, conditions and field.
 
 - `R.DECISION_NOISE`: noise in club, attack, lay-up and recovery choices, also reduced by caddie strategy and
   familiarity.
-- An over-used driver: the penalty `0.10·(1 − mgmt)²` (`engine.py:404`).
+- An over-used driver: the penalty `0.10·(1 − mgmt)²` (`engine.py:412`).
 - Seasonal wind:
   - `wind_skill = 1 − 0.20·(mgmt − 0.75)`, so better managers play the wind better;
   - gusts ×(1 − 0.20·(mgmt − 0.75)).

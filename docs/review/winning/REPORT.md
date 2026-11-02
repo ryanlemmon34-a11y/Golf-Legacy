@@ -44,9 +44,14 @@ stream, and a label is kept only when all 21 creation attributes reproduce:
 
 **Exact replay.** The save's own engine (`c0d1ea5`, run here on Linux and Python 3.13; the save was written on
 Windows and Python 3.15) replays its history. Every week is checked against the archive (the exact edition set,
-every finish and every round's conditions), and every capture is bound to its archived finish. **Seasons
-2027–20xx verified, 0 mismatches** (`results/capture_manifest.json`). The replay captures every starter's exact
-pre-event state, and complete tasks for the selected events.
+every finish and every round's conditions), and every capture is bound to its archived finish.
+
+- **Seasons 2027–2037 verified: 16,058 editions with 0 mismatches**, 15,805 primary-edition captures bound to their finishes, and 163 exact full tasks (`results/capture_manifest.json`,
+  `results/replay_log.jsonl`).
+- The replay was stopped at the start of 2038 to free CPU for the experiments. It can be resumed (`--resume`).
+- **Compact captures** hold every starter's pre-event state, **quantized**: attributes and traits to 0.1,
+  fatigue and familiarity as float32. They are not exact full state.
+- **Full task pickles** of the selected events are **exact** and are used in the experiments.
 
 **Scoring code.** The scoring code (`engine.py`, `tournament.py`, `weather.py`, `ratings.py`, `golfer.py`,
 `course.py`, `baseline.py`, `familiarity.py`, `upsets.py`) is identical in main `18a8e23` and `c0d1ea5`.
@@ -176,10 +181,75 @@ signature of **higher score variance** at an equal mean: more very low weeks and
 Ball-Strikers show the reverse: the most cuts made, fewer wins. Big fields reward variance at the top. The
 controlled fixed-Overall profiles in section 4 test this directly.
 
-## 4. Which attributes matter most and least? (experiments)
+## 4. Which attributes matter most and least?
 
-*Pending: tier 1 round scoring (grid running), tier 2 fixed-field conditional estimates, tier 3 full-event
-validation, fixed-Overall archetype profiles and equal-SD perturbations.*
+### 4a. Where each attribute acts (`ATTRIBUTE_MAP.md`)
+
+**Every shot:**
+
+- power, driving_accuracy;
+- the iron and wedge multipliers;
+- chipping, bunker;
+- short and lag putting, green_reading;
+- the error rates: striking_consistency and focus;
+- decision noise: management.
+
+**Variance** (as well as the mean):
+
+- striking_consistency: day and week strike form, mishits;
+- putting_consistency: putting form, lapses.
+
+**Only in some situations:**
+
+- composure: only under pressure;
+- recovery_rate: only in rounds 2–4;
+- ball_flight: mainly wind, firm greens and doglegs;
+- recovery_play: trees and rough;
+- big_stage (a trait): pressure.
+
+**No shot effect:** injury_resistance acts only on availability.
+
+**Overall weights are not winning contributions.**
+
+### 4b. The actual history: attribute shape and winning (association)
+
+Data: the verified replay seasons 2027–2036, about 1.26M starts with quantized pre-event attributes
+(`attr_assoc.py`, `results/attr_assoc.json`).
+
+Model: a within-edition win model fitted one attribute at a time, with the Overall gap to the field's best plus
+that attribute's deviation from the golfer's own Overall. Odds ratios are per 10 points above the golfer's own
+Overall. Professional tiers 0–4:
+
+| Relatively strong in… | Win odds at the same Overall |
+|---|---|
+| ball_flight | **×1.16** |
+| familiarity with the course (per 10 rounds above the field mean) | ×1.11 |
+| power | ×1.11 |
+| recovery_play | ×1.10 |
+| aggression (per 10 trait points) | ×1.07 |
+| short_putting, chipping, bunker | ×0.97–0.98 |
+| driving_accuracy, green_reading, lag_putting, putting_consistency | ×0.93 |
+| composure | ×0.91 |
+| focus | ×0.89 |
+| management | ×0.88 |
+| striking_consistency | **×0.84** |
+
+These are associations and they largely restate the archetype result. The "consistency and control" profile
+(Strategic Technician, Precision Ball-Striker) wins less than its Overall predicts. The "shot-making and
+variance" profile (Aggressive Shotmaker) wins more.
+
+injury_resistance shows ×1.05 even though it has **no shot effect at all**. That is the clearest sign that these
+associations mix in correlated traits and careers. Mechanisms come from the controlled experiments below.
+
+### 4c. Controlled experiments
+
+*Pending:*
+
+- tier 1: round scoring (grid running);
+- tier 2: fixed-field conditional estimates;
+- tier 3: full-event validation;
+- fixed-Overall archetype profiles;
+- equal-SD perturbations.
 
 ## 5. How much does weather change who wins?
 
@@ -221,7 +291,23 @@ to zero.
 10, 20 and 28 mph, each dry and wet, in seasonal mode. There are 12 independent direction and gust scenarios,
 paired shot seeds, and a re-randomised calm floor.*
 
-## 6. Skill, depth, volatility (to be completed)
+## 6. Skill, depth, volatility
+
+### Day-to-day volatility (`volatility.py`, `results/volatility.json`)
+
+Majors and Premier editions. The residual is a golfer's round minus that round's field mean (everyone who played
+it). The SD is pooled within each event (ability and time adjusted) per golfer-season.
+
+| Variant | Golfer-seasons | Median SD | Overall 80–85 | 85–90 | 90+ |
+|---|---|---|---|---|---|
+| Rounds 1–4, within event | 16,897 | **3.39** | 3.22 | 3.10 | 2.98 |
+| Rounds 1–2, every starter (no cut selection) | 16,203 | **3.28** | 3.12 | 3.02 | 2.82 |
+
+As a **rough comparison only** (different metrics): Data Golf's residual SDs, actual minus predicted strokes
+gained, are 2.72 for the best PGA Tour players and 2.75 for the middle, rising to 3.23 for the weakest
+([Data Golf, 2026-02-18](https://datagolf.com/model-talk/2026-offseason-tweaks)). Test2's elite golfers look
+roughly 5–15% more volatile day to day, and its field as a whole more than that. Data Golf's prediction adjusts
+ability, time and course differently, and this world's Overall bands do not map onto their skill groups.
 
 ## 7. Limitations (to be completed)
 
