@@ -1,6 +1,7 @@
 # Realism pass 1: how to test this branch
 
-Branch `build/realism-youth-aging-longirons`, from main `18a8e23`. Experimental, ready to test, not validated as long-career
+Branch `build/realism-youth-aging-longirons`, from main `18a8e23`, plus the reviewed engine fix for the runaway
+hole (`fix/engine-dogleg-retee`, merged at `c6ce161`). Experimental, ready to test, not validated as long-career
 balance. Main is unchanged.
 
 ## Try it in the observer
@@ -26,6 +27,7 @@ What to look at:
 
 ```
 python -m unittest tests.test_realism_pass1 -v      # 12 tests
+python -m unittest tests.test_tee_plan -v           # 11 tests (the engine fix)
 python docs/review/realism/measure.py OUT.json --years 2028-2047 --procs 4      # paired projections, five seeds
 python docs/review/realism/summarise.py OUT.json
 python tools/long_world.py --seeds 2027 --years 30 --out DIR                    # full-scale world (compare with main)

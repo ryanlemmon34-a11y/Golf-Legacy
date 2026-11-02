@@ -1,7 +1,8 @@
 # Realism pass 1: results
 
 **Status: experimental, ready to test, not validated as long-career balance. One planned gate is unmet (the cliff
-check, section 2) and one is untested (injuries per start).** The plan and targets are in
+check, section 2) and one is untested (injuries per start). Test from the branch head, which carries the reviewed
+engine fix for the 2049 runaway (below).** The plan and targets are in
 `PLAN.md`; how to test is in `TESTING.md`. Main `18a8e23` is unchanged.
 
 ## Provenance
@@ -176,6 +177,49 @@ Tables: `results/world_seed2027_s22.md`. The 10- and 20-season interims are supe
 **Recorded exits** are in the tables as descriptive counts by kind. Their mechanism is unresolved: no decision
 traces were examined. The snapshot 80+ stock is a stock, not eventual supply, and no age or exit explanation is
 offered for its differences.
+
+## The 2049 runaway: engine fix, integration and the completed seed-2027 run
+
+- **The defect** (`results/runaway_2049/RUNAWAY.md`): the branch's run stopped in 2049 at the engine's runaway guard,
+  on a latent tee-planning defect that is identical on main.
+- **The fix:** `fix/engine-dogleg-retee`, engine `e99cb20`, head `46013a5` (from main `18a8e23`). It was reviewed
+  and accepted for test branches only.
+- **Its tests:** `tests/test_tee_plan.py` (11).
+- **The fixture, replayed with execution-only instrumentation:**
+
+  | build | outcome |
+  |---|---|
+  | main `18a8e23` | runaway: 30 tee shots, all driver, 30 penalties |
+  | `d619dd6` | runaway: 30 tee shots, all driver, 30 penalties |
+  | fix | 4 strokes |
+
+- **The fix's full suite:** 90 modules, 1,144 tests, 4 skipped, 0 failures (`results/suite_fix_46013a5/`).
+- **Integrated into the test branches only; main is untouched.**
+  - Realism: `c6ce161` (merge), `c528575` (the resume driver).
+  - Career: `da4075e` (merge), `8a2b92a`. Its all-AI equivalence reference is now main + fix: main alone reproduced
+    its old digests, and main + fix and career + fix give identical new ones.
+- **Combined-branch checks** (`results/combined_checks/`): realism + fix 148 tests and career + fix 90 tests, all
+  passing.
+
+**The failed seed, continued: a mixed-version run, labelled as such.** Provenance:
+`results/runaway_2049/PROVENANCE_mixed.json` (`resume_mixed.py`).
+
+| part | seasons | engine |
+|---|---|---|
+| first | 2027–2048 | `d619dd6` (engine `b62c9c83`) |
+| second | 2049–2056 | realism + fix `c528575` (engine `f0529419`) |
+
+- **Checkpoint:** the run resumed from the verified 2048 checkpoint, whose save and run-state hashes are recorded.
+- **Restart:** one restart, from the 2053 checkpoint on the same engine, after the continuation process was killed by
+  the memory limit while saving after 2054. Season 2054 was replayed deterministically.
+- **Completion:** it crossed 2049, the failure season, and completed 2056. That is 30 contiguous seasons, every one
+  logged with no reconciliation errors or staff violations.
+- **Tables:** `results/world_seed2027_mixed30.md`, against main without the fix. From 2049 the arms differ in the
+  engine fix as well as the realism rules, so those seasons are not a single-version causal comparison. The 22
+  common single-version seasons above remain the primary comparison.
+
+**Second seed, a causal pair with the identical fix in both arms (running).** Seed 3031, 30 seasons, main + fix
+`46013a5` against realism + fix `c528575`. It is reported when complete.
 
 ## Regression
 

@@ -1,0 +1,52 @@
+{
+ "kind": "mixed-version continuation (not a single-version run)",
+ "seed": 2027,
+ "first_part": {
+  "seasons": [
+   2027,
+   2048
+  ],
+  "commit": "d619dd66662bc111f521a51470e35d4e4e762a69",
+  "engine": "b62c9c83cfb0d9c13de9a4dccd587291505aab65",
+  "run_manifest_commit": "d619dd66662bc111f521a51470e35d4e4e762a69"
+ },
+ "second_part": {
+  "seasons": [
+   2049,
+   2056
+  ],
+  "commit": "c528575f962220bb75f5076ea60ada564398d092",
+  "engine": "f0529419945617bc2c8431b04146f681360bd3c9"
+ },
+ "checkpoint": {
+  "save": "/dev/shm/fw/dev2_2027/seed_2027.save",
+  "save_sha256": "95e03eecd848fca0c789025b3d92c3815eb8d5e977c56781215347ca18cd640e",
+  "state": "/dev/shm/fw/dev2_2027/seed_2027.state.pkl",
+  "state_sha256": "35cd232326eb506d1b786754028e6a37eec1295115eb0dafc332f59e4698e9f2",
+  "save_note": "seed 2027 after 2048",
+  "state_last_season": 2048,
+  "state_seasons": 22
+ },
+ "started": "2026-11-02 08:45:07",
+ "restarts": [
+  {
+   "at": "2026-11-02 09:55:03",
+   "why": "the resume process was killed by the memory-cgroup OOM killer at 09:20 while writing its save after 2054 (dmesg: Killed process 29792); its orphaned workers were stopped; seed_2027.save.tmp (partial) ignored",
+   "from_checkpoint": "seed 2027 after 2053 (save and run state consistent: 27 seasons, last 2053)",
+   "engine": "f0529419945617bc2c8431b04146f681360bd3c9 (c528575, the same as the second part)",
+   "replays": "season 2054 from the 2053 checkpoint (deterministic; archive year file and index rows are replaced)",
+   "workers": 1
+  }
+ ],
+ "finished": "2026-11-02 10:17:58",
+ "completion": {
+  "seasons_recorded": 30,
+  "first": 2027,
+  "last": 2056,
+  "contiguous": true,
+  "final_save_note": "seed 2027 after 2056",
+  "final_save_engine": "f0529419945617bc2c8431b04146f681360bd3c9",
+  "crossed_failure_season": true,
+  "checks": "every season of the continuation logged reconcile errors 0+0, staff violations 0, population ok"
+ }
+}
