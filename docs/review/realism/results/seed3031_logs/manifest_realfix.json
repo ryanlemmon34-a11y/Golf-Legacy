@@ -1,0 +1,70 @@
+{
+ "format": "golf-legacy-long-world/2",
+ "commit": "c528575f962220bb75f5076ea60ada564398d092",
+ "engine": "f0529419945617bc2c8431b04146f681360bd3c9",
+ "dirty": false,
+ "python": "3.13.17",
+ "machine": "Intel(R) Xeon(R) Processor @ 2.10GHz, 4 logical CPUs, Python 3.13.17, Linux-6.18.44-fc-v185-x86_64-with-glibc2.39; memory 15.7 GB, 5.6 GB available at the start",
+ "started": "2026-11-02 09:00:01",
+ "years_requested": 30,
+ "config": {
+  "finance": {
+   "LIVING": 32000,
+   "LIVING_WORKING": 40000,
+   "WORK_WAGE": 900,
+   "CREDIT_BASE": 8000,
+   "CREDIT_SHARE": 0.25,
+   "CREDIT_CAP": 60000,
+   "RESERVE_WEEKS": 4,
+   "PRIOR_PRIZE_SHARE": 0.004,
+   "CADDIE_SHARE": 0.08,
+   "BACKER_SHARE": 0.25,
+   "EVIDENCE_DECAY": 0.5,
+   "PROVEN_EVENTS": 8,
+   "SELF_FUNDED_SEASONS": 3
+  },
+  "residence": {
+   "MOVE_COST": 6000.0,
+   "MIN_STAY": 3,
+   "STAY_YEARS": 3,
+   "HOME_PULL": 60.0,
+   "MOVE_MARGIN": 15.0,
+   "MOVE_SCALE": 8.0,
+   "CADDIE_FOLLOWS": 0.15,
+   "COACH_FOLLOWS": 0.25,
+   "HOME_STATE_COLLEGE": 0.55
+  },
+  "staff": {
+   "SELF_TEACHING": 0.3,
+   "SCOUT_SHARE": 0.05,
+   "SELF_CADDIE": 40.0,
+   "CADDIE_TIERS": 2,
+   "COACH_OF_MEANS": 0.1,
+   "CADDIE_OF_MEANS": 0.25
+  },
+  "careers": {
+   "LIFE_AGE": 26.0
+  },
+  "population": {
+   "POTENTIAL_SD": 13.0,
+   "CANDIDATES_PER_POOL": 900,
+   "SCOUTING_SD": 4.0
+  },
+  "development": {
+   "BASE_TRAIN": 0.016,
+   "BASE_PLAY": 0.008,
+   "MATURING": 0.004
+  }
+ },
+ "mature": 12,
+ "amateur_support": true,
+ "arm": {},
+ "seeds": {
+  "3031": {
+   "years_completed": 30,
+   "minutes": 166.4,
+   "holes": 178402048,
+   "commit": "c528575f962220bb75f5076ea60ada564398d092"
+  }
+ }
+}

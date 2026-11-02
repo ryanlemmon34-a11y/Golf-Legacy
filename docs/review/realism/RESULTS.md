@@ -1,9 +1,9 @@
 # Realism pass 1: results
 
-**Status: experimental, ready to test, not validated as long-career balance. One planned gate is unmet (the cliff
-check, section 2) and one is untested (injuries per start). Test from the branch head, which carries the reviewed
-engine fix for the 2049 runaway (below).** The plan and targets are in
-`PLAN.md`; how to test is in `TESTING.md`. Main `18a8e23` is unchanged.
+**Status: final for this pass, code frozen. An experimental playtest build, not fully calibrated balance.** One
+planned gate is unmet (the cliff check, section 2) and one is untested (injuries per start). Test from the branch
+head, which carries the reviewed engine fix for the 2049 runaway (below), against main + the same fix (`46013a5`).
+The plan and targets are in `PLAN.md`; how to test is in `TESTING.md`. Main `18a8e23` is unchanged.
 
 ## Provenance
 
@@ -33,7 +33,7 @@ engine fix for the 2049 runaway (below).** The plan and targets are in
 |---|---|---|
 | Seed 2027, clean | main `18a8e23` against realism `d619dd6`, 22 common single-version seasons (2027–2048) | **The primary comparison.** The realism run stopped in 2049 on the latent engine defect (section below). |
 | Seed 2027, mixed version | main `18a8e23` (no fix) for 30 seasons, against the realism run continued from its verified 2048 checkpoint on realism + fix `c528575` for 2049–2056 (`results/runaway_2049/`) | Evidence that the fixed build crosses the failure point and completes. From 2049 the arms differ in the engine fix as well as the realism rules, so it is **not** a single-version causal comparison. |
-| Seed 3031, same-fix pair (running) | main + fix `46013a5` against realism + fix `c528575`, both carrying the identical engine fix, 30 seasons | A second paired seed; reported when complete. |
+| Seed 3031, same-fix pair | main + fix `46013a5` (engine `2abe4dc8`) against realism + fix `c528575` (engine `f0529419`), both carrying the identical engine fix; 30 single-version seasons each (2027–2056), no restarts | **A causal pair for the realism rules alone**, a second paired seed. Not the same engine as the seed-2027 clean pair (that pair has no fix). |
 
 **Scripts.**
 - Comparison: `compare_worlds.py`, sha256 `dff42fc2…6bbf`. Both arms are always compared on the identical covered
@@ -228,8 +228,32 @@ offered for its differences.
   engine fix as well as the realism rules, so those seasons are not a single-version causal comparison. The 22
   common single-version seasons above remain the primary comparison.
 
-**Second seed, a causal pair with the identical fix in both arms (running).** Seed 3031, 30 seasons, main + fix
-`46013a5` against realism + fix `c528575`. It is reported when complete.
+**Second seed, a causal pair with the identical fix in both arms.** Seed 3031, main + fix `46013a5` (engine
+`2abe4dc8`) against realism + fix `c528575` (engine `f0529419`).
+- **Completed:** both arms, 30 single-version seasons (2027–2056), no restarts. Every season logged reconciliation
+  errors 0+0, staff violations 0, population ok, with no tracebacks and no runaway.
+- **Evidence:** `results/seed3031_logs/` holds the run logs and manifests. Tables are in
+  `results/world_seed3031_samefix30.md` (`compare_worlds.py`, sha256 `dff42fc2…6bbf`).
+- **Causal reading:** this pair differs only in the realism rules, because both arms carry the same engine fix. It is
+  still one paired world, so the counts are descriptive.
+
+| realized, seasons 2027–2056 (one paired seed, same fix in both arms) | main + fix (dev-1) | realism + fix (dev-2) |
+|---|---|---|
+| Yearly change of the post-winter rating at ages 35–39 / 40–44 / 45–49 | −0.49 / −0.78 / −0.97 | −0.57 / −0.92 / −1.10 |
+| Careers seen from 28 or younger to 38 or older: rating at 40 / 45 relative to the highest observed (median) | −2.8 / −6.7 (n 545) | −3.3 / −7.9 (n 553) |
+| Age at the highest observed rating, same careers: median (10th–90th percentile) | 30 (28–34) | 30 (28–33) |
+| Last observed age at 85+, median (90th percentile), censored | 41 (45) | 40 (44) |
+| Share of Premier wins (snapshots) / majors (ledger) won at 40+ | 16.1% / 20.0% (24 of 120) | 13.0% / 19.2% (23 of 120) |
+| Top 50 by Overall: mean number aged 40+ / 45+, all seasons (last 10) | 7.37 / 2.83 (5.20 / 2.00) | 6.17 / 1.87 (3.70 / 0.80) |
+| Stock of golfers at 80+ / 85+ in the season snapshot, 2036 / 2056 (not eventual supply) | 33 / 8; 28 / 4 | 26 / 7; 29 / 4 |
+| Juniors arriving 2028–2056: highest observed SO FAR at 75+ / 80+ / 85+ / 90+ (censored) | 175 / 37 / 5 / 2 | 176 / 40 / 5 / 2 |
+| Most majors by one golfer; distinct major winners | 18; 50 | 14; 55 |
+| Season time over the 30 seasons: median (total) (cloud, two runs sharing 4 CPUs; relative only) | 330 s (10,075 s) | 324 s (9,983 s) |
+
+**Both seeds read the same way.** Decline from the late 30s is a little steeper on the realism rules (about 0.1 a
+year more at 35–49), and fewer golfers aged 40+ hold top-50 places and Premier wins. Majors at 40+ are about level,
+and top junior supply is about level. With one world per seed these are descriptive differences, not established
+effects.
 
 ## Regression
 
@@ -253,7 +277,8 @@ table above; it is a cloud figure, relative only. The 120 s target refers to Rya
   retirement. They isolate the development laws and are not realized careers.
 - **Full-scale worlds are evidence, not proof.**
   - **Seed 2027:** 22 clean single-version paired seasons, then a labelled mixed-version continuation to 30.
-  - **Seed 3031:** the same-fix pair is pending. No further seeds are planned for this pass.
+  - **Seed 3031:** a 30-season same-fix pair, differing only in the realism rules. No further seeds are planned
+    for this pass.
   - Juniors entering from 2028 are seen at most to their mid-40s; most are censored before their decline.
   - Golfers in the starting world are seen from their starting age.
   - Lifelong elite supply and elite longevity across seeds are therefore **not established**.
