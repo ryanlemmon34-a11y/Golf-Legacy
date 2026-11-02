@@ -333,7 +333,77 @@ Overall, with the archetype's aggression and big_stage and with those set neutra
 
 ### 4e. Winning impact (tier 2 fixed-field screening, tier 3 full-event validation)
 
-*Pending (queued).*
+**Tier 2: the subject replayed against fixed production fields** (`exp_fixed.py`; a conditional approximation).
+
+- **Design:**
+  - 500 production replays of the whole event;
+  - in each, the subject's own week is replayed 16 times with the production round code and `play_event`'s
+    pressure and cut rules;
+  - rivals' scores are frozen, so their pressure and cut responses to the subject are not modelled;
+  - playoffs count as an equal share.
+- **Events.** Britannia Open (links) and France Open (sheltered woodland).
+- **Subjects.** The favourite (golfer 1, Overall 88.3, native Strategic Technician) and the rank-10 golfer.
+- **Readout.** Δ win in percentage points per +5 (SE over field replicates), for the favourite. Clipped arms are
+  excluded.
+
+| Attribute (+5) | Britannia (base win 8.8%) | France (base win 9.8%) |
+|---|---|---|
+| driving_accuracy | +1.09 ± .30 | **+2.07** ± .32 |
+| mid_irons | **+1.36** ± .34 | +1.21 ± .36 |
+| wedges | +1.04 ± .29 | +0.96 ± .27 |
+| short_putting | +0.98 ± .18 | +0.96 ± .17 |
+| power | +0.95 ± .30 | +0.60 ± .35 |
+| long_irons | +0.93 ± .29 | +0.58 ± .26 |
+| ball_flight | +1.07 ± .32 | **+0.08** ± .20 |
+| stamina | +0.33 ± .17 | +0.48 ± .18 |
+| bunker, lag_putting, resilience, recovery_play, recovery_rate | +0.0 to +0.45 | +0.2 to +0.4 |
+| putting_consistency | +0.11 ± .10 | +0.30 ± .09 |
+| **striking_consistency** | **−0.02** ± .23 | **−0.04** ± .23 |
+| injury_resistance | 0 (exact) | 0 (exact) |
+
+For the rank-10 subject (base win 3.3% and 2.3%), the gains are smaller, and **striking_consistency +5 lowers the
+win rate** (Britannia −0.17 ± .14; France −0.26 ± .13) while raising cuts (+0.25–0.5 points) and top-10s
+(+0.3–0.5 points). That is the variance mechanism at attribute level: steadier play buys cuts, not wins.
+
+**Tier 3: full production events, paired seeds**, 1,500 per arm, Britannia
+(`results/experiments/events_validation_*.json`).
+
+- **Baselines.**
+  - Favourite: 9.0% in full events against 8.8% fixed-field.
+  - Rank-10: 4.0% against 3.3% (fixed-field about 1.4 SE low).
+- **Treatment effects, full against fixed-field, in points:**
+
+  | Arm | Full | Fixed-field | Difference |
+  |---|---|---|---|
+  | Power +5, favourite | +0.8 ± 0.85 | +0.95 | agrees |
+  | Short putting +5, favourite | +1.3 ± 0.44 | +1.0 | agrees |
+  | Strategic Technician profile, rank 10 | −1.5 ± 0.65 | −1.8 | agrees |
+  | Driving accuracy +5, favourite | **+2.8 ± 0.84** | +1.1 | 1.9 SE (full larger) |
+  | Putting consistency +5, favourite | **−0.4 ± 0.25** | +0.1 | 1.9 SE (opposite sign; both small) |
+  | Aggressive Shotmaker profile, rank 10 | −0.9 ± 0.7 | +0.2 | 1.5 SE |
+  | Power +5, rank 10 | −0.1 ± 0.6 | +0.5 | 0.8 SE |
+
+- **Overall.** Across these seven comparisons χ² ≈ 11.1 on 7 df (approximate p ≈ 0.13), so there is no
+  systematic contradiction. But full events (SE 0.6–0.85 points) cannot confirm the fixed-field fine rankings,
+  and two comparisons differ by about 1.9 SE.
+- **Stream divergence in full events.** A +5 change alters 3–46% of rivals' totals, and an archetype profile 58%,
+  through the shared stream.
+- **Clipping as a no-op check.** short_putting +5 at rank 10 was clipped at 99, so the arm reproduced the
+  baseline exactly.
+
+**What is supported, and what is only screening:**
+
+- **Supported (tier 2 in both events; tier 3 where tested at Britannia):**
+  - the shot-making attributes give the largest win gains for a favourite, about +1 to +3 points of win
+    probability per +5 at a 9% baseline: driving_accuracy, mid_irons, wedges, short_putting, power and
+    long_irons. Full events tested driving_accuracy, power and short_putting, all positive;
+  - ball_flight's win value is course-dependent (links, not sheltered woodland);
+  - injury_resistance is zero;
+  - **striking_consistency does not raise win chances in any tested cell** (every estimate ≤ 0), even though it
+    lowers average scores slightly.
+- **Small and inconsistent:** putting_consistency's win effect is +0.1 to +0.3 fixed-field but −0.4 ± 0.25 in
+  full events.
+- **Screening only:** the order within the top group, and every small difference among the middle attributes.
 
 ### 4f. Equal-SD perturbations
 
