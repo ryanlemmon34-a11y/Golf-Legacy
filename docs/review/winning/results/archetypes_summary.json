@@ -1,0 +1,50 @@
+{
+ "save_meta": {
+  "world_id": "386509-1793467568",
+  "engine": "1949ff63f33ce610a7cd4fe70c089b0b4fbf5b9e",
+  "generation": 70,
+  "cursor": {
+   "year": 2084,
+   "week": 1,
+   "phase": "start"
+  },
+  "state_sha256": "c55bbd2f86d78317ee3d81cc519bf6cc26af2679665d47a16b5f8acee4f1b585",
+  "calendar": "v2"
+ },
+ "tolerance": 0.11,
+ "counts": {
+  "initial/verified": 6550,
+  "junior/verified": 16810,
+  "junior/verified_clamped": 1,
+  "late_entrant/verified": 23924,
+  "none/unknown": 704
+ },
+ "archetype_counts_verified": {
+  "Strategic Technician": 5903,
+  "All-Rounder": 5992,
+  "Power Hitter": 5797,
+  "Elite Putter": 5946,
+  "Effortless Power": 6019,
+  "Short-Game Artist": 5785,
+  "Aggressive Shotmaker": 5859,
+  "Precision Ball-Striker": 5984
+ },
+ "verified_clamped": [
+  [
+   19411,
+   "junior",
+   2041,
+   "Argentina",
+   18,
+   96.09,
+   "Power Hitter",
+   "verified_clamped",
+   0.0828,
+   11,
+   10.036
+  ]
+ ],
+ "min_alt_spread_verified": 10.036,
+ "max_spread_verified": 0.1,
+ "scripts_commit": "18a8e23fb06c241892a73af29124c168c2018467"
+}

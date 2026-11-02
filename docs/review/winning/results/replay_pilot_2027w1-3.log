@@ -1,0 +1,9 @@
+world generated and committed in 5s
+week 1 of 2027: 13 events checked, 0 mismatches so far, 7.6s
+week 2 of 2027: 17 events checked, 0 mismatches so far, 2.2s
+week 3 of 2027: 17 events checked, 0 mismatches so far, 2.1s
+{"checked": 47, "mismatches": 0, "captured": 0, "engine": "1949ff63f33ce610a7cd4fe70c089b0b4fbf5b9e", "seconds": 16}
+
+real	0m17.051s
+user	0m22.556s
+sys	0m0.959s

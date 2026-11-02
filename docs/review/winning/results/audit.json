@@ -1,0 +1,856 @@
+{
+ "provenance": {
+  "save_meta": {
+   "world_id": "386509-1793467568",
+   "engine": "1949ff63f33ce610a7cd4fe70c089b0b4fbf5b9e",
+   "generation": 70,
+   "cursor": {
+    "year": 2084,
+    "week": 1,
+    "phase": "start"
+   },
+   "state_sha256": "c55bbd2f86d78317ee3d81cc519bf6cc26af2679665d47a16b5f8acee4f1b585",
+   "calendar": "v2"
+  },
+  "scripts_commit": "18a8e23fb06c241892a73af29124c168c2018467",
+  "scripts_dirty": true,
+  "year_files": {
+   "2027": {
+    "name": "2027.g000001.json.gz",
+    "sha256": "7879ef9af3ec5fb1285a31e98189c23419f9b9951e86cc4da9183488e8c00a0b"
+   },
+   "2028": {
+    "name": "2028.g000002.json.gz",
+    "sha256": "e79128f4b16f881df3b02cba93d84363b3609aab8bca73c8b4709fb68a77a47a"
+   },
+   "2029": {
+    "name": "2029.g000003.json.gz",
+    "sha256": "1c90ad1e9cd9d2c8d6da182e73eda7d685cf666ab056757e9bfcb112301aceba"
+   },
+   "2030": {
+    "name": "2030.g000004.json.gz",
+    "sha256": "f20c8331d09621d6a86857cabdda6cd39e7fe1af24ad359771ba8b35278cbe33"
+   },
+   "2031": {
+    "name": "2031.g000005.json.gz",
+    "sha256": "9786d4d97879bb16649d6d1331dbebddbbf207d201278dfb89be4d5da16a72a0"
+   },
+   "2032": {
+    "name": "2032.g000006.json.gz",
+    "sha256": "6212a48534d16ecf629b7c3ab87750f876a73ff4625ea6e934f294a597215430"
+   },
+   "2033": {
+    "name": "2033.g000007.json.gz",
+    "sha256": "19f2db14005ba18f9590b7fc9e9b70db92a2e863399488874390b377842e1c42"
+   },
+   "2034": {
+    "name": "2034.g000008.json.gz",
+    "sha256": "6f6cd4ad7adf2ff7fce8cd6a873fca0ffbb4c4a9df7ba2ac57f55cc9b3ea8321"
+   },
+   "2035": {
+    "name": "2035.g000009.json.gz",
+    "sha256": "c62667b01b9309a3dc0956e978061dcc36c302aef24f5568003e82874abd497c"
+   },
+   "2036": {
+    "name": "2036.g000010.json.gz",
+    "sha256": "5d330d01fbcd22104e32e20ff0edb7ec8b6937f8b8fa495d112c45b75ba20f54"
+   },
+   "2037": {
+    "name": "2037.g000011.json.gz",
+    "sha256": "52d76eb156d270f22d647b437fb8b8a94f579a490d171951479835c10438bf60"
+   },
+   "2038": {
+    "name": "2038.g000012.json.gz",
+    "sha256": "c7dfd74ac0dc0fa08f41d43d2f2b40e027cc01b355881381406d7e746c1425d9"
+   },
+   "2039": {
+    "name": "2039.g000013.json.gz",
+    "sha256": "26485174d20dfe95172eb11bca9d53b9f85a3f70f66c49de6fd99ca65899d764"
+   },
+   "2040": {
+    "name": "2040.g000014.json.gz",
+    "sha256": "053d1838ce6910fcff856062aee0c35ebb51762e7cd157691a0e0ea06b1a1e83"
+   },
+   "2041": {
+    "name": "2041.g000015.json.gz",
+    "sha256": "0c6f7e716d5dc8f15f5b4dfa3eb648a892769a3c179dc9eae23b1ec46bdbbec2"
+   },
+   "2042": {
+    "name": "2042.g000016.json.gz",
+    "sha256": "bdff8a4c4910dce793017f5dbb764ab8bd26691444a867ba1f54d10fa6719c99"
+   },
+   "2043": {
+    "name": "2043.g000017.json.gz",
+    "sha256": "7769b9a8af9003b55bfd90a548b0db580191e00e3d113cdab4e3673401cfd9f6"
+   },
+   "2044": {
+    "name": "2044.g000018.json.gz",
+    "sha256": "aab93a479b88f7d0622092ab4580d9dd81d46a274110467bbad4f9acb4a294d1"
+   },
+   "2045": {
+    "name": "2045.g000019.json.gz",
+    "sha256": "a8241eb65f221a0da0bf29790df5f28889aeaaa01a1a771a00f5714efedcd087"
+   },
+   "2046": {
+    "name": "2046.g000020.json.gz",
+    "sha256": "241c4186ecccc6dbea8bfdfae2e9b59af27111b32b3e91ee37473f6c8ccbb05d"
+   },
+   "2047": {
+    "name": "2047.g000021.json.gz",
+    "sha256": "4ab74210f13892571b784465882382a7ab585752a083586fa1ff45a1b28b4ba2"
+   },
+   "2048": {
+    "name": "2048.g000022.json.gz",
+    "sha256": "d1e8b34ae9f4a3d5cc7757ec114ecc1048556b6ae629354c9f1a25219c477d4b"
+   },
+   "2049": {
+    "name": "2049.g000023.json.gz",
+    "sha256": "9459495e71119975e55592d6e203acd867351c3696c552872c6e92f3ded89021"
+   },
+   "2050": {
+    "name": "2050.g000024.json.gz",
+    "sha256": "8b04c168cb852d0fe15c3d9541052e28eece644ffad4bddf40ccbecec43d9c1f"
+   },
+   "2051": {
+    "name": "2051.g000025.json.gz",
+    "sha256": "eea2bb7ab8dac7e8bcb8f8d6b8f04962b424c1c3202ff780ed99091ad9104e38"
+   },
+   "2052": {
+    "name": "2052.g000037.json.gz",
+    "sha256": "9af90010d47f27ecdd3856fc8f9ba50175f8dc40bd50c53507470847a4cd6651"
+   },
+   "2053": {
+    "name": "2053.g000038.json.gz",
+    "sha256": "39733c573c7a7caf920eca971d316adf9390c8d3067e517036c1bfa38a29ca26"
+   },
+   "2054": {
+    "name": "2054.g000039.json.gz",
+    "sha256": "d45f177539b1bdd925fd9ae116b33e259c10909b4bc88e9a2cad531c6007fef5"
+   },
+   "2055": {
+    "name": "2055.g000040.json.gz",
+    "sha256": "5f7825e77d46fbe8cda9642beec78045aaa1c5a27435cca7c3f4478d28413698"
+   },
+   "2056": {
+    "name": "2056.g000041.json.gz",
+    "sha256": "f6f2be73efde473fd5c1562be581a3e4e93a83a182ced054c8844ce145fa2384"
+   },
+   "2057": {
+    "name": "2057.g000042.json.gz",
+    "sha256": "b87978c2292e37e76dbe4172ad5cae85edb39167e47b58f3c11d587c94247f30"
+   },
+   "2058": {
+    "name": "2058.g000044.json.gz",
+    "sha256": "b2c3904283f9d81fcc7ef8ded1fe512ff8c214336dddecf0141ed9a0214dbb58"
+   },
+   "2059": {
+    "name": "2059.g000045.json.gz",
+    "sha256": "1fdd13df9361b2cee2b2329564c594ce3d76b0bbe34b04f0ea5bc64f32f93886"
+   },
+   "2060": {
+    "name": "2060.g000046.json.gz",
+    "sha256": "30a1d84dd1f16e1cc74b4d9a2627132d78bebc86a3dea44ddbe4f804f6110289"
+   },
+   "2061": {
+    "name": "2061.g000047.json.gz",
+    "sha256": "f2b1555d221826ca7c449c014d8833b2e4541a942671ccd7265dbbd632e1f801"
+   },
+   "2062": {
+    "name": "2062.g000048.json.gz",
+    "sha256": "f134f200fbe911d6dab545bd01b3b14e2344b2b87998a74f2dda47c39be81c2c"
+   },
+   "2063": {
+    "name": "2063.g000050.json.gz",
+    "sha256": "9755e8883d8b81ac503fa5302a53a32fa550dc365237b31e5337c68eaa73eb3d"
+   },
+   "2064": {
+    "name": "2064.g000051.json.gz",
+    "sha256": "a56563f85d28b1cc55e83bfa0b19c227a863df685f2876c06e456ecd369460b7"
+   },
+   "2065": {
+    "name": "2065.g000052.json.gz",
+    "sha256": "a3e7114fb357815a51f03ac659f7b238679f10f1b6ea6601ca5d09dbb2d35206"
+   },
+   "2066": {
+    "name": "2066.g000053.json.gz",
+    "sha256": "384c34cd7551e25887e4a4ad983ff1532a362ffb90e9b13e74d08e8bbb56e1b6"
+   },
+   "2067": {
+    "name": "2067.g000054.json.gz",
+    "sha256": "81c11aaa26b936a09132d79ed365a4a90835c18b01bc0430b729753deaea5b1b"
+   },
+   "2068": {
+    "name": "2068.g000055.json.gz",
+    "sha256": "b3d6fe443c0e148304bfbd214b1da8994cf8ef9944c21cbd5c6aad55224d31a8"
+   },
+   "2069": {
+    "name": "2069.g000056.json.gz",
+    "sha256": "787f96a0173954a0399bae6ab9ea3ac8536779b49ce6fbbb0f7bb72064bd83e9"
+   },
+   "2070": {
+    "name": "2070.g000057.json.gz",
+    "sha256": "bb63708cb298cbdd77f49a61340388f58672fe718d7ff0f9ebabca901dd2f6c1"
+   },
+   "2071": {
+    "name": "2071.g000058.json.gz",
+    "sha256": "e3b04385a51d17f68b3705438e88818f868dd19233d6655b186bc565d5e4acd2"
+   },
+   "2072": {
+    "name": "2072.g000059.json.gz",
+    "sha256": "e201ecdcb439cee91775830bd8242ad75b9b41630e5110f9528efc05eb444737"
+   },
+   "2073": {
+    "name": "2073.g000060.json.gz",
+    "sha256": "473e1c15c8f0a14827e802fc710b8c586408db56490a54d3e1aaf0f1e30ed1f5"
+   },
+   "2074": {
+    "name": "2074.g000061.json.gz",
+    "sha256": "2f9368d76883340c21ce53f7975768d20f3da9f4a1bc6ff4b44522617f31ad0e"
+   },
+   "2075": {
+    "name": "2075.g000062.json.gz",
+    "sha256": "ed77cad9bbec88ddb800e2dfdd63989064c146edc723c74901f470c10f1808a8"
+   },
+   "2076": {
+    "name": "2076.g000063.json.gz",
+    "sha256": "885247f4307ff5259741ebacf58c66c03e51efd5b162e3639c9a73068f73f00b"
+   },
+   "2077": {
+    "name": "2077.g000064.json.gz",
+    "sha256": "8de92d9a1a40c2b4e781d57eef7aa77822285c4a833461743bf5a7373995906e"
+   },
+   "2078": {
+    "name": "2078.g000065.json.gz",
+    "sha256": "9970f9b7d4a7fe8cb57af3f46ccf9c28b17f7ea2c22ec7037b10af6ee068f2e7"
+   },
+   "2079": {
+    "name": "2079.g000066.json.gz",
+    "sha256": "4302e18fb4b05be8527abbcfecb06861bf3ef9541c36f4f7d8c57c2f03aded97"
+   },
+   "2080": {
+    "name": "2080.g000067.json.gz",
+    "sha256": "308cb0d65c7b2b3b5f8aec9307641be5da080edb99d6bf890321820c88720291"
+   },
+   "2081": {
+    "name": "2081.g000068.json.gz",
+    "sha256": "c60316cd8fae5f3be0da47913d22b34398269d36fc0efa95bf70b9487e0c7201"
+   },
+   "2082": {
+    "name": "2082.g000069.json.gz",
+    "sha256": "364228d4f84063bed11fbf4e8372694ece034e1ae58eb1939820be97e630633c"
+   },
+   "2083": {
+    "name": "2083.g000070.json.gz",
+    "sha256": "cf5703b847f65f31d12275bb008e6086bd35c900af076e173bee9da1747813c1"
+   }
+  },
+  "editions": 83181,
+  "starts": 7794527
+ },
+ "counts": [
+  [
+   [
+    "calendar",
+    "\"v2\""
+   ],
+   57
+  ],
+  [
+   [
+    "careers_with_ratings"
+   ],
+   677904
+  ],
+  [
+   [
+    "class",
+    "primary"
+   ],
+   81871
+  ],
+  [
+   [
+    "class",
+    "qualifying event"
+   ],
+   1139
+  ],
+  [
+   [
+    "class",
+    "match play"
+   ],
+   171
+  ],
+  [
+   [
+    "cond_len",
+    5
+   ],
+   228604
+  ],
+  [
+   [
+    "created",
+    "late_entrant"
+   ],
+   23924
+  ],
+  [
+   [
+    "created",
+    "junior"
+   ],
+   16811
+  ],
+  [
+   [
+    "created",
+    "initial"
+   ],
+   6550
+  ],
+  [
+   [
+    "format",
+    "regular",
+    "pro",
+    4,
+    false,
+    1,
+    3
+   ],
+   10428
+  ],
+  [
+   [
+    "format",
+    "regular",
+    "amateur",
+    6,
+    false,
+    1,
+    2
+   ],
+   9130
+  ],
+  [
+   [
+    "format",
+    "regular",
+    "pro",
+    4,
+    false,
+    1,
+    2
+   ],
+   8251
+  ],
+  [
+   [
+    "format",
+    "regular",
+    "amateur",
+    6,
+    false,
+    1,
+    1
+   ],
+   8178
+  ],
+  [
+   [
+    "format",
+    "regular",
+    "club_pro",
+    8,
+    false,
+    1,
+    1
+   ],
+   5585
+  ],
+  [
+   [
+    "format",
+    "regular",
+    "pro",
+    2,
+    false,
+    1,
+    4
+   ],
+   5472
+  ],
+  [
+   [
+    "format",
+    "regular",
+    "college",
+    5,
+    false,
+    1,
+    3
+   ],
+   4560
+  ],
+  [
+   [
+    "format",
+    "regular",
+    "pro",
+    3,
+    false,
+    1,
+    4
+   ],
+   4544
+  ],
+  [
+   [
+    "format",
+    "regular",
+    "amateur",
+    6,
+    false,
+    1,
+    3
+   ],
+   4446
+  ],
+  [
+   [
+    "format",
+    "regular",
+    "pro",
+    4,
+    false,
+    1,
+    4
+   ],
+   3761
+  ],
+  [
+   [
+    "format",
+    "regular",
+    "club_pro",
+    8,
+    false,
+    1,
+    2
+   ],
+   2451
+  ],
+  [
+   [
+    "format",
+    "regular",
+    "college",
+    5,
+    false,
+    1,
+    2
+   ],
+   2279
+  ],
+  [
+   [
+    "format",
+    "national_amateur",
+    "amateur",
+    6,
+    false,
+    1,
+    3
+   ],
+   1593
+  ],
+  [
+   [
+    "format",
+    "national_amateur",
+    "amateur",
+    6,
+    false,
+    1,
+    4
+   ],
+   1254
+  ],
+  [
+   [
+    "format",
+    "national_open",
+    "pro",
+    2,
+    false,
+    1,
+    4
+   ],
+   1254
+  ],
+  [
+   [
+    "format",
+    "regular",
+    "pro",
+    3,
+    false,
+    1,
+    3
+   ],
+   1047
+  ],
+  [
+   [
+    "format",
+    "circuit_championship",
+    "pro",
+    4,
+    false,
+    1,
+    3
+   ],
+   912
+  ],
+  [
+   [
+    "format",
+    "national_open",
+    "pro",
+    3,
+    false,
+    1,
+    4
+   ],
+   855
+  ],
+  [
+   [
+    "format",
+    "regular",
+    "amateur",
+    6,
+    false,
+    1,
+    4
+   ],
+   798
+  ],
+  [
+   [
+    "format",
+    "standard",
+    "premier",
+    1,
+    false,
+    1,
+    4
+   ],
+   741
+  ],
+  [
+   [
+    "format",
+    "college_postseason",
+    "college",
+    5,
+    false,
+    1,
+    3
+   ],
+   684
+  ],
+  [
+   [
+    "format",
+    "opportunity",
+    "premier",
+    1,
+    false,
+    1,
+    4
+   ],
+   456
+  ],
+  [
+   [
+    "format",
+    "flagship",
+    "premier",
+    1,
+    false,
+    1,
+    4
+   ],
+   456
+  ],
+  [
+   [
+    "format",
+    "national_open",
+    "premier",
+    1,
+    false,
+    1,
+    4
+   ],
+   399
+  ],
+  [
+   [
+    "format",
+    "national_open",
+    "pro",
+    4,
+    false,
+    1,
+    3
+   ],
+   399
+  ],
+  [
+   [
+    "format",
+    "circuit_championship",
+    "pro",
+    3,
+    false,
+    1,
+    4
+   ],
+   342
+  ],
+  [
+   [
+    "format",
+    "circuit_championship",
+    "amateur",
+    6,
+    false,
+    1,
+    3
+   ],
+   342
+  ],
+  [
+   [
+    "format",
+    "qualifier",
+    "qualifying",
+    7,
+    false,
+    4,
+    1
+   ],
+   285
+  ],
+  [
+   [
+    "format",
+    "circuit_championship",
+    "pro",
+    2,
+    false,
+    1,
+    4
+   ],
+   285
+  ],
+  [
+   [
+    "format",
+    "circuit_championship",
+    "club_pro",
+    8,
+    false,
+    1,
+    2
+   ],
+   285
+  ],
+  [
+   [
+    "format",
+    "elite_amateur",
+    "amateur",
+    6,
+    false,
+    1,
+    4
+   ],
+   228
+  ],
+  [
+   [
+    "format",
+    "major",
+    "major",
+    0,
+    false,
+    1,
+    4
+   ],
+   228
+  ],
+  [
+   [
+    "format",
+    "q_school",
+    "qualifying",
+    7,
+    false,
+    1,
+    4
+   ],
+   228
+  ],
+  [
+   [
+    "format",
+    "q_school",
+    "qualifying",
+    7,
+    false,
+    4,
+    4
+   ],
+   227
+  ],
+  [
+   [
+    "format",
+    "college_postseason",
+    "college",
+    5,
+    false,
+    1,
+    4
+   ],
+   171
+  ],
+  [
+   [
+    "format",
+    "elite_amateur",
+    "amateur",
+    6,
+    true,
+    1,
+    2
+   ],
+   171
+  ],
+  [
+   [
+    "format",
+    "qualifier",
+    "qualifying",
+    7,
+    false,
+    4,
+    2
+   ],
+   114
+  ],
+  [
+   [
+    "format",
+    "qualifier",
+    "qualifying",
+    7,
+    false,
+    8,
+    2
+   ],
+   114
+  ],
+  [
+   [
+    "format",
+    "qualifier",
+    "qualifying",
+    7,
+    false,
+    1,
+    4
+   ],
+   57
+  ],
+  [
+   [
+    "format",
+    "national_open",
+    "pro",
+    4,
+    false,
+    1,
+    4
+   ],
+   57
+  ],
+  [
+   [
+    "format",
+    "qualifier",
+    "qualifying",
+    7,
+    false,
+    2,
+    2
+   ],
+   57
+  ],
+  [
+   [
+    "format",
+    "q_school",
+    "qualifying",
+    7,
+    false,
+    6,
+    4
+   ],
+   57
+  ],
+  [
+   [
+    "model",
+    "upset-model-1",
+    true
+   ],
+   81871
+  ],
+  [
+   [
+    "model",
+    null,
+    false
+   ],
+   1139
+  ],
+  [
+   [
+    "model",
+    "upset-model-1",
+    false
+   ],
+   171
+  ],
+  [
+   [
+    "reconcile",
+    "mc_or_wd_rows"
+   ],
+   2084413
+  ],
+  [
+   [
+    "rules",
+    "2026-11-11"
+   ],
+   57
+  ]
+ ]
+}
