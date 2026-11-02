@@ -97,3 +97,12 @@ def git_dirty():
         return bool(out.strip())
     except Exception:
         return None
+
+
+def provenance(inputs=(), extra=None):
+    """Binding metadata for an output: sha256 of every input file actually read and of every script in this
+    directory, plus the git commit and whether the study directory had uncommitted changes."""
+    return {'scripts_commit': git_head(), 'scripts_dirty': git_dirty(),
+            'scripts_sha256': {p.name: sha256(p) for p in sorted(HERE.glob('*.py'))},
+            'inputs_sha256': {str(Path(p).name): sha256(p) for p in inputs}, **(extra or {})}
+

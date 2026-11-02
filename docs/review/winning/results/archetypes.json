@@ -1,8 +1,24 @@
 {
  "provenance": {
-  "scripts_commit": "02b8ca718a11d8b99ce1d06c30bac932dfc21746",
+  "scripts_commit": "97ffd7899a35ca9a85afd786d1f626de9f9500a3",
   "scripts_dirty": true,
-  "boot": 500
+  "scripts_sha256": {
+   "archetypes.py": "d7ec7a7aeb2b77bdb71c89d86ef575e95b0108c985fa064fd178cafe3a2d5e64",
+   "common.py": "b2de674275fba76e39f7b9999c83ac98c2f95658518729c0e034f330992514f7",
+   "extract.py": "5e59fd20cc5ad113f3921d74dee6eed7f75b6403dd82ea4ca117b9a9910eff08",
+   "favourite.py": "56f87ae72ee8ebce8a996d18818cb7154a616abb1c7a19ff52d0004c64fb4635",
+   "harness.py": "de6fe351ec3121fcfc95205d3ff0624897688b5d59cb72d1ba43e44f6d64cc5f",
+   "recover_archetypes.py": "88dfdacce88a464c411efad28ba3e01a2091bf9289c870f6281d2490a4de22b5",
+   "replay.py": "bca8d429119cff38ec67172b76825d6b7257260b44966bf18639a6d53d199f23"
+  },
+  "inputs_sha256": {
+   "editions.csv.gz": "a018b14b81764620465271f9bbacde74c635cf07aaa0d0fdd5d3d46900222309",
+   "starts.npz": "b931a8961de8bb4bd4e82f967ffcb8e841db418464e5ada5bf8d5b69b829171e",
+   "archetypes.csv.gz": "52b716e2b0412afcfa99a5ee93f1899f19d54f8558add5cd1554f55c73d8314e",
+   "people.g000070.json.gz": "a3ce0ca1f44fe5f4619c05359133c3de08b616331280c956a198a7c4a39b944b"
+  },
+  "boot": 500,
+  "boot_seed": 20261102
  },
  "starts_without_label": 0,
  "clogit": {

@@ -1,0 +1,140 @@
+{
+ "mode": "events",
+ "n": 300,
+ "events": [
+  "2027_BRITANNIA_OPEN_s0.pkl"
+ ],
+ "ranks": [
+  1
+ ],
+ "arms": [
+  "base",
+  "injury_resistance+5",
+  "short_putting+5",
+  "power+5"
+ ],
+ "seconds": 160,
+ "subjects": {
+  "2027_BRITANNIA_OPEN_s0.pkl:1": {
+   "rank": 1,
+   "overall": 88.33,
+   "attrs": {
+    "power": 79.9,
+    "stamina": 86.3,
+    "recovery_rate": 91.7,
+    "injury_resistance": 91.0,
+    "driving_accuracy": 93.7032783863395,
+    "long_irons": 86.20273198861625,
+    "mid_irons": 84.90273198861625,
+    "wedges": 86.3032783863395,
+    "ball_flight": 81.50163919316975,
+    "chipping": 96.00546397723248,
+    "bunker": 91.90327838633951,
+    "recovery_play": 76.60382478406274,
+    "short_putting": 86.92288097372325,
+    "lag_putting": 90.72288097372325,
+    "green_reading": 99.0,
+    "striking_consistency": 81.60710317040223,
+    "putting_consistency": 93.03290112556614,
+    "composure": 94.9060272046763,
+    "resilience": 77.7060272046763,
+    "management": 99.0,
+    "focus": 97.6068882339158
+   },
+   "personality": {
+    "big_stage": 39.9,
+    "aggression": 32.2,
+    "adaptability": 62.4,
+    "coachability": 74.5,
+    "work_ethic": 51.1
+   },
+   "fatigue": 0.22025625188648734,
+   "archetype_note": "see archetypes.csv.gz for the native label"
+  }
+ },
+ "rows": [
+  {
+   "event": "2027_BRITANNIA_OPEN_s0.pkl",
+   "gid": 1,
+   "arm": "base",
+   "n": 300,
+   "win": 0.1,
+   "top5": 0.3433333333333333,
+   "top10": 0.5,
+   "made_cut": 0.93,
+   "d_win": 0.0,
+   "d_win_se": 0.0,
+   "mean_total_made_cut": 289.5125448028674,
+   "field_changed_share": 0.0,
+   "clipped": false,
+   "rank": 1
+  },
+  {
+   "event": "2027_BRITANNIA_OPEN_s0.pkl",
+   "gid": 1,
+   "arm": "injury_resistance+5",
+   "n": 300,
+   "win": 0.1,
+   "top5": 0.3433333333333333,
+   "top10": 0.5,
+   "made_cut": 0.93,
+   "d_win": 0.0,
+   "d_win_se": 0.0,
+   "mean_total_made_cut": 289.5125448028674,
+   "field_changed_share": 0.0,
+   "clipped": false,
+   "rank": 1
+  },
+  {
+   "event": "2027_BRITANNIA_OPEN_s0.pkl",
+   "gid": 1,
+   "arm": "power+5",
+   "n": 300,
+   "win": 0.09666666666666666,
+   "top5": 0.31333333333333335,
+   "top10": 0.5133333333333333,
+   "made_cut": 0.93,
+   "d_win": -0.0033333333333333335,
+   "d_win_se": 0.019752274798553637,
+   "mean_total_made_cut": 289.8817204301075,
+   "field_changed_share": 0.4441505376344086,
+   "clipped": false,
+   "rank": 1
+  },
+  {
+   "event": "2027_BRITANNIA_OPEN_s0.pkl",
+   "gid": 1,
+   "arm": "short_putting+5",
+   "n": 300,
+   "win": 0.11,
+   "top5": 0.36666666666666664,
+   "top10": 0.5033333333333333,
+   "made_cut": 0.93,
+   "d_win": 0.01,
+   "d_win_se": 0.008814956379037023,
+   "mean_total_made_cut": 289.3010752688172,
+   "field_changed_share": 0.11851612903225807,
+   "clipped": false,
+   "rank": 1
+  }
+ ],
+ "provenance": {
+  "scripts_commit": "97ffd7899a35ca9a85afd786d1f626de9f9500a3",
+  "scripts_dirty": true,
+  "scripts_sha256": {
+   "archetypes.py": "d7ec7a7aeb2b77bdb71c89d86ef575e95b0108c985fa064fd178cafe3a2d5e64",
+   "common.py": "b2de674275fba76e39f7b9999c83ac98c2f95658518729c0e034f330992514f7",
+   "exp_attrs.py": "1695a996ecd37854854a85860b8a4f90de3519254a14f39987857419e1812720",
+   "extract.py": "5e59fd20cc5ad113f3921d74dee6eed7f75b6403dd82ea4ca117b9a9910eff08",
+   "favourite.py": "56f87ae72ee8ebce8a996d18818cb7154a616abb1c7a19ff52d0004c64fb4635",
+   "harness.py": "de6fe351ec3121fcfc95205d3ff0624897688b5d59cb72d1ba43e44f6d64cc5f",
+   "recover_archetypes.py": "88dfdacce88a464c411efad28ba3e01a2091bf9289c870f6281d2490a4de22b5",
+   "replay.py": "bca8d429119cff38ec67172b76825d6b7257260b44966bf18639a6d53d199f23"
+  },
+  "inputs_sha256": {
+   "MANIFEST.json": "ab82816c301d86a61365afaed56b6c4bbfe07113ce020d274fabcd9f412e170e",
+   "2027_BRITANNIA_OPEN_s0.pkl": "e60d87619ecd532d880ab511ad40676455571a7435b9732385cc3cbbf29aa3e0"
+  },
+  "engine_checkout": "/dev/shm/aw/wt"
+ }
+}

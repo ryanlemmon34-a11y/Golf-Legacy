@@ -132,18 +132,20 @@ def main():
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
     B = a.boot
-    res = {'provenance': {'scripts_commit': C.git_head(), 'scripts_dirty': C.git_dirty(), 'boot': B,
-                          'boot_seed': 20261102}}
+    d = Path(a.data)
+    res = {'provenance': C.provenance([d / 'editions.csv.gz', d / 'starts.npz', d / 'archetypes.csv.gz'],
+                                      {'boot': B, 'boot_seed': 20261102})}
     res['all'] = summary(e, B, rng, 'all primary editions')
     pro = e[e.tier <= 4]
     res['pro_tiers_0_4'] = summary(pro, B, rng, 'professional tiers 0-4')
     res['majors'] = summary(e[e.tier == 0], B, rng, 'majors')
     res['premier'] = summary(e[e.tier == 1], B, rng, 'Premier')
     # Cardenas: two distinct sensitivities
-    res['excl_cardenas_as_best'] = summary(e[e.top1 != C.CARDENAS], B, rng, 'excluding editions where Cardenas is the best entrant')
+    e['card_best'] = e.top_ids.astype(str).str.split(';').apply(lambda ids: str(C.CARDENAS) in ids)
+    res['excl_cardenas_as_best'] = summary(e[~e.card_best], B, rng, 'excluding editions where Cardenas is (or ties for) the best entrant')
     res['excl_cardenas_entered'] = summary(e[e.cardenas_in == 0], B, rng, 'excluding every edition Cardenas entered')
     res['majors_excl_cardenas_entered'] = summary(e[(e.tier == 0) & (e.cardenas_in == 0)], B, rng, 'majors without Cardenas in the field')
-    res['majors_excl_cardenas_as_best'] = summary(e[(e.tier == 0) & (e.top1 != C.CARDENAS)], B, rng, 'majors where Cardenas is not the best entrant')
+    res['majors_excl_cardenas_as_best'] = summary(e[(e.tier == 0) & ~e.card_best], B, rng, 'majors where Cardenas is not (and does not tie for) the best entrant')
     lv = [LEVEL[k] for k in sorted(LEVEL)]
     tabs = {
         'level': strata(e, 'level', B, rng, lv),

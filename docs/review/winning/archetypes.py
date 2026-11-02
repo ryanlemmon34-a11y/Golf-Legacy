@@ -17,8 +17,13 @@ Per archetype:
     separate coefficients per round count (1-4) on (Overall - field best) and its square;
   - E_std, a non-parametric cross-check: indirect standardisation by Overall rank in the field x level x rounds.
 
-O/E_ovr > 1 means the archetype won more than golfers of the same Overall in the same fields. The model never
-holds Overall and all 21 components at once.
+O/E_ovr > 1 means the archetype won more than the Overall-only model predicts for its starters. It is an
+ASSOCIATION, not a fully controlled causal comparison: the model is a pooled gap-to-best quadratic per round
+count (not per level, field depth or course), it over-predicts the strongest favourites (see
+arch_clogit_calibration.csv), and archetypes also differ in development, access and personality. The
+controlled fixed-Overall profiles (experiments) address mechanism. The model never holds Overall and all 21
+components at once. Made-cut rates count only editions with a genuine cut (more than two rounds, a cut size
+below the field size).
 
 Uncertainty: golfer-clustered bootstrap (resampling golfers within the archetype, keeping each golfer's whole
 record), which measures stability WITHIN this one world, not seed-to-seed variation.
@@ -62,7 +67,9 @@ def load(data, save):
     st['age'] = st.year - st.gid.map(born)
     st['win'] = (st.pos == 1).astype(np.int8)
     st['top10'] = ((st.pos >= 1) & (st.pos <= 10)).astype(np.int8)
-    st['cut'] = (st.pos >= 1).astype(np.int8)          # finished with a position (made the cut, or no cut)
+    ei_cut = ((ei.rounds > 2) & (ei.cut_top.fillna(0) > 0) & (ei.cut_top.fillna(0) < ei.n))
+    st['cut_event'] = st.edition.map(ei_cut).astype(bool)          # a genuine cut was made in this edition
+    st['cut'] = (st.pos >= 1).astype(np.int8)                     # (made the cut; read only where cut_event)
     st['x'] = (st.ovr10 - st.groupby('edition').ovr10.transform('max')) / 10.0
     st['rank'] = st.groupby('edition').ovr10.rank(ascending=False, method='min').astype(int)
     return e, st, a
@@ -127,7 +134,9 @@ def table(st, B, rng, pop=None):
             'archetype': arch, 'population_share': (pop or {}).get(arch, np.nan), 'golfers_with_starts': len(per),
             'starts': len(g), 'start_share': len(g) / tot_starts, 'wins': int(W.sum()),
             'win_share': W.sum() / tot_wins if tot_wins else np.nan, 'wins_per_100': 100 * W.sum() / len(g),
-            'top10_per_100': 100 * g.top10.mean(), 'cuts_per_100': 100 * g.cut.mean(),
+            'top10_per_100': 100 * g.top10.mean(),
+            'cut_events_starts': int(g.cut_event.sum()),
+            'made_cut_per_100_in_cut_events': 100 * g.cut[g.cut_event].mean() if g.cut_event.any() else np.nan,
             'mean_pre_event_overall': g.ovr10.mean() / 10, 'mean_rank_in_field': g['rank'].mean(),
             'E_equal': Eq.sum(), 'O_over_E_equal': W.sum() / Eq.sum(),
             'O_over_E_equal_ci': [float(np.percentile(oq, 2.5)), float(np.percentile(oq, 97.5))],
@@ -157,7 +166,9 @@ def main():
     out.mkdir(parents=True, exist_ok=True)
     ver = arch[arch.status.str.startswith('verified')]
     pop_all = (ver.archetype.value_counts(normalize=True)).to_dict()
-    res = {'provenance': {'scripts_commit': C.git_head(), 'scripts_dirty': C.git_dirty(), 'boot': a.boot},
+    d = Path(a.data)
+    res = {'provenance': C.provenance([d / 'editions.csv.gz', d / 'starts.npz', d / 'archetypes.csv.gz',
+                                       C.archive_file(a.save, 'people')], {'boot': a.boot, 'boot_seed': 20261102}),
            'starts_without_label': unl, 'clogit': {'coef': b.tolist(), 'loglik': ll, 'iterations': it,
                                                    'terms': 'per rounds 1..4: (x, x^2), x = Overall - field best'},
            'population_share': pop_all}
