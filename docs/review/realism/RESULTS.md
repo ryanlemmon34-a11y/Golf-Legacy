@@ -7,28 +7,37 @@ engine fix for the 2049 runaway (below).** The plan and targets are in
 
 ## Provenance
 
-- **Engine.** Commit `d619dd6`, frozen in a detached checkout for every measurement and world run below.
-  - Later commits on this branch change only `docs/review/realism/` files.
-  - Earlier commits and their outputs (`debb655` and before) were withdrawn:
-    - `debb655` assigned the starting world's memberships on lowered teenage ratings (reviewer probe).
-    - The branch world runs started from it, and from one earlier draft, were stopped within their first season and
-      deleted. Nothing from them is used.
-  - The first projection measurements (m1–m3) were calibration on earlier drafts. They are superseded and not
-    reported.
-- **Projection measurement** (`measure.py` at `d619dd6`, sha256 `e20445b5…fa53`). Command:
-  `python docs/review/realism/measure.py OUT.json --years 2028-2047 --procs 2`. It is deterministic: re-running one
-  cohort reproduced it exactly.
-  - Raw output: sha256 `e2693b415d2114e77fe760c95ce4c6cbee332642cbcf49207df81f89b51970e2` (46 MB, not
-    committed; regenerate with the command).
-  - Tables: `summarise.py` (sha256 `5ac74dd6…7a2d`, with the per-golfer cliff metric) in
-    `results/projection_d619dd6.md`.
-- **Full-scale worlds** (`tools/long_world.py`, seed 2027, 30 seasons, the whole population, 2 workers each, both
-  runs at once on the same 4-CPU cloud machine):
-  - main `18a8e23`, started 05:42 UTC;
-  - branch `d619dd6`, started 06:00 UTC.
+**Code.**
+- **Realism engine `d619dd6`:** every projection measurement, the paired seed-2027 world through 2048, and the realism
+  branch's full suite.
+- **Branch head:** carries `d619dd6` plus the reviewed engine fix `e99cb20` (`fix/engine-dogleg-retee`, head `46013a5`,
+  merged at `c6ce161`). After that merge only `docs/review/realism/` files change.
+- **Main:** `18a8e23`, unchanged.
+- **Withdrawn and not used:**
+  - `debb655` and earlier, and their world runs. `debb655` assigned the starting world's memberships on lowered
+    teenage ratings (reviewer probe); those runs were stopped within their first season and deleted.
+  - Projection calibrations m1–m3, made on earlier drafts.
 
-  Comparison: `compare_worlds.py` (sha256 `dff42fc2…6bbf`, for both the 20-season interim and the 22-season
-  tables), both arms on identical covered seasons.
+**Projection measurement.**
+- **Script and command:** `measure.py` at `d619dd6`, sha256 `e20445b5…fa53`, run as
+  `python docs/review/realism/measure.py OUT.json --years 2028-2047 --procs 2`.
+- **Deterministic:** re-running one cohort reproduced it exactly.
+- **Raw output:** sha256 `e2693b415d2114e77fe760c95ce4c6cbee332642cbcf49207df81f89b51970e2` (46 MB, not committed;
+  regenerate it with the command).
+- **Tables:** made by `summarise.py` (sha256 `5ac74dd6…7a2d`, per-golfer cliff metric), in
+  `results/projection_d619dd6.md`.
+
+**Full-scale worlds** (`tools/long_world.py`, the whole population, 2 workers each, on a shared 4-CPU cloud machine).
+
+| run | arms | what it supports |
+|---|---|---|
+| Seed 2027, clean | main `18a8e23` against realism `d619dd6`, 22 common single-version seasons (2027–2048) | **The primary comparison.** The realism run stopped in 2049 on the latent engine defect (section below). |
+| Seed 2027, mixed version | main `18a8e23` (no fix) for 30 seasons, against the realism run continued from its verified 2048 checkpoint on realism + fix `c528575` for 2049–2056 (`results/runaway_2049/`) | Evidence that the fixed build crosses the failure point and completes. From 2049 the arms differ in the engine fix as well as the realism rules, so it is **not** a single-version causal comparison. |
+| Seed 3031, same-fix pair (running) | main + fix `46013a5` against realism + fix `c528575`, both carrying the identical engine fix, 30 seasons | A second paired seed; reported when complete. |
+
+**Scripts.**
+- Comparison: `compare_worlds.py`, sha256 `dff42fc2…6bbf`. Both arms are always compared on the identical covered
+  seasons.
 - **Item 4:** `diag_access.py` (sha256 `65dea982…5f02`) on existing long-run outputs (read only):
   - commit `473690a`: seeds 360013 (45 seasons), 2027 and 3031 (10 each);
   - commit `c0d1ea5`: seeds 4207 (released configuration, 10) and 5309 (5).
@@ -148,9 +157,9 @@ Two readings worth a separate look (not acted on):
   in the engine's tee planning, identical on main (`results/runaway_2049/RUNAWAY.md`). Its 22 completed seasons were
   exported from the run's per-season state (`seed_2027.state.pkl` and save after 2048) without re-running anything.
 - **Comparison:** the two arms are compared on the identical covered seasons 2027–2048.
-- **No mixed-version data:** nothing here comes from a mixed-version run. Seasons 2049 onward of the branch are
-  pending the engine fix (`fix/engine-dogleg-retee`), and will be reported separately with their checkpoint
-  boundary stated.
+- **No mixed-version data:** nothing in this section comes from a mixed-version run. The branch's seasons from 2049
+  onward were played later on realism + fix, as a separately labelled mixed-version continuation (section below,
+  `results/world_seed2027_mixed30.md`).
 
 **Definitions.**
 - Ratings are recorded after the season and its winter; ages are the age in the completed season.
@@ -193,7 +202,8 @@ offered for its differences.
   | `d619dd6` | runaway: 30 tee shots, all driver, 30 penalties |
   | fix | 4 strokes |
 
-- **The fix's full suite:** 90 modules, 1,144 tests, 4 skipped, 0 failures (`results/suite_fix_46013a5/`).
+- **The fix's full suite:** 90 modules, 1,147 tests run, 4 skipped (1,143 non-skipped), 0 failures
+  (`results/suite_fix_46013a5/`).
 - **Integrated into the test branches only; main is untouched.**
   - Realism: `c6ce161` (merge), `c528575` (the resume driver).
   - Career: `da4075e` (merge), `8a2b92a`. Its all-AI equivalence reference is now main + fix: main alone reproduced
@@ -225,7 +235,8 @@ offered for its differences.
 
 The full suite ran on `d619dd6` (frozen checkout), one module at a time at low priority. Logs and summary are in
 `results/suite_d619dd6/`.
-- **90 modules, 1,145 tests, 4 skipped, 0 failures.**
+- **90 modules. On each module's final successful run: 1,148 tests run, 4 skipped (1,144 non-skipped), 0 failures.**
+  (An earlier total of 1,145 missed the three single-test modules, "Ran 1 test".)
 - `test_long_run_safeguards` first errored twice (2 of 18). The harness's own 3 GB free-disk safeguard tripped
   because its temporary folder was on the main disk, which had 2.3 GB free. Re-run with the temporary folder in RAM
   (`TMPDIR=/dev/shm/...`), it passed 18 of 18. Both runs are in the summary.
@@ -240,13 +251,16 @@ table above; it is a cloud figure, relative only. The 120 s target refers to Rya
 
 - **Projections are controlled.** One fixed schedule, self-coached, no injuries, money, access limits or
   retirement. They isolate the development laws and are not realized careers.
-- **Full-scale worlds: one paired seed is evidence, not proof.** A second seed is added only if time allows.
-  - It is one paired seed of 30 seasons, run against main.
-  - Juniors entering in 2028–2056 are seen only up to age 46 at most; most are censored well before their decline.
+- **Full-scale worlds are evidence, not proof.**
+  - **Seed 2027:** 22 clean single-version paired seasons, then a labelled mixed-version continuation to 30.
+  - **Seed 3031:** the same-fix pair is pending. No further seeds are planned for this pass.
+  - Juniors entering from 2028 are seen at most to their mid-40s; most are censored before their decline.
   - Golfers in the starting world are seen from their starting age.
-  - Lifelong elite supply and elite longevity across seeds are therefore **not established** by this run.
+  - Lifelong elite supply and elite longevity across seeds are therefore **not established**.
   - Decline is measured on survivors, who are a selected group.
 - **Readiness changes only the entry level.** Who enters is the existing rule's choice, kept exactly. A junior whose
   readiness is lowered was still chosen on the existing rule's judgement of their level.
-- **The long-irons table is engine-wide.** It also applies to worlds made before this branch if they are opened
-  here. The development rules apply to new worlds only.
+- **Two changes are engine-wide:** the long-irons table and the dogleg tee-plan fix. Both apply to worlds made before
+  this branch if they are opened here; the development rules apply to new worlds only.
+  - Rounds with long irons 60+ are bit-identical only for the isolated long-irons change. Where the dogleg fix
+    triggers, later shots differ.

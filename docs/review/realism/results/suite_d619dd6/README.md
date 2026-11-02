@@ -3,7 +3,11 @@
 Run with `docs/review/realism`'s runner: one module at a time, `nice -n 19`, `python3 -m unittest tests.<module>`,
 2026-11-02 05:56–07:3x UTC.
 
-**Result: 90 modules, 1,145 tests, 4 skipped, 0 failures.** `SUMMARY.txt` has one line per module run.
+**Result: 90 modules. On each module's final successful run: 1,148 tests run, 4 skipped (1,144 non-skipped), 0
+failures.** `SUMMARY.txt` has one line per module run.
+
+(An earlier total, 1,145, missed the three single-test modules, "Ran 1 test": `test_active_golfers`,
+`test_benchmark_tool`, `test_perf_v17`.)
 
 **First run of `test_long_run_safeguards`: 2 errors.**
 - Both were in `test_a_good_season_passes` and `test_population_change_is_a_flag`, as

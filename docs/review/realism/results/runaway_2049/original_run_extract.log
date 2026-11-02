@@ -1,0 +1,21 @@
+seed 2027: 2027 done (1/30), 6964 active, reconcile errors 0+0, staff violations 0, population ok, 264 s
+seed 2027: 2028 done (2/30), 7455 active, reconcile errors 0+0, staff violations 0, population ok, 554 s
+seed 2027: 2029 done (3/30), 7913 active, reconcile errors 0+0, staff violations 0, population ok, 861 s
+...
+seed 2027: 2046 done (20/30), 12288 active, reconcile errors 0+0, staff violations 0, population ok, 6129 s
+seed 2027: 2047 done (21/30), 12411 active, reconcile errors 0+0, staff violations 0, population ok, 6468 s
+seed 2027: 2048 done (22/30), 12435 active, reconcile errors 0+0, staff violations 0, population ok, 6801 s
+...
+  File "/dev/shm/real/frozen/golfsim/engine.py", line 907, in play_round
+    play_hole(pl, hole, i, rng, st, pressure, state, pins[i])
+    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/dev/shm/real/frozen/golfsim/engine.py", line 541, in play_hole
+    raise RuntimeError(f'Runaway hole: {strokes} strokes on hole {hole.number} (engine bug)')
+RuntimeError: Runaway hole: 60 strokes on hole 17 (engine bug)
+...
+  File "/usr/lib/python3.13/concurrent/futures/_base.py", line 453, in result
+    return self.__get_result()
+           ~~~~~~~~~~~~~~~~~^^
+  File "/usr/lib/python3.13/concurrent/futures/_base.py", line 402, in __get_result
+    raise self._exception
+RuntimeError: Runaway hole: 60 strokes on hole 17 (engine bug)

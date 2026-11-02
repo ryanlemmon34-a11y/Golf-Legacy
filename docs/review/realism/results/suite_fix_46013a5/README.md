@@ -4,7 +4,8 @@ The suite ran in the fix branch's worktree. Its code is engine `e99cb20`; the br
 fixture-note correction. Each module ran on its own, at low priority, with `TMPDIR` in RAM. It finished at about
 10:05 UTC on 2026-11-02.
 
-**Result:** 90 modules (main's 89 plus `tests/test_tee_plan.py`), 1,144 tests, 4 skipped, 0 failures.
+**Result:** 90 modules (main's 89 plus `tests/test_tee_plan.py`): 1,147 tests run, 4 skipped (1,143 non-skipped), 0
+failures. (An earlier total, 1,144, missed the three single-test modules, "Ran 1 test".)
 `SUMMARY.txt` has one line per module.
 
 The four skips are the same as on the realism branch's suite (`../suite_d619dd6/SKIPS.md`):
