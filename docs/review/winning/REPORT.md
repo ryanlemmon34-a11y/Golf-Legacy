@@ -263,7 +263,7 @@ The middle of the order is not identical at every level. At Premier, for example
 sits above Effortless Power (0.941), and the middle archetypes' intervals overlap widely
 (`arch_level_*.csv`).
 
-**Interpretation, to be tested in section 4.** Aggressive Shotmakers win about a quarter more than their Overall
+**Interpretation, tested in sections 4d and 4e.** Aggressive Shotmakers win about a quarter more than their Overall
 predicts, yet make the *fewest* cuts and gain much less in top-10s (1.08) than in wins (1.26). That is the
 signature of **higher score variance** at an equal mean: more very low weeks and more bad ones. Precision
 Ball-Strikers show the reverse: the most cuts made, fewer wins. Big fields reward variance at the top. The
@@ -399,8 +399,9 @@ mid_irons and wedges gain a little more going up than they lose going down: +5 g
   cannot see; that is not "worthless".
 - **Variance.** +5 on one attribute barely changes a round's spread. The largest change, from
   striking_consistency, is 1.1% less spread, with slightly fewer exceptional low rounds. Small changes in round SD
-  cannot rule out larger effects in the winning tail, so the variance explanation of the archetype pattern
-  (section 3) stays **pending**: the fixed-Overall profiles (4d) and the winning experiments (4e) test it.
+  cannot rule out larger effects in the winning tail. The fixed-Overall profiles (4d) and the winning experiments
+  (4e) take this further: whole-profile shape and aggression change the spread by −3.5% to +5.6%, and
+  striking_consistency's win effect is ≤ 0 in every tested cell.
 - **Rankings among neighbours are not robust.** The per-event, per-subject ranks of the middle attributes move by
   several places (`SUMMARY.md`, rank table). Only the broad tiers are stable: top, middle, small, situational,
   zero.
@@ -543,9 +544,55 @@ win rate** (Britannia −0.17 ± .14; France −0.26 ± .13) while raising cuts 
   full events.
 - **Screening only:** the order within the top group, and every small difference among the middle attributes.
 
-### 4f. Equal-SD perturbations
+### 4f. Equal-SD perturbations (controlled; `rounds_sd.json`)
 
-*Pending (queued).*
+**Design.** The rank-10 subject of each of the three events, with each attribute raised by **one standard
+deviation of that attribute among Premier and major golfers** (verified replay seasons 2027–2034;
+`results/attr_sd_premier.json`; 7.5 to 11.8 points), 8,000 paired samples. This is a separate question from the
++5-point arms:
+
+- **+5 points:** what a point of improvement is worth;
+- **one SD:** how much the real spread of that attribute among top golfers separates them.
+
+Clipped cells are excluded: 9 of 63, including ball_flight's links cell, so its average below covers woodland
+only.
+
+| Attribute (+1 SD, points) | Δ strokes per round, R1 | R4 | R4 + contention | Links / woodland / tier-2 |
+|---|---|---|---|---|
+| driving_accuracy (9.96) | **−0.34** | −0.39 | −0.33 | −0.37 / −0.35 / −0.30 |
+| power (11.78) | **−0.33** | −0.37 | −0.33 | −0.23 / clipped / −0.43 |
+| mid_irons (8.48) | −0.26 | −0.25 | −0.23 | −0.20 / −0.35 / −0.24 |
+| chipping (9.48) | −0.20 | −0.21 | −0.23 | −0.25 / −0.18 / −0.19 |
+| long_irons (10.03) | −0.17 | −0.15 | −0.18 | −0.18 / −0.12 / −0.20 |
+| short_putting (10.37) | −0.15 | −0.17 | −0.13 | clipped / −0.15 / clipped |
+| wedges (7.49) | −0.14 | −0.16 | −0.15 | −0.14 / −0.11 / −0.18 |
+| green_reading (9.13) | −0.14 | −0.14 | −0.12 | clipped / −0.14 / −0.14 |
+| stamina (8.73) | −0.11 | −0.12 | −0.12 | −0.10 / clipped / −0.12 |
+| recovery_play (8.83) | −0.10 | −0.08 | −0.07 | −0.13 / −0.08 / −0.08 |
+| striking_consistency (8.57) | −0.09 | −0.11 | −0.08 | −0.07 / −0.03 / −0.16 |
+| ball_flight (9.02) | −0.08 (woodland only) | −0.08 | −0.04 | clipped / −0.07 / −0.09 |
+| bunker (9.20) | −0.07 | −0.07 | −0.06 | −0.09 / −0.05 / −0.06 |
+| management (10.02) | −0.07 | −0.06 | −0.03 | −0.05 / −0.04 / −0.11 |
+| lag_putting (9.72) | −0.07 | −0.07 | −0.07 | clipped / −0.07 / clipped |
+| focus (8.76) | −0.05 | −0.06 | −0.07 | −0.05 / −0.04 / −0.06 |
+| resilience (7.85) | −0.04 | −0.04 | −0.03 | clipped / −0.03 / −0.06 |
+| putting_consistency (8.37) | −0.03 | −0.04 | −0.05 | −0.04 / −0.03 / −0.03 |
+| composure (8.63) | 0 | 0 | **−0.18** | (pressure only) |
+| recovery_rate (8.60) | 0 | **−0.10** | −0.09 | (round 2 onward only) |
+| injury_resistance (8.71) | 0 | 0 | 0 | (no shot effect) |
+
+**What changes against +5:**
+
+- **Power** rises to joint top. It has the widest spread among top golfers, so real differences in power
+  separate them as much as driving_accuracy differences do.
+- **The tiers are otherwise the same:**
+  - driving_accuracy, power and mid_irons on top;
+  - short game, putting and the long game in the middle;
+  - the consistency and mental attributes at the bottom;
+  - composure and recovery_rate situational.
+
+These are equal-SD effects, distinct from +5-point effects and from the equal-Overall profile comparisons (4d).
+The three are not mixed.
 
 ## 5. How much does weather change who wins?
 

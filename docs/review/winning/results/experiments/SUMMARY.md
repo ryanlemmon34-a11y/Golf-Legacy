@@ -106,6 +106,212 @@ striking_consistency 0.989 · driving_accuracy 0.993 · resilience 0.996 · mid_
 | France Open (Premier, woodland) | 40 | ball_flight | +5 | 94.6 | +4.4 |
 | France Open (Premier, woodland) | 40 | long_irons | +5 | 95.2 | +3.8 |
 
+### Equal-SD perturbations (each attribute +1 Premier/major SD), rank-10 subjects
+
+#### +7.49 points: Δ strokes per round, mean over the unclipped subject-event cells (of 8000 paired samples each; negative = better; ± = RMS of the cells' paired SEs)
+
+| Attribute | R1 (no pressure) | R4 (in-week fatigue) | R4 + contention | cells |
+|---|---|---|---|---|
+| wedges | -0.144 ± 0.020 | -0.157 ± 0.021 | -0.150 ± 0.021 | 3 |
+
+#### +7.85 points: Δ strokes per round, mean over the unclipped subject-event cells (of 8000 paired samples each; negative = better; ± = RMS of the cells' paired SEs)
+
+| Attribute | R1 (no pressure) | R4 (in-week fatigue) | R4 + contention | cells |
+|---|---|---|---|---|
+| resilience | -0.043 ± 0.009 | -0.035 ± 0.009 | -0.034 ± 0.010 | 2 |
+
+#### +8.37 points: Δ strokes per round, mean over the unclipped subject-event cells (of 8000 paired samples each; negative = better; ± = RMS of the cells' paired SEs)
+
+| Attribute | R1 (no pressure) | R4 (in-week fatigue) | R4 + contention | cells |
+|---|---|---|---|---|
+| putting_consistency | -0.031 ± 0.008 | -0.039 ± 0.008 | -0.051 ± 0.009 | 3 |
+
+#### +8.48 points: Δ strokes per round, mean over the unclipped subject-event cells (of 8000 paired samples each; negative = better; ± = RMS of the cells' paired SEs)
+
+| Attribute | R1 (no pressure) | R4 (in-week fatigue) | R4 + contention | cells |
+|---|---|---|---|---|
+| mid_irons | -0.264 ± 0.025 | -0.248 ± 0.026 | -0.225 ± 0.026 | 3 |
+
+#### +8.57 points: Δ strokes per round, mean over the unclipped subject-event cells (of 8000 paired samples each; negative = better; ± = RMS of the cells' paired SEs)
+
+| Attribute | R1 (no pressure) | R4 (in-week fatigue) | R4 + contention | cells |
+|---|---|---|---|---|
+| striking_consistency | -0.086 ± 0.021 | -0.106 ± 0.021 | -0.079 ± 0.022 | 3 |
+
+#### +8.6 points: Δ strokes per round, mean over the unclipped subject-event cells (of 8000 paired samples each; negative = better; ± = RMS of the cells' paired SEs)
+
+| Attribute | R1 (no pressure) | R4 (in-week fatigue) | R4 + contention | cells |
+|---|---|---|---|---|
+| recovery_rate | +0.000 ± 0.000 | -0.097 ± 0.015 | -0.085 ± 0.015 | 3 |
+
+#### +8.63 points: Δ strokes per round, mean over the unclipped subject-event cells (of 8000 paired samples each; negative = better; ± = RMS of the cells' paired SEs)
+
+| Attribute | R1 (no pressure) | R4 (in-week fatigue) | R4 + contention | cells |
+|---|---|---|---|---|
+| composure | +0.000 ± 0.000 | +0.000 ± 0.000 | -0.180 ± 0.019 | 3 |
+
+#### +8.71 points: Δ strokes per round, mean over the unclipped subject-event cells (of 8000 paired samples each; negative = better; ± = RMS of the cells' paired SEs)
+
+| Attribute | R1 (no pressure) | R4 (in-week fatigue) | R4 + contention | cells |
+|---|---|---|---|---|
+| injury_resistance | +0.000 ± 0.000 | +0.000 ± 0.000 | +0.000 ± 0.000 | 3 |
+
+#### +8.73 points: Δ strokes per round, mean over the unclipped subject-event cells (of 8000 paired samples each; negative = better; ± = RMS of the cells' paired SEs)
+
+| Attribute | R1 (no pressure) | R4 (in-week fatigue) | R4 + contention | cells |
+|---|---|---|---|---|
+| stamina | -0.109 ± 0.013 | -0.123 ± 0.014 | -0.123 ± 0.015 | 2 |
+
+#### +8.76 points: Δ strokes per round, mean over the unclipped subject-event cells (of 8000 paired samples each; negative = better; ± = RMS of the cells' paired SEs)
+
+| Attribute | R1 (no pressure) | R4 (in-week fatigue) | R4 + contention | cells |
+|---|---|---|---|---|
+| focus | -0.049 ± 0.010 | -0.063 ± 0.010 | -0.066 ± 0.011 | 3 |
+
+#### +8.83 points: Δ strokes per round, mean over the unclipped subject-event cells (of 8000 paired samples each; negative = better; ± = RMS of the cells' paired SEs)
+
+| Attribute | R1 (no pressure) | R4 (in-week fatigue) | R4 + contention | cells |
+|---|---|---|---|---|
+| recovery_play | -0.096 ± 0.015 | -0.079 ± 0.016 | -0.074 ± 0.017 | 3 |
+
+#### +9.02 points: Δ strokes per round, mean over the unclipped subject-event cells (of 8000 paired samples each; negative = better; ± = RMS of the cells' paired SEs)
+
+| Attribute | R1 (no pressure) | R4 (in-week fatigue) | R4 + contention | cells |
+|---|---|---|---|---|
+| ball_flight | -0.084 ± 0.017 | -0.084 ± 0.018 | -0.042 ± 0.018 | 2 |
+
+#### +9.13 points: Δ strokes per round, mean over the unclipped subject-event cells (of 8000 paired samples each; negative = better; ± = RMS of the cells' paired SEs)
+
+| Attribute | R1 (no pressure) | R4 (in-week fatigue) | R4 + contention | cells |
+|---|---|---|---|---|
+| green_reading | -0.140 ± 0.011 | -0.144 ± 0.011 | -0.118 ± 0.011 | 2 |
+
+#### +9.2 points: Δ strokes per round, mean over the unclipped subject-event cells (of 8000 paired samples each; negative = better; ± = RMS of the cells' paired SEs)
+
+| Attribute | R1 (no pressure) | R4 (in-week fatigue) | R4 + contention | cells |
+|---|---|---|---|---|
+| bunker | -0.067 ± 0.012 | -0.067 ± 0.012 | -0.063 ± 0.013 | 3 |
+
+#### +9.48 points: Δ strokes per round, mean over the unclipped subject-event cells (of 8000 paired samples each; negative = better; ± = RMS of the cells' paired SEs)
+
+| Attribute | R1 (no pressure) | R4 (in-week fatigue) | R4 + contention | cells |
+|---|---|---|---|---|
+| chipping | -0.204 ± 0.018 | -0.214 ± 0.019 | -0.232 ± 0.020 | 3 |
+
+#### +9.72 points: Δ strokes per round, mean over the unclipped subject-event cells (of 8000 paired samples each; negative = better; ± = RMS of the cells' paired SEs)
+
+| Attribute | R1 (no pressure) | R4 (in-week fatigue) | R4 + contention | cells |
+|---|---|---|---|---|
+| lag_putting | -0.066 ± 0.008 | -0.067 ± 0.009 | -0.066 ± 0.010 | 1 |
+
+#### +9.96 points: Δ strokes per round, mean over the unclipped subject-event cells (of 8000 paired samples each; negative = better; ± = RMS of the cells' paired SEs)
+
+| Attribute | R1 (no pressure) | R4 (in-week fatigue) | R4 + contention | cells |
+|---|---|---|---|---|
+| driving_accuracy | -0.339 ± 0.028 | -0.389 ± 0.029 | -0.333 ± 0.030 | 3 |
+
+#### +10.02 points: Δ strokes per round, mean over the unclipped subject-event cells (of 8000 paired samples each; negative = better; ± = RMS of the cells' paired SEs)
+
+| Attribute | R1 (no pressure) | R4 (in-week fatigue) | R4 + contention | cells |
+|---|---|---|---|---|
+| management | -0.066 ± 0.025 | -0.059 ± 0.025 | -0.034 ± 0.026 | 3 |
+
+#### +10.03 points: Δ strokes per round, mean over the unclipped subject-event cells (of 8000 paired samples each; negative = better; ± = RMS of the cells' paired SEs)
+
+| Attribute | R1 (no pressure) | R4 (in-week fatigue) | R4 + contention | cells |
+|---|---|---|---|---|
+| long_irons | -0.165 ± 0.022 | -0.148 ± 0.022 | -0.177 ± 0.022 | 3 |
+
+#### +10.37 points: Δ strokes per round, mean over the unclipped subject-event cells (of 8000 paired samples each; negative = better; ± = RMS of the cells' paired SEs)
+
+| Attribute | R1 (no pressure) | R4 (in-week fatigue) | R4 + contention | cells |
+|---|---|---|---|---|
+| short_putting | -0.154 ± 0.012 | -0.172 ± 0.012 | -0.131 ± 0.012 | 1 |
+
+#### +11.78 points: Δ strokes per round, mean over the unclipped subject-event cells (of 8000 paired samples each; negative = better; ± = RMS of the cells' paired SEs)
+
+| Attribute | R1 (no pressure) | R4 (in-week fatigue) | R4 + contention | cells |
+|---|---|---|---|---|
+| power | -0.329 ± 0.038 | -0.368 ± 0.038 | -0.330 ± 0.040 | 2 |
+
+#### +5 points, R1: rank of each attribute within each event and subject (1 = largest gain; clipped arms omitted)
+
+| Attribute | median |
+|---|---|
+
+#### +5 points, R1: SD of the round score relative to baseline (mean over subjects/events)
+
+
+
+#### Clipped arms (excluded above; the actual change applied was smaller than nominal)
+
+| Event | Subject rank | Attribute | Nominal | Base value | Actual change |
+|---|---|---|---|---|---|
+| Britannia Open (major, links) | 10 | ball_flight | +9.02 | 95.4 | +3.6 |
+| Britannia Open (major, links) | 10 | green_reading | +9.13 | 95.8 | +3.2 |
+| Britannia Open (major, links) | 10 | lag_putting | +9.72 | 97.1 | +1.9 |
+| Britannia Open (major, links) | 10 | resilience | +7.85 | 93.0 | +6.0 |
+| Britannia Open (major, links) | 10 | short_putting | +10.37 | 99.0 | +0.0 |
+| CH Europe 01 (tier 2, woodland) | 10 | lag_putting | +9.72 | 89.4 | +9.6 |
+| CH Europe 01 (tier 2, woodland) | 10 | short_putting | +10.37 | 98.9 | +0.1 |
+| France Open (Premier, woodland) | 10 | power | +11.78 | 94.4 | +4.6 |
+| France Open (Premier, woodland) | 10 | stamina | +8.73 | 90.9 | +8.1 |
+
+### Fixed-Overall archetype profiles (round scoring)
+| Profile (same Overall) | Context | Δ mean vs subject's own profile | SD ratio | beat base p10 | over base p90 | subjects × events |
+|---|---|---|---|---|---|---|
+| Short-Game Artist | R1 | -0.295 | 0.984 | 0.081 | 0.070 | 6 |
+| Short-Game Artist:neutral | R1 | -0.295 | 0.984 | 0.081 | 0.070 | 6 |
+| Precision Ball-Striker | R1 | -0.215 | 0.970 | 0.076 | 0.071 | 6 |
+| Precision Ball-Striker:neutral | R1 | -0.215 | 0.970 | 0.076 | 0.071 | 6 |
+| Elite Putter | R1 | -0.115 | 1.002 | 0.077 | 0.081 | 6 |
+| Elite Putter:neutral | R1 | -0.115 | 1.002 | 0.077 | 0.081 | 6 |
+| Aggressive Shotmaker | R1 | -0.070 | 1.062 | 0.088 | 0.093 | 6 |
+| Aggressive Shotmaker:neutral | R1 | -0.044 | 1.044 | 0.083 | 0.091 | 6 |
+| Strategic Technician:neutral | R1 | -0.011 | 0.996 | 0.072 | 0.084 | 6 |
+| All-Rounder | R1 | -0.009 | 1.005 | 0.073 | 0.086 | 6 |
+| All-Rounder:neutral | R1 | -0.009 | 1.005 | 0.073 | 0.086 | 6 |
+| Uniform | R1 | -0.009 | 1.005 | 0.073 | 0.086 | 6 |
+| Strategic Technician | R1 | -0.004 | 0.987 | 0.069 | 0.082 | 6 |
+| Effortless Power | R1 | +0.058 | 1.020 | 0.075 | 0.092 | 6 |
+| Effortless Power:neutral | R1 | +0.068 | 1.025 | 0.075 | 0.092 | 6 |
+| Power Hitter:neutral | R1 | +0.329 | 1.040 | 0.067 | 0.106 | 6 |
+| Power Hitter | R1 | +0.348 | 1.050 | 0.067 | 0.108 | 6 |
+| Short-Game Artist | R4 | -0.408 | 0.979 | 0.084 | 0.064 | 6 |
+| Short-Game Artist:neutral | R4 | -0.408 | 0.979 | 0.084 | 0.064 | 6 |
+| Precision Ball-Striker | R4 | -0.315 | 0.972 | 0.079 | 0.067 | 6 |
+| Precision Ball-Striker:neutral | R4 | -0.315 | 0.972 | 0.079 | 0.067 | 6 |
+| Elite Putter | R4 | -0.199 | 1.000 | 0.077 | 0.077 | 6 |
+| Elite Putter:neutral | R4 | -0.199 | 1.000 | 0.077 | 0.077 | 6 |
+| Aggressive Shotmaker | R4 | -0.110 | 1.057 | 0.087 | 0.091 | 6 |
+| Aggressive Shotmaker:neutral | R4 | -0.106 | 1.039 | 0.083 | 0.087 | 6 |
+| Strategic Technician:neutral | R4 | -0.101 | 0.991 | 0.072 | 0.077 | 6 |
+| All-Rounder | R4 | -0.095 | 1.001 | 0.073 | 0.080 | 6 |
+| All-Rounder:neutral | R4 | -0.095 | 1.001 | 0.073 | 0.080 | 6 |
+| Uniform | R4 | -0.095 | 1.001 | 0.073 | 0.080 | 6 |
+| Strategic Technician | R4 | -0.075 | 0.982 | 0.069 | 0.077 | 6 |
+| Effortless Power:neutral | R4 | +0.034 | 1.015 | 0.071 | 0.089 | 6 |
+| Effortless Power | R4 | +0.035 | 1.012 | 0.071 | 0.088 | 6 |
+| Power Hitter:neutral | R4 | +0.246 | 1.031 | 0.066 | 0.097 | 6 |
+| Power Hitter | R4 | +0.263 | 1.042 | 0.068 | 0.099 | 6 |
+| Short-Game Artist | R4P | -0.351 | 0.976 | 0.087 | 0.070 | 6 |
+| Short-Game Artist:neutral | R4P | -0.351 | 0.976 | 0.087 | 0.070 | 6 |
+| Strategic Technician:neutral | R4P | -0.188 | 0.987 | 0.084 | 0.077 | 6 |
+| Precision Ball-Striker | R4P | -0.180 | 0.969 | 0.078 | 0.073 | 6 |
+| Precision Ball-Striker:neutral | R4P | -0.180 | 0.969 | 0.078 | 0.073 | 6 |
+| Elite Putter | R4P | -0.163 | 0.993 | 0.082 | 0.079 | 6 |
+| Elite Putter:neutral | R4P | -0.163 | 0.993 | 0.082 | 0.079 | 6 |
+| Strategic Technician | R4P | -0.162 | 0.976 | 0.079 | 0.076 | 6 |
+| Effortless Power | R4P | -0.068 | 1.010 | 0.081 | 0.085 | 6 |
+| All-Rounder | R4P | +0.007 | 1.004 | 0.079 | 0.086 | 6 |
+| All-Rounder:neutral | R4P | +0.007 | 1.004 | 0.079 | 0.086 | 6 |
+| Uniform | R4P | +0.007 | 1.004 | 0.079 | 0.086 | 6 |
+| Effortless Power:neutral | R4P | +0.008 | 1.015 | 0.080 | 0.090 | 6 |
+| Aggressive Shotmaker:neutral | R4P | +0.024 | 1.039 | 0.084 | 0.095 | 6 |
+| Aggressive Shotmaker | R4P | +0.038 | 1.055 | 0.087 | 0.099 | 6 |
+| Power Hitter:neutral | R4P | +0.391 | 1.031 | 0.068 | 0.108 | 6 |
+| Power Hitter | R4P | +0.402 | 1.043 | 0.068 | 0.111 | 6 |
+
 ### Tier 2: fixed-field conditional estimates (approximation; see validation)
 
 #### fixed_2027_BRITANNIA_OPEN_s0: subject vs fixed production field replicates (conditional approximation); 500 field replicates x 16 subject replays; production winner rate of each subject in the same replicates: {'1': 0.098, '9': 0.044}
