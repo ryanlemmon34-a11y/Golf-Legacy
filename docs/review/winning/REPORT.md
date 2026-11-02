@@ -412,25 +412,28 @@ calm, [scenario interval]:
 | France Open (sheltered woodland) | +0.48 | +0.94 | +1.33 | +0.66 | +1.99 | 5.57 → 5.87 (+5%) |
 | CH Europe 01 (woodland) | +0.62 | +1.27 | +1.78 | +0.75 | +2.58 | 5.51 → 5.77 (+5%) |
 
-Wind costs every golfer three times as much on exposed links as on sheltered woodland, and on links it spreads
-the field strongly.
+**Field-average penalty.** On the links the field-average penalty is about 2.5–3.3 times the woodland one (for
+example +4.43 against +1.33 and +1.78 strokes per round at 28 mph). That is a field average, not every golfer's
+penalty. On the links the field's 36-hole spread also widens, which reflects golfers being affected differently;
+it does not by itself mean more randomness for any individual golfer.
 
-**Who wins.**
+**Who wins: no consistent response resolved.**
 
-- **The best entrant's win rate does not measurably move.** At the Britannia Open the two calm arms, with
-  identical conditions and independent seeds, give 5.8% and 11.9%. The weather arms all fall between 8.6% and
-  10.8%, inside that sampling band. The other events behave the same way (France 8.1–11.9%; CH Europe 2.5–4.4%;
-  Scotland 5.8–10.3%).
-- **The median winner's Overall rank improves slightly in wind on links** (14 → 12 at Britannia; 13 → 11–12 at
-  Scotland) and on woodland (19 → 13–16 at France).
-- **The distribution of winners** (total-variation distance from calm, against the calm-versus-calm floor of
-  0.27–0.35 with the same samples):
-  - within the floor for most arms;
-  - modestly above it only in strong wind on the Scotland Open links (0.35–0.38 against 0.27).
-- **Same winner as calm, seed for seed:** 4–9% in every weather arm, against 1–2% for two calm runs with
-  independent seeds. The extra comes from the shared week form and first-round pins. In other words, almost any
-  change of conditions produces a different winner in a given replay, but the *chances* of each golfer hardly
-  move except in strong links wind.
+- **The best entrant's win rate shows no consistent direction across the four fields.** At the Britannia Open,
+  the two calm control arms (identical conditions, independent seeds) give 21/360 (5.8%) and 43/360 (11.9%);
+  the weather arms give 8.6–10.8%. The other fields: France 8.1–11.9%, CH Europe 2.5–4.4%, Scotland 5.8–10.3%.
+- **360 runs per arm cannot show that the favourite's or any individual's win probability "hardly changes".** The
+  two calm controls are themselves noisy and their range is not a formal uncertainty band. No paired Δ-win
+  interval or equivalence bound was computed. Modest changes in win probabilities therefore **remain
+  uncertain**, neither shown nor excluded.
+- **The median winner's Overall rank** is slightly better in wind (Britannia 14 → 12; Scotland 13 → 11–12;
+  France 19 → 13–16). This is suggestive only, with no interval.
+- **The win-distribution distance from calm** sits near the calm-versus-calm reroll value (0.27–0.35) for most
+  arms and a little above it for strong wind on the Scotland Open links (0.35–0.38 against 0.27). The reroll
+  value is a reference point, not a proven significance threshold.
+- **Same winner as calm, seed for seed:** 4–9% in weather arms against 1–2% for independent calm reruns. The
+  extra comes from the shared week form and first-round pins. Winner turnover in single replays cannot by itself
+  establish how winning probabilities shift.
 
 **Who gains relative to calm.** This is the correlation, across the real field, between an attribute and the
 change in finishing percentile (negative means the attribute helps):
@@ -447,11 +450,15 @@ shot effect at all**, shows −0.31 to −0.38 at Britannia in strong wind. Only
 documented mechanism (`ATTRIBUTE_MAP.md`; section 4c: +5 ball_flight is worth −0.17 strokes per round on links
 against −0.03 on sheltered woodland).
 
-**Answer to "how much did weather impact who won?"** In this engine, weather mostly moves everyone together and
-widens the spread on exposed links. It reorders the field in favour of ball-flight-strong (and higher-Overall)
-golfers in strong links wind, and in any single tournament it changes the winner almost as surely as a re-roll
-would. It does not measurably change how often the best entrant wins. No counterfactual is claimed for any
-specific historic edition beyond these verified 2027 events.
+**Answer to "how much did weather impact who won?", as far as this evidence goes:**
+
+- **Scoring effects are clear.** Wind and rain raise scores for the whole field, with a field-average penalty
+  about 2.5–3.3 times larger on exposed links than on sheltered woodland, and widen the field's spread on links.
+- **The field is reordered towards ball-flight-strong golfers in links wind**, per the attribute correlations
+  and the tier-1 mechanism.
+- **No consistent favourite-win response was resolved** across the four fields. Modest changes in win
+  probabilities remain uncertain at this sample size.
+- No counterfactual is claimed for any specific historic edition beyond these verified 2027 events.
 
 ## 6. Skill, depth, volatility
 
