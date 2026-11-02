@@ -194,3 +194,45 @@ seams in the current code rather than a packaging framework or a rewrite.
   cloud) would need a safe, validated format first.
 - **No insecure localhost mutation.** Every career change is a POST behind the observer's existing local-only
   Host/Origin check, carries an operation key and the expected date/version, and never mutates on GET.
+
+## 9. Boundary refinements from review (2026-11-02), part of the design above
+
+1. **When the plan is revalidated.** Each week is split into `prepare` and `play`.
+   - `prepare` is exactly the start of today's `run_week`: the week's bookings are cleared, then the four-weekly
+     block planning runs.
+   - `play` is the rest: fields, charges, results, development and finances.
+   - The cursor gets a persisted `planned` phase between the two.
+   - The order of parts and gates:
+
+     1 January part → gates (pending decisions due, plan missing) → `prepare` → `planned` gate → `play`
+
+     The `planned` gate revalidates the player's choice with the same rules, after the 1 January support, staff
+     and finance effects and after block planning, but before any field, charge or result.
+   - Pending staff decisions are created before their own consequences, and none is applied until answered.
+2. **Work pathway.** An 18-year-old full-time amateur outside college is within the existing work pathway, so it is
+   not skipped. When the pathway would put the controlled golfer in a job, that becomes a required decision:
+   - **Take the job:** the pathway's own consequence, through the same code (part-time, the ordinary salary and
+     schedule). No money is given.
+   - **Keep playing full-time:** the count continues, and the decision returns at the next monthly plan if they are
+     still blocked.
+   - **Return the golfer to AI control** is always available.
+
+   Paid work weeks for professionals (`needs_paid_work`) are not part of this slice, because the newcomer is an
+   amateur. If a controlled professional ever needed them, the gate stops with an explicit "not supported in this
+   build" decision, offering the AI handback, never a silent bypass.
+3. **Commits and counting.** An advance commits whenever any part ran or the career changed, even with zero weeks
+   played: a decision created at a gate is saved. The 1 January, `prepare` and winter parts are never counted as
+   played weeks, so "four weeks" means four played weeks unless interrupted.
+4. **Phase completion is persisted.** 1 January salaries, support and the staff market, the block planning, and the
+   winter (aging, entrants) each run once. The cursor records that they ran, so a reload, a retry or `end_control`
+   never repeats them.
+5. **The AI planning replay is limited.** For random-stream alignment, the AI planning path for the controlled golfer
+   only draws what the AI would draw (the training-category draw). It never runs `staff_midseason` (a coach-fee stop
+   or caddie departure) or the work pathway's decision on them behind a gate. The coach-fee stop for a controlled
+   golfer is left to Phase G; the slice's newcomer has no fee coach unless the player accepts one.
+6. **Pending offers have no side effects.** An offer does not end an old stint, assign, charge or reserve capacity.
+   Acceptance revalidates (staff active, room, affordability) and atomically replaces at most one stint; declining
+   records the refusal. Both go through the same staff functions as the AI.
+7. **The command layer.** Career commands form an application-level API (`career.apply` via `Session.career_action`),
+   separate from HTTP. Payloads are versioned (`schema`). Saved career state holds only plain data: no renderer
+   objects, handlers or paths.
