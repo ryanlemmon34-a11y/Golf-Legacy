@@ -5,11 +5,17 @@ not merged and not released; `main` is unchanged. The plan and its boundaries ar
 
 ## Try it
 
-From the project folder:
+In a separate folder, so your current checkout and local work are untouched (from your existing clone):
 
 ```
-python tools/observer_app.py --worlds <an empty or test library folder> --open
+git fetch origin build/career-v1-foundation
+git worktree add ../golf-career-test origin/build/career-v1-foundation
+cd ../golf-career-test
+git log --oneline -1
+python tools/observer_app.py --worlds worlds-career-test --workers 1 --open
 ```
+
+`worlds-career-test` is a new library folder inside that worktree, so no existing world is touched.
 
 1. **Library → Start a new career.** Give a name, a starting year (default 2027) and a seed. A background job creates
    the world and plays its first season under AI (a few minutes on a desktop; the progress bar shows the weeks). It
