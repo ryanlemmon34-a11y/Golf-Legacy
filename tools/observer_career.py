@@ -159,9 +159,9 @@ def advance_card(w, v):
     due = [d for d in v['pending'] if d['deadline'] is None or tuple(d['deadline']) <= tuple(v['date'])]
     note = (f'<p class="muted">{len(due)} decision{"s" if len(due) != 1 else ""} must be answered before the next week '
             'can be played: advancing stops at once until then.</p>') if due else ''
-    return (f'<div class="filters"><form method="post" action="/career/advance">{hidden(w, None, (("mode", "next"),))}'
+    return (f'<div class="filters"><form method="post" action="/career/advance">{hidden(w, v["version"], (("mode", "next"),))}'
             '<button class="primary" title="Plays on until something needs your decision">Advance to next decision</button>'
-            f'</form><form method="post" action="/career/advance">{hidden(w, None, (("mode", "period"),))}'
+            f'</form><form method="post" action="/career/advance">{hidden(w, v["version"], (("mode", "period"),))}'
             '<button title="Plays to the end of the current four-week period, stopping earlier only if a decision is due">'
             'Advance through planned period</button></form></div>' + note)
 
