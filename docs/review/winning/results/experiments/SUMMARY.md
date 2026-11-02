@@ -336,6 +336,28 @@ striking_consistency 0.989 · driving_accuracy 0.993 · resilience 0.996 · mid_
 | 10 | arch:Short-Game Artist | 2.75% | +0.43 ± 0.22 | +4.59 ± 0.57 | +6.16 ± 0.62 | False |
 | 10 | arch:Short-Game Artist:neutral | 2.75% | +0.43 ± 0.22 | +4.59 ± 0.57 | +6.16 ± 0.62 | False |
 
+### Tier 3: full-event validation
+
+#### events_validation_br1: full production events, 1500 paired seeds per arm
+
+| Arm | Full: win | Full: Δ win (pp) ± SE | Fixed-field: Δ win (pp) ± SE | |difference| / combined SE | Full: made cut | Field totals changed |
+|---|---|---|---|---|---|---|
+| base | 9.00% | +0.00 ± 0.00 | +0.00 ± 0.00 | — | 91.5% | 0% |
+| driving_accuracy+5 | 11.80% | +2.80 ± 0.84 | +1.09 ± 0.30 | 1.92 | 92.8% | 38% |
+| power+5 | 9.80% | +0.80 ± 0.85 | +0.95 ± 0.30 | 0.16 | 92.7% | 46% |
+| putting_consistency+5 | 8.60% | -0.40 ± 0.25 | +0.11 ± 0.10 | 1.91 | 91.4% | 3% |
+| short_putting+5 | 10.33% | +1.33 ± 0.44 | +0.98 ± 0.18 | 0.73 | 92.3% | 12% |
+
+#### events_validation_br10: full production events, 1500 paired seeds per arm
+
+| Arm | Full: win | Full: Δ win (pp) ± SE | Fixed-field: Δ win (pp) ± SE | |difference| / combined SE | Full: made cut | Field totals changed |
+|---|---|---|---|---|---|---|
+| arch:Aggressive Shotmaker | 3.13% | -0.87 ± 0.66 | +0.19 ± 0.24 | 1.51 | 79.2% | 58% |
+| arch:Strategic Technician | 2.53% | -1.47 ± 0.65 | -1.82 ± 0.22 | 0.52 | 76.9% | 58% |
+| base | 4.00% | +0.00 ± 0.00 | +0.00 ± 0.00 | — | 82.7% | 0% |
+| power+5 | 3.93% | -0.07 ± 0.64 | +0.49 ± 0.23 | 0.81 | 81.9% | 45% |
+| short_putting+5 | 4.00% | +0.00 ± 0.00 | +0.00 ± 0.00 | — | 82.7% | 0% |
+
 ### Weather counterfactuals
 
 12 scenarios x 30 paired shot seeds per arm and event; intervals bootstrap the scenarios (clusters)
