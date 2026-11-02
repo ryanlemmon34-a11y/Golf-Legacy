@@ -164,3 +164,33 @@ there are no placeholder buttons.
 - **Regression.** The focused session, season and observer suites. Any full-suite run is reported as such.
 - **Performance.** Relative to main, in this environment: action commit, advance overhead with a career, and page
   times. This is not Ryan's 120-second target.
+
+## 8. Architecture constraint: a possible future Steam release
+
+Ryan, 2026-11-02 01:32 UTC: "I'm not trying to rush it. I just want us to make architecture decisions with it in mind
+as a future goal." Nothing here builds for Steam now: no SDK, storefront, account, spending, cloud hosting or mobile
+work. The aim is not to paint ourselves into a corner when a packaged Windows release becomes worthwhile, using modest
+seams in the current code rather than a packaging framework or a rewrite.
+
+- **Three layers, kept apart.**
+  - Simulation (`golfsim/`): rules and consequences.
+  - The command / application layer (`golfsim/career.py` actions, gates and views; `Session.career_action` and the
+    gated advances): UI-agnostic, the same calls tests, a command line or a future desktop shell would make.
+  - UI (`tools/observer_*`): renders views and submits actions, and holds no rules.
+- **Paths.** Career work adds no install-directory assumption. The world library is already a parameter (`--worlds`),
+  and every log and save lives inside the world's folder. A packaged build would pass a per-user data directory there.
+  The current default (`worlds/` beside the program) is kept for Ryan's existing setup; changing the default is a
+  packaging decision, recorded as open.
+- **Versioned career state.** The career record carries a format number. Opening a save whose career format is newer
+  than the build refuses to continue it, with the reason, and leaves the save untouched. Older formats need an
+  explicit, tested upgrade step: none yet, as this is the first format.
+- **Atomic saves and update safety.** Every career action commits through the session's existing generation mechanism:
+  a new checkpoint, hashed, read back, renamed into place, then the pointer replaced. There are no side files, so an
+  interrupted action leaves the previous state whole.
+- **A clean local lifecycle.** Advances stay cancellable background jobs, and Quit stops after the current week and
+  saves. Career actions are short transactions under the same locks.
+- **Saves are trusted local data only.** Checkpoints are Python pickles, which are not safe for arbitrary interchange.
+  Career mode adds no import of downloaded or shared saves, and no route loads uploaded files. Sharing saves (workshop,
+  cloud) would need a safe, validated format first.
+- **No insecure localhost mutation.** Every career change is a POST behind the observer's existing local-only
+  Host/Origin check, carries an operation key and the expected date/version, and never mutates on GET.
