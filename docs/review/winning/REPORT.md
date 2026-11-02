@@ -428,7 +428,8 @@ impact is section 4e.
 - Each profile is run twice: with the archetype's aggression and big_stage, and with both set to 50 ("neutral").
 - Everything else about the subject is unchanged.
 - **Reference.** The flat profile (every attribute equal to the Overall), which is identical to All-Rounder.
-- **Clipping.** One profile is clipped (Elite Putter at Britannia rank 10).
+- **Clipping.** One cell is clipped (Elite Putter at Britannia rank 10) and excluded, like every clipped arm. The
+  Elite Putter row averages its five unclipped cells.
 
 **Round scoring.** Three events, 8,000 paired samples; Δ strokes per round and SD against the flat profile, R1,
 averaged over events and subjects:
@@ -437,7 +438,7 @@ averaged over events and subjects:
 |---|---|---|---|---|---|
 | Short-Game Artist | **−0.29** | −0.38 / −0.25 / −0.22 | 0.979 | −0.36 | 0.99 |
 | Precision Ball-Striker | −0.21 | −0.23 / −0.32 / −0.07 | **0.965** | −0.19 | **0.90** |
-| Elite Putter | −0.11 | −0.14 / −0.10 / −0.08 | 0.996 | −0.17 | 0.99 |
+| Elite Putter (5 unclipped cells) | −0.097 | −0.13 (rank 40 only) / −0.10 / −0.08 | 0.993 | −0.156 | 0.99 |
 | Aggressive Shotmaker | −0.06 | **−0.33** / +0.08 / +0.07 | **1.056** (neutral 1.038) | +0.03 | **1.26** |
 | Strategic Technician | ±0.00 | +0.04 / −0.09 / +0.07 | 0.981 | −0.17 | **0.82** |
 | Flat / All-Rounder | 0 | 0 | 1 | 0 | 1.02 |
@@ -572,7 +573,8 @@ deviation of that attribute among Premier and major golfers** (verified replay s
 +5-point arms:
 
 - **+5 points:** what a point of improvement is worth;
-- **one SD:** how much the real spread of that attribute among top golfers separates them.
+- **one SD:** a population-scaled sensitivity, the effect of a step equal to that attribute's spread among top
+  golfers. It is not the share of actual population scoring variance that each attribute explains.
 
 Clipped cells are excluded: 9 of 63, including ball_flight's links cell, so its average below covers woodland
 only.
@@ -603,8 +605,9 @@ only.
 
 **What changes against +5:**
 
-- **Power** rises to joint top. It has the widest spread among top golfers, so real differences in power
-  separate them as much as driving_accuracy differences do.
+- **Power** rises to joint top because its one-SD step is the largest (11.8 points). This is a sensitivity to a
+  population-scaled step, not a measure of how much of the population's actual scoring variance power
+  explains.
 - **The tiers are otherwise the same:**
   - driving_accuracy, power and mid_irons on top;
   - short game, putting and the long game in the middle;
