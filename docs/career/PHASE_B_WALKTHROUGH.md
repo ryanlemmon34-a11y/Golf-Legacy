@@ -51,6 +51,10 @@ Reloading the page, restarting the observer, or reopening the world at any point
   `Sec-Fetch-Site: cross-site`, is refused for every POST) and carry the full command identity (world id, date,
   phase, career version except when starting, operation key); pages send `Referrer-Policy: same-origin` and
   `X-Frame-Options: DENY`.
+- Engine fix (merged at `da4075e`; reviewed, test branches only): `fix/engine-dogleg-retee`, engine `e99cb20`.
+  - Tee plans price a dogleg run-through where play puts the ball, and a reload after out of bounds re-plans.
+  - It fixes a runaway hole found in a long realism-branch world; the defect is latent on main too.
+  - The all-AI equivalence reference is now main + fix (`8a2b92a`).
 - Phase B observer routes: `/career`, `/career/plan`, `/career/start`, plan submission (POST `/career/plan`), `/career/decide`,
   `/career/end`, `/career/advance` (background job), `/career/new` (background job). Each POST carries world, date,
   phase, career version and an operation key; the page is always redrawn from the committed generation. Forms are
@@ -62,6 +66,7 @@ Reloading the page, restarting the observer, or reopening the world at any point
 python -m unittest tests.test_career_foundation      # 25 tests: Phase A + the three defects (ParkedDefects)
 python -m unittest tests.test_observer_career        # 9 tests: the slice over HTTP, guards, rollback
 python -m unittest tests.test_session tests.test_development tests.test_access_ledger   # regressions
+python -m unittest tests.test_tee_plan                # 11 tests: the engine fix
 ```
 
 - `ParkedDefects`: stopped result from `advance_one_week` and `advance(commit_every_week=True)`; mid-block handback
