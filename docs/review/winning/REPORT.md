@@ -374,8 +374,9 @@ Professional tiers 0–4, within-course associations:
 itself depend on the weather, so these are not whole-field effects. The controlled all-starter rounds 1–2
 comparison is in 5b. The "per wet round" column is the change in the event's average for each wet round it had.
 
-The descriptive picture is that windier and wetter events score higher and more spread among survivors, but the
-best entrant's win rate hardly differs. By wind band, the professional best-entrant win rate is 10.1% below
+The descriptive picture is that windier and wetter events score higher and more spread among survivors. The best
+entrant's win rate shows no detectable within-course association with wind (+0.06 ± 0.04 points per mph). This
+is an association, not a causal estimate. By wind band, the professional best-entrant win rate is 10.1% below
 6 mph and 12.1% at 22 mph or more. These bands are confounded by course and field, and the within-course
 estimate is close to zero.
 
