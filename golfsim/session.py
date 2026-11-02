@@ -193,8 +193,10 @@ class Session:
         """Play the next week (running 1 January first, or the end of the season after week 52) and commit
         the world. Returns {'completed': (year, week), 'events': [...], 'changes': {...}, 'cursor': {...},
         'generation': n}. `expected`: the cursor the caller believes is next (StaleCursor otherwise).
-        `op_key`: repeating a recently committed key returns its result without simulating again."""
-        return self._advance(1, expected, op_key)[0]
+        `op_key`: repeating a recently committed key returns its result without simulating again.
+        In career mode a gate can stop before any week is played: the result then has 'completed': None and
+        'stop' (why); whatever ran and any decision the gate created are committed."""
+        return self._advance(1, expected, op_key, one=True)[0]
 
     def advance(self, weeks, progress=None, cancel=None, commit_every_week=False, expected=None, op_key=None):
         """Advance several weeks with the same weekly step. By default the world is committed once, at
@@ -207,19 +209,25 @@ class Session:
             for _ in range(weeks):
                 if cancel and cancel():
                     break
-                out.append(self.advance_one_week(expected=self.cursor))
+                r = self.advance_one_week(expected=self.cursor)
+                if r['completed'] is None:                   # a career gate stopped before the week
+                    break
+                out.append(r)
                 if progress:
                     progress(out[-1])
             return out
         return self._advance(weeks, expected, op_key, progress, cancel)
 
-    def advance_career(self, mode, expected=None, op_key=None, progress=None, cancel=None):
+    def advance_career(self, mode, expected=None, op_key=None, progress=None, cancel=None, expected_version=None):
         """Career mode: advance to the next decision (`mode` 'next': stops when a new decision appears or one is
         due) or through the planned period (`mode` 'period': to the end of the current four-week block, stopping
-        earlier only when a decision is due). Returns {'weeks': [week results], 'stop': why it stopped}."""
+        earlier only when a decision is due). Returns {'weeks': [week results], 'stop': why it stopped}.
+        `expected_version`: the career version the request was drawn at; a request drawn before a later decision
+        or plan is refused (career.StaleCareer), so an old request can never advance past what the player has
+        since decided. A request with an `op_key` is recorded even when it is blocked and changes nothing."""
         if mode not in ('next', 'period'):
             raise ValueError(f'unknown advance mode {mode!r}')
-        return self._advance(52, expected, op_key, progress, cancel, mode=mode)
+        return self._advance(52, expected, op_key, progress, cancel, mode=mode, expected_version=expected_version)
 
     def career_action(self, action, expected=None, op_key=None):
         """Run one career command (golfsim/career.py: plan, decide, end control, new career) and commit it as a new
@@ -258,7 +266,8 @@ class Session:
                     raise
                 return res
 
-    def _advance(self, weeks, expected, op_key, progress=None, cancel=None, mode=None):
+    def _advance(self, weeks, expected, op_key, progress=None, cancel=None, mode=None, one=False,
+                 expected_version=None):
         with self._lock:
             with _FileLock(self.dir / 'lock'):
                 # first the committed world (another process may have committed meanwhile, or recovery
@@ -270,9 +279,12 @@ class Session:
                     return done
                 if expected is not None and dict(expected) != self.state['cursor']:
                     raise StaleCursor(f'expected {expected}, the world is at {self.state["cursor"]}')
+                car = getattr(self.season, 'career', None)
+                if expected_version is not None and car is not None and car.version != expected_version:
+                    from . import career as CA
+                    raise CA.StaleCareer(f'drawn at career version {expected_version}; it is now {car.version}')
                 out = []
                 stop = None
-                car = getattr(self.season, 'career', None)
                 active = car is not None and car.status == 'active'
                 v0 = car.version if car is not None else None
                 ran = False
@@ -288,11 +300,16 @@ class Session:
                         else:
                             out, stop, ran = self._career_steps(weeks, mode, progress, cancel)
                     car = getattr(self.season, 'career', None)
-                    if out or ran or (car is not None and car.version != v0):
-                        # (a decision created at a gate is saved even when no week was played)
+                    n = self.generation
+                    if out or ran or (car is not None and car.version != v0) or op_key is not None:
+                        # (a decision created at a gate is saved even when no week was played, and a request with
+                        # an op_key is recorded even when a gate blocked it and nothing changed: resubmitting it
+                        # returns that outcome instead of advancing later, once the decision is answered)
                         n = _next_generation(self.dir, self.generation)
                         for r in out:
                             r['generation'] = n
+                        if one and not out:
+                            out = [self._stopped(stop, n)]
                         result = out if mode is None else {'weeks': out, 'stop': stop}
                         if op_key is not None:
                             self.state['ops'] = (self.state['ops'] + [[op_key, result]])[-OPS_KEPT:]
@@ -306,7 +323,14 @@ class Session:
                     self._rollback()
                     raise
                 self.last_stop = stop
+                if one and not out:
+                    out = [self._stopped(stop, n)]
                 return out if mode is None else {'weeks': out, 'stop': stop}
+
+    def _stopped(self, stop, generation):
+        """advance_one_week's result when a career gate stopped before any week was played."""
+        return {'completed': None, 'events': [], 'changes': {}, 'cursor': dict(self.state['cursor']),
+                'generation': generation, 'stop': stop}
 
     def _career_steps(self, weeks, mode, progress, cancel):
         """The weekly step in parts (1 January, prepare, play, winter), each committed with the cursor naming what

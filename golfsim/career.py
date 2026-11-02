@@ -569,6 +569,10 @@ def _end_control(season, c, cursor, action):
     c.status = 'ended'
     c.ended = (y, w)
     c.log.append((y, w, 'returned the golfer to AI control'))
+    if cursor['phase'] in ('week', 'planned'):
+        # the player's intents for the rest of this block are replaced by the AI's own plan (no side effects; a
+        # week already prepared keeps the plan it was prepared with): see Season.replan_after_handback
+        season.replan_after_handback(c.golfer_id, y, w, prepared=cursor['phase'] == 'planned')
     g = season.g.get(c.golfer_id)
     c.note(y, w, 'end', f'{g.name if g else "The golfer"} is back under AI control from {date_text(y, w)}.')
     return {'ok': True, 'ended': [y, w]}

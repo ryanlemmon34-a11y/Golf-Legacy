@@ -407,6 +407,136 @@ class Persistence(unittest.TestCase):
             Session.open(d)
 
 
+class ParkedDefects(unittest.TestCase):
+    """The three defects found in review of 8354ea0, each fixed and tested on its own."""
+
+    def test_advance_one_week_returns_a_stopped_result_at_a_gate(self):
+        s = started()
+        g0 = s.generation
+        r = s.advance_one_week(expected=s.cursor)                 # 1 January runs, then the plan gate stops
+        self.assertIsNone(r['completed'])
+        self.assertEqual(r['stop']['kind'], 'decision')
+        self.assertEqual(r['cursor'], {'year': 2028, 'week': 1, 'phase': 'week'})
+        self.assertGreater(s.generation, g0)                        # the decision the gate created is committed
+        self.assertEqual(r['generation'], s.generation)
+        g1 = s.generation
+        r = s.advance_one_week(expected=s.cursor)                 # still stopped; nothing new, nothing committed
+        self.assertIsNone(r['completed'])
+        self.assertEqual(r['stop']['kind'], 'decision')
+        self.assertEqual(s.generation, g1)
+        self.assertEqual(s.advance(3, commit_every_week=True), [])   # the per-week API stops instead of failing
+        self.assertEqual(s.cursor, {'year': 2028, 'week': 1, 'phase': 'week'})
+        k = s.advance_one_week(expected=s.cursor, op_key='k')     # a keyed blocked request: recorded, replayable
+        self.assertIsNone(k['completed'])
+        self.assertEqual(s.advance_one_week(expected=s.cursor, op_key='k'), k)
+        plan(s, (2028, 1))
+        out = s.advance(2, commit_every_week=True)
+        self.assertEqual([x['completed'] for x in out], [(2028, 1), (2028, 2)])
+        s.close()
+
+    def _handback(self, s):
+        """End control with Season._plan_acts spied on; returns (the calls, the plans before)."""
+        calls = []
+        real = Season._plan_acts
+
+        def spy(self, g, year, week0, weeks, *a, **k):
+            r = real(self, g, year, week0, weeks, *a, **k)
+            calls.append((g.id, year, list(weeks), list(r[0])))
+            return r
+        with mock.patch.object(Season, '_plan_acts', spy):
+            act(s, {'type': 'end_control'}, f'end-{s.season.career.version}')
+        return calls
+
+    def _side_effects(self, s, gid):
+        se = s.season
+        coach, caddie = se.staff.coach(gid), se.staff.caddie(gid)
+        return json.dumps([dict(se.block_flags[2028].get(gid, {})), se.stuck_blocks.get(gid), se.week_avail.get(gid),
+                           coach.id if coach else None, caddie.id if caddie else None, golfer(s).lifestyle,
+                           golfer(s).tour, round(golfer(s).cash, 6), sorted(se.plan_ev.get(2028, {}).keys())
+                           if hasattr(se, 'plan_ev') else None], sort_keys=True, default=str)
+
+    def test_handback_mid_block_hands_the_rest_of_the_block_to_the_ai(self):
+        s = started()
+        s.advance_career('next', op_key='a')
+        human = {w: {'kind': 'train', 'category': 'putting'} for w in (1, 2, 3, 4)}
+        plan(s, (2028, 1), human)
+        s.advance(1)                                                # week 1 played as planned
+        self.assertEqual(s.cursor, {'year': 2028, 'week': 2, 'phase': 'week'})
+        gid = s.season.career.golfer_id
+        self.assertEqual(s.season.plans[gid], {w: ('train', 'putting') for w in (1, 2, 3, 4)})
+        before = self._side_effects(s, gid)
+        calls = self._handback(s)
+        self.assertEqual(len(calls), 1)                             # the AI planner ran once, for weeks 2-4 only
+        cg, cy, weeks, acts = calls[0]
+        self.assertEqual((cg, cy, weeks), (gid, 2028, [2, 3, 4]))
+        plans = s.season.plans[gid]
+        self.assertEqual(plans[1], ('train', 'putting'))           # the week already played is left alone
+        self.assertEqual([plans[w][0] for w in (2, 3, 4)], acts)   # the AI's own plan, not the player's intents
+        self.assertEqual(self._side_effects(s, gid), before)       # no staff, job, statistics or evidence change
+        d = s.dir
+        s.close()
+        s = Session.open(d)                                         # saved with the handback
+        self.assertEqual([s.season.plans[gid][w][0] for w in (2, 3, 4)], acts)
+        out = s.advance(3)                                          # the AI plays the rest of the block
+        self.assertEqual([x['completed'] for x in out], [(2028, 2), (2028, 3), (2028, 4)])
+        s.close()
+
+    def test_handback_in_a_prepared_week_keeps_that_week(self):
+        s = started()
+        s.advance_career('next', op_key='a')
+        e1 = first_event(s, 1)
+        plan(s, (2028, 1), {1: {'kind': 'event', 'event_id': e1['event_id'], 'fallback': {'kind': 'rest'}}})
+        g = golfer(s)
+        g.cash, g.backing = -1e7, 0.0                               # the planned trip becomes unaffordable
+        s.season.am_support.pop(g.id, None)
+        s._commit()
+        s.advance_career('period', op_key='b')
+        self.assertEqual(s.cursor['phase'], 'planned')              # week 1 prepared; the replan decision waits
+        prepared = s.season.plans[g.id][1]
+        calls = self._handback(s)
+        self.assertEqual([c[2] for c in calls], [[2, 3, 4]])       # only the weeks not yet prepared
+        self.assertEqual(s.season.plans[g.id][1], prepared)
+        self.assertEqual(s.season.career.pending(), [])             # the open decision was closed by the handback
+        self.assertEqual(s.advance(1)[0]['completed'], (2028, 1))
+        s.close()
+
+    def test_handback_at_a_block_start_leaves_planning_to_plan_block(self):
+        s = started()
+        s.advance_career('next', op_key='a')
+        plan(s, (2028, 1))
+        s.advance(4)
+        self.assertEqual(s.cursor, {'year': 2028, 'week': 5, 'phase': 'week'})
+        self.assertEqual(self._handback(s), [])                     # nothing to rebuild: week 5 plans its block
+        s.close()
+
+    def test_a_blocked_keyed_request_is_recorded_and_never_runs_later(self):
+        s = started()
+        s.advance_career('next', op_key='A')                        # the first gate creates the plan decision
+        v = s.season.career.version
+        g1 = s.generation
+        played = s.state['weeks_played']
+        b = s.advance_career('next', expected=s.cursor, op_key='B', expected_version=v)   # blocked by that decision
+        self.assertEqual(b['weeks'], [])
+        self.assertEqual(b['stop']['kind'], 'decision')
+        self.assertGreater(s.generation, g1)                        # recorded although nothing changed
+        self.assertEqual(s.season.career.version, v)
+        plan(s, (2028, 1))                                          # the decision is answered; the cursor is unchanged
+        self.assertEqual(s.cursor, {'year': 2028, 'week': 1, 'phase': 'week'})
+        d = s.dir
+        s.close()
+        s = Session.open(d)                                         # durable across a reload
+        again = s.advance_career('next', expected=s.cursor, op_key='B', expected_version=v)
+        self.assertEqual(again, b)                                  # the recorded outcome, not a new advance
+        self.assertEqual(s.state['weeks_played'], played)
+        self.assertEqual(s.cursor, {'year': 2028, 'week': 1, 'phase': 'week'})
+        with self.assertRaises(CA.StaleCareer):                     # a new request drawn before the plan: refused
+            s.advance_career('next', expected=s.cursor, op_key='C', expected_version=v)
+        self.assertEqual(s.state['weeks_played'], played)
+        out = s.advance_career('period', expected=s.cursor, op_key='D', expected_version=s.season.career.version)
+        self.assertEqual(len(out['weeks']), 4)
+        s.close()
+
+
 class Privacy(unittest.TestCase):
     def test_no_hidden_potential_in_views(self):
         s = started()
