@@ -1,0 +1,41 @@
+{
+ "config": {
+  "study": "headroom (PLAN.md)",
+  "test2_seed": 386509,
+  "paired_seeds": [
+   2027,
+   11,
+   23,
+   83,
+   386509
+  ],
+  "arms": [
+   "A0",
+   "A1",
+   "B1",
+   "B2",
+   "B2c",
+   "B2p"
+  ],
+  "light_arms": [
+   "A0",
+   "B1",
+   "B2"
+  ],
+  "years": [
+   2028,
+   2084
+  ],
+  "project_min_pot_paired": 70.0,
+  "to_age": 40
+ },
+ "study.py": "108adec09507d703ed50c5c97316c5f3899c09c27672295e7ff108c2337738d7",
+ "validate.py": "0f3e25c81229b598b8672337b842d56f3806247029624b2f6d70ef3103169cef",
+ "provenance.py": "71d52e5ccbf70708c7922b52df2fe64a5a96ac6a272913f1b6957ffe493a8b8f",
+ "run.py": "16a2821f4c84ed9411dfeda46825314850d10423fadc0accbc15d934ebe244aa",
+ "fixture": "3993923fa787526d98cf201fe366123b1757ca36a8a6851f7aff264ebbcfa9c9",
+ "checkout_head": "37c1329b761502ecafaf6ee7849f007916b61143",
+ "golfsim_digest": "b39eb853cf215aa9fecd3eadd23497f5c813ff4584c90cda71b847a44db2c7cd",
+ "validation_stamp": "bda14942da8669295296b988169a96a789273987edff9e76713a82b9a04bd408",
+ "hash": "66ec74cd4272f01c"
+}
