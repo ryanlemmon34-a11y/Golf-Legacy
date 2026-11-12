@@ -140,7 +140,7 @@ class ObserverAppTests(unittest.TestCase):
             app.renderer.call(app.advance, form(w, '4', op='bg'))
             self.assertTrue(entered.wait(60))                           # a week has been played in memory
             during = self.draw(app, '/rankings')
-            main = lambda html: html.split('<main>')[1].split('</main>')[0]
+            main = lambda html: re.split(r'<main\b[^>]*>', html, maxsplit=1)[1].split('</main>')[0]
             self.assertEqual(main(during), main(before))                # the same committed snapshot
             self.assertIn('2027, week 41', during)
             self.assertIn('Stop simulation', during)

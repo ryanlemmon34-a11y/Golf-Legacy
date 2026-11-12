@@ -51,6 +51,7 @@ import observer_qual as OQ                                            # noqa: E4
 import observer_prestige as OP                                        # noqa: E402
 import observer_upsets as OU                                          # noqa: E402
 import observer_stories as STORY                                      # noqa: E402
+import observer_help as HELP                                          # noqa: E402
 
 PAGE_SIZE = 100
 
@@ -120,6 +121,102 @@ dl.kv { display:grid; grid-template-columns:max-content 1fr; gap:2px 14px; } dl.
 .rbar.final .rb, .rbar.now .rb { opacity:.65; outline:1px dashed var(--fg); }
 .rbar .rv { font-size:11px; font-variant-numeric:tabular-nums; } .rbar .ry { font-size:11px; color:var(--muted); }
 @media (max-width: 760px) { nav { display:none; } main { padding:12px 16px; } }
+
+/* Observer presentation only: the same committed world, with a clearer desktop hierarchy. */
+:root { --header-height:70px; --soft:#f0f4ef; --hover:#eaf2eb; }
+@media (prefers-color-scheme: dark) { :root { --soft:#232b26; --hover:#253a2d; } }
+body { line-height:1.55; }
+header { padding:12px 20px; gap:10px 20px; box-shadow:0 2px 10px #00000006; z-index:20; }
+.brand { font-size:18px; letter-spacing:-.04em; white-space:nowrap; }
+header .date { font-size:13px; padding:5px 10px; background:var(--soft); border-radius:6px; }
+.people-search { margin-left:auto; }
+.people-search input { width:220px; }
+.sidebar { width:208px; padding:16px 12px 24px; position:sticky; top:var(--header-height);
+  height:calc(100vh - var(--header-height)); min-height:0; overflow-y:auto; align-self:flex-start; }
+.sidebar h4 { padding:0 10px; margin:20px 0 6px; font-size:10px; letter-spacing:.12em; }
+.sidebar h4:first-child { margin-top:0; }
+.sidebar a { padding:5px 10px; border-radius:5px; font-size:13px; color:var(--muted); border-left:3px solid transparent; }
+.sidebar a:hover { color:var(--fg); background:var(--soft); text-decoration:none; }
+.sidebar a.active { border-left-color:var(--accent); color:var(--accent); background:var(--hover); font-weight:650; }
+main { padding:24px 32px 40px; }
+h1 { font-size:30px; line-height:1.2; letter-spacing:-.035em; margin:0 0 20px; }
+h2 { font-size:20px; line-height:1.3; letter-spacing:-.02em; margin:24px 0 12px; }
+h3 { font-size:16px; }
+button, .button, input, select { min-height:34px; }
+button.primary { background:var(--accent); color:var(--panel); font-weight:650; padding:7px 14px; }
+@media (prefers-color-scheme: dark) { button.primary { color:#10231a; } }
+button:hover:not(:disabled), .button:hover { box-shadow:inset 0 0 0 1px var(--accent); text-decoration:none; }
+summary { cursor:pointer; }
+summary:focus-visible, .scroll:focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
+.skip-link { position:fixed; left:12px; top:-100px; padding:10px; background:var(--panel); z-index:100; }
+.skip-link:focus { top:10px; }
+.advance-more { position:relative; }
+.advance-more > summary { padding:6px 10px; border-radius:5px; border:1px solid var(--line); font-size:13px; }
+.advance-options { position:absolute; right:0; top:calc(100% + 8px); width:310px; padding:14px;
+  background:var(--panel); border:1px solid var(--line); border-radius:8px; box-shadow:0 8px 30px #0002; }
+.advance-options p { font-size:12px; margin:0 0 12px; }
+.advance-options button { margin:0 4px 8px 0; }
+.season-count { display:flex; align-items:center; gap:10px; font-size:13px; margin:6px 0 10px; }
+#job { display:flex; align-items:center; flex-wrap:wrap; gap:8px; font-size:13px; }
+#job progress { width:140px; }
+.filters { gap:10px; padding:12px; background:var(--soft); border:1px solid var(--line); border-radius:7px; margin:14px 0; }
+.filters label { gap:3px; }
+.filters input { max-width:240px; }
+.tabs { margin:18px 0 20px; gap:6px; }
+.tabs a { padding:8px 12px; font-size:13px; }
+.tabs a.on { border-bottom:3px solid var(--accent); }
+.scroll { max-height:68vh; border:1px solid var(--line); border-radius:7px; margin:10px 0 16px;
+  scrollbar-gutter:stable; isolation:isolate; }
+.scroll table { margin:0; min-width:min(100%, 760px); }
+.scroll thead th { position:sticky; top:0; z-index:3; background:var(--soft); box-shadow:0 1px var(--line); }
+.scroll td:first-child, .scroll th:first-child { position:sticky; left:0; background:var(--panel); z-index:1; }
+.scroll thead th:first-child { background:var(--soft); z-index:4; }
+.scroll table[data-identity="second"] td:first-child { position:static; }
+.scroll table[data-identity="second"] thead th:first-child { left:auto; z-index:3; }
+.scroll table[data-identity="second"] td:nth-child(2),
+.scroll table[data-identity="second"] th:nth-child(2) { position:sticky; left:0; z-index:2; background:var(--panel); }
+.scroll table[data-identity="second"] thead th:nth-child(2) { top:0; z-index:4; background:var(--soft); }
+th, td { padding:8px 12px; }
+th { font-size:10px; letter-spacing:.06em; white-space:nowrap; }
+tbody tr:hover > td { background:var(--hover); }
+tfoot td { background:var(--soft) !important; border-top:2px solid var(--line); font-weight:600; }
+.sort-button { font:inherit; color:inherit; background:none; border:0; border-radius:2px; padding:0; min-height:24px;
+  text-transform:inherit; letter-spacing:inherit; text-align:inherit; }
+.sort-button:hover:not(:disabled) { color:var(--accent); box-shadow:none; }
+table.sortable th:not([aria-sort]) .sort-button::after,
+table.sortable th[data-href]:not([aria-sort]) > a::after { content:" ↕"; opacity:.6; }
+.pagination { display:flex; gap:16px; align-items:center; flex-wrap:wrap; font-size:13px; margin:12px 0 18px; }
+.pagination a { padding:5px 10px; border:1px solid var(--line); border-radius:5px; }
+.overview-grid { display:grid; grid-template-columns:minmax(300px, .85fr) minmax(480px, 1.65fr); gap:24px; align-items:start; }
+.overview-grid > .card { min-width:0; margin:0; }
+.overview-grid .scroll table { width:100%; min-width:0; }
+.overview-grid h2 { margin-top:4px; }
+.season-progress { width:100%; accent-color:var(--accent); height:8px; }
+.profile-summary { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:1px;
+  background:var(--line); border:1px solid var(--line); border-radius:8px; overflow:hidden; margin:18px 0 12px; max-width:none; }
+.profile-stat { background:var(--panel); padding:14px 16px; min-width:0; }
+.profile-stat dt { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; }
+.profile-stat dd { margin:5px 0 0; font-weight:650; font-size:20px; line-height:1.3; }
+.profile-stat dd .muted { font-size:13px; font-weight:400; }
+.profile-team { font-size:13px; }
+.section-nav { display:flex; width:auto; min-height:0; gap:8px; flex-wrap:wrap; padding:10px 0; margin:12px 0 20px;
+  border:0; position:static; }
+.section-nav a { display:inline-block; padding:5px 10px; border:1px solid var(--line); border-radius:20px; font-size:12px; }
+.section-nav a:hover { background:var(--hover); text-decoration:none; }
+.profile-section { margin:20px 0; scroll-margin-top:calc(var(--header-height) + 16px); }
+.profile-details { border:1px solid var(--line); border-radius:8px; padding:0 18px; background:var(--panel);
+  margin:12px 0; scroll-margin-top:calc(var(--header-height) + 16px); }
+.profile-details > summary { padding:14px 0; font-size:16px; font-weight:650; }
+.profile-details[open] > summary { border-bottom:1px solid var(--line); margin-bottom:16px; }
+.profile-details > :last-child { margin-bottom:18px; }
+details.help { padding:10px 0; font-size:13px; color:var(--muted); }
+details.help summary { color:var(--accent); }
+.history-context { margin-top:32px; padding-top:16px; border-top:1px solid var(--line); font-size:12px; }
+@media (min-width:2100px) { main { padding:28px 44px 48px; } .overview-grid { gap:32px; } }
+@media (max-width:1100px) { .overview-grid { grid-template-columns:1fr; } header { gap:8px 12px; } }
+@media (max-width:760px) { .sidebar { display:none; } main { padding:18px 16px; }
+  .people-search { margin-left:0; } .people-search input { width:170px; } .profile-summary { grid-template-columns:repeat(2,1fr); }
+  .section-nav { display:flex; } .scroll { max-height:70vh; } h1 { font-size:25px; } }
 """
 
 
@@ -564,9 +661,10 @@ def advance_controls(w, job=None):
         stop = (f'<form method="post" action="/cancel"><input type="hidden" name="job" value="{esc(job["id"])}">'
                 f'<button title="Stops after the week being played; every completed week is kept"'
                 f'{" disabled" if not job["cancellable"] or job["cancel_requested"] else ""}>'
-                'Stop simulation</button></form>') if job['kind'] == 'advance' else ''
+                'Stop simulation</button></form>') if job['kind'] in ('advance', 'career-advance') else ''
         total = job['total'] or 0
-        bar = f'<progress max="{total}" value="{job["done"]}"></progress>' if total else '<progress></progress>'
+        bar = (f'<progress aria-label="Simulation progress" max="{total}" value="{job["done"]}"></progress>'
+               if total else '<progress aria-label="Operation progress"></progress>')
         return (f'<span id="job" data-job="{esc(job["id"])}" role="status" aria-live="polite">{esc(job["title"])}: '
                 f'{bar} <span id="job-text">{esc(job_line(job))}</span></span>{stop}')
     if w is None or w.read_only or w.live is None:
@@ -575,12 +673,16 @@ def advance_controls(w, job=None):
     hidden = ''.join(f'<input type="hidden" name="{k}" value="{esc(v)}">' for k, v in
                      (('world', w.live.world_id), ('year', c['year']), ('week', c['week']), ('phase', c['phase']),
                       ('op', uuid.uuid4().hex)))
-    return (f'<form method="post" action="/advance">{hidden}<button name="weeks" value="1" class="primary">Advance week</button>'
-            '<button name="weeks" value="4">4 weeks</button><button name="weeks" value="season">'
-            'To end of season</button><span class="sep" aria-hidden="true">·</span>'
+    return (f'<form class="advance-controls" aria-label="Advance world" method="post" action="/advance">{hidden}'
+            '<button name="weeks" value="1" class="primary" formnovalidate>Advance week</button>'
+            '<details class="advance-more"><summary>Longer advance</summary><div class="advance-options">'
+            '<p class="muted">Stops safely after a week. Completed weeks are kept.</p>'
+            '<button name="weeks" value="4" formnovalidate>4 weeks</button><button name="weeks" value="season" formnovalidate>'
+            'To end of season</button><label class="season-count">Number of seasons '
             f'<input name="seasons" type="number" min="1" max="{MAX_SEASONS}" value="1" aria-label="Number of seasons" '
             'title="Plays to the end of this season, then the rest as whole seasons; each season is saved when it ends" '
-            'style="width:5em"><button name="weeks" value="seasons">Advance seasons</button></form>')
+            'style="width:5em"></label><button name="weeks" value="seasons">Advance seasons</button>'
+            '</div></details></form>')
 
 
 def job_line(job):
@@ -608,7 +710,7 @@ POLL_JS = """<script>
 </script><noscript><meta http-equiv="refresh" content="3"></noscript>"""
 
 
-def page(w, title, body, job=None, notices=()):
+def page(w, title, body, job=None, notices=(), path=None):
     if w is not None and w.live is not None:
         date = date_text(w.live.cursor)
     elif w is not None and w.session is not None:
@@ -619,12 +721,14 @@ def page(w, title, body, job=None, notices=()):
         date = 'no world open'
     world = (f'<a href="/worlds" title="World library">{esc(w.label)}</a>' if w is not None
              else '<a href="/worlds">World library</a>')
-    search = ('<form action="/golfers"><input name="q" placeholder="Search people" aria-label="Search people"></form>'
+    search = ('<form class="people-search" role="search" action="/search"><input name="q" type="search" '
+              'placeholder="Search all people" aria-label="Search golfers, coaches and caddies">'
+              '<button>Search</button></form>'
               if w is not None else '')
-    nav = ('<nav aria-label="Sections"><h4>World</h4><a href="/">Overview</a><a href="/calendar">Calendar</a>'
+    nav = ('<nav class="sidebar" aria-label="Sections"><h4>World</h4><a href="/">Overview</a><a href="/calendar">Calendar</a>'
            '<a href="/rankings">Rankings</a><a href="/qualification">Qualification</a><a href="/stats">Stats</a>'
            '<a href="/money">Prize money</a>'
-           '<h4>Explore</h4><a href="/golfers">Golfers</a><a href="/coaches">Coaches</a><a href="/caddies">Caddies</a>'
+           '<h4>Explore</h4><a href="/search">All people</a><a href="/golfers">Golfers</a><a href="/coaches">Coaches</a><a href="/caddies">Caddies</a>'
            '<a href="/courses">Courses</a><a href="/nations">Nations</a><a href="/tours">Tours</a>'
            '<a href="/tournaments">Tournaments</a>' + my_world_link(w) + '<a href="/views">Saved views</a>'
            '<h4>History</h4><a href="/seasons">Seasons</a><a href="/records">Record Book</a><a href="/upsets">Biggest Upsets</a>'
@@ -633,14 +737,69 @@ def page(w, title, body, job=None, notices=()):
            '<a href="/rules">Rules</a>'
            '<h4>Worlds</h4><a href="/worlds">World library</a><a href="/export">Report a problem</a>'
            '<a href="/job">Last operation</a></nav>')
+    active = navigation_section(path, w)
+    if active:
+        nav = nav.replace(f'<a href="{active}">', f'<a href="{active}" class="active" aria-current="page">', 1)
     banners = ''.join(f'<div class="banner {esc(kind)}" role="status">{text}</div>' for kind, text in notices)
     running = job is not None and job.get('state') == 'running'
     return (f'<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" '
             f'content="width=device-width, initial-scale=1"><title>{esc(title)} — Golf Legacy</title>'
-            f'<style>{CSS}</style></head><body><header><strong>Golf Legacy</strong>{world}'
+            f'<style>{CSS}{HELP.HELP_CSS}</style></head><body><a class="skip-link" href="#main-content">Skip to content</a>'
+            f'<header><strong class="brand">Golf Legacy</strong>{world}'
             f'<span class="date">{esc(date)}</span>{search}{advance_controls(w, job)}</header>'
-            f'<div class="layout">{nav}<main>{banners}<h1>{esc(title)}</h1>{body}'
-            f'{history_note(w) if w is not None else ""}</main></div>{POLL_JS if running else ""}{V.SORT_JS}</body></html>')
+            f'<div class="layout">{nav}<main id="main-content">{banners}<h1>{esc(title)}</h1>{body}'
+            f'<footer class="history-context">{history_note(w) if w is not None else ""}</footer></main></div>'
+            f'{POLL_JS if running else ""}{V.SORT_JS}{SHELL_JS}<script>{HELP.HELP_JS}</script></body></html>')
+
+
+def navigation_section(path, w=None):
+    """Select the containing section without relying on mutable page titles or browser scripting."""
+    if not path:
+        return None
+    if path.startswith('/golfer/'):
+        try:
+            p = w.person(int(path.rsplit('/', 1)[1])) if w else None
+        except (ValueError, TypeError):
+            p = None
+        roles = (p or {}).get('roles', [])
+        return '/golfers' if 'golfer' in roles else '/coaches' if 'coach' in roles else '/caddies' if 'caddie' in roles else '/search'
+    for prefix, section in (('/event/', '/tournaments'), ('/series/', '/tournaments'), ('/course/', '/courses'),
+                            ('/nation/', '/nations'), ('/tour/', '/tours'), ('/season/', '/seasons'),
+                            ('/records/', '/records'), ('/golf-records/', '/records')):
+        if path.startswith(prefix):
+            return section
+    return {'/shortlist': '/my-world', '/standings': '/qualification'}.get(path, path)
+
+
+SHELL_JS = """<script>
+(function(){
+  var header=document.querySelector('header');
+  function size(){document.documentElement.style.setProperty('--header-height', header.offsetHeight+'px');}
+  size(); if(window.ResizeObserver) new ResizeObserver(size).observe(header);
+  document.querySelectorAll('.tabs a.on').forEach(function(a){a.setAttribute('aria-current','page');});
+  function scrollRegions(){document.querySelectorAll('.scroll').forEach(function(el){
+    var overflow=el.scrollWidth>el.clientWidth || el.scrollHeight>el.clientHeight;
+    if(overflow){el.tabIndex=0; el.setAttribute('role','region');
+      el.setAttribute('aria-label',el.querySelector('table')?'Scrollable table':'Scrollable content');}
+    else {el.removeAttribute('tabindex'); el.removeAttribute('role'); el.removeAttribute('aria-label');}
+  });}
+  scrollRegions(); window.addEventListener('resize',scrollRegions);
+  document.addEventListener('toggle',scrollRegions,true);
+  document.addEventListener('click', function(e){
+    document.querySelectorAll('details.advance-more[open]').forEach(function(d){if(!d.contains(e.target)) d.open=false;});
+  });
+  document.addEventListener('keydown', function(e){if(e.key==='Escape'){
+    document.querySelectorAll('details.advance-more[open]').forEach(function(d){d.open=false; d.querySelector('summary').focus();});
+  }});
+  function reveal(hash){
+    var el=document.getElementById(hash.slice(1)); if(!el) return;
+    if(el.tagName==='DETAILS') el.open=true;
+    el.querySelectorAll('details').forEach(function(d){d.open=true;});
+  }
+  document.querySelectorAll('.section-nav a').forEach(function(a){a.addEventListener('click',function(){reveal(a.hash);});});
+  reveal(location.hash); window.addEventListener('hashchange',function(){reveal(location.hash);});
+})();
+</script>"""
 
 
 def my_world_link(w):
@@ -672,25 +831,32 @@ def history_note(w):
                      f'generation {esc(gen)}.</p>')
 
 
-def table(headers, rows, numeric=(), heads=None):
+def table(headers, rows, numeric=(), heads=None, footer_rows=(), help_keys=None):
     """headers: [label]; rows: [[cell html]]; numeric: column indexes right-aligned. A table sorts the rows it shows
     by any column in the browser (numbers as numbers, missing values last). `heads` (sort_heads) makes it a
     server-sorted list instead: its column headers are links that sort the whole filtered list before paging, and
     the browser never re-sorts the page shown."""
     def th(i, x):
         n = ' class=n' if i in numeric else ''
+        help_ = HELP.help_for(x, (help_keys or {}).get(i))
         if heads is None:
-            return f'<th{n} title="Sort the rows shown by this column">{esc(x)}</th>'
+            label = f'Sort by {x or "column " + str(i + 1)} (rows shown)'
+            return (f'<th{n} scope="col" title="Sort the rows shown by this column"><button class="sort-button" '
+                    f'type="button" aria-label="{esc(label)}">{esc(x)}</button>{help_}</th>')
         if i not in heads:
-            return f'<th{n}>{esc(x)}</th>'
+            return f'<th{n} scope="col">{esc(x)}{help_}</th>'
         href, aria = heads[i]
-        return (f'<th{n}{f" aria-sort={chr(34)}{aria}{chr(34)}" if aria else ""} data-href="{esc(href)}" '
-                f'title="Sort the whole list by this column"><a href="{esc(href)}">{esc(x)}</a></th>')
+        return (f'<th{n} scope="col"{f" aria-sort={chr(34)}{aria}{chr(34)}" if aria else ""} data-href="{esc(href)}" '
+                f'title="Sort the whole list by this column"><a href="{esc(href)}">{esc(x)}</a>{help_}</th>')
     h = ''.join(th(i, x) for i, x in enumerate(headers))
     body = ''.join('<tr>' + ''.join(f'<td{" class=n" if i in numeric else ""}>{c}</td>' for i, c in enumerate(r)) + '</tr>'
                    for r in rows)
     own = ' data-server-sort="1"' if heads is not None else ''
-    return f'<div class="scroll"><table class="sortable"{own}><thead><tr>{h}</tr></thead><tbody>{body}</tbody></table></div>'
+    if len(headers) > 1 and headers[0] in ('#', 'Pos', 'Rank') and headers[1] in ('Golfer', 'Name', 'Player'):
+        own += ' data-identity="second"'
+    foot = ('<tfoot>' + ''.join('<tr>' + ''.join(f'<td{" class=n" if i in numeric else ""}>{c}</td>'
+            for i, c in enumerate(r)) + '</tr>' for r in footer_rows) + '</tfoot>') if footer_rows else ''
+    return f'<div class="scroll"><table class="sortable"{own}><thead><tr>{h}</tr></thead><tbody>{body}</tbody>{foot}</table></div>'
 
 
 SERVER_DROP = ('sort', 'dir', 'page', 'tsort', 'default')
@@ -733,12 +899,13 @@ def paged(rows, q, path, size=PAGE_SIZE, drop=()):
     nav.append(f'<span class="muted">page {n} of {pages} ({len(rows):,} rows)</span>')
     if n < pages:
         nav.append(link(n + 1, 'Next →'))
-    return rows[(n - 1) * size:n * size], '<p>' + ' · '.join(nav) + '</p>'
+    return rows[(n - 1) * size:n * size], '<p class="pagination" aria-label="Pagination">' + ' · '.join(nav) + '</p>'
 
 
-def filters(path, q, fields, carry=()):
+def filters(path, q, fields, carry=(), clear_keep=()):
     """A GET form of filters. fields: [(name, label, options or None)]; options: [(value, label)]. `carry`: query
-    keys kept as they are when the form is applied (a server-sorted list's sort and direction)."""
+    keys kept as they are when the form is applied (a server-sorted list's sort and direction).
+    `clear_keep` preserves navigation context, such as a profile tab, when clearing filters."""
     out = [f'<form class="filters" action="{path}">']
     for name in carry:
         if one(q, name):
@@ -753,7 +920,8 @@ def filters(path, q, fields, carry=()):
             out.append(f'<label>{esc(label)}<select name="{name}">{opts}</select></label>')
     out.append('<button>Apply</button>')
     if any(one(q, n) for n, _, _ in fields):
-        out.append(f'<a href="{path}?default=1">Clear</a>')
+        clear = urlencode({'default': '1', **{k: one(q, k) for k in clear_keep if one(q, k)}})
+        out.append(f'<a href="{path}?{esc(clear)}">Clear</a>')
     return ''.join(out) + '</form>'
 
 
@@ -897,18 +1065,21 @@ def overview(w, q):
         year = lv.cursor['year']
         recent = sorted((e for e in lv.editions.values() if _winner(e)), key=lambda e: (-e['week'], -(e['prestige'] or 0)))[:20]
         top = sorted(lv.wr.items(), key=lambda x: x[1])[:10]
-        out.append('<h2>World ranking</h2>' + table(['#', 'Golfer', 'Tour'], [
+        out.append('<div class="overview-grid"><section class="card"><h2>World ranking</h2>' + table(['#', 'Golfer', 'Tour'], [
             [str(p), w.person_link(g), tour_link(w, lv.people.get(g, {}).get('tour'))] for g, p in top], numeric=(0,))
-            + '<p><a href="/rankings">Full ranking</a></p>')
+            + '<p><a href="/rankings">Full ranking →</a></p></section>')
         played = sum(1 for e in lv.schedule if e['status'] == 'played')
-        out.append(f'<h2>{year} so far</h2><p>{played} of {len(lv.schedule)} scheduled events played · '
-                   f'<a href="/calendar">calendar</a></p>')
+        out.append(f'<section class="card"><h2>{year} so far</h2><p>{played} of {len(lv.schedule)} scheduled events played · '
+                   f'<a href="/calendar">Full calendar →</a></p>'
+                   f'<progress class="season-progress" aria-label="Scheduled events completed" max="{max(1, len(lv.schedule))}" '
+                   f'value="{played}"></progress><h3>Recent winners</h3>')
         if recent:
             out.append(table(['Week', 'Event', 'Tour', 'Winner'], [
                 [str(e['week']), event_link(w, e['id']), tour_link(w, e['tour']),
                  w.person_link(_winner(e))] for e in recent]))
         else:
             out.append(f'<p class="muted">No events completed yet in {year}.</p>')
+        out.append('</section></div>')
     if w.a:
         y = w.a.years[-1]
         facts = w.a.recap(y)
@@ -1095,7 +1266,8 @@ def directory(w, q, role='golfer'):
         body = table(['Name', 'Nation', 'Born', 'Status', 'Prestige', 'Clients now', 'Also'], [
             [w.person_link(pid), nation_link(p.get('country')), esc(p.get('born')), status_cell(p, st),
              esc(p.get(role, {}).get('reputation', '')), str(clients.get(pid, 0)) if w.live else '',
-             esc(', '.join(r for r in p['roles'] if r != role))] for pid, p, st in chunk], numeric=(2, 4, 5), heads=heads)
+             esc(', '.join(r for r in p['roles'] if r != role))] for pid, p, st in chunk], numeric=(2, 4, 5), heads=heads,
+                     help_keys={4: 'prestige_staff'})
     else:
         heads = sort_heads(path, q, {0: 'name', 1: 'nation', 2: 'born', 3: 'status', 4: 'tour', 5: 'rank',
                                      6: 'reputation', 7: 'roles'}, sort, one(q, 'dir', ''))
@@ -1103,7 +1275,7 @@ def directory(w, q, role='golfer'):
             [w.person_link(pid), nation_link(p.get('country')), esc(p.get('born')), status_cell(p, st),
              tour_link(w, p.get('golfer', {}).get('tour')), esc(wr.get(pid, '')),
              esc(golfer_prestige(w, pid, p) if golfer_prestige(w, pid, p) is not None else ''), esc(', '.join(p['roles']))]
-            for pid, p, st in chunk], numeric=(2, 5, 6), heads=heads)
+            for pid, p, st in chunk], numeric=(2, 5, 6), heads=heads, help_keys={6: 'prestige_golfer'})
     note = ('<p class="muted">Everyone in the published history and the current world. "Now" is as of the date in the '
             'header; retired people keep their pages, and so do people who have died (marked deceased). ' + ('Prestige: a golfer\'s public standing (0-100), now, or at '
             'their last recorded season\'s end -- the last 52 weeks\' results plus a slowly fading legacy of majors '
@@ -1113,7 +1285,10 @@ def directory(w, q, role='golfer'):
                'with no recorded Prestige is listed last either way.' if role is not None else '')
             + ' A column heading sorts the whole list, not only this page (click again for the other direction).</p>')
     return ROLE_TITLES[role] if not term else f'{ROLE_TITLES[role]} matching “{term}”', \
-        filters(path, q, fields) + note + body + pager
+        (filters(path, q, fields) + f'<p class="muted">{len(rows):,} people · current world and recorded history. '
+         'Column headings sort all matching rows.</p>'
+         + '<details class="help"><summary>About this directory and its measures</summary>' + note + '</details>'
+         + body + pager)
 
 
 def status_cell(p, st):
@@ -1126,7 +1301,8 @@ def status_cell(p, st):
 
 
 DIR_FIRST = {'name': 'asc', 'rank': 'asc', 'born': 'desc', 'reputation': 'desc', 'clients': 'desc',
-             'prestige': 'desc', 'hosted': 'desc', 'editions': 'desc'}       # (any other key: ascending first)
+             'prestige': 'desc', 'hosted': 'desc', 'editions': 'desc',
+             'year': 'desc', 'week': 'desc', 'prize': 'desc', 'pos': 'asc'}  # (other keys: ascending first)
 
 
 def directory_sort(rows, sort, direction, values):
@@ -1216,35 +1392,39 @@ def golfer(w, q, pid):
     initial = a and pid in a.people and a.people[pid].get('initial')
     dead = OD.died(p)
     out.append(f'<p class="lead">'
-               + (f'{esc(OD.death_text(dead))} · ' if dead else f'Age {age_text(w, p.get("born"))} · ')
+               + ('' if tab == 'season' else f'{esc(OD.death_text(dead))} · ' if dead else f'Age {age_text(w, p.get("born"))} · ')
                + f'born {esc(p.get("born"))} · {nation_link(p.get("country"))} · {esc(", ".join(roles))}'
                + (' · <span class="tag">career began before the archive</span>' if initial else '')
-               + (' · <span class="tag">retired</span>' if OD.playing_status(p.get('golfer'))[0] == 'retired' else '')
-               + (' · <span class="tag">deceased</span>' if dead else '')
+               + (' · <span class="tag">retired</span>' if tab != 'season' and OD.playing_status(p.get('golfer'))[0] == 'retired' else '')
+               + (' · <span class="tag">deceased</span>' if tab != 'season' and dead else '')
                + (f' · <a href="/compare?ids={pid}">compare</a>' if 'golfer' in roles else '')
                + '</p>' + shortlist_button(w, 'person', pid))
     geo = w.geography(pid)
-    if geo:
+    if geo and tab != 'season':
         out.append(f'<p>Nationality: {esc(p.get("country"))} · born in {esc(where(geo["birthplace"]))}'
                    f' · lives in {esc(where(geo["residence"]))}</p>')
-    gs = p.get('golfer')
-    if gs and w.live and pid in w.live.people:
-        coach, caddie = w.live.coach_of.get(pid), w.live.caddie_of.get(pid)
-        now = [f'world No. {w.live.wr[pid]}'] if pid in w.live.wr else []
-        now += ([f'coach {w.person_link(coach)}'] if coach else []) + ([f'caddie {w.person_link(caddie)}'] if caddie else [])
-        if now:
-            out.append('<p>Now: ' + ' · '.join(now) + '</p>')
+    results = OD.results(w, pid) if 'golfer' in roles and tab in ('playing', 'results') else None
+    if 'golfer' in roles and tab == 'playing':
+        out.append(_profile_summary(w, pid, p, results))
+    elif tab == 'season':
+        selected = one(q, 'year', '')
+        current = w.live and str(w.live.cursor['year']) == selected
+        context = 'Season in progress' if current else 'Historical season'
+        out.append(f'<p class="notice"><strong>{context} {esc(selected)}</strong> · '
+                   'The facts below belong to this season. '
+                   f'<a href="/golfer/{pid}?tab=playing">View full career and latest profile →</a></p>')
     out.append('<div class="tabs">' + ''.join(
         f'<a href="/golfer/{pid}?tab={k}{"&year=" + quote(one(q, "year", "")) if k == "season" else ""}" '
         f'class="{"on" if k == tab else ""}">{t}</a>' for k, t, r in tabs if r in roles) + '</div>')
     if tab == 'playing':
-        out.append(_playing(w, q, pid, p))
-        out.append(OH.residence_section(w, pid, p, geo))
-        out.append(OH.familiar_section(w, pid, p, geo))
+        out.append(_playing(w, q, pid, p, results))
+        places = OH.residence_section(w, pid, p, geo) + OH.familiar_section(w, pid, p, geo)
+        out.append('<details class="profile-details" id="career-context"><summary>Places and familiarity</summary>'
+                   + (places or '<p class="muted">No residence or familiarity history recorded.</p>') + '</details>')
     elif tab == 'season':
         out.append(OH.season_view(w, q, pid, p))
     elif tab == 'results':
-        out.append(_results(w, q, pid))
+        out.append(_results(w, q, pid, results))
     elif tab == 'team':
         out.append(OH.team_history(w, pid))
     elif tab in ('coaching', 'caddying'):
@@ -1254,11 +1434,66 @@ def golfer(w, q, pid):
     if a and a.index and tab == 'playing':
         moments_ = a.index.moments(person=pid)
         if moments_:
-            out.append('<h2>Moments</h2>' + table(['Season', 'What', 'Event', 'Venue'], [
+            out.append('<details class="profile-details"><summary>Recorded moments</summary><h2>Moments</h2>' + table(['Season', 'What', 'Event', 'Venue'], [
                 [esc(m['year']), esc(m['kind']), event_link(w, m['event']), venue_link(w, m.get('layout'))]
-                for m in moments_], numeric=(0,)))
+                for m in moments_], numeric=(0,)) + '</details>')
     out.append(f'<p class="muted">* {AGE_NOTE}</p>')
     return w.name(pid), ''.join(out)
+
+
+def _profile_summary(w, pid, p, rows=None):
+    """Small, explicitly dated facts; never turn missing history into a career total."""
+    gs = p.get('golfer') or {}
+    lp = w.live.people.get(pid) if w.live else None
+    current = lp is not None
+    stamp = 'now' if current else 'last recorded'
+    stats = [('Status · ' + stamp, esc(OD.playing_status(gs)[1]))]
+    if current and pid in (getattr(w.live, 'injured_now', None) or ()):
+        stats.append(('Availability · now', '<a href="/golfer/' + str(pid)
+                      + '?tab=playing#career-ratings">Injured now</a>'))
+    if gs.get('tour'):
+        tour_stamp = 'last recorded' if gs.get('lifestyle') == 'retired' else stamp
+        stats.append(('Tour · ' + tour_stamp, tour_link(w, gs['tour'])))
+    if current and pid in w.live.wr:
+        stats.append(('World ranking · now', f'No. {w.live.wr[pid]}'))
+    ratings = (lp or {}).get('ratings')
+    if ratings:
+        rating_stamp = 'last recorded' if gs.get('lifestyle') == 'retired' else 'now'
+        stats.append(('Overall · ' + rating_stamp, f'{ratings[0]:.1f}'))
+    else:
+        snapshots = OD.rating_snapshots(w, pid)
+        if snapshots:
+            year = max(snapshots)
+            keys = (w.a.world.get('rating_keys') if w.a else None) or ['overall']
+            overall_index = keys.index('overall') if 'overall' in keys else 0
+            rating_stamp = (f'final · end of {year - 1}' if OD.playing_status(gs)[0] == 'retired'
+                            else f'start of {year}')
+            stats.append((f'Overall · {rating_stamp}', f'{snapshots[year][overall_index]:.1f}'))
+    peak = OD.recorded_peak(w, pid)
+    if peak:
+        label = 'Peak Overall' if peak['complete'] else 'Recorded Peak Overall'
+        stats.append((label, f'<a href="/golfer/{pid}?tab=playing#career-ratings">{peak["value"]:.1f}</a>'))
+    prestige = golfer_prestige(w, pid, p)
+    if prestige is not None:
+        pres_stamp = 'now' if (lp or {}).get('prestige') is not None else 'last recorded'
+        stats.append(('Prestige · ' + pres_stamp, esc(prestige)))
+    wins = [r for r in (OD.results(w, pid) if rows is None else rows) if r['pos'] == 1 and not OD.is_qualifying(r)]
+    major_wins = sum(r.get('category') == 'major' for r in wins)
+    stats.extend([('Recorded wins · all tours', results_link(pid, str(len(wins)), outcome='win')),
+                  ('Recorded major wins', results_link(pid, str(major_wins), outcome='win', honor='major'))])
+    if current:
+        stats.append((f'Prize money · {w.live.cursor["year"]} so far', money(w.live.prize.get(pid, 0.0))))
+    out = ['<dl class="profile-summary">' + ''.join(
+        f'<div class="profile-stat"><dt>{esc(label)}{HELP.help_for(label, "overall") if label.startswith("Overall ·") else HELP.help_for(label)}</dt><dd>{value}</dd></div>'
+        for label, value in stats) + '</dl>']
+    out.append('<p class="muted">Wins cover recorded events only; qualifying stages are excluded.</p>')
+    if current:
+        team = [(role, members.get(pid)) for role, members in
+                [('Coach', w.live.coach_of), ('Caddie', w.live.caddie_of)]]
+        assigned = [f'{role}: {w.person_link(person)}' for role, person in team if person]
+        if assigned:
+            out.append('<p class="profile-team">Team now · ' + ' · '.join(assigned) + '</p>')
+    return ''.join(out)
 
 
 def when(t):
@@ -1285,8 +1520,11 @@ def _ratings(w, pid, p):
     if cur is None:
         if snaps:
             last = max(snaps)
-            return (f'<h2>Ratings</h2><p class="muted">No current ratings (not competing). Last recorded at the start of '
-                    f'{last}: overall {snaps[last][0]}.</p>' + peak)
+            stamp = (f'Final playing ratings at the end of {last - 1}'
+                     if OD.playing_status(p.get('golfer'))[0] == 'retired' else f'Last recorded at the start of {last}')
+            overall_index = keys.index('overall') if 'overall' in keys else 0
+            return (f'<h2>Ratings</h2><p class="muted">No current ratings (not competing). {stamp}: '
+                    f'overall {snaps[last][overall_index]}.</p>' + peak)
         return ('<h2>Ratings</h2>' + peak) if peak else ''
     now = dict(zip(['overall', *ATTRIBUTE_KEYS], cur))
     base = dict(zip(keys, snaps[y])) if y in snaps else None
@@ -1303,17 +1541,18 @@ def _ratings(w, pid, p):
         groups.setdefault(ATTRIBUTE_GROUPS[k], []).append(k)
     cards = []
     for g, ks in groups.items():
-        rows = ''.join(f'<tr><td>{esc(ATTRIBUTE_LABELS[k])}</td><td class="n"><strong>{now[k]:.1f}</strong></td>'
+        rows = ''.join(f'<tr><td>{esc(ATTRIBUTE_LABELS[k])}{HELP.help_for(ATTRIBUTE_LABELS[k])}</td><td class="n"><strong>{now[k]:.1f}</strong></td>'
                        f'<td class="n">{delta(now[k], base and base.get(k))}</td>'
                        f'<td class="n">{delta(base and base.get(k), prev and prev.get(k))}</td></tr>' for k in ks)
-        cards.append(f'<div class="card"><h4>{esc(g)}</h4><table class="mini"><tr><th></th><th class="n">Now</th>'
-                     f'<th class="n">Season</th><th class="n">Last</th></tr>{rows}</table></div>')
+        cards.append(f'<div class="card"><h4>{esc(g)}</h4><table class="mini"><thead><tr><th scope="col">Attribute</th>'
+                     f'<th scope="col" class="n">Now</th><th scope="col" class="n">Season</th>'
+                     f'<th scope="col" class="n">Last</th></tr></thead><tbody>{rows}</tbody></table></div>')
     arche = lp.get('archetype')
     note = (f'Season: change since the start of {y}. Last: from the start of {y - 1} to the start of {y}. Ratings at the '
             'start of a season are recorded when the season before it is archived (after its season-end aging); '
             '“unavailable” where there is no such record (the world’s first season, or seasons archived before '
             'ratings were recorded). Potential is never shown.')
-    return (f'<h2>Ratings</h2><p>Overall <strong>{now["overall"]:.1f}</strong> · this season '
+    return (f'<h2>Ratings</h2><p>Overall {HELP.help_for("Overall")} <strong>{now["overall"]:.1f}</strong> · this season '
             f'{delta(now["overall"], base and base.get("overall"))} · last season '
             f'{delta(base and base.get("overall"), prev and prev.get("overall"))}'
             + (f' · archetype {esc(arche)}' if arche else '') + '</p>' + peak
@@ -1387,7 +1626,7 @@ def ratings_history(w, q, pid, p):
                    if k not in ('rh', 'rm') and v)
     modes = ''.join(f'<option value="{m}"{" selected" if m == mode else ""}>{t}</option>'
                     for m, t in (('level', 'level'), ('change', 'change from the season before')))
-    form = (f'<form class="filters" action="/golfer/{pid}">{keep}<label>Rating<select name="rh">{opts}</select></label>'
+    form = (f'<form class="filters" action="/golfer/{pid}#career-ratings">{keep}<label>Rating<select name="rh">{opts}</select></label>'
             f'<label>Show<select name="rm">{modes}</select></label><button>Show</button></form>')
     return ('<h3>Ratings over time</h3>' + form
             + f'<div class="scroll"><div class="rchart {"chg" if mode == "change" else ""}">{"".join(bars)}</div></div>'
@@ -1616,11 +1855,13 @@ def _season_history(w, q, pid, p, rows):
             else:
                 bt[2] = False
             if expand and len(tours) > 1:
-                out.append(['', '', '&nbsp;&nbsp;↳ ' + tour_link(w, t), ''] + cells(y, t, r['tours'][t],
+                out.append([label + ' <span class="tag">tour</span>', age_text(w, born, y, OD.died(p)),
+                            '&nbsp;&nbsp;↳ ' + tour_link(w, t), ''] + cells(y, t, r['tours'][t],
                                                                                   money(tp, known) if db or live else '…')
                            + [''])
     if not out:
         return '<h2>Season by season</h2><p class="muted">No seasons played yet.</p>'
+    footer_start = len(out)
     out.append(['<strong>Career</strong>', '', f'{len(by_tour)} tour{"s" if len(by_tour) != 1 else ""}', '']
                + cells(None, None, career, money(career_prize, not prize_unknown)) + [''])
     if expand:
@@ -1628,25 +1869,35 @@ def _season_history(w, q, pid, p, rows):
             out.append(['', '', '&nbsp;&nbsp;career ↳ ' + tour_link(w, t), ''] + cells(None, t, agg, money(tp, known and bool(db or w.live)))
                        + [''])
     sc = {'scope': SC.MAJORS_PREMIER} if mp else {}
-    toggle = (f'<a href="/golfer/{pid}?{urlencode({"tab": "playing", **sc})}">hide tours</a>' if expand else
-              f'<a href="/golfer/{pid}?{urlencode({"tab": "playing", "tours": 1, **sc})}">show each tour</a>')
-    toggle = scope_buttons(f'/golfer/{pid}', {**q, 'tab': ['playing']}, one(q, 'scope'), 'scope') + toggle
+    toggle = (f'<a href="/golfer/{pid}?{urlencode({"tab": "playing", **sc})}#career-seasons">hide tours</a>' if expand else
+              f'<a href="/golfer/{pid}?{urlencode({"tab": "playing", "tours": 1, **sc})}#career-seasons">show each tour</a>')
+    toggle = scope_buttons(f'/golfer/{pid}', {**q, 'tab': ['playing']}, one(q, 'scope'), 'scope',
+                           anchor='career-seasons') + toggle
     note = ('Click a season to see it as it was (that season\'s tour, rights, ratings, team and decisions). Starts '
             'exclude qualifying stages. Top 2/5/10 include wins (do not add them up); runner-up is a recorded second '
             'place (ties included). Cuts: made / stroke-play events with a cut; missed cuts are the rest of those '
             'events. Prize money is gross tournament prize money; per tour it is each event\'s recorded payout (or, for '
             'seasons played before payouts were recorded, the payouts recomputed and shown only where they match the '
             'money paid). The career row adds every season once; career by tour adds each tour\'s seasons.')
+    if expand:
+        note += ' Tour rows repeat their season so they remain identifiable when sorted; do not add tour rows to the all-tour season totals.'
     if mp:
         note += (f' {SC.LABEL}: only majors and Premier events, by each edition\'s classification when played (a '
                  'Challenger member\'s major and Premier starts count; a Premier member\'s regional starts do not); '
                  'prize money is those events\' payouts. World ranking and ratings stay global.')
     if building and expand:
         note += f' Prize money by tour is being worked out ({building["done"]} of {building["total"]} seasons).'
-    return (f'<h2>Season by season</h2><p>{toggle}</p>' + table(
+    coverage = (SC.LABEL + ': only those events; ranking and ratings stay global.' if mp else
+                'All tours · recorded seasons only. Prize money is gross tournament earnings.')
+    if w.a and pid in w.a.people and w.a.people[pid].get('initial'):
+        coverage += ' This career began before the archive; earlier results are not included.'
+    if building and expand:
+        coverage += f' Prize money by tour is being worked out ({building["done"]} of {building["total"]} seasons).'
+    return (f'<h2>Season by season</h2><p>{toggle}</p><p class="muted">{esc(coverage)}</p>' + table(
         ['Season', 'Age*', 'Tour(s)', 'Status', 'Starts', 'Wins', 'Runner-up', 'Top 2', 'Top 5', 'Top 10', 'Cuts',
-         'Missed cuts', 'Prize money', 'World (end)'], out, numeric=(1, 4, 5, 6, 7, 8, 9, 11, 12, 13))
-        + f'<p class="muted">{note}</p>')
+         'Missed cuts', 'Prize money', 'World (end)'], out[:footer_start], numeric=(1, 4, 5, 6, 7, 8, 9, 11, 12, 13),
+        footer_rows=out[footer_start:])
+        + f'<details class="help"><summary>How to read season statistics</summary><p class="muted">{note}</p></details>')
 
 
 def ST_person_seasons(db, pid):
@@ -1654,25 +1905,41 @@ def ST_person_seasons(db, pid):
     return ST.person_seasons(db, pid)
 
 
-def _playing(w, q, pid, p):
-    rows = OD.results(w, pid)
+def _playing(w, q, pid, p, rows=None):
+    rows = OD.results(w, pid) if rows is None else rows
     active = (p.get('golfer') or {}).get('lifestyle') not in (None, 'retired')
-    out = [OH.status_section(w, pid, p), _ratings(w, pid, p), OH.aggression_section(w, pid, p),
-           ratings_history(w, q, pid, p), injuries_section(w, pid, rows),
-           _honors(w, pid, rows, active),
-           OH.grand_slam_line(w, pid), _season_history(w, q, pid, p, rows),
-           OG.golf_section(w, pid, one(q, 'scope'))]
+    anchors = [('career-honors', 'Honors'), ('career-seasons', 'Seasons'), ('career-status', 'Status'),
+               ('career-ratings', 'Ratings & health'), ('career-performance', 'Performance'),
+               ('career-story', 'Career story'), ('career-context', 'Places')]
+    out = ['<nav class="section-nav" aria-label="Playing career sections">' + ''.join(
+        f'<a href="#{key}">{label}</a>' for key, label in anchors) + '</nav>',
+        '<section class="profile-section" id="career-honors">', _honors(w, pid, rows, active),
+        OH.grand_slam_line(w, pid)]
     wins = [r for r in rows if r['pos'] == 1 and not OD.is_qualifying(r)]
     if wins:
-        out.append(f'<h2>Wins ({len(wins)})</h2>' + table(['Season', 'Event', 'Tour then'], [
-            [esc(r['year']), event_link(w, r['event']), tour_link(w, r['tour'])] for r in reversed(wins)]))
-    out.append(STORY.profile_section(w, pid, rows))
-    out.append(OG.ranking_section(w, pid))
+        out.append(f'<details class="profile-details"><summary>All recorded wins ({len(wins)})</summary>'
+                   + f'<h2>Wins ({len(wins)})</h2>' + table(['Season', 'Event', 'Tour then'], [
+            [esc(r['year']), event_link(w, r['event']), tour_link(w, r['tour'])] for r in reversed(wins)]) + '</details>')
+    ratings_open = ' open' if one(q, 'rh') or one(q, 'rm') else ''
+    out.extend(['</section>', '<section class="profile-section" id="career-seasons">',
+                _season_history(w, q, pid, p, rows), '</section>',
+                '<details class="profile-details" id="career-status"><summary>Status and eligibility</summary>',
+                OH.status_section(w, pid, p), '</details>',
+                f'<details class="profile-details" id="career-ratings"{ratings_open}><summary>Ratings, development and health</summary>',
+                _ratings(w, pid, p), OH.aggression_section(w, pid, p), ratings_history(w, q, pid, p),
+                injuries_section(w, pid, rows), '</details>',
+                '<details class="profile-details" id="career-performance"><summary>Performance and world ranking</summary>',
+                OG.golf_section(w, pid, one(q, 'scope')), OG.ranking_section(w, pid), '</details>',
+                '<section class="profile-section" id="career-story">',
+                STORY.profile_section(w, pid, rows) or '<h2>Stories</h2><p class="muted">No notable performances recorded yet.</p>',
+                '</section>'])
     return ''.join(out)
 
 
-def _results(w, q, pid):
-    rows = OD.results(w, pid)
+def _results(w, q, pid, rows=None):
+    path = f'/golfer/{pid}'
+    q = {**q, 'tab': ['results']}
+    rows = OD.results(w, pid) if rows is None else rows
     year, tour, outcome, honor = one(q, 'year'), one(q, 'tour'), one(q, 'outcome'), one(q, 'honor')
     sid = one(q, 'series')
     quals = one(q, 'quals') == '1'                     # qualifying stages: shown only on request (not starts)
@@ -1700,26 +1967,60 @@ def _results(w, q, pid):
         sel = [r for r in sel if r['pos'] == 1 and not OD.is_qualifying(r) and first_honor(r) == honor]
     if not rows:
         return '<p class="muted">No starts yet.</p>'
-    sel = list(reversed(sel))
-    chunk, pager = paged(sel, q, f'/golfer/{pid}', size=50)
+    # Sort all matching starts, not just the displayed page. Keep ties deterministic
+    # in both directions and keep unrecorded values after recorded zeroes.
     db, _ = w.statistics()
-    prizes = OD.start_prizes(w, pid, chunk, db)
+    columns = {0: 'year', 1: 'week', 2: 'event', 3: 'tour', 4: 'pos', 5: 'prize',
+               6: 'coach', 7: 'caddie', 8: 'route'}
+    sort = one(q, 'sort', 'year')
+    if sort not in columns.values():
+        sort = 'year'
+    direction = one(q, 'dir')
+    if direction not in ('asc', 'desc'):
+        direction = DIR_FIRST.get(sort, 'asc')
+    prizes = OD.start_prizes(w, pid, sel, db) if sort == 'prize' else {}
+    tours_by_id = w.tours()
+    def value(r):
+        if sort in ('year', 'week', 'pos'):
+            return r.get(sort)
+        if sort == 'prize':
+            return prizes.get((r['event'], r['site']))
+        if sort == 'event':
+            return text_key(f"{r['event'].split(':')[0]} {w.series_name(r['event'].split(':', 1)[1])}")
+        if sort == 'tour':
+            t = r.get('tour')
+            return text_key(tours_by_id.get(t, {}).get('name', t.replace('_', ' ').title())) if t else None
+        if sort in ('coach', 'caddie'):
+            return text_key(w.name(r[sort])) if r.get(sort) else None
+        route = r.get('route')
+        return text_key(OH.R.explain(route, w.calendar_version)[1] or route) if route else None
+    sel = sorted(sel, key=lambda r: (-(r.get('year') or 0), -(r.get('week') or 0), r['event'], r['site']))
+    valued = [(r, value(r)) for r in sel]
+    known = [(r, v) for r, v in valued if v is not None]
+    known.sort(key=lambda item: item[1], reverse=direction == 'desc')
+    sel = [r for r, _ in known] + [r for r, v in valued if v is None]
+    chunk, pager = paged(sel, q, path, size=50, drop=('tsort',))
+    if sort != 'prize':
+        prizes = OD.start_prizes(w, pid, chunk, db)
+    heads = sort_heads(path, q, columns, sort, direction)
     years = sorted({r['year'] for r in rows}, reverse=True)
     tours = sorted({r['tour'] for r in rows if r['tour']})
-    f = filters(f'/golfer/{pid}', {**q, 'tab': ['results']}, [
+    f = filters(path, q, [
         ('year', 'Season', [('', 'all')] + [(str(y), str(y)) for y in years]),
         ('tour', 'Tour then', [('', 'all'), (SC.MAJORS_PREMIER, SC.LABEL)]
          + [(t, w.tours().get(t, {}).get('name', t)) for t in tours]),
         ('outcome', 'Finish', [('', 'any'), ('win', 'wins'), ('runner-up', 'runner-up'), ('top2', 'top 2'), ('top5', 'top 5'),
-                               ('top10', 'top 10'), ('made-cut', 'made cut'), ('missed-cut', 'missed cut')])])
-    f = f.replace('<button>Apply</button>', '<input type="hidden" name="tab" value="results">'
-                  + ('<input type="hidden" name="quals" value="1">' if quals else '') + '<button>Apply</button>')
+                               ('top10', 'top 10'), ('made-cut', 'made cut'), ('missed-cut', 'missed cut')])],
+        carry=('tab', 'quals', 'series', 'honor', 'sort', 'dir'), clear_keep=('tab',))
+    def clear_scope(key):
+        keep = {k: v[0] for k, v in q.items() if v and v[0] and k not in (key, 'page', 'tsort', 'default')}
+        return esc(f'{path}?{urlencode(keep)}')
     if honor:
-        f += f'<p>Honor: {esc(dict((k, l) for k, l, _ in OD.HONORS).get(honor, honor))} · <a href="/golfer/{pid}?tab=results">clear</a></p>'
+        f += f'<p>Honor: {esc(dict((k, l) for k, l, _ in OD.HONORS).get(honor, honor))} · <a href="{clear_scope("honor")}">clear</a></p>'
     if sid:
-        f += f'<p>Tournament: <a href="/series/{quote(sid)}">{esc(w.series_name(sid))}</a> · <a href="/golfer/{pid}?tab=results">clear</a></p>'
+        f += f'<p>Tournament: <a href="/series/{quote(sid)}">{esc(w.series_name(sid))}</a> · <a href="{clear_scope("series")}">clear</a></p>'
     n_quals = sum(1 for r in rows if OD.is_qualifying(r))
-    toggle = urlencode({**{k: v[0] for k, v in q.items() if k not in ('quals', 'page')}, 'tab': 'results',
+    toggle = urlencode({**{k: v[0] for k, v in q.items() if v and v[0] and k not in ('quals', 'page', 'tsort', 'default')}, 'tab': 'results',
                         **({} if quals else {'quals': '1'})})
     scope = (f'qualifying stages included and marked ({n_quals:,}; not starts) · '
              f'<a href="/golfer/{pid}?{toggle}">starts only</a>' if quals else
@@ -1735,11 +2036,12 @@ def _results(w, q, pid):
           money(prizes[(r['event'], r['site'])]) if (r['event'], r['site']) in prizes
                   else '<span class="muted">—</span>',
           w.person_link(r['coach']), w.person_link(r['caddie']), OH.route_html(r['route'], w.calendar_version)]
-         for r in chunk], numeric=(0, 1, 4, 5)) + pager
-        + '<p class="muted">Prize: the money paid for the start, as recorded (since rules 2026-10-30); for older seasons '
+         for r in chunk], numeric=(0, 1, 4, 5), heads=heads) + pager
+        + '<p class="muted">Prize: recorded or reconciled payouts. “—” means unconfirmed or still loading.</p>'
+        + '<details class="help"><summary>Prize money and entry routes</summary><p>Prize: the money paid for the start, as recorded (since rules 2026-10-30); for older seasons '
           'the start’s share of the purse recomputed from the event’s finish and checked against the money paid that '
           'season, “—” where that cannot be confirmed (or the statistics are still being built). How they got in: the '
-          'rule in words, linked to the rules page, with the code recorded at the time.</p>')
+          'rule in words, linked to the rules page, with the code recorded at the time.</p></details>')
 
 
 def live_stints(w, pid, side, kind=None):
@@ -1867,7 +2169,9 @@ def _staff_card(info, role):
         rows.append(('Prestige', f'{info["reputation"]} <span class="muted">of 100: their public reputation, built by '
                      + ('their clients\' success' if role == 'coach' else 'the success and earnings of the bags they '
                         'carry') + '; it is what golfers see when choosing, not a measure of skill</span>'))
-    return '<dl class="kv">' + ''.join(f'<dt>{k}</dt><dd>{v}</dd>' for k, v in rows) + '</dl>'
+    return '<dl class="kv">' + ''.join(
+        f'<dt>{k}{HELP.help_for(k, "prestige_staff") if k == "Prestige" else ""}</dt><dd>{v}</dd>'
+        for k, v in rows) + '</dl>'
 
 
 PAIR_NOTE = ('Fit: how well the two work together, drawn once for each pairing and kept for good (−2 to +2; most '
@@ -2112,7 +2416,7 @@ def tournaments(w, q):
         ['Tournament', 'Tour', 'Tier', 'Kind', 'Category', 'Prestige', 'Editions played'], [
         [f'<a href="/series/{quote(sid)}">{esc(s.get("name", sid))}</a>', tour_link(w, s.get('tour')), esc(s.get('tier')),
          esc(s.get('kind')), esc(s.get('category')), OP.cell(pres.get(sid)), str(counts.get(sid, 0))] for sid, s in chunk],
-        numeric=(2, 5, 6), heads=heads) + pager
+        numeric=(2, 5, 6), heads=heads, help_keys={5: 'prestige_event'}) + pager
 
 
 def calendar(w, q):
@@ -2178,7 +2482,8 @@ def courses_page(w, q):
                                                'Prestige', 'Editions hosted'], [
         [course_link(w, cid), esc(c.get('city')), esc(sub(c)), nation_link(c.get('country')), esc(c.get('class')),
          esc(', '.join(c.get('layouts', {}))), OP.cell(pres.get(cid)), str(hosted.get(cid, 0)) if hosted.get(cid) else
-         '0 <span class="muted">(local club)</span>'] for cid, c in chunk], numeric=(6, 7), heads=heads) + pager
+         '0 <span class="muted">(local club)</span>'] for cid, c in chunk], numeric=(6, 7), heads=heads,
+                      help_keys={6: 'prestige_course'}) + pager
 
 
 def course(w, q, cid):
@@ -2287,7 +2592,7 @@ def nations(w, q):
                            [OP.cell(get('prestige', n)), OP.cell(get('multiplier', n), 3), OP.pct(share('juniors', n)),
                             OP.pct(share('juniors', n, 'baseline_shares')), OP.pct(share('new_pros', n))]
                            for n, r in rows],
-                           numeric=tuple(range(1, k + 6))))
+                           numeric=tuple(range(1, k + 6)), help_keys={k + 1: 'prestige_nation'}))
 
 
 def nation(w, q, code):
@@ -2414,13 +2719,15 @@ def tour_scope_name(w, tour):
     return w.tours().get(tour, {}).get('name', tour)
 
 
-def scope_buttons(path, q, current, param='tour'):
+def scope_buttons(path, q, current, param='tour', anchor=None):
     """The shared one-click scope control: Majors + Premier, or All tours (the reset). It replaces only the tour
     choice; season, view, sort, minimum and every other filter are kept."""
     keep = {k: v[0] for k, v in q.items() if k not in (param, 'page') and v and v[0]}
     def b(value, label):
         on = (current or '') == value
         href = f'{path}?{urlencode({**keep, **({param: value} if value else {})})}'
+        if anchor:
+            href += '#' + quote(anchor)
         return f'<a href="{href}" class="{"on" if on else ""}" aria-pressed="{"true" if on else "false"}">{esc(label)}</a>'
     return ('<div class="tabs scope" title="Which events count">' + b(SC.MAJORS_PREMIER, SC.LABEL) + b('', 'All tours')
             + '</div>')
@@ -2504,11 +2811,16 @@ def stats_page(w, q, view='stats'):
         else:
             nxt, mark = first, ''
         args = {**keep, 'sort': k, **({'dir': nxt} if nxt != first else {})}
-        return (f'<a href="{path}?{urlencode(args)}"' + (f' aria-sort="{"descending" if desc else "ascending"}"'
-                                                         if k == sort else '') + f'>{esc(label)}{mark}</a>')
-    head = ('<tr><th class="n">#</th><th>' + sort_link('name', 'Golfer') + '</th><th>Nation</th>'
-            + (f'<th class="n" title="{esc(ov_note)}">' + sort_link('overall', ov_label) + '</th>' if ov_label else '')
-            + ''.join(f'<th class="n">{sort_link(k, label)}</th>' for k, label, _ in cols) + '</tr>')
+        return f'<a href="{path}?{urlencode(args)}">{esc(label)}{mark}</a>'
+    def stat_head(k, label, numeric=True, note=''):
+        aria = f' aria-sort="{"descending" if desc else "ascending"}"' if k == sort else ''
+        title = f' title="{esc(note)}"' if note else ''
+        return (f'<th scope="col"{" class=n" if numeric else ""}{aria}{title}>'
+                + sort_link(k, label) + HELP.help_for(label, 'overall' if k == 'overall' else None) + '</th>')
+    head = ('<tr><th scope="col" class="n">#</th>' + stat_head('name', 'Golfer', False)
+            + '<th scope="col">Nation</th>'
+            + (stat_head('overall', ov_label, note=ov_note) if ov_label else '')
+            + ''.join(stat_head(k, label) for k, label, _ in cols) + '</tr>')
     yfilter = None if ysel == 'all' else ysel
     body = []
     for i, (pid, r) in enumerate(chunk, start + 1):
@@ -2533,8 +2845,10 @@ def stats_page(w, q, view='stats'):
     scope += ' · ' + tour_scope_name(w, tour)
     other = ('<a href="/money">Prize money leaderboard</a>' if view == 'stats' else '<a href="/stats">All statistics</a>')
     return title, (f + f'<p>{esc(scope)} · {len(rows):,} golfers · {other}</p>'
-                   + f'<div class="scroll"><table>{head}{"".join(body)}</table></div>' + pager
-                   + f'<p class="muted">{STATS_NOTE}' + (f' {esc(ov_note)}' if ov_note else '') + '</p>')
+                   + f'<div class="scroll"><table data-identity="second"><thead>{head}</thead><tbody>{"".join(body)}</tbody></table></div>' + pager
+                   + '<p class="muted">Recorded results only; qualifying stages are excluded. Unknown prize money stays marked unknown.</p>'
+                   + f'<details class="help"><summary>How to read these statistics</summary><p>{STATS_NOTE}'
+                   + (f' {esc(ov_note)}' if ov_note else '') + '</p></details>')
 
 
 def overall_column(w, db, ysel, cur, pids):
@@ -2595,9 +2909,9 @@ def records(w, q):
                if w.a else no_history())
     return 'Record Book', (through + '<h2>Start here</h2><ul>' + first + '</ul><h2>Golf statistics and '
                                      'margins</h2><ul>' + OG.records_list() + '</ul><h2>All lists</h2><ul>' + rest +
-                                     '</ul><h2>Definitions</h2><dl>' + ''.join(
+                                     '</ul><details class="help"><summary>Record definitions</summary><dl>' + ''.join(
                                          f'<dt>{esc(k)}</dt><dd class="muted">{esc(v)}</dd>' for k, v in DEFINITIONS.items())
-                                     + '</dl>')
+                                     + '</dl></details>')
 
 
 def record(w, q, name):

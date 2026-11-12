@@ -29,7 +29,7 @@ FORMAT = 'golf-legacy-views/1'
 MAX_SAVED = 200
 
 # list pages whose view is remembered (exact paths) and list pages under a prefix (each remembered by its path)
-LISTS = {'/rankings': 'World ranking', '/golfers': 'Golfers', '/coaches': 'Coaches', '/caddies': 'Caddies',
+LISTS = {'/search': 'People', '/rankings': 'World ranking', '/golfers': 'Golfers', '/coaches': 'Coaches', '/caddies': 'Caddies',
          '/records': 'Record Book', '/moments': 'Moments', '/tournaments': 'Tournaments', '/calendar': 'Calendar',
          '/courses': 'Courses', '/nations': 'Nations', '/tours': 'Tours', '/seasons': 'Seasons', '/stats': 'Stats',
          '/money': 'Prize money', '/grand-slam': 'Career Grand Slam', '/cohort': 'Where are they now',
@@ -233,14 +233,14 @@ def views_page(w, q):
         body = ('<p class="muted">No saved views yet. On any list (Stats, Prize money, Golfers, Records, Moments and '
                 'others) choose a season, scope, filters, sort and page, then <em>Save view</em>.</p>')
     else:
+        from observer import table
         rows = []
         for x in sorted(saved, key=lambda x: (page_name(x['path']), x['name'])):
-            rows.append(f'<tr><td><a href="{esc(href(x["path"], x["query"]))}">{esc(x["name"])}</a></td>'
-                        f'<td>{esc(page_name(x["path"]))}</td><td>{describe(x["path"], x["query"])}</td>'
-                        f'<td>{esc(x["added"])}</td><td><form method="post" action="/views/remove" class="inline">'
-                        f'<input type="hidden" name="id" value="{esc(x["id"])}"><button>Remove</button></form></td></tr>')
-        body = ('<div class="scroll"><table class="sortable"><thead><tr><th>View</th><th>Page</th><th>What it shows</th>'
-                '<th>Saved</th><th></th></tr></thead><tbody>' + ''.join(rows) + '</tbody></table></div>')
+            rows.append([f'<a href="{esc(href(x["path"], x["query"]))}">{esc(x["name"])}</a>',
+                         esc(page_name(x['path'])), describe(x['path'], x['query']), esc(x['added']),
+                         '<form method="post" action="/views/remove" class="inline">'
+                         f'<input type="hidden" name="id" value="{esc(x["id"])}"><button>Remove</button></form>'])
+        body = table(['View', 'Page', 'What it shows', 'Saved', 'Actions'], rows)
     last = state(w)['last']
     if last:
         body += ('<h2>Last view of each page</h2><p class="muted">Opening a page from the menu shows the view you '
@@ -280,7 +280,8 @@ SORT_JS = """<script>
   }
   var tables = function () { return Array.prototype.slice.call(document.querySelectorAll('table.sortable')); };
   document.addEventListener('click', function (ev) {
-    var th = ev.target.closest('table.sortable th'); if (!th || ev.target.closest('a,button,input,select')) return;
+    var th = ev.target.closest('table.sortable thead th');
+    if (!th || (ev.target.closest('a,button,input,select') && !ev.target.closest('button.sort-button'))) return;
     var table = th.closest('table'), i = Array.prototype.indexOf.call(th.parentNode.children, th);
     if (table.hasAttribute('data-server-sort')) {      // the server sorts the whole list: follow the heading's link
       var href = th.getAttribute('data-href'); if (href) location.href = href; return;

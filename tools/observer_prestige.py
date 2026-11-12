@@ -276,11 +276,8 @@ def nation_section(w, code):
     if trs:
         h = (['Entrant season', 'Prestige'] + (['Achievement', 'Against expectation'] if achieved else [])
              + ['Multiplier', 'Share of juniors', 'Share of new pros', 'Juniors', 'New pros'])
-        out.append('<div class="scroll"><table class="sortable"><thead><tr>'
-                   + ''.join(f'<th{" class=n" if i else ""} title="Sort the rows shown by this column">{esc(x)}</th>' for i, x in enumerate(h))
-                   + '</tr></thead><tbody>'
-                   + ''.join('<tr>' + ''.join(f'<td{" class=n" if i else ""}>{c}</td>' for i, c in enumerate(r)) + '</tr>'
-                             for r in trs) + '</tbody></table></div>')
+        from observer import table
+        out.append(table(h, trs, numeric=tuple(range(1, len(h))), help_keys={1: 'prestige_nation'}))
     out.append(pending_note(pend))
     out.append('<p class="muted">Each entrant season’s shares were set when the season before it ended, from national '
                'prestige; Juniors and New pros are the golfers the nation actually received that season (the totals '

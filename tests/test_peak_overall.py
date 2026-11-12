@@ -158,13 +158,13 @@ class World(unittest.TestCase):
             return [float(v) if v[:1].isdigit() else None
                     for v in re.findall(r'<tr><td class="n">\d+</td><td>.*?</td><td>.*?</td><td class="n">([^<]*)', body)]
         down = self.page('/stats?sort=overall')
-        self.assertIn('aria-sort="descending">Overall ▼', down)
+        self.assertRegex(down, r'<th scope="col" class=n aria-sort="descending"[^>]*><a href="[^"]+">Overall ▼</a>')
         vals = column(down)
         live = [p['ratings'][0] for pid, p in self.w.live.people.items() if p.get('ratings')]
         self.assertEqual(vals[0], max(live))                               # the top of every row, not of one page
         self.assertEqual(vals, sorted(vals, reverse=True))
         up = self.page('/stats?sort=overall&dir=asc')
-        self.assertIn('aria-sort="ascending">Overall ▲', up)
+        self.assertRegex(up, r'<th scope="col" class=n aria-sort="ascending"[^>]*><a href="[^"]+">Overall ▲</a>')
         vals_up = [v for v in column(up) if v is not None]
         self.assertEqual(vals_up, sorted(vals_up))
         n = int(re.search(r'([\d,]+) golfers', up).group(1).replace(',', ''))

@@ -47,6 +47,8 @@ packages a saved world for us. How to stop, reopen, which saves are supported an
 checklist: `docs/OBSERVER_ALPHA.md`. From a terminal: `python tools/observer.py --open`.
 `RUN_BENCHMARK_WINDOWS.bat` times a season skip on your computer and writes `benchmark_result.txt`.
 
+On the realism testing branch, the observer also includes the [desktop UI cleanup](docs/review/ui/TESTING.md).
+
 ## Running it (Windows)
 
 1. Install Python 3.11 or newer from python.org (tick "Add Python to PATH").

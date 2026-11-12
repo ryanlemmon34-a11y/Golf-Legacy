@@ -403,11 +403,11 @@ class App:
         w = self.world
         job = self.job()
         if path == '/worlds':
-            return O.page(w, *self.library_page(q), job=job, notices=notices)
+            return O.page(w, *self.library_page(q), job=job, notices=notices, path=path)
         if path == '/export':
-            return O.page(w, *self.export_page(q), job=job, notices=notices)
+            return O.page(w, *self.export_page(q), job=job, notices=notices, path=path)
         if path == '/job':
-            return O.page(w, *self.job_page(q), job=job, notices=notices)
+            return O.page(w, *self.job_page(q), job=job, notices=notices, path=path)
         if w is None:
             self.notices[:0] = notices                  # not shown yet
             return None
@@ -425,7 +425,7 @@ class App:
                  '(<a href="/export">report a problem</a> includes it).</p>')
         if r is None:
             return 404
-        return O.page(w, *r, job=job, notices=notices)
+        return O.page(w, *r, job=job, notices=notices, path=path)
 
     def library_page(self, q):
         worlds = WL.list_worlds(self.lib)

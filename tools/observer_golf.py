@@ -120,6 +120,7 @@ def golf_section(w, pid, scope=None):
         rows.append([label, str(a['starts']), str(a['rounds'])] + figure_cells(a) + [_coverage(a)])
     if not rows:
         return ''
+    footer_start = len(rows)
     if career.get('golf_starts'):
         rows.append(['<strong>Career</strong>', str(career['starts']), str(career['rounds'])] + figure_cells(career)
                     + [_coverage(career)])
@@ -130,9 +131,11 @@ def golf_section(w, pid, scope=None):
                                 + figure_cells(c) + [_coverage(c)])
     from golfsim.scopes import MAJORS_PREMIER, LABEL
     title = '<h2>Golf statistics' + (f' — {LABEL}' if scope == MAJORS_PREMIER else '') + '</h2>'
-    return (title + O.table(head, rows, numeric=tuple(range(1, len(head) - 1)))
-            + f'<p class="muted">{DEFINITIONS_NOTE} Coverage: starts with recorded statistics / starts. The career rows '
-              'add only recorded seasons. <a href="/stats?show=golf">Compare in the Stats directory</a>.</p>')
+    return (title + O.table(head, rows[:footer_start], numeric=tuple(range(1, len(head) - 1)),
+                           footer_rows=rows[footer_start:])
+            + '<p class="muted">Coverage: starts with recorded statistics / starts. The career rows '
+              'add only recorded seasons. <a href="/stats?show=golf">Compare in the Stats directory</a>.</p>'
+            + f'<details class="help"><summary>Golf statistic definitions</summary><p>{DEFINITIONS_NOTE}</p></details>')
 
 
 def _coverage(c):
@@ -174,10 +177,14 @@ def golf_table(w, q, data, path, keep, cur_note, single_season):
     base = {k: v for k, v in keep.items() if k != 'min'}          # the toggle sets or drops the minimum itself
     def th(k, label):
         """Best first; the active heading turns it around (worst first) and back."""
-        mark = (' ▲' if worst else ' ▼') if k == sort else ''
+        higher = GS.METRICS[k][3] if k in GS.METRICS else True
+        ascending = worst == higher
+        mark = (' ▲' if ascending else ' ▼') if k == sort else ''
         args = {**keep, 'sort': k, **({'dir': 'worst'} if k == sort and not worst else {})}
-        return f'<th class="n"><a href="{path}?{urlencode(args)}">{O.esc(label)}{mark}</a></th>'
-    head = ('<tr><th class="n">#</th><th>Golfer</th><th>Nation</th>' + th('golf_starts', 'Starts') + th('rounds', 'Rounds')
+        aria = f' aria-sort="{"ascending" if ascending else "descending"}"' if k == sort else ''
+        return (f'<th scope="col" class="n"{aria}><a href="{path}?{urlencode(args)}">{O.esc(label)}{mark}</a>'
+                + O.HELP.help_for(label) + '</th>')
+    head = ('<tr><th scope="col" class="n">#</th><th scope="col">Golfer</th><th scope="col">Nation</th>' + th('golf_starts', 'Starts') + th('rounds', 'Rounds')
             + ''.join(th(k, SHORT[k]) for k in SHOWN) + '</tr>')
     body = []
     for i, (pid, r) in enumerate(chunk, start + 1):
@@ -191,9 +198,11 @@ def golf_table(w, q, data, path, keep, cur_note, single_season):
             + f'). Proposed thresholds: {QUALIFY["season_rounds"]} rounds for a season, {QUALIFY["career_rounds"]} '
               'all-time, for review.')
     return (f'<p>{cur_note} · {len(rows):,} golfers · {qual}</p>'
-            + f'<div class="scroll"><table>{head}{"".join(body)}</table></div>' + pager
-            + f'<p class="muted">{DEFINITIONS_NOTE} Sorted ' + ('worst first' if worst else 'best first')
-            + ' (best: lowest for scoring, putts and bogeys; the active heading turns the order around); N/A last.</p>')
+            + f'<div class="scroll"><table data-identity="second"><thead>{head}</thead><tbody>{"".join(body)}</tbody></table></div>' + pager
+            + '<p class="muted">Sorted ' + ('worst first' if worst else 'best first')
+            + '; N/A last. Coverage and qualification apply to recorded rounds.</p>'
+            + f'<details class="help"><summary>Golf statistics and sort directions</summary><p>{DEFINITIONS_NOTE} '
+              'Best: lowest for scoring, putts and bogeys; the active heading turns the order around.</p></details>')
 
 
 # ---- world ranking points ------------------------------------------------------------------------------------------

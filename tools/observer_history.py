@@ -697,7 +697,7 @@ def aggression_section(w, pid, p):
         v = ((p or {}).get('golfer') or {}).get('aggression')
     if v is None:
         return ''
-    return (f'<h2>Playing style</h2><p>Aggression <b>{O.esc(v)}</b> / 100 · {O.esc(aggression_style(v))}</p>'
+    return (f'<h2>Playing style</h2><p>Aggression {O.HELP.help_for("Aggression")} <b>{O.esc(v)}</b> / 100 · {O.esc(aggression_style(v))}</p>'
             f'<p class="muted">{O.esc(AGGRESSION_NOTE)} <a href="/rules#aggression">rule</a></p>')
 
 

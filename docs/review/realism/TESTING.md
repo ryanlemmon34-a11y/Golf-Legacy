@@ -4,6 +4,8 @@
 the runaway hole (`fix/engine-dogleg-retee`, merged at `c6ce161`). It is an **experimental playtest build**, not
 calibrated balance; see `RESULTS.md`. Main is unchanged.
 
+**UI cleanup:** the current head also includes the desktop observer cleanup. You can test both in this one branch; see [UI changes and playtest checklist](../ui/TESTING.md). Career-preview gameplay remains separate.
+
 **The baseline to compare against is main + the same engine fix:** `fix/engine-dogleg-retee` at `46013a5`. Plain
 main lacks the fix, so on doglegs it plays differently from both test builds.
 

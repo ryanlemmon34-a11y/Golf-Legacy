@@ -200,7 +200,8 @@ class RatingsOverTime(unittest.TestCase):
         self.assertIn(f'<dt>Takes on</dt><dd>up to {info["clients"]} clients</dd>', html)
         for k, label in (('teaching', 'Teaching'), ('scouting', 'Scouting')):   # shown and archived (2026-11-02)
             self.assertIn(f'<dt>{label}</dt><dd>{info[k]:.1f} ', html)
-        self.assertIn(f'<dt>Prestige</dt><dd>{info["reputation"]} ', html)  # public reputation, shown apart
+        self.assertIn(f'<dt>Prestige{O.HELP.help_for("Prestige", "prestige_staff")}</dt><dd>{info["reputation"]} ',
+                      html)  # public reputation and its explanation, shown apart from skill
         self.assertIn('not a measure of skill', html)
         self.assertNotIn('potential', html.split('<dl class="kv">')[1].split('</dl>')[0].replace(
             'never the player\'s hidden potential', ''))                     # no golfer's potential, anywhere
@@ -268,8 +269,9 @@ class RatingsOverTime(unittest.TestCase):
         vals = [float(v) for v in re.findall(r'<td class=n>([0-9]+\.[0-9])</td><td>', page)]
         self.assertTrue(vals)
         self.assertEqual(vals, sorted(vals, reverse=True))                # highest first
-        head = (r'<th class=n aria-sort="descending" data-href="/{}\?[^"]*sort=reputation&amp;dir=asc" '
-                r'title="Sort the whole list by this column"><a href="[^"]+">Prestige</a></th>')
+        head = (r'<th class=n scope="col" aria-sort="descending" data-href="/{}\?[^"]*sort=reputation&amp;dir=asc" '
+                r'title="Sort the whole list by this column"><a href="[^"]+">Prestige</a>'
+                r'<button type="button" class="context-help"[^>]+><span aria-hidden="true">\?</span></button></th>')
         self.assertRegex(page, head.format('golfers'))                   # a heading that sorts the whole list
         coaches = O.render(self.w, '/coaches', parse_qs('sort=reputation'))[1]
         self.assertRegex(coaches, head.format('coaches'))
