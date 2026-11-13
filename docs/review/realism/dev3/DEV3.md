@@ -39,7 +39,8 @@ Generation only (no golf played):
 
 Controlled projection (production `develop_week` / `age_year` on a fixed schedule; no access, money, injuries,
 coaching or retirement; `junior_projection_6_seeds.json`): dev-2 potential 92+ (n = 13) median peak 93.24 → 91.74,
-years at 90+ 18.8 → 13.2; potential 84–89 unchanged. James Garside's class (seed 416342, 2040): entry 94.11 → 84.75,
+years at 90+ 18.8 → 13.2; potential 84–87 unchanged, 87–89 nearly unchanged (median peak 87.25 → 87.12, entry
+76.51 → 76.48), 89–92 slightly lower (median peak 89.71 → 89.51). James Garside's class (seed 416342, 2040): entry 94.11 → 84.75,
 age 19 95.3 → 87.2, peak 97.96 → 93.39, ceilings at 99 18 → 0.
 
 Played (full-size world, seed 416342, dev-3, 5 seasons 2027–2031 only; the run stopped at the tool's 420 s season
@@ -48,8 +49,9 @@ passed each season. Rory 93.8 → 92.7 (Test3: 98.5 → 97.3), gap 3.5 → 2.0 (
 7), Premier-tier wins 11 (Test3: 23). Five seasons say nothing about long-term balance.
 
 Compatibility: dev-1 and dev-2 generation, junior and new-professional classes and 15 years of aging fingerprint
-identical to `c9f53d3` (`dev2_fingerprint.py`); a dev-2 world played two seasons (scale 0.1) is identical to
-`c9f53d3` (`season_fp.py`).
+identical to `c9f53d3` (`dev2_fingerprint.py`); a dev-1 world and a dev-2 world each played two seasons
+(scale 0.1) are identical to `c9f53d3` (`season_fp.py`). These run the code directly; the observer itself keeps
+older worlds browse-only (see step 4 below).
 
 ## Fresh-world tests for Ryan
 
@@ -70,10 +72,16 @@ identical to `c9f53d3` (`dev2_fingerprint.py`); a dev-2 world played two seasons
      everything);
    - 18–19-year-old prodigies: very good, still growing, rarely top-10 in the world in their first season;
    - how long one golfer stays #1, majors per golfer, ages of major winners;
-   - starting money: the best professionals rich, not hundreds of millions; mini-tour players unchanged;
+   - starting money: seeded by each professional's standing among all the world's professionals (every tour,
+     mini tours included), so the best are rich but not hundreds of millions, and a world whose best are in the 80s
+     seeds them like one whose best are in the 90s; amateurs and club professionals keep their flat amounts;
    - Premier fields (36 Premier + 4 majors a year), no zero-start full-time amateur or college seasons, money
      reconciling (the observer's checks).
-4. Old saves (dev-1 / dev-2) open and continue with their own rules.
+4. Existing worlds (Test3 and every world created on an earlier build) are **browse-only** in this build: the
+   observer continues only worlds saved by the same engine (owner decision, 31 October 2026), and these changes
+   give a new engine. Continue an old world with the build that created it; test these changes on fresh worlds.
+   (The code still keeps each world's own rules: a dev-1 or dev-2 world loaded by this code plays dev-1 or dev-2,
+   verified against `c9f53d3`.)
 
 ## Limits
 
