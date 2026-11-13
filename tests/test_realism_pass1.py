@@ -91,7 +91,7 @@ class Readiness(unittest.TestCase):
         nations = starting_nations()
         for seed, year in ((11, 2031), (386509, 2036), (7, 2031), (11, 2044)):     # (incl. formerly-flipped routes)
             a = P.junior_class(year, seed, nations, 1, set(), rules=RZ.LEGACY)
-            b = P.junior_class(year, seed, nations, 1, set(), rules=RZ.CURRENT)
+            b = P.junior_class(year, seed, nations, 1, set(), rules=RZ.DEV2)
             self.assertEqual([ident(g) for g in a], [ident(g) for g in b], (seed, year))
             for x, y in zip(a, b):
                 self.assertEqual(x.potential, y.potential)
@@ -103,7 +103,7 @@ class Readiness(unittest.TestCase):
             for x, y in short:
                 self.assertGreater(y.potential - y.overall, 3.5)
             na = P.new_professionals(year, seed, nations, 1, set(), rules=RZ.LEGACY)
-            nb = P.new_professionals(year, seed, nations, 1, set(), rules=RZ.CURRENT)
+            nb = P.new_professionals(year, seed, nations, 1, set(), rules=RZ.DEV2)
             self.assertEqual([(ident(g), g.potential, g.attrs) for g in na], [(ident(g), g.potential, g.attrs) for g in nb])
 
     def test_a_full_size_new_world_keeps_every_initial_decision(self):
@@ -113,8 +113,8 @@ class Readiness(unittest.TestCase):
         assigned memberships on the lowered teenage ratings and moved four paths: reviewer probe of debb655).
         Only teenagers' attributes (lower entry, same potential) and their ceilings differ."""
         a = P.generate_world(seed=2027, dev_rules=RZ.LEGACY)
-        b = P.generate_world(seed=2027)
-        self.assertEqual((a.dev_rules, b.dev_rules), (RZ.LEGACY, RZ.CURRENT))
+        b = P.generate_world(seed=2027, dev_rules=RZ.DEV2)
+        self.assertEqual((a.dev_rules, b.dev_rules), (RZ.LEGACY, RZ.DEV2))
         self.assertEqual(len(a.golfers), len(b.golfers))
         self.assertGreater(len(a.golfers), 5000)
 
@@ -170,11 +170,11 @@ class Aging(unittest.TestCase):
         g = golfer(peak=27.0)
         before = dict(g.attrs)
         for age in range(19, 30):                                        # through peak + 2
-            D.age_year(g, age, random.Random(age), 1.0, rules=RZ.CURRENT)
+            D.age_year(g, age, random.Random(age), 1.0, rules=RZ.DEV2)
         for k in D.CATEGORY_OF:
             if k not in RZ.EXPERIENCE_KEYS and RZ.AGING[k][0] >= 3:
                 self.assertEqual(g.attrs[k], before[k], k)                # nothing physical or technical lost yet
-        D.age_year(g, 31, random.Random(31), 1.0, rules=RZ.CURRENT)       # peak + 4: physical only
+        D.age_year(g, 31, random.Random(31), 1.0, rules=RZ.DEV2)       # peak + 4: physical only
         self.assertLess(g.attrs['power'], before['power'])
         self.assertEqual(g.attrs['chipping'], before['chipping'])
 
@@ -189,11 +189,11 @@ class Aging(unittest.TestCase):
                 path.append(dict(g.attrs))
             return path
         prof = RZ.profile(golfer(gid=7))
-        new, old = run(RZ.CURRENT, 1.0 / prof['physical']), run(RZ.LEGACY, 1.0)   # (this golfer's factor removed)
+        new, old = run(RZ.DEV2, 1.0 / prof['physical']), run(RZ.LEGACY, 1.0)   # (this golfer's factor removed)
         for at in (40, 45, 50):
             self.assertLess(new[at - 26]['power'], old[at - 26]['power'] - 1.0, at)
         for lo, hi in ((0.6, 0.8), (0.8, 1.0), (1.0, 1.4)):
-            a, b = run(RZ.CURRENT, lo), run(RZ.CURRENT, hi)
+            a, b = run(RZ.DEV2, lo), run(RZ.DEV2, hi)
             self.assertGreater(a[50 - 26]['power'], b[50 - 26]['power'])            # (at 50: above the 1.0 floor)
             self.assertGreater(a[50 - 26]['short_putting'], b[50 - 26]['short_putting'])
         drops = [new[i]['power'] - new[i + 1]['power'] for i in range(len(new) - 1)]
@@ -208,7 +208,7 @@ class Aging(unittest.TestCase):
         stroke); dev-2 lets it mature until 48 and decline only after 55, like the mental game."""
         g, h = golfer(peak=27.0, level=70), golfer(peak=27.0, level=70)
         for age in range(36, 48):
-            D.age_year(g, age, random.Random(age), 1.0, rules=RZ.CURRENT)
+            D.age_year(g, age, random.Random(age), 1.0, rules=RZ.DEV2)
             D.age_year(h, age, random.Random(age), 1.0, rules=RZ.LEGACY)
         self.assertGreater(g.attrs['green_reading'], 70.0)
         self.assertLess(h.attrs['green_reading'], 70.0)
@@ -216,7 +216,7 @@ class Aging(unittest.TestCase):
     def test_part_of_physical_decline_is_conditioning_training_can_win_back(self):
         g = golfer(peak=27.0, level=80)
         g.ceilings = dict(g.attrs)
-        D.age_year(g, 40, random.Random(1), 1.0, rules=RZ.CURRENT)
+        D.age_year(g, 40, random.Random(1), 1.0, rules=RZ.DEV2)
         gap = g.ceilings['power'] - g.attrs['power']
         lost = 80.0 - g.attrs['power']
         self.assertAlmostEqual(gap, RZ.MAINTAIN * lost, places=6)

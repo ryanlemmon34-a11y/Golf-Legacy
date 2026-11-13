@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import re
 
-RULES_VERSION = '2026-11-16'
+RULES_VERSION = '2026-11-17'
 RANKING_RULE = 'world-ranking-1'     # the world ranking's formula (unchanged since the world began; named now)
 VERSIONS = (
     ('2026-10-30', 'Winners\' exemptions count whatever a golfer\'s membership (a non-member champion earns a '
@@ -134,6 +134,15 @@ VERSIONS = (
                    'can win back; green reading matures with experience until 48). Worlds started earlier keep dev-1. '
                    'Long irons rated 25 to 60 now play a little better with each point (they had played alike); from '
                    '60 up nothing changes, nor for mid irons and wedges.'),
+    ('2026-11-17', 'Development rules dev-3 for new worlds (golfsim/realism.py, section 3): the rarest talents no '
+                   'longer land at 99 in everything. Potential above 89 is compressed smoothly (a better talent is '
+                   'still always better; 92 becomes about 91.2, 99 about 93.9, never above 95), and the golfer\'s '
+                   'level moves with it, for the starting world, juniors and new professionals alike, after the '
+                   'scouts, colleges and tours have chosen, so every class keeps exactly its golfers, nations and '
+                   'paths. A teenager with exceptional potential keeps more room to grow at entry (half a point more '
+                   'per point of potential above 85: about 9 points for the very best at 18). The mental game and '
+                   'green reading still mature with experience, but the last points to 99 come slowly. Worlds '
+                   'started earlier keep their rules (dev-1 or dev-2) unchanged.'),
 )
 EARLIER = ('Seasons archived before rules versions were recorded were played under earlier rules. The '
            'differences that matter for reading old results: a winner without a Premier card held no '

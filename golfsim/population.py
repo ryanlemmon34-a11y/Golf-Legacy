@@ -237,14 +237,17 @@ def _make_golfer(i, row, year, seed, profiles, taken, in_use=None, rules=RZ.LEGA
     prof = profiles[country]
     grng = random.Random(f'{seed}:golfer:{i}')
     arch = _pick_archetype(prof.style, grng)
-    before = grng.getstate() if rules == RZ.CURRENT else None
+    before = grng.getstate() if rules in RZ.READY_RULES else None
     attrs = _build_attrs(cur, arch, prof.style, age, peak, grng)
     if before is not None:
-        low = RZ.entry_overall(cur, pot, age)
+        low, new_pot = RZ.generated_level(cur, pot, age, rules)
         if low < cur:
             twin = random.Random()
             twin.setstate(before)
-            ready[i] = _build_attrs(low, arch, prof.style, age, peak, twin)
+            built = _build_attrs(low, arch, prof.style, age, peak, twin)
+            # dev-2: the attributes only (the potential is the existing rule's); dev-3: the elite-tail potential too
+            ready[i] = built if rules not in RZ.ELITE_RULES else \
+                (built, math.ceil(max(new_pot, overall_rating(built)) * 10) / 10)
     pers = _personality(arch, cur, grng)
     g = Golfer(make_name(country, grng, taken, in_use), attrs, pers, archetype=arch, id=i, country=country,
                born=year - age, hometown=grng.choice(CITIES_BY_COUNTRY[country]).name, status=status,
@@ -260,8 +263,13 @@ def _make_golfer(i, row, year, seed, profiles, taken, in_use=None, rules=RZ.LEGA
 def _apply_ready(golfers, ready):
     """Swap in the readiness-floor attributes (_make_golfer) once the existing rule's decisions are taken."""
     for g in golfers:
-        if g.id in ready:
-            g.attrs = ready[g.id]
+        r = ready.get(g.id)
+        if r is None:
+            continue
+        if isinstance(r, tuple):                  # dev-3: attributes and the elite-tail potential (realism.py, 3)
+            g.attrs, g.potential = r
+        else:
+            g.attrs = r
 
 
 def generate_world(year=2027, seed=2027, nation_profiles=None, scale=1.0, dev_rules=RZ.CURRENT):
@@ -692,7 +700,7 @@ def new_professionals(year, seed, profiles, start_id, taken, in_use=None, baseli
     ready = {}
     golfers = [_make_golfer(start_id + i, row, year, f'{seed}:p{year}', profiles, taken, in_use, rules, ready)
                for i, row in enumerate(rows)]
-    _apply_ready(golfers, ready)                  # (aged 21 or more: nothing to swap)
+    _apply_ready(golfers, ready)                  # (aged 21 or more: dev-3's elite tail only)
     for g in golfers:
         g.turned_pro = year
     return golfers

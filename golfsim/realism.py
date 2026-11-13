@@ -1,7 +1,9 @@
-"""Development rules for new worlds: readiness at entry and attribute-specific aging (rules 2026-11-16, 'dev-2').
+"""Development rules for new worlds: readiness at entry and attribute-specific aging (rules 2026-11-16, 'dev-2'),
+then the elite tail, prodigy readiness and the experience taper (rules 2026-11-17, 'dev-3', section 3 below).
 
 Worlds keep the development rules they were created with (`World.dev_rules`, `Season.dev_rules`): worlds created
-before these rules, and any world asked for `LEGACY`, play the rules of 'dev-1' unchanged. Plan, targets and
+before these rules, and any world asked for `LEGACY`, play the rules of 'dev-1' unchanged; worlds created under
+'dev-2' keep 'dev-2' unchanged (sections 1 and 2 only). Plan, targets and
 evidence: docs/review/realism/PLAN.md and RESULTS.md.
 
 1. Readiness at entry (teenagers only). The existing generation rule draws a candidate's potential, peak age, aging
@@ -33,7 +35,16 @@ import math
 import random
 
 LEGACY = 'dev-1'
-CURRENT = 'dev-2'
+DEV2 = 'dev-2'
+DEV3 = 'dev-3'
+CURRENT = DEV3
+# Which rule families each version uses. Versions are compared by membership, never by `== CURRENT`: when CURRENT
+# moves on, a world created under an earlier version must keep exactly its own rules (a dev-2 world keeps dev-2
+# readiness and dev-2 aging; it must not fall back to dev-1 because it is no longer CURRENT).
+READY_RULES = (DEV2, DEV3)           # readiness floor at entry (section 1)
+ATTRIBUTE_AGING = (DEV2, DEV3)       # attribute-specific aging (section 2)
+ELITE_RULES = (DEV3,)                # elite tail, prodigy readiness, experience taper (section 3)
+KNOWN = (LEGACY, DEV2, DEV3)
 
 # ---- 1. readiness at entry ----------------------------------------------------------------------------------------
 READY_FLOOR = 4.5            # youth headroom (potential - Overall) an 18-year-old keeps at least, softly
@@ -49,10 +60,11 @@ def _softplus(z):
     return z + math.log1p(math.exp(-z)) if z > 0 else math.log1p(math.exp(z))
 
 
-def entry_overall(cur, pot, age):
+def entry_overall(cur, pot, age, rules=DEV2):
     """The entry Overall under the readiness floor: potential minus a headroom that is never far below the floor.
-    Increasing in `cur` and in `pot`; equal to `cur` from age 20; never above `cur`."""
-    m = ready_floor(age)
+    Increasing in `cur` and in `pot`; equal to `cur` from age 20; never above `cur`. Under dev-3 the floor also
+    grows with how far the potential is above PRODIGY_FROM (prodigy_floor)."""
+    m = ready_floor(age) if rules not in ELITE_RULES else prodigy_floor(pot, age)
     if m <= 0.0:
         return cur
     s = m / 4.0
@@ -95,3 +107,62 @@ def profile(g):
         r = random.Random(f'aging-profile:{g.id}:{g.born}')
         p = _PROFILES[key] = {c: math.exp(PROFILE_SD * r.gauss(0.0, 1.0) - PROFILE_SD ** 2 / 2) for c in PROFILE_CATS}
     return p
+
+
+# ---- 3. the elite tail (dev-3, rules 2026-11-17) ---------------------------------------------------------------------
+# Measured on dev-2 (Test3, seed 416342, 55 seasons; and generation over 40 seeds): talent is drawn from a normal
+# distribution (sd 13) and the rating scale stops at 99, so the very rare draws far above every other golfer land at
+# or near 99 with every skill at 99 (the starting world's Rory Wilson, 98.6 against 90.5; James Garside, potential
+# 99, entering at 94.1 at 18 and leading the world by 6-7 for twenty years). The clamp at 99 also ate the youth
+# headroom of exactly those draws (their entry level came from the unclamped talent, their potential was cut to 99).
+#
+# a. Elite tail. Potential above ELITE_KNEE is compressed smoothly towards ELITE_KNEE + ELITE_SPAN:
+#        p' = K + S (1 - exp(-(p - K) / S))
+#    monotone (a better draw is always better), slope 1 at the knee, unchanged below it. The level moves down by the
+#    same amount, so the golfer keeps the growth (or decline) they had for their age. Every generated golfer (the
+#    starting world, juniors, new professionals) is treated alike, after every decision the existing rule takes on
+#    the entry level (memberships, college or series), so cohorts, identities, paths and nation allocation are
+#    unchanged. At K 89, S 6: 90 -> 89.9, 91.8 -> 91.2, 95 -> 92.8, 99 -> 93.9 (asymptote 95).
+# b. Prodigy readiness. The 18-year-old floor (READY_FLOOR) grows by PRODIGY_SLOPE per point of potential above
+#    PRODIGY_FROM (half at 19, none from 20): a potential-94 teenager keeps at least about 9 points to grow, a
+#    potential-88 one about 6, a typical potential-80 one 4.5 as in dev-2. Ordinary juniors are untouched.
+# c. Experience taper. The mental game and green reading still mature with experience until 48, but the last few
+#    points to 99 come slowly (growth x (99 - rating) / EXPERIENCE_TAPER when the rating is above 99 - TAPER), so
+#    long careers no longer end with every mental attribute at exactly 99. Below 87 nothing changes.
+ELITE_KNEE = 89.0
+ELITE_SPAN = 6.0
+PRODIGY_FROM = 85.0
+PRODIGY_SLOPE = 0.5
+EXPERIENCE_TAPER = 12.0
+
+
+def elite_potential(pot):
+    """The dev-3 potential for a drawn potential (section 3a)."""
+    if pot <= ELITE_KNEE:
+        return pot
+    return ELITE_KNEE + ELITE_SPAN * (1.0 - math.exp(-(pot - ELITE_KNEE) / ELITE_SPAN))
+
+
+def prodigy_floor(pot, age):
+    """The dev-3 readiness floor (section 3b): dev-2's floor plus the prodigy term, both scaled by age."""
+    lo, hi = READY_AGES
+    share = max(0.0, min(1.0, (hi - age) / (hi - lo)))
+    return share * (READY_FLOOR + PRODIGY_SLOPE * max(0.0, pot - PRODIGY_FROM))
+
+
+def generated_level(cur, pot, age, rules):
+    """(entry Overall, potential) for a generated golfer under the world's rules. dev-1: unchanged; dev-2: the
+    readiness floor; dev-3: the elite tail, then the readiness floor with the prodigy term on the new scale."""
+    if rules in ELITE_RULES:
+        new_pot = elite_potential(pot)
+        cur = cur - (pot - new_pot)
+        return entry_overall(cur, new_pot, age, rules), new_pot
+    if rules in READY_RULES:
+        return entry_overall(cur, pot, age), pot
+    return cur, pot
+
+
+def experience_taper(rating):
+    """Share of a year's experience growth an attribute at this rating still takes (section 3c)."""
+    room = 99.0 - rating
+    return 1.0 if room >= EXPERIENCE_TAPER else max(0.0, room / EXPERIENCE_TAPER)
