@@ -22,12 +22,14 @@ from golfsim.season import Season                                      # noqa: E
 from golfsim.session import Session, StaleCursor, UnsupportedCareer    # noqa: E402
 
 # digests of the fixture world (all AI) after its first season, and after 12 more weeks advanced one committed week
-# at a time, under the engine this branch builds on: main 18a8e23 + the reviewed engine fix fix/engine-dogleg-retee
-# (e99cb20; tee plans priced as played, reload after out of bounds re-plans), computed with the same procedure on
-# that fix branch (46013a5). For reference, main 18a8e23 alone gives 25ca6497...e42b and 6d826056...d4cb; the fix
-# changes play in this small world's first season, so the reference moved with it.
-MAIN_SEASON1 = '4d9be6cb11b25ac9d2d42c3a5242ab9650c3d3ff92859d18fb64e24a56a92097'
-MAIN_2028_W12 = '1ce3067674f215e25afd2e66eb46ff148e3c14747276a596c9c17dacfea76e7a'
+# at a time, under the engine this integration build builds on: the realism test build 52870f5 (engine of 7e88aa2:
+# dev-3 rules for new worlds, the long-irons table of rules 2026-11-16, standing-based seeded money), computed with
+# the same procedure on 52870f5 itself (docs/career/INTEGRATION.md). The career branch's earlier reference, main
+# 18a8e23 + the engine fix (4d9be6cb...2097 and 1ce30676...e7a), cannot hold here: the long-irons table changes play
+# in every world, whatever its development rules (a dev-1 fixture gives 360fed3a...a165 on both 52870f5 and this
+# build).
+MAIN_SEASON1 = 'c6230d8ec521c39b53e8829585ddb3e59ff646e1f795b2e67130150dc233c25b'
+MAIN_2028_W12 = '80ad8e6f1cbccef2a72a6e323de52bb675da401a455808cca11a0908df54b8a9'
 
 REST = {'kind': 'rest'}
 POLICY = {'selected': 'accept', 'qualifying': 'skip'}
@@ -64,8 +66,9 @@ def golfer(s):
 
 class AllAI(unittest.TestCase):
     def test_all_ai_worlds_equal_main(self):
-        """Without a career the engine and session behave exactly as the engine this branch builds on (main + the
-        engine fix): the same world after a season and after twelve more weeks advanced one committed week at a time."""
+        """Without a career the engine and session behave exactly as the engine this build builds on (the realism
+        test build 52870f5, dev-3): the same world after a season and after twelve more weeks advanced one committed
+        week at a time."""
         s = Session.open(F.copy_of(F.first_boundary()))
         self.assertEqual(F.digest(s), MAIN_SEASON1)
         for _ in range(12):
