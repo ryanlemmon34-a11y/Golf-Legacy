@@ -71,8 +71,10 @@ These were already not built on the career branch and are unchanged by the integ
 
 ## Tests
 
-Measured on the code of this commit. The only changes after `01a7340` are this document, the scripts in
-`docs/career/integration/` and the career test's reference digests.
+Measured on the engine and observer code of this commit. Everything after the merge `01a7340` is tests and
+documents only: this document, the scripts in `docs/career/integration/`, the career test's reference digests and
+the two test corrections below. The focused runs were on `61aa60c` (identical game code); the full suite was run on
+the final commit.
 - **Career foundation** (`tests.test_career_foundation`, model/API): 25 tests OK, including all-AI equivalence against
   dev-3.
 - **Career, session, observer and UI** (`test_observer_career`, `test_session`, `test_observer_app`, `test_ui_shell`,
@@ -96,6 +98,24 @@ Measured on the code of this commit. The only changes after `01a7340` are this d
   - A safe stop at week 52 before the winter (no 2029 class created).
   - Return to AI, the world continuing under AI into 2029, and a reopen afterwards.
   - Run time: 336 s for the first season and 768 s in all, on this 2-core cloud machine (not Ryan's).
+- **A real event entry on a full-size world** (`docs/career/integration/career_event_full.py`, same world and golfer):
+  every block plans the least prestigious eligible, affordable event. No entry is forced and no rule is changed.
+  - The golfer's entry priority was computed in each of the 4 entry orderings, like everyone's.
+  - Three entries were not accepted (fields full), so their fallbacks applied, with notices.
+  - In week 2 of 2028 he entered North American Amateur Series Event 3 and finished 18th, with 69, in a field of 144.
+    The result is in the season's results and survives save and reopen.
+- **Two baseline failures from the career branch**, corrected in tests only, with no change to the game:
+  - `test_amateur_return.WorkStart.test_every_way_into_work_records_it` fails on `c3847d3` and passes on `52870f5`.
+    - Cause: career mode moved the work-start recording into `work_pathway.take_job`, which the AI path and the
+      player's acceptance both call, so the source check on `work_pathway.decide` could no longer find it.
+    - The test keeps its `careers.decide` three-path check. It now checks the recording in `take_job` and both callers.
+    - A new runtime test proves that the AI path and the player's yes record the same start date, history row and log,
+      and that a no records nothing and keeps the golfer full-time. Disabling the recording, or the accept path, makes
+      it fail.
+  - `test_college_open_access.FieldFillingTests.test_fixed_capacity_no_duplicates_deterministic` fails on `c3847d3` and
+    passes on `52870f5`.
+    - Cause: its `Stub(Season)` skips `Season.__init__`, and the entry code now reads `Season.career`.
+    - The stub now sets `career = None` (an all-AI season). No assertion changed.
 - **Full suite:** run on this exact commit. The result and any failure with its baseline status are in the hand-off
   note, not in this file, so that the tested commit and the shipped commit are the same.
 

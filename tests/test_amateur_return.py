@@ -8,6 +8,7 @@ Run from the project folder:  python -m unittest tests.test_amateur_return -v
 from __future__ import annotations
 
 import sys
+from collections import defaultdict
 import unittest
 from pathlib import Path
 from types import SimpleNamespace as NS
@@ -155,10 +156,54 @@ class WorkStart(unittest.TestCase):
 
     def test_every_way_into_work_records_it(self):
         import inspect
-        from golfsim import careers, work_pathway
+        from golfsim import career as CA, careers, work_pathway
         src = inspect.getsource(careers.decide)
         self.assertEqual(src.count("AR.started_work("), 3)              # graduation, took a job, back to amateur
-        self.assertIn('AR.started_work(', inspect.getsource(work_pathway.decide))
+        # the work pathway (since career mode, c3847d3): its one consequence, take_job, records the start, and both
+        # ways into it -- the AI's decision (work_pathway.decide) and the player's yes (career._decide) -- go through it
+        self.assertIn('AR.started_work(', inspect.getsource(work_pathway.take_job))
+        self.assertIn('take_job(', inspect.getsource(work_pathway.decide))
+        self.assertIn('WP.take_job(', inspect.getsource(CA._decide))
+
+    def _pathway_world(self, career=None):
+        from golfsim import work_pathway as WP
+        g = NS(id=7, lifestyle='full_time', status='amateur', cash=0.0, age=lambda year: 20)
+        logs = []
+        s = NS(work_pathway_on=True, career=career, g={7: g}, amateur_work_from={},
+               cash_blocked={7: WP.WEEKS}, am_pos={}, work_pathway=defaultdict(list),
+               log=lambda gid, y, w, text: logs.append((gid, y, w, text)))
+        return s, g, logs
+
+    def test_the_ai_and_the_players_yes_record_the_start_and_a_no_records_nothing(self):
+        """At run time, not only in the source: the AI path and the player's acceptance record the same start date
+        and history; declining records nothing and keeps the golfer full-time."""
+        from unittest import mock
+        from golfsim import career as CA, work_pathway as WP
+        with mock.patch.object(WP, 'tracked', lambda g: True), mock.patch.object(WP, 'why_not', lambda s, g, y: ''):
+            s, g, logs = self._pathway_world()                          # the AI: a job from this block on
+            WP.decide(s, 2031, 17)
+            self.assertEqual(s.amateur_work_from, {7: (2031, 17)})
+            self.assertEqual(g.lifestyle, 'part_time')
+            self.assertEqual([r['week'] for r in s.work_pathway[2031]], [17])
+            self.assertNotIn(7, s.cash_blocked)
+            self.assertEqual(len(logs), 1)
+            ai = (dict(s.amateur_work_from), [dict(r) for r in s.work_pathway[2031]], logs[0][3])
+
+            for answer in ('accept', 'decline'):                      # the player: an offer, then the answer
+                car = CA.Career(7, 2031, 1, {'kind': 'test'})
+                s, g, logs = self._pathway_world(car)
+                WP.decide(s, 2031, 17)
+                self.assertEqual((s.amateur_work_from, g.lifestyle, logs), ({}, 'full_time', []))   # nothing yet
+                d = car.pending(('job',))[0]
+                CA.apply(s, {'year': 2031, 'week': 17, 'phase': 'week'},
+                         {'schema': CA.SCHEMA, 'type': 'decide', 'decision': d['id'], 'answer': answer})
+                if answer == 'accept':
+                    self.assertEqual((dict(s.amateur_work_from), [dict(r) for r in s.work_pathway[2031]], logs[0][3]), ai)
+                    self.assertEqual(g.lifestyle, 'part_time')
+                else:
+                    self.assertEqual((s.amateur_work_from, dict(s.work_pathway), logs), ({}, {}, []))
+                    self.assertEqual(g.lifestyle, 'full_time')
+                    self.assertEqual(s.cash_blocked, {7: WP.WEEKS})
 
 
 if __name__ == '__main__':

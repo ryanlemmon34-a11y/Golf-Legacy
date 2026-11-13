@@ -69,6 +69,7 @@ class Stub(Season):
         self.event_routes = defaultdict(dict)
         self.entry_stats = defaultdict(_dd_counter)
         self.entry_wants, self.entry_misses = defaultdict(Counter), defaultdict(Counter)
+        self.career = None                        # an all-AI season (career mode, c3847d3, reads Season.career)
 
     # what the regular entries read about each golfer: everyone eligible, willing and able to pay
     def home_country(self, g):
