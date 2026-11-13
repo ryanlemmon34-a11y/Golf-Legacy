@@ -30,6 +30,19 @@ requirements are unchanged; no new long run, spending or calibration change is a
    tournaments, records and frivolities; navigation and long-history queries.
 5. **Complete the universe and release proof**: nation development, remaining autonomous pathway details,
    broad long-run validation. Nation-versus-nation events later; nationality and residence history kept.
+6. **Golfer Encyclopedia Entry** (owner request, 13 November 2026; roadmap only, not yet authorised for
+   implementation). Scheduled after career functionality testing. On the golfer profile, an entry the
+   observer generates only when the reader asks for it: nothing is prepared in advance or in the background.
+   - Factual only: every statement comes from the simulation's records (history archive, careers, results,
+     moments, rankings, staff stints, residence, ratings over time). No dramatisation, invented quotes,
+     motives, personality colour or events that the records do not contain.
+   - Sections appear only where the records support them (for example origin, amateur and college path,
+     professional career, notable and major wins, records and moments, coaches and caddies, later career,
+     retirement or coaching); a section with no supporting record is left out, not padded.
+   - Fresh when requested: built from the records as they stand at that moment, stating the date it reflects;
+     an earlier copy is never shown as current.
+   - Built so that the same mechanism can later produce entries for tournaments, courses and nations (each
+     entity type with its own record-backed sections); golfers only in the first version.
 
 ## Roadmap v14 build (branch build/v14; report `docs/V14_BUILD_REPORT.md`)
 
