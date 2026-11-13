@@ -164,7 +164,13 @@ class ProfileTests(unittest.TestCase):
     def test_shown_with_explanation_not_a_grade(self):
         w = SimpleNamespace(live=SimpleNamespace(people={5: {'aggression': 82}}))
         html = self.OH.aggression_section(w, 5, {'roles': ['golfer'], 'golfer': {}})
-        self.assertIn('Aggression <b>82</b> / 100', html)
+        # the label, then (since the observer's context help, c9f53d3) an optional help button, then the value on
+        # its 0-100 scale: the same reading as before, with the button allowed between label and value
+        self.assertRegex(html, r'Aggression (<button type="button" class="context-help"[^>]*>.*?</button> )?'
+                               r'<b>82</b> / 100')
+        if 'context-help' in html:                        # the help text says what the number is, not a grade
+            self.assertIn('data-help="A fixed 0–100 personality trait: cautious to attacking.', html)
+            self.assertIn('not ability', html)
         self.assertIn('attacking', html)
         self.assertIn('not an ability', html)
         self.assertIn('higher is not better', html)
