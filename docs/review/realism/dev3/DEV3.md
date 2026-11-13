@@ -43,15 +43,41 @@ years at 90+ 18.8 → 13.2; potential 84–87 unchanged, 87–89 nearly unchange
 76.51 → 76.48), 89–92 slightly lower (median peak 89.71 → 89.51). James Garside's class (seed 416342, 2040): entry 94.11 → 84.75,
 age 19 95.3 → 87.2, peak 97.96 → 93.39, ceilings at 99 18 → 0.
 
-Played (full-size world, seed 416342, dev-3, 5 seasons 2027–2031 only; the run stopped at the tool's 420 s season
-safeguard because it shared the CPU with the test suite): 0 reconcile errors, 0 staff violations, population checks
-passed each season. Rory 93.8 → 92.7 (Test3: 98.5 → 97.3), gap 3.5 → 2.0 (Test3: 8.0 → 5.9), majors 6 of 20 (Test3:
-7), Premier-tier wins 11 (Test3: 23). Five seasons say nothing about long-term balance.
+Played (full-size world, seed 416342, dev-3 at `43c134a`, 5 seasons 2027–2031 only): 0 reconcile errors, 0 staff
+violations, population checks passed each season. Rory 93.8 → 92.7 (Test3: 98.5 → 97.3), gap 3.5 → 2.0 (Test3: 8.0 →
+5.9), majors 6 of 20 (Test3: 7), Premier-tier wins 11 (Test3: 23). The run was stopped by `tools/long_world.py`'s
+runaway safeguard: season 2031 took 444 s against its 420 s limit (2027–2030: 345–404 s), while the run shared
+the 2-core machine with the full test suite. No baseline timing was measured on this machine under the same load, so
+whether dev-3 itself is slower is not established here. Five seasons say nothing about lifetime careers, dominance
+or long-term balance; Rory still winning 6 of 20 majors means a 3–4 point lead may still dominate majors early.
 
 Compatibility: dev-1 and dev-2 generation, junior and new-professional classes and 15 years of aging fingerprint
 identical to `c9f53d3` (`dev2_fingerprint.py`); a dev-1 world and a dev-2 world each played two seasons
 (scale 0.1) are identical to `c9f53d3` (`season_fp.py`). These run the code directly; the observer itself keeps
 older worlds browse-only (see step 4 below).
+
+## Tests
+
+Full suite (`python -m unittest discover -s tests`), run once on `43c134a` (golfsim and tools identical to the final
+commit; later commits change tests and docs only): `Ran 1223 tests in 7893 s; FAILED (failures=6, skipped=4)`, no
+errors. All six failures also fail on `c9f53d3` (re-run per module on both commits); each was a stale UI string from
+`c9f53d3`'s sortable headers and context-help buttons:
+
+| test | on `c9f53d3` | fix (test only; UI unchanged) |
+|---|---|---|
+| `test_aggression_visible.ProfileTests.test_shown_with_explanation_not_a_grade` | fails | `91686ba`: help button allowed between label and value; value, scale and help text checked |
+| `test_nation_achievement.ObserverText.test_achievement_shown_with_its_explanation` | fails | `601b5ba`: header matched inside its sort button |
+| `test_nation_achievement.ObserverProjections.test_live_only_new_formula_detail_shows_its_components` | fails | `601b5ba` (also restores two absence checks that had become vacuous) |
+| `test_v17_integration.NationPageWithPendingSeasons.test_pending_seasons_are_not_records_and_rows_are_as_wide_as_the_table` | fails | `caaa04c` |
+| `test_v17_integration.NationPageWithPendingSeasons.test_all_pending_new_world_with_its_live_season` | fails | `caaa04c` (also restores one vacuous absence check) |
+| `test_world_prestige.InASession.test_observer_columns_and_bars` | fails | `caaa04c` (the rest of the test, never reached on `c9f53d3`, now runs and passes) |
+
+The full suite was **not** re-run on the final commit. On the final commit the affected and new modules were re-run:
+`test_aggression_visible`, `test_nation_achievement`, `test_v17_integration`, `test_world_prestige`,
+`test_dev3_elite_money`, `test_realism_pass1` (75 tests, OK); `tools/money_reference.py --check` matches.
+
+Test3 itself (a copy): loaded by this code through the engine override in 261 s, world and season `dev-2`, one week
+played (2082 week 1 → 2) without error.
 
 ## Fresh-world tests for Ryan
 
