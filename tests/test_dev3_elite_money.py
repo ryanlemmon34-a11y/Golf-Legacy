@@ -185,18 +185,48 @@ class MoneyStanding(unittest.TestCase):
             if x.status in ('amateur', 'club_pro'):
                 self.assertEqual(x.cash, y.cash)
 
-    def test_seeded_fame_follows_standing_under_dev3(self):
+    def test_newcomer_is_placed_as_if_already_in_the_pool(self):
+        """member=False (a new professional judged against the world they join) equals adding them to the pool."""
+        pool = [55.0, 62.5, 62.5, 70.0, 70.0, 81.25, 90.0]
+        m = FIN.MoneyStanding(pool)
+        for x in (40.0, 55.0, 62.5, 66.0, 70.0, 85.0, 90.0, 95.0):
+            joined = FIN.MoneyStanding(pool + [x])
+            self.assertEqual(m.standing(x, member=False), joined.standing(x), x)
+            g = golfer(x, born=1999)
+            joined = FIN.MoneyStanding(pool + [g.overall])            # (the golfer's Overall as computed, to the bit)
+            self.assertEqual(FIN.initial_cash(g, 26, 0.4, m, member=False), FIN.initial_cash(g, 26, 0.4, joined), x)
+            self.assertEqual(FIN.seeded_losses(g, 3, m, member=False), FIN.seeded_losses(g, 3, joined), x)
+        self.assertEqual(FIN.MoneyStanding([]).standing(70, member=False), FIN.MoneyStanding([70]).standing(70))
+
+    def test_seeded_fame_is_exactly_scale_free_under_dev3(self):
+        """Two dev-3 worlds identical but for every golfer's ratings moved down by 5 (order unchanged) seed exactly
+        the same fame for every golfer; under dev-2 (absolute Overall) they do not."""
         from golfsim import prestige as PR
         from golfsim.season import Season
-        w = P.generate_world(seed=5, scale=0.05)
-        s = Season(copy.deepcopy(w), seed=5, workers=1)
-        pros = [g for g in s.world.golfers if FIN.in_money_pool(g)]
-        top = max(pros, key=lambda g: g.overall)
-        fame = sum(v for _, v in s.fame_log[top.id])
-        pool = FIN.MoneyStanding(g.overall for g in pros)
-        lo, hi = PR.seeded_fame(pool.reference(top.overall), 0.0), PR.seeded_fame(pool.reference(top.overall), 1.0)
-        self.assertTrue(lo - 1e-6 <= fame <= hi + 1e-6)
 
+        def seeded(rules, shift):
+            w = P.generate_world(seed=5, scale=0.05, dev_rules=rules)
+            for g in w.golfers:
+                g.attrs = {k: v - shift for k, v in g.attrs.items()}
+            s = Season(w, seed=5, workers=1)
+            return s, {g.id: list(s.fame_log[g.id]) for g in s.world.golfers}
+
+        s0, a = seeded(RZ.DEV3, 0.0)
+        _, b = seeded(RZ.DEV3, 5.0)
+        self.assertEqual(a, b)
+        s2, c = seeded(RZ.DEV2, 0.0)
+        _, d = seeded(RZ.DEV2, 5.0)
+        self.assertNotEqual(c, d)
+        # and the value is the formula's: the best professional's six entries sum to seeded_fame of the reference
+        # Overall at their standing, for this world's own draw u (recovered from the dev-2 world, which shares the
+        # stream: same seed, same golfers, same order)
+        pros = [g for g in s0.world.golfers if FIN.in_money_pool(g)]
+        top = max(pros, key=lambda g: g.overall)
+        ref = FIN.MoneyStanding(g.overall for g in pros).reference(top.overall)
+        absolute = sum(v for _, v in c[top.id])                     # dev-2: seeded_fame(Overall, u)
+        base = PR.seeded_fame(s2.world.by_id[top.id].overall, 0.0) / 0.6           # (this golfer's dev-2 Overall)
+        share = absolute / base                                     # 0.6 + 0.8 u
+        self.assertAlmostEqual(sum(v for _, v in a[top.id]), PR.seeded_fame(ref, (share - 0.6) / 0.8), places=6)
 
 if __name__ == '__main__':
     unittest.main()
