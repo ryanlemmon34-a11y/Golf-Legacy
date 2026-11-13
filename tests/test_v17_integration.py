@@ -31,6 +31,12 @@ def rows_of(html):
     return [re.findall(r'<td[^>]*>(.*?)</td>', r) for r in re.findall(r'<tr>(.*?)</tr>', tb)]
 
 
+
+def header(name):
+    """A column header of the observer's tables: the name closes the <th>, directly or (since the sortable headers of
+    c9f53d3) inside its sort button. Present or absent exactly as the plain header was."""
+    return '>' + re.escape(name) + '(</button>)?</th>'
+
 class ListsWithTheStore(unittest.TestCase):
     def test_sorted_lists_while_values_are_being_read(self):
         for w, page, col in ((TourWorld(), O.tournaments, 'S'), (CourseWorld(), O.courses_page, 'C')):
@@ -79,7 +85,7 @@ class NationPageWithPendingSeasons(unittest.TestCase):
     def test_pending_seasons_are_not_records_and_rows_are_as_wide_as_the_table(self):
         recs = {2040: PS.PENDING, 2041: {'nations': self.NEW}, 2042: None, 2043: PS.PENDING}
         html = self.page(recs)                                                 # (no AttributeError on PENDING)
-        self.assertIn('>Achievement</th>', html)
+        self.assertRegex(html, header('Achievement'))
         self.assertIn('Visible success first', html)
         self.assertIn('being read', html)
         widths = {len(r) for r in rows_of(html)}
@@ -92,13 +98,13 @@ class NationPageWithPendingSeasons(unittest.TestCase):
     def test_all_pending_new_world_with_its_live_season(self):
         live = {'nations': dict(self.NEW, closed=2043, baseline_shares={'juniors': {'Fiji': 0.01}, 'new_pros': {}})}
         html = self.page({2040: PS.PENDING, 2041: PS.PENDING, 2042: PS.PENDING}, live=live)
-        self.assertIn('>Achievement</th>', html)                              # from the live view's own fields
+        self.assertRegex(html, header('Achievement'))                              # from the live view's own fields
         self.assertEqual({len(r) for r in rows_of(html)}, {9})
 
     def test_an_old_world_with_pending_seasons_keeps_seven_columns(self):
         old = {k: v for k, v in self.NEW.items() if k not in ('achievement', 'rules')}
         html = self.page({2040: PS.PENDING, 2041: {'nations': old}, 2042: None})
-        self.assertNotIn('>Achievement</th>', html)
+        self.assertNotRegex(html, header('Achievement'))
         self.assertEqual({len(r) for r in rows_of(html)}, {7})
 
 

@@ -5,6 +5,7 @@ Run from the project folder:  python -m unittest tests.test_world_prestige -v
 """
 from __future__ import annotations
 
+import re
 import shutil
 import sys
 import tempfile
@@ -22,6 +23,13 @@ from golfsim.session import Session                                     # noqa: 
 
 SER = WorldCalendar().by_id['PT_GULF_COAST_CLASSIC']
 
+
+
+def header(name):
+    """A column header of the observer's tables: the name closes the <th>, directly or inside its sort link or sort
+    button, optionally followed (since the observer's context help, c9f53d3) by its help button in the same <th>."""
+    return ('>' + re.escape(name) + r'(</a>|</button>)?'
+            r'(<button type="button" class="context-help"[^>]*>(?:(?!</th>).)*?</button>)?</th>')
 
 class EventWindow(unittest.TestCase):
     def test_warm_up_first_edition_carries_a_quarter(self):
@@ -148,7 +156,7 @@ class InASession(unittest.TestCase):
     def test_observer_columns_and_bars(self):
         O, w = self.O, self.w
         _, html = O.tournaments(w, {})
-        self.assertRegex(html, r'>Prestige(</a>)?</th>')
+        self.assertRegex(html, header('Prestige'))
         _, html = O.tournaments(w, {'sort': ['prestige']})
         # the most prestigious first; tied leaders (the majors can tie exactly) in the list's own order: tier, then name
         import observer_prestige as OP
@@ -163,14 +171,14 @@ class InASession(unittest.TestCase):
         self.assertIn('<span class="ry">2027</span>', html)
         self.assertIn('<span class="ry">now</span>', html)
         _, html = O.courses_page(w, {})
-        self.assertRegex(html, r'>Prestige(</a>)?</th>')
+        self.assertRegex(html, header('Prestige'))
         cid = max(self.end_courses, key=self.end_courses.get)
         _, html = O.course(w, {}, cid)
         self.assertIn('Prestige over time', html)
         self.assertIn('<span class="ry">2028</span>', html)                 # set at the end of 2027 for 2028
         _, html = O.nations(w, {})
         for h in ('Prestige', 'Multiplier', 'Share of juniors', 'Starting share', 'Share of new pros'):
-            self.assertIn(f'>{h}</th>', html)
+            self.assertRegex(html, header(h))
         _, html = O.nation(w, {}, 'USA')
         self.assertIn('Share of each year’s juniors', html)
         self.assertIn('Starting share of new golfers', html)
