@@ -31,6 +31,7 @@ from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass, field, replace
 
 from . import access as ACC
+from . import career as CA
 from . import amateur_support as AS
 from . import decision_evidence as DE
 from . import development as D
@@ -399,6 +400,7 @@ class Season:
         # otherwise, so support is the one difference: docs/LONG_RUN_PLAN.md)
         self.amateur_support_on = amateur_support
         self.work_pathway_on = True                          # cash-blocked adult amateurs can take work (WP)
+        self.career = None                                   # career mode (golfsim/career.py): None = all AI
         self.amateur_return_on = True                        # ... and working amateurs can return (amateur_return)
         # college amateurs aged 18-21 with a winner's exemption or ranked in the amateur top 15 may turn professional
         # before graduation (rules 2026-11-15, careers.early_pro_gate); worlds saved before it never decide early
@@ -1105,6 +1107,17 @@ class Season:
         self.year = year
         self.run_week(year, week, [e for e in self.cal.editions(year) if e.week == week])
 
+    def advance_week_prepare(self, year, week):
+        """The first part of a week (career mode steps the week in two parts): bookings cleared and, every four
+        weeks, the block planned. Nothing is entered, charged or played."""
+        self.year = year
+        self.prepare_week(year, week)
+
+    def advance_week_play(self, year, week):
+        """The rest of a prepared week: fields, charges, results, development, finances, rankings."""
+        self.year = year
+        self.play_prepared_week(year, week, [e for e in self.cal.editions(year) if e.week == week])
+
     def finish_year(self, year):
         """After week 52: the season's evidence, tour cards, careers, aging, new juniors."""
         self.year = year
@@ -1119,16 +1132,30 @@ class Season:
         self.finish_year(year)
 
     def run_week(self, year, week, eds):
+        self.prepare_week(year, week)
+        self.play_prepared_week(year, week, eds)
+
+    def prepare_week(self, year, week):
+        """The start of a week, before any field: this week's commitments and bookings cleared, then (every four
+        weeks) the block planned. Career mode stops after this to check the player's choice again."""
         self.week = week
-        rng = random.Random(_seed(self.seed, year, week, 'entries'))
-        venues = self.venues(year)
-        busy = defaultdict(set)                              # gid -> days committed this week
-        self._week_where = where = defaultdict(list)         # gid -> [(days, country)] committed this week
-        fields = {}                                          # event_id -> [per-site golfer lists]
+        self._week_where = defaultdict(list)                 # gid -> [(days, country)] committed this week
         self._reserved.clear()                               # one budget for the week: every accepted entry
         self._caddie_week.clear()                            # books its cost at once (the caddie's weekly
         self._caddie_paid.clear()                            # fee once), so the next entry sees what is left
         self._week_grants.clear()
+        if self.development and (week - 1) % 4 == 0:
+            self.plan_block(year, week)
+
+    def play_prepared_week(self, year, week, eds):
+        self.week = week
+        rng = random.Random(_seed(self.seed, year, week, 'entries'))
+        venues = self.venues(year)
+        busy = defaultdict(set)                              # gid -> days committed this week
+        where = self.__dict__.get('_week_where')             # (prepared this week; a save does not keep it)
+        if where is None:
+            where = self._week_where = defaultdict(list)
+        fields = {}                                          # event_id -> [per-site golfer lists]
 
         def commit(ed, ids_by_site, how='selected'):
             fields[ed.event_id] = ids_by_site
@@ -1142,8 +1169,6 @@ class Season:
                     self._week_entered.setdefault(gid, (ed.event_id, how))
                     self.reserve(self.g[gid], ed.series, city)
 
-        if self.development and (week - 1) % 4 == 0:
-            self.plan_block(year, week)
         special = [e for e in eds if self.is_special(e.series)]
         regular = [e for e in eds if not self.is_special(e.series)]
         for ed in sorted(special, key=lambda e: (e.series.tier, e.series.series_id)):
@@ -1194,6 +1219,8 @@ class Season:
         by_id = {ed.event_id: ed for ed in regular}
         city = {ed.event_id: venues[ed.event_id][0].city for ed in regular}
         prefs = {}
+        car = self.career
+        hid = car.golfer_id if car is not None and car.status == 'active' else None
         open_to = {}                                         # who may enter which events this week (by kind)
         fees = {}                                            # (paid by school?, country of residence, event) -> cost
         bases = {}                                           # (country of residence, lifestyle, event) -> base value
@@ -1238,6 +1265,9 @@ class Season:
                     base = bases[bk] = self.base_value(g, ed, country[eid])
                 v = self.event_value(g, ed, week, rng, country[eid], cost, gw, base)
                 opts.append((v, eid))
+            if g.id == hid:                                  # the player's entry: that event or none
+                self._career_entry(car, g, year, week, opts, prefs)
+                continue
             if not opts:
                 continue
             opts.sort(reverse=True)
@@ -1271,6 +1301,11 @@ class Season:
                 if bumped is not None:
                     free.append(bumped)
         placed = {gid for v in held.values() for _, gid in v}
+        if hid is not None and prefs.get(hid, ((),))[0] and hid not in placed:
+            eid = prefs[hid][0][0]
+            car.note(year, week, 'entry', f'Week {week} of {year}: your entry for {by_id[eid].series.name} was not accepted '
+                     '(the field filled with golfers ahead of you in its entry order); your fallback for the week applies.',
+                     key=('shut', year, week))
         late_entries = defaultdict(list)                     # took a spare place below their own bar
         for eid, ed in by_id.items():
             s = ed.series
@@ -1306,6 +1341,21 @@ class Season:
                 stats[tour]['shut out'] += 1
                 self.entry_misses[year][gid] += 1           # wanted to play; every field they tried was full
                 self._week_shut.add(gid)
+
+    def _career_entry(self, car, g, year, week, opts, prefs):
+        """The controlled golfer's entry: exactly the planned event, if it is among the week's options the same
+        checks produced (eligible, no clash with the week's other commitments, affordable); no bar, no alternative."""
+        ch = car.choice(year, week)
+        eid = ch.get('event_id') if ch and ch.get('kind') == 'event' else None
+        if eid is None:
+            return
+        if any(e == eid for _, e in opts):
+            prefs[g.id] = ([eid], [])
+            return
+        name = next((e.series.name for e in self.cal.editions(year) if e.event_id == eid), eid)
+        car.note(year, week, 'entry', f'Week {week} of {year}: you could not enter {name} after all (a clash with a '
+                 'selected event that week, or the cost or eligibility changed); your fallback for the week applies.',
+                 key=('noentry', year, week))
 
     def _default_routes(self, s, year, sites):
         """Every selected field explains each entrant: fields whose rule records no routes of its own are
@@ -1397,6 +1447,9 @@ class Season:
     def available(self, gid, s, busy, countries=None):
         if busy[gid] & s.day_set or gid in self.injured or self.g[gid].lifestyle == 'retired':
             return False
+        c = self.career
+        if c is not None and c.controls(gid) and not c.accepts(self.year, self.week, s):
+            return False                                     # the player's policy for this period: not taken
         return countries is None or not self.cal.spec.travel or self.can_travel(gid, s.day_set, countries)
 
     TRAVEL_DAYS = {'country': 0, 'region': 1, 'world': 2}   # free days needed between events this week
@@ -1633,6 +1686,10 @@ class Season:
         f = Q.build_field(sid, year, self.ctx)
         self.stage_log[(year, sid, 'field')] = f
         can_play = lambda gid: gid in self.g and gid not in self.injured and self.g[gid].lifestyle != 'retired'
+        car = self.career
+        if car is not None and ed is not None and car.status == 'active':
+            plays = can_play
+            can_play = lambda gid: plays(gid) and not (car.controls(gid) and not car.accepts(year, week, ed.series))
         cities = sorted({v.city for v in self.venues(year)[ed.event_id]}) if ed is not None else []
         money = {}                               # gid -> the money a place was decided on (observation only)
 
@@ -1918,6 +1975,14 @@ class Season:
         return [g.id for g in members]
 
     # ---- USA Open and Britannia Open qualifying ----------------------------------------------------
+    def _applies(self, g, keen, year, week, s):
+        """Whether a golfer applies to qualify: the AI's keenness draw (`keen`, already drawn, so every random
+        stream stays as it was), or for the controlled golfer the player's policy for the period."""
+        c = self.career
+        if c is not None and c.controls(g.id):
+            return c.accepts(year, week, s)
+        return keen
+
     def qualifier_field(self, ed, year, week, rng, free):
         if self.cal.spec.snapshots:                          # v2: waves, one attempt, earned exemptions only
             return self.qualifier_waves(ed, year, week, rng, free)
@@ -1941,7 +2006,7 @@ class Season:
                     continue
                 good = g.status in ('pro', 'club_pro') or self.am_pos.get(g.id, 9999) <= 400
                 keen = 0.75 if self.home_region(g) in home else 0.08   # open to all: proximity decides
-                if good and rng.random() < keen:
+                if good and self._applies(g, rng.random() < keen, year, week, s):
                     pool.append(g.id)
             pool.sort(key=lambda gid: (self.wr_pos.get(gid, 9999) if self.g[gid].status != 'amateur'
                                        else self.am_pos.get(gid, 9999) * 3))
@@ -2016,7 +2081,7 @@ class Season:
                     continue
                 good = g.status in ('pro', 'club_pro') or self.am_pos.get(g.id, 9999) <= 400
                 keen = 0.75 if self.home_region(g) in home else 0.08
-                if good and rng.random() < keen:
+                if good and self._applies(g, rng.random() < keen, year, week, s):
                     pool.append(g.id)
             pool.sort(key=lambda gid: (self.wr_pos.get(gid, 9999) if self.g[gid].status != 'amateur'
                                        else self.am_pos.get(gid, 9999) * 3))
@@ -2165,6 +2230,7 @@ class Season:
         state.setdefault('dev_acc', defaultdict(dict))       # development evidence before it was kept: not recorded
         state.setdefault('creations', defaultdict(dict))
         state.setdefault('injury_lasting', defaultdict(dict))   # lasting injury losses before they were kept
+        state.setdefault('career', None)                     # saves from before career mode: all AI
         state.setdefault('record_decisions', True)          # decision evidence: kept from now on (not before)
         if 'plan_ev' not in state:
             state['plan_ev'], state['career_ev'] = DE.new_tables()
@@ -2936,94 +3002,150 @@ class Season:
         # (region, tier) pairs with a regular event in each week: 'no suitable event' vs 'not eligible'
         level_weeks = {w: {(COUNTRIES[CITY_BY_NAME[city[e.event_id]].country].region, e.series.tier)
                            for e in by_week[w]} for w in weeks}
+        car = self.career
         for g in self.active_golfers():
             if g.lifestyle == 'retired':
                 continue
-            key = (g.tour, g.country, self.home_country(g), g.status, g.lifestyle, self.wr_pos.get(g.id, 9999) <= 500,
-                   self.am_pos.get(g.id, 9999) <= 25, self.am_pos.get(g.id, 9999) <= 300,
-                   g.id if g.status == 'club_pro' else 0,      # club pros: their own diary and drives
-                   g.id in self.winners_now())
-            if key not in cache:                             # every eligible event, best first
-                cache[key] = [sorted(((self.base_value(g, e, CITY_BY_NAME[city[e.event_id]].country), e.event_id, e)
-                                      for e in by_week[w] if self.eligible(g, e.series, w)), reverse=True)
-                              for w in weeks]
-            options = cache[key]
-            money0 = self.spendable(g, year)
-            # each week: the most valuable event they can actually pay for (a cheaper local event is
-            # still an option when the one they would prefer is out of reach)
-            base, costs = [], []
-            for opts in options:
-                pick = self.best_affordable(g, opts, city, money0)
-                base.append(pick[0] if pick else None)
-                costs.append(pick[1] if pick else 0.0)
-            avail = {}
-            for i, w in enumerate(weeks):
-                if base[i] is not None:
-                    avail[w] = 'ok'
-                elif options[i]:
-                    avail[w] = 'unaff'
-                else:
-                    avail[w] = 'inelig' if (region_of(g), self.level_tier(g)) in level_weeks[w] else 'none'
+            options, money0, base, costs, avail, eligible_any, stuck = self._block_options(
+                g, year, weeks, by_week, city, level_weeks, cache)
             self.week_avail[g.id] = avail
-            eligible_any = any(options)
-            stuck = (money0 < 0 and self.committed_weekly(g) > 0) or (eligible_any and not any(base))
             self.stuck_blocks[g.id] = self.stuck_blocks[g.id] + 1 if stuck else 0
             self.block_flags[year][g.id]['stuck' if stuck else 'no event' if not eligible_any else 'ok'] += 1
+            if car is not None and car.controls(g.id):
+                # the player's plan; of the AI's planning only its random draw is taken (streams stay aligned):
+                # no staff decision, no work decision, no plan search on the controlled golfer
+                insight = self.staff.insight(g, year)
+                D.choose_category(g, rng, insight, D.perceived_gaps(g, insight))
+                CA.install(self, year, week0)
+                continue
             self.staff_midseason(g, year, week0, money0)
-            age = g.age(year)
             insight = self.staff.insight(g, year)
             gaps = D.perceived_gaps(g, insight)
             cat = D.choose_category(g, rng, insight, gaps)
-            work_scale = 0.3 if g.lifestyle == 'part_time' else 1.0
-            gamma = 60.0
-            dp = gamma * D.development_value(g, 'play', age, insight=insight, gaps=gaps)
-            dt = gamma * D.development_value(g, 'train', age, cat, insight, self.staff.coaching(g, cat, age, year),
-                                             self.experience(g.id, year, week0), gaps) * work_scale
-            bar = self.bar(g)
-            target = self.target_events(g)
-            played0 = len(self.played[year][g.id])
-            inj_until = self.injured.get(g.id, (0,))[0]
-            stam = g.attrs['stamina'] / 100
-            load4 = 4 * FATIGUE_PER_ROUND * (1.4 - 0.8 * stam) * (1 + 0.02 * max(0, age - 30))
-            rest_rec = 0.40 + 0.30 * (1 - g.attrs['recovery_rate'] / 100)
-            top100 = self.wr_pos.get(g.id, 9999) <= 100
-            unit = FIN.money_unit(self.funds(g, year))
-            prizes = [self.expected_kept(g, b[1].series) if b else 0.0 for b in base]
-            # Paid work only makes sense when money is genuinely short: funds would not last three
-            # months and their own results are not paying for their golf.
-            burn = FIN.weekly_living(g)[1] + (sum(costs) / max(1, sum(1 for b in base if b)))
-            # ... and they must earn if they cannot cover the next weeks' committed costs, or cannot
-            # afford any trip this month (otherwise a golfer just short of a trip would wait for ever).
-            can_work = (g.status == 'pro' and g.lifestyle == 'full_time'
-                        and (stuck or money0 < 13 * burn and sum(prizes) <= sum(costs)))
-            work_v = min(20.0, FIN.WORK_WAGE / unit) if can_work else -1.0
-            if can_work and stuck:
-                work_v = 40.0
-            playable = [i for i, w in enumerate(weeks) if base[i] is not None and now + w >= inj_until]
-            slot = {i: j for j, i in enumerate(playable)}
-            # loop invariants, worked out once with the same arithmetic as before (injury_chance for 4
-            # rounds, each week's pace target, major-week caution and net trip cost)
-            inj0 = INJURY_BASE * 4 / 4
-            inj_b = 1.8 - 1.6 * g.attrs['injury_resistance'] / 100
-            inj_c = 1 + 0.05 * max(0, age - 30)
-            inj_d = 1 + 0.5 * (1 - g.attrs['stamina'] / 100)
-            pace0 = [target * w / 52 for w in weeks]
-            major = [6 if w + 1 in self.cal.major_weeks and top100 else 0 for w in weeks]
-            net = [(costs[i] - prizes[i]) / unit for i in range(len(weeks))]
-            f0 = self.fatigue[g.id]
-            best_val, best_acts = plan_search(weeks, now, inj_until, slot, playable, costs, base, pace0, major, bar, dp,
-                                              inj0, inj_b, inj_c, inj_d, net, load4, rest_rec, work_v, dt, can_work,
-                                              f0, played0, money0)
-            fallback = best_acts is None
-            if best_acts is None:                            # nothing affordable: work if they can
-                best_acts = ['work' if g.status == 'pro' and g.lifestyle == 'full_time' else 'train'
-                             for _ in weeks]
+            best_acts, ev = self._plan_acts(g, year, week0, weeks, base, costs, money0, stuck, cat, insight, gaps)
             self.plans[g.id] = {w: (a, cat) for w, a in zip(weeks, best_acts)}
             if self.record_decisions:                        # evidence only: the figures above, as computed
-                DE.record_plan(self, g, year, week0, target=target, weeks=weeks, avail=avail, acts=best_acts,
-                               inj_until=inj_until, now=now, f0=f0, played0=played0, money0=money0, bar=bar, dp=dp,
-                               dt=dt, work_v=work_v, load4=load4, rest_rec=rest_rec, risk=inj0 * inj_b * inj_c * inj_d,
-                               can_work=can_work, stuck=stuck, major=any(major), fallback=fallback)
+                DE.record_plan(self, g, year, week0, weeks=weeks, avail=avail, acts=best_acts, stuck=stuck, **ev)
+
+    def _block_options(self, g, year, weeks, by_week, city, level_weeks, cache):
+        """One golfer's options for the weeks of a block (pure: nothing in the world changes). Returns (every
+        eligible event per week, best first; spendable funds; the most valuable affordable pick per week; its cost;
+        availability per week; any eligible event; stuck)."""
+        key = (g.tour, g.country, self.home_country(g), g.status, g.lifestyle, self.wr_pos.get(g.id, 9999) <= 500,
+               self.am_pos.get(g.id, 9999) <= 25, self.am_pos.get(g.id, 9999) <= 300,
+               g.id if g.status == 'club_pro' else 0,      # club pros: their own diary and drives
+               g.id in self.winners_now())
+        if key not in cache:                             # every eligible event, best first
+            cache[key] = [sorted(((self.base_value(g, e, CITY_BY_NAME[city[e.event_id]].country), e.event_id, e)
+                                  for e in by_week[w] if self.eligible(g, e.series, w)), reverse=True)
+                          for w in weeks]
+        options = cache[key]
+        money0 = self.spendable(g, year)
+        # each week: the most valuable event they can actually pay for (a cheaper local event is
+        # still an option when the one they would prefer is out of reach)
+        base, costs = [], []
+        for opts in options:
+            pick = self.best_affordable(g, opts, city, money0)
+            base.append(pick[0] if pick else None)
+            costs.append(pick[1] if pick else 0.0)
+        avail = {}
+        for i, w in enumerate(weeks):
+            if base[i] is not None:
+                avail[w] = 'ok'
+            elif options[i]:
+                avail[w] = 'unaff'
+            else:
+                avail[w] = 'inelig' if (region_of(g), self.level_tier(g)) in level_weeks[w] else 'none'
+        eligible_any = any(options)
+        stuck = (money0 < 0 and self.committed_weekly(g) > 0) or (eligible_any and not any(base))
+        return options, money0, base, costs, avail, eligible_any, stuck
+
+    def _plan_acts(self, g, year, week0, weeks, base, costs, money0, stuck, cat, insight, gaps):
+        """The plan search for one golfer's weeks (pure). Returns (an act per week, the evidence figures)."""
+        age = g.age(year)
+        now = self.abs_week(year, 0)
+        work_scale = 0.3 if g.lifestyle == 'part_time' else 1.0
+        gamma = 60.0
+        dp = gamma * D.development_value(g, 'play', age, insight=insight, gaps=gaps)
+        dt = gamma * D.development_value(g, 'train', age, cat, insight, self.staff.coaching(g, cat, age, year),
+                                         self.experience(g.id, year, week0), gaps) * work_scale
+        bar = self.bar(g)
+        target = self.target_events(g)
+        played0 = len(self.played[year][g.id])
+        inj_until = self.injured.get(g.id, (0,))[0]
+        stam = g.attrs['stamina'] / 100
+        load4 = 4 * FATIGUE_PER_ROUND * (1.4 - 0.8 * stam) * (1 + 0.02 * max(0, age - 30))
+        rest_rec = 0.40 + 0.30 * (1 - g.attrs['recovery_rate'] / 100)
+        top100 = self.wr_pos.get(g.id, 9999) <= 100
+        unit = FIN.money_unit(self.funds(g, year))
+        prizes = [self.expected_kept(g, b[1].series) if b else 0.0 for b in base]
+        # Paid work only makes sense when money is genuinely short: funds would not last three
+        # months and their own results are not paying for their golf.
+        burn = FIN.weekly_living(g)[1] + (sum(costs) / max(1, sum(1 for b in base if b)))
+        # ... and they must earn if they cannot cover the next weeks' committed costs, or cannot
+        # afford any trip this month (otherwise a golfer just short of a trip would wait for ever).
+        can_work = (g.status == 'pro' and g.lifestyle == 'full_time'
+                    and (stuck or money0 < 13 * burn and sum(prizes) <= sum(costs)))
+        work_v = min(20.0, FIN.WORK_WAGE / unit) if can_work else -1.0
+        if can_work and stuck:
+            work_v = 40.0
+        playable = [i for i, w in enumerate(weeks) if base[i] is not None and now + w >= inj_until]
+        slot = {i: j for j, i in enumerate(playable)}
+        # loop invariants, worked out once with the same arithmetic as before (injury_chance for 4
+        # rounds, each week's pace target, major-week caution and net trip cost)
+        inj0 = INJURY_BASE * 4 / 4
+        inj_b = 1.8 - 1.6 * g.attrs['injury_resistance'] / 100
+        inj_c = 1 + 0.05 * max(0, age - 30)
+        inj_d = 1 + 0.5 * (1 - g.attrs['stamina'] / 100)
+        pace0 = [target * w / 52 for w in weeks]
+        major = [6 if w + 1 in self.cal.major_weeks and top100 else 0 for w in weeks]
+        net = [(costs[i] - prizes[i]) / unit for i in range(len(weeks))]
+        f0 = self.fatigue[g.id]
+        best_val, best_acts = plan_search(weeks, now, inj_until, slot, playable, costs, base, pace0, major, bar, dp,
+                                          inj0, inj_b, inj_c, inj_d, net, load4, rest_rec, work_v, dt, can_work,
+                                          f0, played0, money0)
+        fallback = best_acts is None
+        if best_acts is None:                            # nothing affordable: work if they can
+            best_acts = ['work' if g.status == 'pro' and g.lifestyle == 'full_time' else 'train'
+                         for _ in weeks]
+        return best_acts, dict(target=target, inj_until=inj_until, now=now, f0=f0, played0=played0, money0=money0,
+                               bar=bar, dp=dp, dt=dt, work_v=work_v, load4=load4, rest_rec=rest_rec,
+                               risk=inj0 * inj_b * inj_c * inj_d, can_work=can_work, major=any(major),
+                               fallback=fallback)
+
+    def replan_after_handback(self, gid, year, week, prepared):
+        """A golfer handed back to the AI in the middle of a block: the AI's plan for the block's remaining weeks,
+        worked out as plan_block works it out for this golfer alone, with no side effects (no staff or job
+        decision, no block statistics, no decision evidence; the training category is drawn from the golfer's own
+        stream, so the shared planning stream is not touched). A week already prepared keeps the plan it was
+        prepared with. At a block's first week, not yet prepared, there is nothing to do: plan_block plans it."""
+        g = self.g.get(gid)
+        if not self.development or g is None or g.lifestyle == 'retired':
+            return None
+        w0 = CA.block_start(week)
+        first = week + 1 if prepared else week
+        if not prepared and week == w0:
+            return None
+        weeks = [w for w in CA.block_weeks(w0) if w >= first]
+        if not weeks:
+            return None
+        eds = [e for e in self.cal.editions(year) if e.week in weeks and not self.is_special(e.series)]
+        venues = self.venues(year)
+        city = {e.event_id: venues[e.event_id][0].city for e in eds}
+        by_week = {w: [e for e in eds if e.week == w] for w in weeks}
+        level_weeks = {w: {(COUNTRIES[CITY_BY_NAME[city[e.event_id]].country].region, e.series.tier)
+                           for e in by_week[w]} for w in weeks}
+        options, money0, base, costs, avail, eligible_any, stuck = self._block_options(
+            g, year, weeks, by_week, city, level_weeks, {})
+        rng = random.Random(_seed(self.seed, year, w0, gid, 'handback'))
+        insight = self.staff.insight(g, year)
+        gaps = D.perceived_gaps(g, insight)
+        cat = D.choose_category(g, rng, insight, gaps)
+        acts, _ = self._plan_acts(g, year, first, weeks, base, costs, money0, stuck, cat, insight, gaps)
+        plan = dict(self.plans.get(gid, {}))
+        plan.update({w: (a, cat) for w, a in zip(weeks, acts)})
+        self.plans[gid] = plan
+        return {w: (a, cat) for w, a in zip(weeks, acts)}
 
     def needs_paid_work(self, g, year):
         """A full-time professional whose funds would not cover three months of living costs: they take
@@ -3471,6 +3593,10 @@ class Season:
                 act = 'work'
             else:
                 act = 'train' if action in ('play', 'train') and self.development else 'rest'
+                if action == 'play' and self.career is not None and self.career.controls(g.id):
+                    fb = self.career.fallback(year, week)
+                    if fb is not None and fb['kind'] == 'rest':
+                        act = 'rest'                         # the player's fallback: rest (training: its category)
             self.week_activity[g.id] = act
             self.activity_counts[year][g.id][act] += 1
             if self.development and g.ceilings:

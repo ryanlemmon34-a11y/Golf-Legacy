@@ -169,7 +169,8 @@ class SessionTests(unittest.TestCase):
         t = Session.open(self.dir, workers=1)
         self.assertEqual(t.cursor['week'], 4)
         self.assertEqual(fingerprint(t.season), fingerprint(direct(3)))
-        with mock.patch.object(t.season, 'advance_week', side_effect=KeyboardInterrupt):
+        # (the session plays a week in parts since career mode Phase A: the playing part is interrupted)
+        with mock.patch.object(t.season, 'advance_week_play', side_effect=KeyboardInterrupt):
             with self.assertRaises(KeyboardInterrupt):                    # interrupted mid-week: nothing commits
                 t.advance(2)
         self.assertEqual(t.cursor['week'], 4)

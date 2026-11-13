@@ -725,7 +725,8 @@ def page(w, title, body, job=None, notices=(), path=None):
               'placeholder="Search all people" aria-label="Search golfers, coaches and caddies">'
               '<button>Search</button></form>'
               if w is not None else '')
-    nav = ('<nav class="sidebar" aria-label="Sections"><h4>World</h4><a href="/">Overview</a><a href="/calendar">Calendar</a>'
+    nav = ('<nav class="sidebar" aria-label="Sections">' + (f'<h4>Career</h4>{OCAR.career_link(w)}' if w is not None else '')
+           + '<h4>World</h4><a href="/">Overview</a><a href="/calendar">Calendar</a>'
            '<a href="/rankings">Rankings</a><a href="/qualification">Qualification</a><a href="/stats">Stats</a>'
            '<a href="/money">Prize money</a>'
            '<h4>Explore</h4><a href="/search">All people</a><a href="/golfers">Golfers</a><a href="/coaches">Coaches</a><a href="/caddies">Caddies</a>'
@@ -768,7 +769,7 @@ def navigation_section(path, w=None):
                             ('/records/', '/records'), ('/golf-records/', '/records')):
         if path.startswith(prefix):
             return section
-    return {'/shortlist': '/my-world', '/standings': '/qualification'}.get(path, path)
+    return {'/shortlist': '/my-world', '/standings': '/qualification', '/career/plan': '/career'}.get(path, path)
 
 
 SHELL_JS = """<script>
@@ -2970,6 +2971,8 @@ def moments(w, q):
         '<p class="muted">Venue: the course and layout where it happened, as recorded with the moment.</p>')
 
 
+import observer_career as OCAR                         # noqa: E402  (career mode pages; needs esc and table above)
+
 ROUTES = [('/golfer/', golfer), ('/event/', event), ('/series/', series), ('/course/', course), ('/records/', record),
           ('/golf-records/', OG.golf_record),
           ('/nation/', nation), ('/tour/', tour), ('/season/', season)]
@@ -2980,7 +2983,8 @@ PAGES = {'/': overview, '/rankings': rankings, '/search': search, '/golfers': go
          '/rules': OH.rules_page,
          '/grand-slam': OH.grand_slam_page, '/views': V.views_page, '/cohort': OC.cohort_page,
          '/compare': OCMP.compare_page, '/goat': GOAT.goat_page, '/qualification': OQ.qualification_page,
-         '/standings': OQ.standings_page, '/upsets': OU.page}
+         '/standings': OQ.standings_page, '/upsets': OU.page, '/career': OCAR.career_page,
+         '/career/plan': OCAR.plan_page}
 
 
 def render(w, path, q):

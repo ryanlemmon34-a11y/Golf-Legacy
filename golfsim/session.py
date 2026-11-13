@@ -81,6 +81,10 @@ class Busy(Exception):
     """Another advance holds the session's lock."""
 
 
+class UnsupportedCareer(Exception):
+    """The save holds a career in a format this build does not read (a newer build made it): it is not continued."""
+
+
 class Session:
     def __init__(self, directory, season, state, generation):
         self.dir = Path(directory)
@@ -189,8 +193,10 @@ class Session:
         """Play the next week (running 1 January first, or the end of the season after week 52) and commit
         the world. Returns {'completed': (year, week), 'events': [...], 'changes': {...}, 'cursor': {...},
         'generation': n}. `expected`: the cursor the caller believes is next (StaleCursor otherwise).
-        `op_key`: repeating a recently committed key returns its result without simulating again."""
-        return self._advance(1, expected, op_key)[0]
+        `op_key`: repeating a recently committed key returns its result without simulating again.
+        In career mode a gate can stop before any week is played: the result then has 'completed': None and
+        'stop' (why); whatever ran and any decision the gate created are committed."""
+        return self._advance(1, expected, op_key, one=True)[0]
 
     def advance(self, weeks, progress=None, cancel=None, commit_every_week=False, expected=None, op_key=None):
         """Advance several weeks with the same weekly step. By default the world is committed once, at
@@ -203,13 +209,65 @@ class Session:
             for _ in range(weeks):
                 if cancel and cancel():
                     break
-                out.append(self.advance_one_week(expected=self.cursor))
+                r = self.advance_one_week(expected=self.cursor)
+                if r['completed'] is None:                   # a career gate stopped before the week
+                    break
+                out.append(r)
                 if progress:
                     progress(out[-1])
             return out
         return self._advance(weeks, expected, op_key, progress, cancel)
 
-    def _advance(self, weeks, expected, op_key, progress=None, cancel=None):
+    def advance_career(self, mode, expected=None, op_key=None, progress=None, cancel=None, expected_version=None):
+        """Career mode: advance to the next decision (`mode` 'next': stops when a new decision appears or one is
+        due) or through the planned period (`mode` 'period': to the end of the current four-week block, stopping
+        earlier only when a decision is due). Returns {'weeks': [week results], 'stop': why it stopped}.
+        `expected_version`: the career version the request was drawn at; a request drawn before a later decision
+        or plan is refused (career.StaleCareer), so an old request can never advance past what the player has
+        since decided. A request with an `op_key` is recorded even when it is blocked and changes nothing."""
+        if mode not in ('next', 'period'):
+            raise ValueError(f'unknown advance mode {mode!r}')
+        return self._advance(52, expected, op_key, progress, cancel, mode=mode, expected_version=expected_version)
+
+    def career_action(self, action, expected=None, op_key=None):
+        """Run one career command (golfsim/career.py: plan, decide, end control, new career) and commit it as a new
+        generation, like an advance. A repeated `op_key` returns its stored result; a stale `expected` cursor is
+        refused (StaleCursor); a command that cannot proceed raises career.CareerError and changes nothing."""
+        from . import career as CA
+        with self._lock:
+            with _FileLock(self.dir / 'lock'):
+                self._sync()
+                done = self._done(op_key)
+                if done is not None:
+                    return done
+                if expected is not None and dict(expected) != self.state['cursor']:
+                    raise StaleCursor(f'expected {expected}, the world is at {self.state["cursor"]}')
+                car = getattr(self.season, 'career', None)
+                before = (id(car), car.version if car is not None else None)
+                try:
+                    res = CA.apply(self.season, dict(self.state['cursor']), action)
+                except CA.CareerError:
+                    car = getattr(self.season, 'career', None)
+                    if (id(car), car.version if car is not None else None) != before:
+                        self._rollback()                     # (never expected: commands check before changing)
+                    raise
+                except BaseException:
+                    self._rollback()
+                    raise
+                try:
+                    n = _next_generation(self.dir, self.generation)
+                    res = dict(res, generation=n)
+                    if op_key is not None:
+                        self.state['ops'] = (self.state['ops'] + [[op_key, res]])[-OPS_KEPT:]
+                    self.state['last_op'] = {'key': op_key, 'result': res}
+                    self._commit(n)
+                except BaseException:
+                    self._rollback()
+                    raise
+                return res
+
+    def _advance(self, weeks, expected, op_key, progress=None, cancel=None, mode=None, one=False,
+                 expected_version=None):
         with self._lock:
             with _FileLock(self.dir / 'lock'):
                 # first the committed world (another process may have committed meanwhile, or recovery
@@ -221,22 +279,42 @@ class Session:
                     return done
                 if expected is not None and dict(expected) != self.state['cursor']:
                     raise StaleCursor(f'expected {expected}, the world is at {self.state["cursor"]}')
+                car = getattr(self.season, 'career', None)
+                if expected_version is not None and car is not None and car.version != expected_version:
+                    from . import career as CA
+                    raise CA.StaleCareer(f'drawn at career version {expected_version}; it is now {car.version}')
                 out = []
+                stop = None
+                active = car is not None and car.status == 'active'
+                v0 = car.version if car is not None else None
+                ran = False
                 try:
                     with _collector_paused():
-                        for _ in range(weeks):
-                            if cancel and cancel():
-                                break                        # a clean stop between weeks: commit what is done
-                            out.append(self._step())
-                            if progress:
-                                progress(out[-1])
-                    if out:
+                        if not active and self.state['cursor']['phase'] in ('start', 'week'):
+                            for _ in range(weeks):
+                                if cancel and cancel():
+                                    break                    # a clean stop between weeks: commit what is done
+                                out.append(self._step())
+                                if progress:
+                                    progress(out[-1])
+                        else:
+                            out, stop, ran = self._career_steps(weeks, mode, progress, cancel)
+                    car = getattr(self.season, 'career', None)
+                    n = self.generation
+                    if out or ran or (car is not None and car.version != v0) or op_key is not None:
+                        # (a decision created at a gate is saved even when no week was played, and a request with
+                        # an op_key is recorded even when a gate blocked it and nothing changed: resubmitting it
+                        # returns that outcome instead of advancing later, once the decision is answered)
                         n = _next_generation(self.dir, self.generation)
                         for r in out:
                             r['generation'] = n
+                        if one and not out:
+                            out = [self._stopped(stop, n)]
+                        result = out if mode is None else {'weeks': out, 'stop': stop}
                         if op_key is not None:
-                            self.state['ops'] = (self.state['ops'] + [[op_key, out]])[-OPS_KEPT:]
-                        self.state['last_op'] = {'key': op_key, 'result': out[-1]}
+                            self.state['ops'] = (self.state['ops'] + [[op_key, result]])[-OPS_KEPT:]
+                        self.state['last_op'] = {'key': op_key, 'result': out[-1] if out else None}
+                        self.state['last_stop'] = stop
                         self._commit(n)
                 except BaseException:
                     # an error, an interrupt or a failed commit: go back to what is committed, so memory
@@ -244,7 +322,63 @@ class Session:
                     # is committed: reloading it is the same world, and the history is published next time)
                     self._rollback()
                     raise
-                return out
+                self.last_stop = stop
+                if one and not out:
+                    out = [self._stopped(stop, n)]
+                return out if mode is None else {'weeks': out, 'stop': stop}
+
+    def _stopped(self, stop, generation):
+        """advance_one_week's result when a career gate stopped before any week was played."""
+        return {'completed': None, 'events': [], 'changes': {}, 'cursor': dict(self.state['cursor']),
+                'generation': generation, 'stop': stop}
+
+    def _career_steps(self, weeks, mode, progress, cancel):
+        """The weekly step in parts (1 January, prepare, play, winter), each committed with the cursor naming what
+        has run, with the career's gates asked before each part (golfsim/career.py). Only played weeks count as
+        weeks. Returns (week results, why it stopped, whether any part ran)."""
+        from . import career as CA
+        car = self.season.career
+        out, stop, ran = [], None, False
+        c0 = self.state['cursor']
+        y0, w0 = c0['year'], (1 if c0['phase'] == 'start' else c0['week'])
+        period_end = (y0, CA.block_weeks(CA.block_start(w0))[-1])
+        seen = {d['id'] for d in car.pending()} if car is not None else set()
+        while True:
+            cur = self.state['cursor']
+            active = car is not None and car.status == 'active'
+            if mode is None and len(out) >= weeks:
+                break
+            if mode == 'period' and (cur['year'], 0 if cur['phase'] == 'start' else cur['week']) > period_end \
+                    and cur['phase'] != 'end':
+                stop = {'kind': 'period_end', 'text': f'The planned period (to week {period_end[1]}) is complete.'}
+                break
+            if cancel and cancel():
+                stop = {'kind': 'cancelled', 'text': 'Stopped at your request.'}
+                break
+            g = CA.gate(self.season, cur) if active else None
+            if g:
+                stop = g
+                break
+            if mode == 'next' and active:
+                new = [d['id'] for d in car.pending() if d['id'] not in seen]
+                if new:
+                    stop = {'kind': 'decision', 'ids': new}
+                    break
+            ph = cur['phase']
+            ran = True
+            if ph == 'start':
+                self._part_start()
+            elif ph == 'week':
+                self._part_prepare()
+            elif ph == 'planned':
+                out.append(self._part_play())
+                if progress:
+                    progress(out[-1])
+            else:                                            # 'end': the winter (only once the career has ended)
+                self._part_end()
+                if mode is not None:
+                    break
+        return out, stop, ran
 
     def _done(self, op_key):
         if op_key is None:
@@ -273,14 +407,43 @@ class Session:
         self.state.setdefault('ops', [])
 
     def _step(self):
+        """The next week, whole: 1 January first if due, the week (prepared, then played) and after week 52 the
+        winter. The cursor's phase names what has run ('start': 1 January not yet; 'week': the week not yet
+        prepared; 'planned': prepared, not yet played; 'end': week 52 played, the winter not yet), so a part never
+        runs twice. ('end' and 'planned' are only left by career mode's stops.)"""
+        c = self.state['cursor']
+        if c['phase'] == 'end':
+            year = c['year']
+            e = self._part_end()
+            return {'completed': (year, 52), 'events': [], 'changes': {'season_end': e},
+                    'cursor': dict(self.state['cursor'])}
+        if c['phase'] == 'start':
+            self._part_start()
+        if self.state['cursor']['phase'] == 'week':
+            self._part_prepare()
+        r = self._part_play()
+        if self.state['cursor']['phase'] == 'end':
+            r['changes']['season_end'] = self._part_end()
+            r['cursor'] = dict(self.state['cursor'])
+        return r
+
+    def _part_start(self):
+        """1 January (people refreshed, sponsor contracts, the staff market, playing rights)."""
+        c = self.state['cursor']
+        self.season.start_year(c['year'])
+        self.state['cursor'] = {'year': c['year'], 'week': 1, 'phase': 'week'}
+
+    def _part_prepare(self):
+        c = self.state['cursor']
+        self.season.advance_week_prepare(c['year'], c['week'])
+        self.state['cursor'] = {'year': c['year'], 'week': c['week'], 'phase': 'planned'}
+
+    def _part_play(self):
         s, c = self.season, self.state['cursor']
         year, week = c['year'], c['week']
-        if c['phase'] == 'start':
-            s.start_year(year)
-            c['phase'] = 'week'
         before = set(s.results)
         top = s.ctx.ranking(year, week - 1)[:1] if week > 1 else []
-        s.advance_week(year, week)
+        s.advance_week_play(year, week)
         events = sorted(k for k in s.results if k not in before)
         winners = {eid: s.results[eid].winner() for eid in events if s.results[eid].winner() is not None}
         now_top = s.ctx.ranking(year, week)[:1]
@@ -290,16 +453,22 @@ class Session:
                    'new_number_one': bool(top) and now_top != top}
         self.state['weeks_played'] += 1
         if week == 52:
-            s.finish_year(year)
-            if self.on_season_end:
-                self.on_season_end(s, year)
-            changes['season_end'] = {'career_decisions': dict(s.career_counts.get(year, {})),
-                                     'juniors': s.juniors_added.get(year + 1, 0)}
-            self._stage_archive(year)
-            self.state['cursor'] = {'year': year + 1, 'week': 1, 'phase': 'start'}
+            self.state['cursor'] = {'year': year, 'week': 52, 'phase': 'end'}
         else:
             self.state['cursor'] = {'year': year, 'week': week + 1, 'phase': 'week'}
         return {'completed': (year, week), 'events': events, 'changes': changes, 'cursor': dict(self.state['cursor'])}
+
+    def _part_end(self):
+        """The winter after week 52: the season's evidence, tour cards, careers, aging, new entrants; archived."""
+        s, c = self.season, self.state['cursor']
+        year = c['year']
+        s.finish_year(year)
+        if self.on_season_end:
+            self.on_season_end(s, year)
+        e = {'career_decisions': dict(s.career_counts.get(year, {})), 'juniors': s.juniors_added.get(year + 1, 0)}
+        self._stage_archive(year)
+        self.state['cursor'] = {'year': year + 1, 'week': 1, 'phase': 'start'}
+        return e
 
     def _history_years(self):
         """The archived seasons of the committed generation's history (from its staged or carried world
@@ -706,6 +875,17 @@ def _load_committed(d, allow_other_engine, attempts=5):
             time.sleep(0.2 * (i + 1))
 
 
+def _check_career(season):
+    car = getattr(season, 'career', None)
+    if car is None:
+        return
+    from .career import FORMAT
+    fmt = getattr(car, 'format', None)
+    if fmt != FORMAT:
+        raise UnsupportedCareer(f'this save holds a career in format {fmt}; this build reads format {FORMAT} '
+                                '(a newer build made it): it is not continued here, and the save is left unchanged')
+
+
 def _load_generation(d, n, allow_other_engine):
     name = f'gen_{n:06d}'
     meta = _valid(d, name)
@@ -720,6 +900,7 @@ def _load_generation(d, n, allow_other_engine):
         finally:
             gc.enable()
     settle_heap()
+    _check_career(blob['season'])
     return blob['season'], blob['state']
 
 

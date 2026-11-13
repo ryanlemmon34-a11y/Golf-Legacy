@@ -151,7 +151,18 @@ def capture(session):
                for cid, site in s.lib.sites.items()}
     tours = {k: {'name': t.name, 'tier': t.tier} for k, t in TOUR_BY_KEY.items()}
     records = json.loads(json.dumps(s.records.to_dict()))
+    from golfsim import career as CA                   # the career as the player may see it (plain data, no potential)
+    car = getattr(s, 'career', None)
+    career = CA.view(s, session.cursor)
+    career_planner = ({b: CA.planner(s, session.cursor, *b) for b in CA.plannable(session.cursor)}
+                      if car is not None and car.status == 'active' else {})
+    career_can_start = None
+    c0 = session.cursor
+    if car is None and c0['phase'] == 'start' and c0['week'] == 1 and c0['year'] == s.first_year + 1:
+        n = sum(1 for r in s.creations.get(c0['year'], {}).values() if r.get('path') == 'junior')
+        career_can_start = {'year': c0['year'], 'class_size': n} if n else None
     view = LiveView(
+        career=career, career_planner=career_planner, career_can_start=career_can_start,
         world_id=session.state.get('world_id'), seed=session.state.get('seed', getattr(s, 'seed', None)),
         cursor=session.cursor, generation=session.generation, history_generation=session.history_generation,
         history_years=sorted(archived), weeks_played=session.state.get('weeks_played'), engine=meta.get('engine'), commit=meta.get('commit'),

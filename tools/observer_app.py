@@ -28,6 +28,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / 'tools'))
 import observer as O                                                 # noqa: E402
+import observer_career as OCAR                                       # noqa: E402
 import observer_jobs as J                                            # noqa: E402
 import observer_worlds as WL                                         # noqa: E402
 from observer import esc                                             # noqa: E402
@@ -207,7 +208,208 @@ class App:
             job.finish('stopped', f'Stopped at your request after {played} of {total} weeks{seasons}; every completed '
                                   f'week is saved. {where}')
         else:
-            job.finish('done', f'{played} week{"s" if played != 1 else ""} played and saved in {el:.0f} s{seasons}. {where}')
+            stop = OCAR.stop_text(getattr(s, 'last_stop', None)) if played < total else ''
+            job.finish('done', f'{played} week{"s" if played != 1 else ""} played and saved in {el:.0f} s{seasons}. '
+                               + (stop + ' ' if stop else '') + where)
+
+    # -- career mode (docs/career/PHASE_AB_PLAN.md): commands and advances through the session ------------------
+    # Every rule lives in golfsim/career.py; these only read forms, call the session's career API (which checks the
+    # date, the career version and the operation key, commits, and refuses stale or repeated submissions) and report.
+    CURSOR_PHASES = ('start', 'week', 'planned', 'end')
+
+    def _career_world(self, form, need_version=True):
+        """The open world and the command identity every career form carries (observer_career.hidden): the world's
+        id, the date the page was drawn at, the career version (not for 'start': there is no career yet) and an
+        operation key. All are required and checked here, so a form that lacks them (or one not drawn by this
+        observer for this world) changes nothing. Returns (world, (expected cursor, version, op), None) or
+        (None, None, notice)."""
+        w = self.world
+        if w is None or w.read_only:
+            return None, None, ('warn', 'Open a world (not read-only) to play a career.')
+        if O.one(form, 'world') != w.live.world_id:
+            return None, None, ('warn', 'That form belongs to another world (or to none): nothing was changed.')
+        op = O.one(form, 'op') or ''
+        try:
+            expected = {'year': int(O.one(form, 'year')), 'week': int(O.one(form, 'week')),
+                        'phase': O.one(form, 'phase')}
+            version = int(O.one(form, 'version')) if need_version else None
+        except (TypeError, ValueError):
+            expected = None
+        if expected is None or expected['phase'] not in self.CURSOR_PHASES or not 1 <= len(op) <= 64:
+            return None, None, ('err', 'That form was incomplete (it lacks the date, career version or operation key '
+                                       'every career page carries): nothing was changed.')
+        return w, (expected, version, op), None
+
+    def career_command(self, form, kind):
+        """(renderer thread) One career command from a form -- 'start' (a new career at a season start), 'plan' (a
+        four-week plan), 'decide' (an offer or a stop), 'end' (hand the golfer back) -- committed by the session like
+        an advance. Refused while another operation runs or holds the world. Returns (notice, page to show)."""
+        from golfsim import career as CA
+        from golfsim.session import Busy, StaleCursor
+        w, ident, notice = self._career_world(form, need_version=kind != 'start')
+        if notice:
+            return notice, '/career'
+        expected, version, op = ident
+        run = self.jobs.running()
+        if run is not None:
+            return ('warn', f'{esc(run.title)} is running: one operation at a time.'), '/career'
+        stay = '/career'
+        if kind == 'start':
+            body = {'schema': CA.SCHEMA, 'type': 'new_career'}
+        elif kind == 'plan':
+            body = OCAR.plan_command(form, O.one)
+            if body is None:
+                return ('err', 'The plan form was incomplete: nothing was saved.'), '/career'
+            stay = '/career/plan?block=' + quote(O.one(form, 'block') or '')
+        elif kind == 'decide':
+            body = {'schema': CA.SCHEMA, 'type': 'decide', 'decision': O.one(form, 'decision'),
+                    'answer': O.one(form, 'answer'), 'version': version}
+        elif kind == 'end':
+            if O.one(form, 'confirm') != 'yes':
+                return ('warn', 'Tick the box to confirm that the AI decides for this golfer from now on: nothing was '
+                                'changed.'), '/career'
+            body = {'schema': CA.SCHEMA, 'type': 'end_control', 'version': version}
+        else:
+            return ('err', 'Unknown career command.'), '/career'
+        if not w.session_lock.acquire(blocking=False):
+            return ('warn', 'The world is busy saving: try again in a moment. Nothing was changed.'), stay
+        try:
+            res = w.session.career_action(body, expected=expected, op_key=op)
+        except CA.StaleCareer:
+            return ('warn', 'This page was drawn before a later decision or plan: nothing was changed. The page now '
+                            'shows the current state.'), '/career'
+        except CA.CareerError as e:
+            return ('err', esc(e)), stay
+        except StaleCursor:
+            return ('warn', 'This page was drawn at an earlier date: nothing was changed.'), '/career'
+        except Busy:
+            return ('warn', 'Another program is changing this world right now: nothing was changed here.'), '/career'
+        finally:
+            w.session_lock.release()
+        if not res.get('ok', True):
+            return ('warn', esc(res.get('reason') or 'That could not be done.')), '/career'
+        if kind == 'start':
+            text = f'Your career has started: you now play {esc(res.get("name"))}. Plan the first four weeks next.'
+        elif kind == 'plan':
+            b = res.get('block') or [None, None]
+            text = f'Plan saved for weeks {b[1]}–{min(52, (b[1] or 1) + 3)} of {b[0]}.'
+        elif kind == 'decide':
+            text = {'accept': 'Accepted.', 'decline': 'Declined.', 'return_to_ai': 'The golfer is back under AI control.'}.get(
+                res.get('answer'), 'Done.')
+        else:
+            text = 'The golfer is back under AI control; the AI plans the rest of this period and everything after it.'
+        return ('ok', text), '/career'
+
+    def career_advance(self, form):
+        """(renderer thread) Start 'advance to the next decision' or 'advance through the planned period' (a job).
+        Returns a notice, or None if it started (or is the running one)."""
+        w, ident, notice = self._career_world(form)
+        if notice:
+            return notice
+        expected, version, op = ident
+        mode = O.one(form, 'mode')
+        if mode not in ('next', 'period'):
+            return ('err', 'Unknown advance.')
+        run = self.jobs.running()
+        if run is not None:
+            if run.op_key == op:
+                return None
+            return ('warn', f'{esc(run.title)} is still running: one operation at a time.')
+        title = 'Advance to the next decision' if mode == 'next' else 'Advance through the planned period'
+        self.start('career-advance', title, lambda job: self._run_career_advance(job, w, mode, expected, version, op),
+                   op=op, world_dir=w.path, cancellable=True)
+        return None
+
+    def _run_career_advance(self, job, w, mode, expected, version, op):
+        from golfsim import career as CA
+        from golfsim.session import Busy, StaleCursor
+        job.update(phase='starting')
+        t0 = time.perf_counter()
+        out = None
+        try:
+            with w.session_lock:
+                s = w.session
+                gen0 = s.generation
+                J.record_job(w.path, job, s.cursor, gen0)
+
+                def progress(r):
+                    job.update(done=job.done + 1, last=tuple(r['completed']), phase='playing')
+                try:
+                    J.ensure_pool(s.season)
+                    out = s.advance_career(mode, expected=expected, op_key=op, progress=progress,
+                                           cancel=lambda: job.cancel_requested, expected_version=version)
+                except StaleCursor:
+                    job.finish('refused', f'This page was drawn at {O.date_text(expected)}, but the world is at '
+                                          f'{O.date_text(s.cursor)}: nothing was advanced.')
+                    return
+                except CA.StaleCareer:
+                    job.finish('refused', 'This page was drawn before a later decision or plan: nothing was advanced. '
+                                          'Look at the career page again.')
+                    return
+                except Busy:
+                    job.finish('refused', 'Another program is advancing this world right now: nothing was advanced here.')
+                    return
+                except Exception as e:
+                    J.log(w.path, f'career advance failed: {e!r}\n{traceback.format_exc()}')
+                    job.finish('failed', f'{type(e).__name__}: {e}. Nothing after the last save was kept: the world is at '
+                                         f'{O.date_text(s.cursor)} (generation {s.generation}).')
+                    return
+        finally:
+            J.clear_job(w.path)
+        s = w.session
+        played = len(out['weeks'])
+        stop = OCAR.stop_text(out['stop'])
+        if s.generation == gen0 and op is not None and s._done(op) is not None:     # the same request, done before
+            job.finish('done', f'Already applied (this request had been completed: {played} week'
+                               f'{"s" if played != 1 else ""} played{"; " + stop if stop else ""}). The world is at '
+                               f'{O.date_text(s.cursor)}.')
+            return
+        msg = (f'{played} week{"s" if played != 1 else ""} played and saved in {time.perf_counter() - t0:.0f} s. '
+               + (stop + ' ' if stop else '') + f'Now at {O.date_text(s.cursor)} (generation {s.generation}).')
+        job.finish('stopped' if (out['stop'] or {}).get('kind') == 'cancelled' else 'done', msg)
+
+    def new_career(self, form):
+        """New Career from the library: create a world, play its first season under AI (so that the world's own rules
+        have created its first junior class), then start a career with one of those newcomers at the start of the
+        second season. One job; stopping it keeps the world, and the career can be started later from its Career
+        page at the start of the second season."""
+        try:
+            d = WL.check_name(self.lib, O.one(form, 'name'))
+            seed = O.one(form, 'seed')
+            seed = int(seed) if seed not in (None, '') else random.randrange(1, 1000000)
+            if not 0 <= seed < 2 ** 31:
+                raise ValueError('The seed must be a whole number from 0 to 2147483647.')
+            start = int(O.one(form, 'start_year') or 2027)
+            if not 1900 <= start <= 2200:
+                raise ValueError('The starting year must be from 1900 to 2200.')
+        except (ValueError, FileExistsError) as e:
+            return ('err', esc(e))
+
+        def run(job):
+            from golfsim import career as CA
+            from golfsim.population import generate_world
+            from golfsim.session import Session
+            job.update(phase='generating the world and its population')
+            s = Session.create(d, seed=seed, workers=self.workers, world=generate_world(year=start, seed=seed),
+                               calendar='v2')
+            WL.record_creation(d, seed, start, 'v2')
+            J.log(d, f'created for a new career with seed {seed}, starting in {start}')
+            job.update(phase='playing the first season under AI', total=52)
+            J.ensure_pool(s.season)
+            s.advance(52, progress=lambda r: job.update(done=job.done + 1, last=tuple(r['completed'])),
+                      cancel=lambda: job.cancel_requested, op_key=f'new-career-season-{d.name}')
+            if s.cursor != {'year': start + 1, 'week': 1, 'phase': 'start'}:
+                self.renderer.call(self._install, d, s)
+                job.finish('stopped', f'Stopped at your request at {O.date_text(s.cursor)}; the world is saved. Advance it '
+                                      f'to the start of {start + 1} and start the career from its Career page.')
+                return
+            job.update(phase='starting the career')
+            res = s.career_action({'schema': CA.SCHEMA, 'type': 'new_career'}, op_key=f'new-career-{d.name}')
+            self.renderer.call(self._install, d, s)
+            job.finish('done', f'World “{d.name}” created (seed {seed}) and its first season played. Your career has '
+                               f'started: you play {res.get("name")}. Open Career to plan the first four weeks.')
+        _, started = self.start('new-career', f'New career in “{d.name}”', run, world_dir=None, cancellable=True)
+        return None if started else ('warn', 'Another operation is running: one at a time.')
 
     # -- library operations (each a job) --------------------------------------------------------------------
     def create(self, form):
@@ -493,6 +695,14 @@ class App:
                    'A new seed is suggested each time; type an earlier world’s seed (shown in the library) to make that '
                    'world again. The whole world is generated: every nation, golfer, coach and caddie. Every new world '
                    'plays the reference calendar (majors in weeks 15, 20, 25 and 30).</p>')
+        out.append('<h2>Start a new career</h2><form method="post" action="/career/new" class="filters">'
+                   '<label>Name<input name="name" required placeholder="my career"></label>'
+                   '<label>Starting year<input name="start_year" type="number" min="1900" max="2200" value="2027"></label>'
+                   f'<label>Seed<input name="seed" type="number" min="0" max="2147483647" value="{random.randrange(1, 1000000)}">'
+                   '</label><button class="primary">New Career</button></form>'
+                   '<p class="muted">Creates a world, plays its first season under AI (a few minutes) so that the '
+                   'world\'s own rules create its first class of juniors, and gives you one of them, chosen by a seeded '
+                   'draw, at the start of the second season. Nobody is added to the world for you.</p>')
         trash = WL.trashed(self.lib)
         if trash:
             out.append('<h2>Removed worlds (trash)</h2>' + O.table(['World', 'Removed', 'Size', ''], [
@@ -569,6 +779,8 @@ def make_handler(app):
             self.send_header('Content-Type', ctype)
             self.send_header('Content-Length', str(len(data)))
             self.send_header('Cache-Control', 'no-store')
+            self.send_header('Referrer-Policy', 'same-origin')     # (this observer's own forms name their origin)
+            self.send_header('X-Frame-Options', 'DENY')            # (no other page may frame these controls)
             for k, v in headers:
                 self.send_header(k, v)
             self.end_headers()
@@ -594,10 +806,16 @@ def make_handler(app):
             host = (self.headers.get('Host') or '').rsplit(':', 1)[0].strip('[]')
             if host not in ('localhost', '127.0.0.1', '::1'):
                 return False
-            origin = self.headers.get('Origin')
-            if self.command == 'POST' and origin and origin != 'null':
-                o = urlparse(origin)
-                return o.hostname in ('localhost', '127.0.0.1', '::1') and o.port == self.server.server_address[1]
+            if self.command == 'POST':
+                # a browser names the page a form came from: another site's page (or an opaque one, 'null': a
+                # sandboxed frame, a data: or file: page) may not post here. Clients that send no Origin are local
+                # programs, not a browser on another site (every browser sends it with a form POST).
+                if (self.headers.get('Sec-Fetch-Site') or '').lower() in ('cross-site', 'same-site'):
+                    return False
+                origin = self.headers.get('Origin')
+                if origin is not None:
+                    o = urlparse(origin)
+                    return o.hostname in ('localhost', '127.0.0.1', '::1') and o.port == self.server.server_address[1]
             return True
 
         def do_GET(self):
@@ -642,6 +860,12 @@ def make_handler(app):
                         notice = ('warn', 'Nothing to stop: the operation had already finished.')
                 elif u.path == '/worlds/create':
                     notice, to = app.create(form), '/'
+                elif u.path in ('/career/start', '/career/plan', '/career/decide', '/career/end'):
+                    notice, to = app.renderer.call(app.career_command, form, u.path.rsplit('/', 1)[1])
+                elif u.path == '/career/advance':
+                    notice, to = app.renderer.call(app.career_advance, form), '/career'
+                elif u.path == '/career/new':
+                    notice, to = app.new_career(form), '/career'
                 elif u.path == '/worlds/open':
                     notice, to = app.open(form), '/'
                 elif u.path == '/worlds/browse':
