@@ -298,7 +298,7 @@ def age_year(g, age, rng, experience=1.0, acc=None, rules=None):
     competition matures nothing. `rules`: the world's development rules (realism.py); 'dev-2' ages each
     attribute on its own schedule (_age_year_v2), anything else plays the rules below unchanged."""
     if rules in RZ.ATTRIBUTE_AGING:               # dev-2 and later (never `== CURRENT`: see realism.KNOWN)
-        return _age_year_v2(g, age, rng, experience, acc, taper=rules in RZ.ELITE_RULES)
+        return _age_year_v2(g, age, rng, experience, acc)
     a, c = g.attrs, g.ceilings
     rate = g.aging_rate
     x_phys = age - (g.peak_age + 3)
@@ -325,11 +325,11 @@ def age_year(g, age, rng, experience=1.0, acc=None, rules=None):
                 c[k] = a[k]
 
 
-def _age_year_v2(g, age, rng, experience, acc, taper=False):
+def _age_year_v2(g, age, rng, experience, acc):
     """'dev-2' aging (realism.py): each attribute from its own onset after the golfer's peak age, at its own rate,
     times the golfer's aging rate and their category factor; part of the physical decline is conditioning that
     training can win back (the ceiling falls by the rest); green reading and the mental game mature with
-    competitive experience until 48 and decline after 55. `taper` (dev-3): experience growth slows near 99."""
+    competitive experience until 48 and decline after 55."""
     a, c = g.attrs, g.ceilings
     rate = g.aging_rate
     prof = RZ.profile(g)
@@ -339,8 +339,6 @@ def _age_year_v2(g, age, rng, experience, acc, taper=False):
             if age < 48:
                 d = 0.35 * (0.6 + 0.8 * rng.random()) * (1.0 if cat == 'mental' else 0.5) * \
                     (experience if cat == 'mental' else 0.5 + 0.5 * experience)
-                if taper:                         # dev-3: the last points to 99 come slowly (realism.py, 3c)
-                    d *= RZ.experience_taper(a[k])
             elif age > 55:
                 d = -0.2 * (age - 55) ** 0.7
             if d:

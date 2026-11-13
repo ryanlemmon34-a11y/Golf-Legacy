@@ -1,5 +1,5 @@
 """Development rules for new worlds: readiness at entry and attribute-specific aging (rules 2026-11-16, 'dev-2'),
-then the elite tail, prodigy readiness and the experience taper (rules 2026-11-17, 'dev-3', section 3 below).
+then the elite tail, prodigy readiness and seeded money by standing (rules 2026-11-17, 'dev-3', section 3).
 
 Worlds keep the development rules they were created with (`World.dev_rules`, `Season.dev_rules`): worlds created
 before these rules, and any world asked for `LEGACY`, play the rules of 'dev-1' unchanged; worlds created under
@@ -43,7 +43,7 @@ CURRENT = DEV3
 # readiness and dev-2 aging; it must not fall back to dev-1 because it is no longer CURRENT).
 READY_RULES = (DEV2, DEV3)           # readiness floor at entry (section 1)
 ATTRIBUTE_AGING = (DEV2, DEV3)       # attribute-specific aging (section 2)
-ELITE_RULES = (DEV3,)                # elite tail, prodigy readiness, experience taper (section 3)
+ELITE_RULES = (DEV3,)                # elite tail, prodigy readiness, seeded money by standing (section 3)
 KNOWN = (LEGACY, DEV2, DEV3)
 
 # ---- 1. readiness at entry ----------------------------------------------------------------------------------------
@@ -126,14 +126,13 @@ def profile(g):
 # b. Prodigy readiness. The 18-year-old floor (READY_FLOOR) grows by PRODIGY_SLOPE per point of potential above
 #    PRODIGY_FROM (half at 19, none from 20): a potential-94 teenager keeps at least about 9 points to grow, a
 #    potential-88 one about 6, a typical potential-80 one 4.5 as in dev-2. Ordinary juniors are untouched.
-# c. Experience taper. The mental game and green reading still mature with experience until 48, but the last few
-#    points to 99 come slowly (growth x (99 - rating) / EXPERIENCE_TAPER when the rating is above 99 - TAPER), so
-#    long careers no longer end with every mental attribute at exactly 99. Below 87 nothing changes.
+# c. Seeded money by standing (finance.MoneyStanding): the starting world's savings, the backers' seeding
+#    estimate and fame, and new professionals' savings, follow a golfer's standing in the world's professional pool,
+#    not their absolute Overall. Aging is dev-2's, unchanged (no experience taper: owner decision 2026-11-12).
 ELITE_KNEE = 89.0
 ELITE_SPAN = 6.0
 PRODIGY_FROM = 85.0
 PRODIGY_SLOPE = 0.5
-EXPERIENCE_TAPER = 12.0
 
 
 def elite_potential(pot):
@@ -161,8 +160,3 @@ def generated_level(cur, pot, age, rules):
         return entry_overall(cur, pot, age), pot
     return cur, pot
 
-
-def experience_taper(rating):
-    """Share of a year's experience growth an attribute at this rating still takes (section 3c)."""
-    room = 99.0 - rating
-    return 1.0 if room >= EXPERIENCE_TAPER else max(0.0, room / EXPERIENCE_TAPER)

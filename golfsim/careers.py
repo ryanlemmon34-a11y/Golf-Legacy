@@ -32,6 +32,7 @@ import random
 from .calendar import TOUR_BY_KEY
 from .cards import home_challenger, home_lower, home_mini, premier_circuit, winner_exemptions
 from .development import EXPERIENCE_ROUNDS, init_ceilings
+from . import realism as RZ
 from . import amateur_return as AR
 from . import decision_evidence as DE
 from . import finance as FIN
@@ -641,13 +642,18 @@ def add_new_professionals(season, year):
     season.participation.record(year, 'new_pros', args['report'])
     season.world.next_id = start + len(arrivals)
     rng = random.Random(f'{season.seed}:new-pros:{year}')
+    # seeded money (finance.MoneyStanding): dev-3 judges a newcomer's savings on their standing among the world's
+    # professionals now (themselves not yet counted); earlier rules on the absolute Overall
+    standing = FIN.MoneyStanding(x.overall for x in season.world.golfers if FIN.in_money_pool(x)) \
+        if season.dev_rules in RZ.ELITE_RULES else None
     for g in arrivals:
         age = g.age(year)
         init_ceilings(g, age, rng)
-        g.cash = initial_cash(g, age, rng.random())
+        g.cash = initial_cash(g, age, rng.random(), standing, member=False)
         g.status, g.lifestyle, g.tour = 'pro', 'full_time', home_mini(g)
         g.backer = FIN.backer_deal(age, 0.2, rng.random(), rng.random())     # no ranking to show backers
-        if g.backer and g.cash >= FIN.SELF_FUNDED_SEASONS * FIN.seeded_losses(g, TOUR_BY_KEY[g.tour].tier):
+        if g.backer and g.cash >= FIN.SELF_FUNDED_SEASONS * FIN.seeded_losses(g, TOUR_BY_KEY[g.tour].tier, standing,
+                                                                               member=False):
             g.backer = 0.0                               # their savings pay for it: backers if they need them later
         g.backer_patience = rng.random()
         season.world.golfers.append(g)

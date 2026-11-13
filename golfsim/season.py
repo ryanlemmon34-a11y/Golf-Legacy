@@ -601,9 +601,13 @@ class Season:
     def _seed_world(self):
         """Pre-history: world/amateur ranking points, fame and last season's standings, from reputation."""
         rng = random.Random(_seed(self.seed, 'seed-world'))
+        # fame (prestige, then sponsors) is seeded money: dev-3 judges it on standing in the professional pool
+        # (finance.MoneyStanding), earlier rules on the absolute Overall
+        standing = FIN.MoneyStanding(g.overall for g in self.world.golfers if FIN.in_money_pool(g)) \
+            if self.dev_rules in RZ.ELITE_RULES else None
         for g in self.world.golfers:
             u = rng.random()
-            last_year = PR.seeded_fame(g.overall, u) * (1.0 if g.status == 'pro' else 0.2)
+            last_year = PR.seeded_fame(FIN.money_overall(g, standing), u) * (1.0 if g.status == 'pro' else 0.2)
             for k in range(6):
                 self.fame_log[g.id].append((-k * 9, last_year / 6))
             for k in range(16):

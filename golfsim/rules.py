@@ -140,9 +140,12 @@ VERSIONS = (
                    'level moves with it, for the starting world, juniors and new professionals alike, after the '
                    'scouts, colleges and tours have chosen, so every class keeps exactly its golfers, nations and '
                    'paths. A teenager with exceptional potential keeps more room to grow at entry (half a point more '
-                   'per point of potential above 85: about 9 points for the very best at 18). The mental game and '
-                   'green reading still mature with experience, but the last points to 99 come slowly. Worlds '
-                   'started earlier keep their rules (dev-1 or dev-2) unchanged.'),
+                   'per point of potential above 85: about 9 points for the very best at 18). Money a new world has to '
+                   'invent before anything is played (starting savings, seeded backing and fame, a new '
+                   'professional\'s savings) follows a golfer\'s standing among the world\'s professionals, not '
+                   'their absolute rating: the best professional of a world whose best are 80s is seeded like the '
+                   'best of one whose best are 90s; years on tour, status and age still count as before. Aging is '
+                   'unchanged. Worlds started earlier keep their rules (dev-1 or dev-2) unchanged.'),
 )
 EARLIER = ('Seasons archived before rules versions were recorded were played under earlier rules. The '
            'differences that matter for reading old results: a winner without a Premier card held no '

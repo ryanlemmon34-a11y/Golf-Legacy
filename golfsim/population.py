@@ -277,7 +277,8 @@ def generate_world(year=2027, seed=2027, nation_profiles=None, scale=1.0, dev_ru
     `dev_rules`: the world's development rules (realism.py): new worlds play the current ones; RZ.LEGACY gives
     the rules of worlds created before them."""
     from .development import init_ceilings
-    from .finance import SELF_FUNDED_SEASONS, backer_deal, initial_backing, initial_cash, seeded_losses
+    from .finance import (SELF_FUNDED_SEASONS, MoneyStanding, backer_deal, in_money_pool, initial_backing,
+                          initial_cash, seeded_losses)
     profiles = nation_profiles or starting_nations()
     taken = set()
     ready = {}
@@ -287,10 +288,13 @@ def generate_world(year=2027, seed=2027, nation_profiles=None, scale=1.0, dev_ru
     _assign_memberships(world, random.Random(f'{seed}:tours'))
     _apply_ready(golfers, ready)                  # (after the memberships: realism.py; ceilings below see the new gap)
     rng = random.Random(f'{seed}:careers')
+    # seeded money (finance.MoneyStanding): dev-3 judges it on standing in the professional pool, earlier rules on
+    # the absolute Overall
+    standing = MoneyStanding(g.overall for g in golfers if in_money_pool(g)) if dev_rules in RZ.ELITE_RULES else None
     for g in golfers:
         age = g.age(year)
         init_ceilings(g, age, rng)
-        g.cash = initial_cash(g, age, rng.random())
+        g.cash = initial_cash(g, age, rng.random(), standing)
         g.backing = initial_backing(age, rng.random(), rng.random())
         t = TOUR_BY_KEY.get(g.tour)
         if g.status == 'club_pro' or (g.status == 'amateur' and age > 22 and not g.tour.startswith('CO_')):
@@ -302,7 +306,7 @@ def generate_world(year=2027, seed=2027, nation_profiles=None, scale=1.0, dev_ru
             # the deal is their backing (family money included), not an extra pot
             b = random.Random(f'{seed}:backers:{g.id}')
             g.backer = backer_deal(age, 0.4, b.random(), b.random())
-            if g.backer and g.cash >= SELF_FUNDED_SEASONS * seeded_losses(g, t.tier):
+            if g.backer and g.cash >= SELF_FUNDED_SEASONS * seeded_losses(g, t.tier, standing):
                 g.backer = 0.0                        # their own savings already pay for the chase: backers
                                                       # come only if they later need them (careers)
             if g.backer:
