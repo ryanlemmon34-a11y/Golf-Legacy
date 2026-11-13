@@ -15,6 +15,7 @@ from __future__ import annotations
 import math
 import pickle
 import sys
+import re
 import unittest
 from pathlib import Path
 
@@ -29,6 +30,12 @@ W = PT.ACHIEVEMENT_WEIGHT
 def q_only(a, p):
     return (a + PT.NATION_PSEUDO) / (p + PT.NATION_PSEUDO)
 
+
+
+def header(name):
+    """A column header of the observer's tables: the name closes the <th>, directly or (since the sortable headers of
+    c9f53d3) inside its sort button. Present or absent exactly as the plain header was."""
+    return '>' + re.escape(name) + '(</button>)?</th>'
 
 class Components(unittest.TestCase):
     def test_even_share_is_ability_free_and_sums_to_the_fame_on_offer(self):
@@ -110,8 +117,8 @@ class ObserverText(unittest.TestCase):
              'multiplier': {'Argentina': 1.92}, 'shares': {'juniors': {'Argentina': 0.0187}, 'new_pros': {}},
              'allocated': {'juniors': {'Argentina': 6}}}
         html = self.page(n)
-        self.assertIn('>Achievement</th>', html)
-        self.assertIn('>Against expectation</th>', html)
+        self.assertRegex(html, header('Achievement'))
+        self.assertRegex(html, header('Against expectation'))
         self.assertIn('<td class=n>3.002</td><td class=n>0.789</td>', html)
         self.assertIn('Visible success first', html)
         self.assertNotIn('exactly the success expected', html)
@@ -120,7 +127,7 @@ class ObserverText(unittest.TestCase):
         n = {'prestige': {'Argentina': 41.5}, 'ratio': {'Argentina': 0.789}, 'multiplier': {'Argentina': 0.79},
              'shares': {'juniors': {'Argentina': 0.0076}, 'new_pros': {}}}
         html = self.page(n)
-        self.assertNotIn('>Achievement</th>', html)
+        self.assertNotRegex(html, header('Achievement'))
         self.assertIn('exactly the success expected', html)
 
 
@@ -148,7 +155,7 @@ class ObserverProjections(unittest.TestCase):
 
     def test_live_only_new_formula_detail_shows_its_components(self):
         html = self.detail(self.NEW_LIVE)
-        self.assertIn('>Achievement</th>', html)
+        self.assertRegex(html, header('Achievement'))
         self.assertIn('<td class=n>3.002</td><td class=n>0.789</td>', html)
         self.assertIn('Visible success first', html)
         self.assertNotIn('exactly the success expected', html)
@@ -160,7 +167,7 @@ class ObserverProjections(unittest.TestCase):
 
     def test_live_only_old_world_detail_keeps_the_earlier_wording(self):
         html = self.detail(self.OLD_LIVE)
-        self.assertNotIn('>Achievement</th>', html)
+        self.assertNotRegex(html, header('Achievement'))
         self.assertIn('exactly the success expected', html)
 
     def test_latest_from_the_archive_keeps_rules_and_components(self):
