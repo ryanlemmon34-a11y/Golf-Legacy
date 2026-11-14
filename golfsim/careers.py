@@ -433,12 +433,24 @@ def decide(season, year, snap):
         if rec and model:                                   # (an evaluation without its model -- a model
             DE.record_career(season, year, g, model, p, u, ev)   # stood in for, as tests do -- keeps nothing)
 
+    car = getattr(season, 'career', None)
     for g in sorted(season.world.golfers, key=lambda x: x.id):     # order never matters
         if g.lifestyle == 'retired':
             continue
         row = snap.get(g.id, {})
         age = g.age(year)
         college = g.tour.startswith('CO_')
+        if car is not None and car.controls(g.id):
+            # career mode: the player decided this golfer's winter (career.py, year end); the AI decides nothing for
+            # them and takes no draw for them from this stream. Their backers still decide on their own money.
+            if g.status == 'pro' and g.lifestyle == 'full_time':
+                change = review_backers(season, g, row, year, rng)
+                if change:
+                    seen = season.__dict__.pop('_own_way_last', None) if change == 'backers no longer needed' else None
+                    note(change, g, backer=round(g.backer), progress=round(progress_signal(row), 2),
+                         secured=list(row.get('secured', ())), **({'forecast': seen} if seen else {}))
+            apply_player_winter(season, g, row, year, car.winter_answer(year), exempt, note)
+            continue
         # ---- retirement ---------------------------------------------------------------------
         ev = {} if rec else None
         p_ret = p_retire(season, g, row, year, ev=ev) if not college else 0.0
@@ -586,6 +598,150 @@ def decide(season, year, snap):
             end_backing(season, g, year, 'Their backing deal ended when they stopped chasing the tour'
                         if g.lifestyle != 'retired' else None)
     return counts
+
+
+# ---- career mode: the controlled golfer's winter (career.py, docs/career/YEAR_END.md) ---------------------------------
+# The options are the choices the AI's own branches above can make for a golfer in the same state, with the same
+# eligibility rules (early_pro_gate, amateur_return.chance, ages); the consequences are the same functions. No
+# probability, potential or other hidden fact is read or shown.
+
+def player_winter_options(season, g, row, year):
+    """[(key, label, facts)] for the controlled golfer this winter, from the completed season's evidence `row`
+    (after the tour cards). The first option is always the one that changes nothing."""
+    age = g.age(year)
+    college = g.tour.startswith('CO_')
+    exempt = winner_exemptions(season, year + 1)
+    rank = row.get('am_end')
+    opts = []
+    if g.status == 'amateur':
+        if college and age < 22:
+            opts.append(('stay_in_college', f'Stay in college on the {TOUR_BY_KEY[g.tour].name}', {}))
+            gate = early_pro_gate(season, g, row, year, exempt)
+            if gate:
+                opts.append(('turn_pro', 'Turn professional now, before college eligibility ends',
+                             {'reason': f"a winner's exemption: {exempt[g.id]}" if gate == 'exemption'
+                              else f'amateur ranking {rank}', **_pro_start(g, rank, exempt.get(g.id))}))
+            return opts
+        if college:                                         # 22: college eligibility ends this winter
+            opts.append(('amateur_with_job', 'College eligibility ends: keep playing as an amateur alongside a job, on '
+                                             'the amateur circuit where you live', {}))
+            opts.append(('turn_pro', 'Turn professional after college', _pro_start(g, rank, exempt.get(g.id))))
+            return opts
+        opts.append(('continue', 'Continue as a ' + ('full-time' if g.lifestyle == 'full_time' else 'working')
+                     + ' amateur', {}))
+        opts.append(('turn_pro', 'Turn professional', _pro_start(g, rank, exempt.get(g.id))))
+        if g.lifestyle == 'full_time' and age >= 19:
+            opts.append(('take_job', 'Take a job and keep playing as an amateur', {}))
+        elif g.lifestyle == 'part_time' and season.amateur_return_on:
+            p, facts = AR.chance(season, g, row, year, amateur_standing(rank))
+            if 'blocked' not in facts:
+                opts.append(('return_full_time', 'Leave your job and play full-time amateur golf again',
+                             {'results': facts['results'], 'season_cost': facts['season_cost']}))
+            else:
+                opts_blocked = facts['blocked']
+                opts[0] = (opts[0][0], opts[0][1], {'cannot_return_full_time': opts_blocked})
+        opts.append(('retire', 'Retire from competitive golf', {}))
+        return opts
+    if g.status == 'pro' and g.lifestyle == 'part_time':
+        return [('continue', 'Continue as a part-time professional alongside your job', {}),
+                ('comeback', 'Quit your job and chase the tour full-time again',
+                 {'tour': TOUR_BY_KEY[home_mini(g)].name}),
+                ('retire', 'Retire from competitive golf', {})]
+    if g.status == 'pro':
+        return [('keep_chasing', f'Keep chasing: play next season on the {TOUR_BY_KEY[g.tour].name}'
+                 if g.tour in TOUR_BY_KEY else 'Keep chasing', {}),
+                ('club_pro', 'Stop chasing and become a club professional', {}),
+                ('regain_amateur', 'Stop chasing, take a job and regain amateur status', {}),
+                ('part_time_pro', 'Stop chasing; take a job and play a few local events as a professional',
+                 {'tour': TOUR_BY_KEY[home_mini(g)].name}),
+                ('retire', 'Retire from competitive golf', {})]
+    return [('continue', 'Continue', {})]                  # (a club professional: nothing to decide here)
+
+
+def _pro_start(g, rank, exemption):
+    """Where turning professional would start, by the same rule as turn_pro (nothing drawn)."""
+    r = rank or 99999
+    tour = premier_circuit(g) if exemption else home_challenger(g) if r <= 15 else home_lower(g) if r <= 60 \
+        else home_mini(g)
+    return {'tour': TOUR_BY_KEY[tour].name, 'amateur_rank': rank, **({'exemption': exemption} if exemption else {})}
+
+
+def apply_player_winter(season, g, row, year, answer, exempt, note):
+    """The player's winter choice for the controlled golfer, applied in the career decisions' place (careers.decide).
+    An answer that is no longer one of the options (never expected: nothing changes between the choice and here but
+    the backers' review) is applied as the option that changes nothing, and logged as such."""
+    log = season.log
+    age = g.age(year)
+    keys = [k for k, _, _ in player_winter_options(season, g, row, year)]
+    if answer not in keys:
+        if answer is not None:
+            log(g.id, year, 53, f'The chosen winter option ({answer}) no longer applied; nothing changed')
+        answer = keys[0]
+    college = g.tour.startswith('CO_')
+    rank = row.get('am_end')
+    if answer in ('continue', 'keep_chasing'):
+        return
+    if answer == 'stay_in_college':
+        if early_pro_gate(season, g, row, year, exempt):
+            log(g.id, year, 53, f'Could have turned professional from college at {age}; chose to stay in college on '
+                                f'the {TOUR_BY_KEY[g.tour].name}')
+            note('stayed in college', g, via='player', am_rank=rank)
+        return
+    if answer == 'retire':
+        log(g.id, year, 53, f'Retired from competitive golf at {age}')
+        g.lifestyle, g.tour = 'retired', ''
+        note('retired', g, via='player', injury_weeks=row.get('injury_weeks', 0), events=row.get('events', 0))
+        return
+    if answer == 'turn_pro':
+        how = (f'from college at {age}, before their eligibility ended' if college and age < 22 else
+               'after college' if college else
+               'late, after years as an amateur' if g.lifestyle == 'part_time' and age >= 27 else 'from the amateur ranks')
+        late = g.lifestyle == 'part_time' and age >= 27 and not college
+        turn_pro(season, g, year, rank or 99999, how, exempt.get(g.id))
+        note('comeback' if late else 'turned pro', g, via='player', am_rank=rank, graduating=college and age >= 22)
+        return
+    if answer == 'amateur_with_job':
+        g.tour, g.lifestyle = amateur_series(g, season.home_country(g)), 'part_time'
+        AR.started_work(season, g, year, 53)
+        log(g.id, year, 53, 'College eligibility ended (the season they turned 22); kept playing as an amateur '
+                            f'alongside a job, on the {TOUR_BY_KEY[g.tour].name} where they live')
+        note('college to amateur', g, via='player', am_rank=rank)
+        return
+    if answer == 'take_job':
+        g.lifestyle = 'part_time'
+        AR.started_work(season, g, year, 53)
+        log(g.id, year, 53, f'Took a job at {age} and kept playing as an amateur')
+        note('amateur took a job', g, via='player', am_rank=rank, cash=round(g.cash))
+        return
+    if answer == 'return_full_time':
+        g.lifestyle = 'full_time'
+        season.amateur_work_from.pop(g.id, None)
+        log(g.id, year, 53, f'Left their job at {age} to play full-time amateur golf again')
+        note(AR.KIND, g, via='player', am_rank=rank)
+        return
+    if answer == 'comeback':
+        g.lifestyle = 'full_time'
+        g.tour = home_mini(g)
+        log(g.id, year, 53, f'Quit their job to make another run at it, aged {age}')
+        note('comeback', g, via='player', wins=row.get('wins', 0), top3=row.get('top3', 0))
+        return
+    if answer == 'club_pro':
+        g.status, g.lifestyle, g.tour = 'club_pro', 'part_time', ''
+        log(g.id, year, 53, f'Stopped chasing the tour at {age} and became a club professional')
+        note('became club pro', g, via='player')
+        return
+    if answer == 'regain_amateur':
+        g.status, g.lifestyle, g.tour = 'amateur', 'part_time', amateur_series(g, season.home_country(g))
+        AR.started_work(season, g, year, 53)
+        log(g.id, year, 53, f'Stopped chasing the tour at {age}, took a job and regained amateur status')
+        note('back to amateur', g, via='player')
+        return
+    if answer == 'part_time_pro':
+        g.lifestyle, g.tour = 'part_time', home_mini(g)
+        log(g.id, year, 53, f'Stopped chasing the tour at {age}; took a job and plays a few local events')
+        note('part-time pro', g, via='player')
+        return
+    raise ValueError(f'unknown winter option {answer!r}')
 
 
 def turn_pro(season, g, year, am_rank, how, exemption=None):

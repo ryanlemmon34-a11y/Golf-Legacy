@@ -1,0 +1,10 @@
+{
+ "work": {
+  "available": true,
+  "wage": 900,
+  "why": ""
+ },
+ "command_week": {
+  "kind": "work"
+ }
+}

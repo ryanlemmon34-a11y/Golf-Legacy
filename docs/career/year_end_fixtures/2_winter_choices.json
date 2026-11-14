@@ -1,0 +1,107 @@
+{
+ "year": 2028,
+ "stage": "winter_choices",
+ "winter_parts_done": 1,
+ "version": 44,
+ "review": {
+  "year": 2028,
+  "golfer_id": 1268,
+  "name": "Drew Rogers",
+  "age": 18,
+  "status": "amateur",
+  "lifestyle": "full_time",
+  "tour": "North American Amateur Series",
+  "recorded_weeks": 52,
+  "complete": true,
+  "events": 1,
+  "wins": 0,
+  "top10": 0,
+  "missed_cuts": 0,
+  "best_finish": {
+   "position": 23,
+   "event": "Small College National Championship",
+   "tied": true
+  },
+  "prize_money": 0.0,
+  "income": null,
+  "activity": {
+   "rest": 51,
+   "play": 1
+  },
+  "overall_start": 32.546,
+  "overall_now": 32.886,
+  "world_rank": null,
+  "amateur_rank": 407,
+  "funds": 26369.9
+ },
+ "decisions": [
+  {
+   "id": "D16",
+   "kind": "winter_career",
+   "text": "Winter 2028: what does Drew Rogers do next season?",
+   "options": [
+    "continue",
+    "turn_pro",
+    "retire"
+   ],
+   "choices": [
+    {
+     "key": "continue",
+     "label": "Continue as a full-time amateur",
+     "facts": {}
+    },
+    {
+     "key": "turn_pro",
+     "label": "Turn professional",
+     "facts": {
+      "tour": "Sunbelt Mini Tour",
+      "amateur_rank": 407
+     }
+    },
+    {
+     "key": "retire",
+     "label": "Retire from competitive golf",
+     "facts": {}
+    }
+   ]
+  },
+  {
+   "id": "D17",
+   "kind": "winter_staff",
+   "text": "Winter 2028: keep your team (coach Glen Whitbread, caddie Matteo Galli) for next season, or let someone go? (Staff may still decide to move on themselves, as they always could.)",
+   "options": [
+    "keep",
+    "let_go_coach",
+    "let_go_caddie",
+    "let_go_both"
+   ],
+   "choices": [
+    {
+     "key": "keep",
+     "label": "Keep your team",
+     "facts": {}
+    },
+    {
+     "key": "let_go_coach",
+     "label": "Let coach Glen Whitbread go",
+     "facts": {}
+    },
+    {
+     "key": "let_go_caddie",
+     "label": "Let caddie Matteo Galli go",
+     "facts": {}
+    },
+    {
+     "key": "let_go_both",
+     "label": "Let both go",
+     "facts": {}
+    }
+   ]
+  }
+ ],
+ "offers": [],
+ "answers": {
+  "intent": "keep"
+ },
+ "candidates": null
+}

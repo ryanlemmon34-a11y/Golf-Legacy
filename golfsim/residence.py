@@ -342,60 +342,106 @@ def move_odds(season, g, year, changed=False):
     return best, _sig((value[best] - value[current] - MOVE_MARGIN) / MOVE_SCALE)
 
 
-def review_moves(season, year, snap):
-    """Each winter: professionals (and anyone whose golfing life changed, graduates included) may move
-    closer to the events they have a route to enter, or back home (see the module notes)."""
+def _move_case(season, g, year, snap):
+    """(changed, current, best, p) for a golfer the winter's career-move rule considers, or None (who does not move
+    this winter: retired, in college, with no recorded home, off any tour, or neither chasing nor changed, or too soon
+    after the last move)."""
     from .calendar import TOUR_BY_KEY
     P = season.places
+    if g.lifestyle == 'retired' or g.tour.startswith('CO_') or not P.known(g.id) or g.tour not in TOUR_BY_KEY:
+        return None
+    row = snap.get(g.id)
+    changed = row is not None and (row['status'] != g.status or row['lifestyle'] != g.lifestyle
+                                   or row['tour'].startswith('CO_'))
+    chasing = g.status == 'pro' and g.lifestyle == 'full_time'
+    if not (chasing or changed):
+        return None                                  # a job, a club or a family home keeps them where they are
+    if not changed and year - P.since.get(g.id, year) < MIN_STAY:
+        return None
+    best, p = move_odds(season, g, year, changed)
+    return changed, P.home[g.id][0], best, p
+
+
+def move_affordable(season, g):
+    """(own money for a move, the move's cost): paid from their own money (family and backers' included), never on
+    credit, keeping RESERVE_WEEKS of their committed costs."""
+    own = g.cash + g.backing + g.backer_funds - FIN.RESERVE_WEEKS * season.committed_weekly(g)
+    return own, MOVE_COST
+
+
+def review_moves(season, year, snap):
+    """Each winter: professionals (and anyone whose golfing life changed, graduates included) may move
+    closer to the events they have a route to enter, or back home (see the module notes). Career mode: the
+    controlled golfer moves only if the player chose the move (the same draw is taken, so no one else's moves)."""
     rng = random.Random(f'{season.seed}:moves:{year}')
+    car = getattr(season, 'career', None)
     for g in sorted(season.active_golfers(), key=lambda g: g.id):
-        if g.lifestyle == 'retired' or g.tour.startswith('CO_') or not P.known(g.id) or g.tour not in TOUR_BY_KEY:
+        case = _move_case(season, g, year, snap)
+        if case is None:
             continue
-        row = snap.get(g.id)
-        changed = row is not None and (row['status'] != g.status or row['lifestyle'] != g.lifestyle
-                                       or row['tour'].startswith('CO_'))
-        chasing = g.status == 'pro' and g.lifestyle == 'full_time'
-        if not (chasing or changed):
-            continue                                 # a job, a club or a family home keeps them where they are
-        if not changed and year - P.since.get(g.id, year) < MIN_STAY:
+        changed, current, best, p = case
+        if car is not None and car.controls(g.id):
+            if best != current:
+                rng.random()                         # (the AI's draw, taken as it always was)
+            want = car.winter_answer(year, 'residence')
+            if want != f'move:{best}' or best == current:
+                continue
+        elif best == current or rng.random() >= p:
             continue
-        current = P.home[g.id][0]
-        events = season.target_events(g)
-        best, p = move_odds(season, g, year, changed)
-        if best == current or rng.random() >= p:
+        own, cost = move_affordable(season, g)
+        if own < cost:                               # cannot pay for the move: they stay
+            season.move_blocked[year] = season.move_blocked.get(year, 0) + 1
             continue
-        cost = MOVE_COST
-        own = g.cash + g.backing + g.backer_funds - FIN.RESERVE_WEEKS * season.committed_weekly(g)
-        if own < cost:                               # paid from their own money (family and backers'
-            season.move_blocked[year] = season.move_blocked.get(year, 0) + 1   # included), never on credit
-            continue                                 # cannot pay for the move: they stay
-        season.spend(g, year, 'moving', cost)
-        season.cover_shortfall(g, year)              # funded now, from this year's pots, in this year's
-                                                     # ledger (not after January's backer top-up)
-        saved = (season.tour_trip_cost(g, g.tour, home=current, caddie=False)
-                 - season.tour_trip_cost(g, g.tour, home=best, caddie=False)) * events
-        to = _destination(season, g, best, g.tour)
-        if best == _homeland(season, g):
-            why = 'returned home' + (f' (travel ${-saved:,.0f} a season dearer, no longer a burden)' if saved < -500
-                                     else f' (closer to their events too: ${saved:,.0f} a season less travel)'
-                                     if saved > 500 else '')
-        else:
-            why = (f'closer to the {TOUR_BY_KEY[g.tour].name} events (about ${saved:,.0f} a season less '
-                   f'travel; the move cost ${cost:,.0f})')
-        if changed and row['tour'].startswith('CO_'):
-            why += '; after college'
-        elif changed and g.lifestyle != row['lifestyle']:
-            why += '; after giving up the chase for a job' if g.lifestyle == 'part_time' else '; a new start'
-        elif changed:
-            why += '; after a change of status'
-        _record(season, g.id, year, 53, to, why)
-        if g.status == 'amateur':                    # open amateur golf is local: the new home's circuit
-            from .careers import amateur_series
-            circuit = amateur_series(g, best)
-            if circuit != g.tour:
-                season.log(g.id, year, 53, f'Now plays amateur golf on the {TOUR_BY_KEY[circuit].name}, '
-                                           'where they live')
-                g.tour = circuit
+        _career_move(season, g, year, snap.get(g.id), changed, current, best, cost)
+
+
+def _career_move(season, g, year, row, changed, current, best, cost):
+    from .calendar import TOUR_BY_KEY
+    events = season.target_events(g)
+    season.spend(g, year, 'moving', cost)
+    season.cover_shortfall(g, year)              # funded now, from this year's pots, in this year's
+                                                 # ledger (not after January's backer top-up)
+    saved = (season.tour_trip_cost(g, g.tour, home=current, caddie=False)
+             - season.tour_trip_cost(g, g.tour, home=best, caddie=False)) * events
+    to = _destination(season, g, best, g.tour)
+    if best == _homeland(season, g):
+        why = 'returned home' + (f' (travel ${-saved:,.0f} a season dearer, no longer a burden)' if saved < -500
+                                 else f' (closer to their events too: ${saved:,.0f} a season less travel)'
+                                 if saved > 500 else '')
+    else:
+        why = (f'closer to the {TOUR_BY_KEY[g.tour].name} events (about ${saved:,.0f} a season less '
+               f'travel; the move cost ${cost:,.0f})')
+    if changed and row['tour'].startswith('CO_'):
+        why += '; after college'
+    elif changed and g.lifestyle != row['lifestyle']:
+        why += '; after giving up the chase for a job' if g.lifestyle == 'part_time' else '; a new start'
+    elif changed:
+        why += '; after a change of status'
+    _record(season, g.id, year, 53, to, why)
+    if g.status == 'amateur':                    # open amateur golf is local: the new home's circuit
+        from .careers import amateur_series
+        circuit = amateur_series(g, best)
+        if circuit != g.tour:
+            season.log(g.id, year, 53, f'Now plays amateur golf on the {TOUR_BY_KEY[circuit].name}, '
+                                       'where they live')
+            g.tour = circuit
+
+
+def player_move_option(season, g, year, snap):
+    """Career mode, the residence stage: None when the winter's move rule offers no move for this golfer; else the
+    rule's destination with its facts {'country', 'cost', 'own', 'affordable', 'travel_saved', 'home'}."""
+    case = _move_case(season, g, year, snap)
+    if case is None:
+        return None
+    changed, current, best, p = case
+    if best == current:
+        return None
+    own, cost = move_affordable(season, g)
+    events = season.target_events(g)
+    saved = (season.tour_trip_cost(g, g.tour, home=current, caddie=False)
+             - season.tour_trip_cost(g, g.tour, home=best, caddie=False)) * events
+    return {'country': best, 'from': current, 'cost': cost, 'own': round(own, 2), 'affordable': own >= cost,
+            'travel_saved': round(saved, 2), 'home': best == _homeland(season, g)}
 
 
 def staff_moves(season, year):

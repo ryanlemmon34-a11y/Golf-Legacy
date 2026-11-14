@@ -11,8 +11,13 @@ Design and boundaries: docs/career/PHASE_AB_PLAN.md. In short:
   checkpoint generation, exactly like an advance.
 * Gates (`gate`) tell the session when it must stop before a part of the simulation. They run before the week is
   prepared (a plan is missing, or a decision is due) and again after the week is prepared (the week's choice
-  revalidated after 1 January's and the block planning's effects, before any field, charge or result). Winter is
-  not playable in this build, so its gate always stops; the golfer can be returned to AI control.
+  revalidated after 1 January's and the block planning's effects, before any field, charge or result).
+* The year end (docs/career/YEAR_END.md) is a sequence of committed stages: the season review and the annual intent
+  (keep the golfer, switch to a newcomer, or end the career) before any of the winter runs; then, for a kept golfer,
+  their winter career choice and staff, the winter's career decisions (the AI decides nothing for them), their
+  residence, and the rest of the winter; after a switch (or a retirement), one of ten genuine juniors of the new class
+  on 1 January, before anything of the new season runs. A golfer left behind is an AI golfer through the whole
+  winter; the player never makes their winter choices.
 * Offers to the controlled golfer (coach, caddie, a job from the work pathway) become pending decisions. Nothing is
   ended, assigned, charged or reserved until the player answers. Acceptance revalidates, then applies the same
   consequence as the AI path.
@@ -23,7 +28,8 @@ from __future__ import annotations
 import random
 import copy
 
-FORMAT = 1                  # the career record's format: a save with a newer one is refused, never guessed at
+FORMAT = 2                  # the career record's format (2: control stints and winter answers; a format-1 record is
+                            # read and upgraded, keeping its history as one stint); a newer one is refused, never guessed
 SCHEMA = 1                  # the command payloads' schema
 BLOCK = 4                   # planning period: the engine's four-week block (13 a season), not a calendar month
 NOTICES_KEPT = 200
@@ -31,6 +37,8 @@ CATEGORIES = ('physical', 'long_game', 'short_game', 'putting', 'mental')
 CATEGORY_LABEL = {'physical': 'Physical', 'long_game': 'Long game', 'short_game': 'Short game', 'putting': 'Putting',
                   'mental': 'Mental game'}
 OFFER_KINDS = ('coach_offer', 'caddie_offer', 'job')
+YEAR_END_KINDS = ('season_review', 'winter_career', 'winter_staff', 'winter_residence', 'choose_newcomer')
+CANDIDATES = 10             # newcomers offered at a switch: a seeded sample of the new junior class, drawn once
 
 
 class CareerError(Exception):
@@ -76,10 +84,24 @@ class Career:
         self.notices = []                     # information only, newest last
         self.log = []                         # (year, week, what the player did)
         self.weekly_recaps = {}               # observation only, (year, week) -> played-week evidence
+        # control stints, oldest first: who the player controlled, from when to when (None: still), and how chosen
+        self.stints = [{'golfer_id': golfer_id, 'from': [year, week], 'to': None, 'how': dict(entry)}]
+        self.winter = {}                      # year -> the player's year-end answers ('intent', 'career', 'staff', ...)
 
     # ---- reading -------------------------------------------------------------------------------------------------
     def controls(self, gid):
         return self.status == 'active' and gid == self.golfer_id
+
+    def winter_answer(self, year, key='career'):
+        """The player's year-end answer for `year` (None: not given -- the option that changes nothing applies)."""
+        return self.winter.get(year, {}).get(key)
+
+    def controlled_at(self, year, week):
+        """The golfer the player controlled in that week (None: no one), from the stints."""
+        for st in self.stints:
+            if tuple(st['from']) <= (year, week) and (st['to'] is None or (year, week) <= tuple(st['to'])):
+                return st['golfer_id']
+        return None
 
     def plan_for(self, year, week):
         return self.plans.get((year, block_start(week)))
@@ -170,6 +192,17 @@ class Career:
                            {'weeks_blocked': weeks_blocked}, text, ('accept', 'decline'))
 
 
+def upgrade(c):
+    """A format-1 career record read by this build: its history kept as one control stint (ended if it ended), no
+    winter answers. Nothing recorded is reinterpreted; an ended career stays ended. Returns the record."""
+    if getattr(c, 'format', None) == 1:
+        c.stints = [{'golfer_id': c.golfer_id, 'from': list(c.started),
+                     'to': list(c.ended) if c.ended else None, 'how': dict(c.entry)}]
+        c.winter = {}
+        c.format = 2
+    return c
+
+
 def _share_text():
     from .staff import SCOUT_SHARE
     return f'{SCOUT_SHARE:.0%} of prize money'
@@ -227,14 +260,31 @@ def explain_ineligible(season, g, s, week):
     return 'not open to this golfer'
 
 
-def check_choice(season, g, year, week, ch):
-    """('ok' | 'injured' | 'invalid', reason) for one week's choice, judged now by the engine's own rules."""
+def work_unavailable(season, g, year, planning=True):
+    """Why the golfer may not plan a week of paid work ('' if they may): the engine's own rule -- a full-time
+    professional whose funds would not cover three months of living costs (Season.needs_paid_work), the same test
+    the AI planner's paid work rests on. Once planned, a work week stands (as the AI's planned work weeks do) even if
+    a prize arrives meanwhile; it is paid WORK_WAGE, like any golfer's."""
+    if g.status != 'pro' or g.lifestyle != 'full_time':
+        return 'only a full-time professional takes paid work weeks (amateurs and part-time professionals have jobs)'
+    if planning and not season.needs_paid_work(g, year):
+        return ('paid work is for a professional whose money would not cover three months of living costs; '
+                'yours does')
+    return ''
+
+
+def check_choice(season, g, year, week, ch, planning=False):
+    """('ok' | 'injured' | 'invalid', reason) for one week's choice, judged now by the engine's own rules
+    (planning: as the plan is made; otherwise as a planned week is about to be played)."""
     if not isinstance(ch, dict):
         return 'invalid', 'no choice for this week'
     kind = ch.get('kind')
     inj = injured_until(season, g.id, year, week)
     if kind == 'rest':
         return 'ok', ''
+    if kind == 'work':                                 # paid work: the AI's rule (Season.needs_paid_work) decides who
+        why = work_unavailable(season, g, year, planning)   # may; an injured golfer does light work, as the AI's do
+        return ('invalid', why) if why else ('ok', '')
     if kind not in ('train', 'event'):
         return 'invalid', 'unknown choice'
     if inj is not None:
@@ -271,6 +321,8 @@ def to_engine(ch):
         return 'play', (fb['category'] if fb['kind'] == 'train' else None)
     if ch['kind'] == 'train':
         return 'train', ch['category']
+    if ch['kind'] == 'work':
+        return 'work', None
     return 'rest', None
 
 
@@ -288,36 +340,38 @@ def install(season, year, w0):
 def gate(season, cursor):
     """None if the next part may run; otherwise {'kind': 'decision', 'ids': [...]} (decisions may be created here)."""
     c = getattr(season, 'career', None)
-    if c is None or c.status != 'active':
+    if c is None or c.status not in ('active', 'choosing'):
         return None
     y, w, ph = cursor['year'], cursor['week'], cursor['phase']
     g = season.g.get(c.golfer_id)
     if ph == 'start':
+        if c.status == 'active' and (g is None or g.lifestyle == 'retired') and c.stints[-1]['from'][0] < y:
+            # the golfer retired (the player's own winter choice) or died over the winter: their stint ends with the
+            # season they played, and the player may pick a newcomer of this new class
+            _end_stint(c, y - 1, 53)
+            c.status = 'choosing'
+            c.note(y, 1, 'stint', f'{g.name if g else "Your golfer"} is no longer playing. You can take control of one '
+                                  f'of the juniors entering the world for {y}, or end the career.')
+        if c.status == 'choosing':
+            d = _newcomer_decision(season, c, y)
+            return {'kind': 'decision', 'ids': [d['id']]} if d is not None else None
         return None                                    # 1 January runs; what it brings is checked before the week
+    if c.status != 'active':
+        return None
+    if ph == 'end':
+        return _year_end_gate(season, c, g, y)
     if g is None or g.lifestyle == 'retired':
         d = c.ensure('unsupported', ('unsupported', 'retired', y), y, w, None, {},
                      'The golfer is no longer playing. This build cannot continue a career past that point.',
                      ('return_to_ai',))
         return {'kind': 'decision', 'ids': [d['id']]}
-    if ph == 'end':
-        d = c.ensure('season_end', ('season_end', y), y, 52, None, {'year': y},
-                     f'The {y} season is over. Season-end decisions (turning professional, college, residence, '
-                     'retirement) and the season review are not playable in this build. Return the golfer to AI '
-                     'control to let the world continue: the AI then makes those decisions for them.', ('return_to_ai',))
-        return {'kind': 'decision', 'ids': [d['id']]}
     if ph == 'week':
-        if g.status == 'pro' and g.lifestyle == 'full_time' and season.needs_paid_work(g, y):
-            # (not reachable in this build's slice -- a newcomer is an amateur and status changes only in the winter --
-            # but never bypassed silently: a professional short of money takes paid work weeks, not yet plannable)
-            c.ensure('unsupported', ('unsupported', 'paid_work', y, block_start(w)), y, w, None, {},
-                     'Your money would not cover three months of living costs. A professional in that position takes '
-                     'paid work weeks, which this build cannot yet plan for a player. Return the golfer to AI control '
-                     '(the AI then plans their weeks, paid work included).', ('return_to_ai',))
         if c.plan_for(y, w) is None:
             w0 = block_start(w)
             c.ensure('plan', ('plan', y, w0), y, w, (y, w0),
-                     {'block': [y, w0]}, f'Plan weeks {w0}–{block_weeks(w0)[-1]} of {y}: an event, training or rest for '
-                                        'each week, and what to do if selected or invited.', ('plan',))
+                     {'block': [y, w0]}, f'Plan weeks {w0}–{block_weeks(w0)[-1]} of {y}: an event, training, rest '
+                                        '(or, for a professional short of money, paid work) for each week, and what '
+                                        'to do if selected or invited.', ('plan',))
     else:                                              # 'planned': revalidate this week's choice before it counts
         ch = c.choice(y, w)
         code, why = check_choice(season, g, y, w, ch)
@@ -331,6 +385,243 @@ def gate(season, cursor):
     if due:
         return {'kind': 'decision', 'ids': [d['id'] for d in due]}
     return None
+
+
+# ---- the year end (docs/career/YEAR_END.md) ----------------------------------------------------------------------------
+
+def _end_stint(c, year, week):
+    if c.stints and c.stints[-1]['to'] is None:
+        c.stints[-1]['to'] = [year, week]
+    c._bump()
+
+
+def winter_stage(season, c, year):
+    """The year-end stage the career is at in season `year`'s winter (cursor at week 52 'end'), from what has run and
+    what the player has answered: 'season_review', 'winter_choices', 'winter_residence' (a player stage, possibly
+    already answered), or 'engine' (the next winter part runs)."""
+    done = season.winter_parts_done(year)
+    a = c.winter.get(year, {})
+    if 'intent' not in a:
+        return 'season_review'
+    if done == 1:
+        return 'winter_choices'
+    if done == 2:
+        return 'winter_residence'
+    return 'engine'
+
+
+def _year_end_gate(season, c, g, y):
+    legacy = [d for d in c.pending() if d['kind'] == 'season_end']
+    if legacy:                                         # (a stop recorded by an earlier build: answered as it was)
+        return {'kind': 'decision', 'ids': [d['id'] for d in legacy]}
+    offers = [d for d in c.pending(OFFER_KINDS)]
+    a = c.winter.setdefault(y, {})
+    stage = winter_stage(season, c, y)
+    ids = []
+    if stage == 'season_review':
+        choices = [
+            {'key': 'keep', 'label': f'Keep playing as {g.name}',
+             'facts': {'detail': f'You make {g.name}\'s winter choices next (career path, staff, residence).'}},
+            {'key': 'switch', 'label': 'Switch to a newcomer',
+             'facts': {'detail': f'{g.name} returns to AI control now, before the winter: the AI makes all their winter '
+                                 f'decisions. On 1 January {y + 1} you choose one of {CANDIDATES} juniors entering '
+                                 'the world (they exist whoever you choose).'}},
+            {'key': 'end_career', 'label': 'End the career',
+             'facts': {'detail': 'Every golfer is under AI control from now on. This cannot be undone.'}}]
+        d = c.ensure('season_review', ('season_review', y), y, 52, None, {'year': y, 'choices': choices},
+                     f'The {y} season is over. Keep playing as {g.name}, switch to one of the juniors entering the '
+                     f'world for {y + 1} (chosen on 1 January, after the winter; {g.name} carries on under AI control '
+                     'through the winter), or end the career.', [x['key'] for x in choices])
+        ids.append(d['id'])
+    elif stage == 'winter_choices':
+        from .careers import player_winter_options
+        row = season.snapshots[y].get(g.id, {})
+        if 'career' not in a:
+            opts = player_winter_options(season, g, row, y)
+            if len(opts) == 1:
+                a['career'] = opts[0][0]
+                c.note(y, 53, 'winter', f'Winter {y}: {opts[0][1]} (the only option for {g.name} this winter).',
+                       key=('winter_career', y))
+            else:
+                d = c.ensure('winter_career', ('winter_career', y), y, 52, None,
+                             {'year': y, 'choices': [{'key': k, 'label': lab, 'facts': f} for k, lab, f in opts]},
+                             f'Winter {y}: what does {g.name} do next season?', tuple(k for k, _, _ in opts))
+                ids.append(d['id'])
+        if 'staff' not in a:
+            opts = staff_options(season, g)
+            if len(opts) == 1:
+                a['staff'] = {}
+            else:
+                st = season.staff
+                who = [f'coach {st.coach(g.id).name}' if st.coach(g.id) else None,
+                       f'caddie {st.caddie(g.id).name}' if st.caddie(g.id) else None]
+                co, ca = st.coach(g.id), st.caddie(g.id)
+                labels = {'keep': 'Keep your team',
+                          'let_go_coach': f'Let coach {co.name if co else ""} go',
+                          'let_go_caddie': f'Let caddie {ca.name if ca else ""} go',
+                          'let_go_both': 'Let both go'}
+                d = c.ensure('winter_staff', ('winter_staff', y), y, 52, None,
+                             {'year': y, 'coach': co.id if co else None, 'caddie': ca.id if ca else None,
+                              'choices': [{'key': k, 'label': labels[k], 'facts': {}} for k in opts]},
+                             f'Winter {y}: keep your team ({", ".join(x for x in who if x)}) for next season, or let '
+                             'someone go? (Staff may still decide to move on themselves, as they always could.)', opts)
+                ids.append(d['id'])
+    elif stage == 'winter_residence':
+        if 'residence' not in a:
+            from . import residence as RES
+            opt = None if g is None or g.lifestyle == 'retired' else \
+                RES.player_move_option(season, g, y, season.snapshots[y])
+            if opt is None:
+                a['residence'] = 'stay'
+            elif not opt['affordable']:
+                a['residence'] = 'stay'
+                c.note(y, 53, 'winter', f'Winter {y}: a move to {opt["country"]} would suit your golf, but its cost '
+                                        f'(${opt["cost"]:,.0f}) is more than your own money allows: you stay.',
+                       key=('winter_residence', y))
+            else:
+                choices = [{'key': 'stay', 'label': f'Stay in {opt["from"]}', 'facts': {}},
+                           {'key': f'move:{opt["country"]}', 'label': f'Move to {opt["country"]}',
+                            'facts': {'cost': opt['cost'], 'travel_saved': opt['travel_saved'], 'own': opt['own']}}]
+                d = c.ensure('winter_residence', ('winter_residence', y), y, 52, None,
+                             dict(opt, year=y, choices=choices),
+                             f'Winter {y}: move to {opt["country"]}'
+                             + (' (your homeland)' if opt['home'] else '') + ' or stay where you live? Moving costs '
+                             f'${opt["cost"]:,.0f} from your own money; '
+                             + (f'about ${opt["travel_saved"]:,.0f} a season less travel to your events.'
+                                if opt['travel_saved'] >= 0 else
+                                f'about ${-opt["travel_saved"]:,.0f} a season more travel to your events.'),
+                             ('stay', f'move:{opt["country"]}'))
+                ids.append(d['id'])
+    if offers or ids:
+        return {'kind': 'decision', 'ids': [d['id'] for d in offers] + ids}
+    return None
+
+
+def staff_options(season, g):
+    st = season.staff
+    has_coach, has_caddie = st.coach(g.id) is not None, st.caddie(g.id) is not None
+    opts = ['keep']
+    if has_coach:
+        opts.append('let_go_coach')
+    if has_caddie:
+        opts.append('let_go_caddie')
+    if has_coach and has_caddie:
+        opts.append('let_go_both')
+    return tuple(opts)
+
+
+def candidates(season, year):
+    """The newcomers offered at a switch for `year`: a seeded uniform sample of that year's junior class (genuine
+    entrants the normal rules created; none is created here), at most CANDIDATES, sorted by id."""
+    cls = sorted(gid for gid, r in season.creations.get(year, {}).items()
+                 if r.get('path') == 'junior' and gid in season.g and season.g[gid].lifestyle != 'retired')
+    if len(cls) <= CANDIDATES:
+        return cls
+    return sorted(random.Random(f'{season.seed}:career:candidates:{year}').sample(cls, CANDIDATES))
+
+
+def _newcomer_decision(season, c, y):
+    for d in c.pending(('choose_newcomer',)):
+        return d
+    if any(d['kind'] == 'choose_newcomer' and d['payload']['year'] == y for d in c.decisions.values()):
+        return None
+    ids = candidates(season, y)
+    text = (f'Choose who to play as from {y}: one of {len(ids)} juniors entering the world this season '
+            f'(a fixed draw from the class of {sum(1 for r in season.creations.get(y, {}).values() if r.get("path") == "junior")}; '
+            'the others carry on under AI control), or end the career.')
+    choices = [{'key': str(i), 'label': season.g[i].name, 'facts': candidate_facts(season, season.g[i], y)}
+               for i in ids]
+    choices.append({'key': 'end_career', 'label': 'End the career',
+                    'facts': {'detail': 'Every golfer is under AI control from now on. This cannot be undone.'}})
+    return c.ensure('choose_newcomer', ('choose_newcomer', y), y, 1, None,
+                    {'year': y, 'candidates': ids, 'choices': choices}, text, [x['key'] for x in choices])
+
+
+def candidate_facts(season, g, year):
+    """What the player may see of a newcomer: their public profile as it stands (no potential, ceilings, peak age,
+    aging rate or any other hidden fact)."""
+    from .calendar import TOUR_BY_KEY
+    t = TOUR_BY_KEY.get(g.tour)
+    return {'id': g.id, 'name': g.name, 'country': g.country, 'age': g.age(year), 'status': g.status,
+            'lifestyle': g.lifestyle, 'tour': t.name if t else (g.tour or None),
+            'overall': round(g.overall, 1),
+            'attrs': [(label, [(k, round(g.attrs[k], 1)) for k in keys if k in g.attrs]) for label, keys in ATTR_GROUPS],
+            'funds': round(g.cash + g.backing + g.backer_funds, 2)}
+
+
+def _answer_year_end(season, c, d, cursor, answer):
+    y, w = _now(cursor)
+    kind = d['kind']
+    yr = d['payload'].get('year', y)
+    a = c.winter.setdefault(yr, {}) if kind != 'choose_newcomer' else None
+    if kind == 'season_review':
+        if cursor['phase'] != 'end' or season.winter_parts_done(yr):
+            raise CareerError('The season review can only be answered before the winter starts.')
+        if answer == 'end_career':
+            return _end_control(season, c, cursor, {})
+        offers = c.pending(OFFER_KINDS)
+        if offers:
+            raise CareerError('Answer the pending offers first: ' + '; '.join(x['text'].split('.')[0] for x in offers)
+                              + '.')
+        a['intent'] = answer
+        c.resolve(d, 'resolved', y, w, answer)
+        g = season.g.get(c.golfer_id)
+        if answer == 'switch':
+            _end_stint(c, yr, 52)
+            c.status = 'choosing'
+            c.log.append((y, w, f'switching: {g.name if g else c.golfer_id} returns to AI control for the winter'))
+            c.note(y, w, 'stint', f'{g.name if g else "Your golfer"} carries on under AI control from the end of {yr}. '
+                                  f'On 1 January {yr + 1} you choose one of the juniors entering the world.')
+        else:
+            c.log.append((y, w, f'kept {g.name if g else c.golfer_id} for {yr + 1}'))
+        return {'ok': True, 'answer': answer}
+    if kind == 'winter_career':
+        if season.winter_parts_done(yr) != 1:
+            raise CareerError('This winter choice is no longer open.')
+        a['career'] = answer
+        label = next((x['label'] for x in d['payload']['choices'] if x['key'] == answer), answer)
+        c.resolve(d, 'resolved', y, w, label)
+        c.log.append((y, w, f'winter {yr}: {label}'))
+        return {'ok': True, 'answer': answer}
+    if kind == 'winter_staff':
+        if season.winter_parts_done(yr) != 1:
+            raise CareerError('This winter choice is no longer open.')
+        a['staff'] = {'coach': 'let_go' if answer in ('let_go_coach', 'let_go_both') else 'keep',
+                      'caddie': 'let_go' if answer in ('let_go_caddie', 'let_go_both') else 'keep'}
+        c.resolve(d, 'resolved', y, w, answer)
+        c.log.append((y, w, f'winter {yr}: staff {answer.replace("_", " ")}'))
+        return {'ok': True, 'answer': answer}
+    if kind == 'winter_residence':
+        if season.winter_parts_done(yr) != 2:
+            raise CareerError('This winter choice is no longer open.')
+        a['residence'] = answer
+        c.resolve(d, 'resolved', y, w, answer)
+        c.log.append((y, w, f'winter {yr}: residence {answer}'))
+        return {'ok': True, 'answer': answer}
+    if kind == 'choose_newcomer':
+        if cursor['phase'] != 'start':
+            raise CareerError('A newcomer is chosen on 1 January, before anything of the season runs.')
+        if answer == 'end_career':
+            c.resolve(d, 'resolved', y, w, 'ended the career')
+            c.status = 'ended'
+            c.ended = (y, 1)
+            c.log.append((y, w, 'ended the career'))
+            c.note(y, 1, 'end', 'The career has ended. Every golfer is under AI control.')
+            return {'ok': True, 'answer': answer}
+        pick = int(answer)
+        g = season.g.get(pick)
+        if g is None or g.lifestyle == 'retired':
+            raise CareerError('That golfer is no longer playing: choose another.')
+        c.golfer_id = pick
+        c.status = 'active'
+        c.stints.append({'golfer_id': pick, 'from': [y, 1], 'to': None,
+                         'how': {'kind': 'junior', 'class': y, 'candidates': len(d['payload']['candidates']),
+                                 'rule': 'chosen by the player from a seeded sample of the season\'s junior class'}})
+        c.resolve(d, 'resolved', y, w, f'chose {g.name}')
+        c.log.append((y, w, f'took control of {g.name}'))
+        c.note(y, 1, 'start', f'You now control {g.name}, one of the juniors entering the world for {y}.')
+        return {'ok': True, 'answer': answer, 'golfer': pick, 'name': g.name}
+    raise CareerError('Unknown year-end decision.')
 
 
 # ---- commands -----------------------------------------------------------------------------------------------------------
@@ -368,11 +659,18 @@ def apply(season, cursor, action):
     c = getattr(season, 'career', None)
     if c is None:
         raise CareerError('This world has no career.')
+    if getattr(c, 'format', None) == 1:
+        upgrade(c)
     if getattr(c, 'format', None) != FORMAT:
         raise CareerError(f'This career was saved in format {getattr(c, "format", None)}; this build reads format {FORMAT}.')
     if action.get('version') is not None and action['version'] != c.version:
         raise StaleCareer('This form was drawn before the latest change to the career: nothing was changed. '
                           'Look at the career page again and choose from what it shows now.')
+    if c.status == 'choosing':
+        d = c.decisions.get(action.get('decision'))
+        if t != 'decide' or d is None or d['kind'] != 'choose_newcomer':
+            raise CareerError('Choose a newcomer (or end the career) first.')
+        return _decide(season, c, cursor, action)
     if c.status != 'active':
         raise CareerError('This career has ended: the golfer is under AI control.')
     if t == 'plan_block':
@@ -418,7 +716,7 @@ def _plan_block(season, c, cursor, action):
     errors = []
     for w in weeks:
         ch = given.get(w)
-        code, why = check_choice(season, g, y, w, ch)
+        code, why = check_choice(season, g, y, w, ch, planning=True)
         if code == 'injured':
             errors.append(f'week {w}: {why}; choose rest')
         elif code == 'invalid':
@@ -441,6 +739,8 @@ def _plan_block(season, c, cursor, action):
                         'fallback': {'kind': fb['kind'], 'category': fb.get('category') if fb['kind'] == 'train' else None}}
         elif ch['kind'] == 'train':
             clean[w] = {'kind': 'train', 'category': ch['category']}
+        elif ch['kind'] == 'work':
+            clean[w] = {'kind': 'work'}
         else:
             clean[w] = {'kind': 'rest'}
     ny, nw = _now(cursor)
@@ -469,9 +769,11 @@ def _decide(season, c, cursor, action):
     if answer not in d['options']:
         raise CareerError(f'Choose one of: {", ".join(d["options"])}.')
     y, w = _now(cursor)
-    g = season.g[c.golfer_id]
+    g = season.g.get(c.golfer_id)
     if answer == 'return_to_ai':
         return _end_control(season, c, cursor, action)
+    if d['kind'] in YEAR_END_KINDS:
+        return _answer_year_end(season, c, d, cursor, answer)
     if d['kind'] == 'coach_offer':
         return _answer_coach(season, c, d, g, y, w, answer)
     if d['kind'] == 'caddie_offer':
@@ -570,6 +872,7 @@ def _end_control(season, c, cursor, action):
         c.resolve(d, 'closed', y, w, 'the golfer returned to AI control')
     c.status = 'ended'
     c.ended = (y, w)
+    _end_stint(c, y, w)
     c.log.append((y, w, 'returned the golfer to AI control'))
     if cursor['phase'] in ('week', 'planned'):
         # the player's intents for the rest of this block are replaced by the AI's own plan (no side effects; a
@@ -593,6 +896,8 @@ def choice_text(season, year, ch):
         return 'not planned'
     if ch['kind'] == 'rest':
         return 'Rest'
+    if ch['kind'] == 'work':
+        return 'Paid work'
     if ch['kind'] == 'train':
         return f'Train: {CATEGORY_LABEL[ch["category"]]}'
     ed = edition(season, year, ch['event_id'])
@@ -630,8 +935,10 @@ def week_options(season, g, year, week):
             if not row['affordable']:
                 row['why'] = f'costs ${cost:,.0f}; ${max(0.0, money):,.0f} available for golf'
         events.append(row)
+    from .finance import WORK_WAGE
+    why = work_unavailable(season, g, year)
     return {'week': week, 'events': events, 'selected': selected, 'money': round(money, 2),
-            'injured_until': inj}
+            'injured_until': inj, 'work': {'available': not why, 'wage': WORK_WAGE, 'why': why}}
 
 
 def _country(city):
@@ -684,7 +991,86 @@ def view(season, cursor):
             'pending': [dict(d) for d in c.pending()],
             'resolved': [dict(d) for d in c.decisions.values() if d['status'] != 'pending'][-10:],
             'notices': list(c.notices[-20:]), 'log': list(c.log[-20:]),
-            'recaps': period_recaps(c), 'readiness': readiness(season, g, y, w)}
+            'recaps': period_recaps(c), 'readiness': readiness(season, g, y, w),
+            'stints': [stint_view(season, st) for st in getattr(c, 'stints', [])],
+            'year_end': year_end_view(season, cursor)}
+
+
+def stint_view(season, st):
+    g = season.g.get(st['golfer_id'])
+    return {'golfer_id': st['golfer_id'], 'name': g.name if g else None, 'from': list(st['from']),
+            'to': list(st['to']) if st['to'] else None, 'how': dict(st['how'])}
+
+
+def season_review(season, c, gid, year):
+    """One golfer's season as the career recorded it (the weekly recaps of the weeks the player controlled them)
+    and as the world stands now. Every key is always present; a figure the records cannot give is None."""
+    from .calendar import TOUR_BY_KEY
+    g = season.g.get(gid)
+    weeks = [r for (y, w), r in sorted(getattr(c, 'weekly_recaps', {}).items())
+             if y == year and r.get('golfer_id', c.controlled_at(y, w)) == gid]
+    events = [e for r in weeks for e in r['events']]
+    placed = [e for e in events if e['position'] is not None]
+    best = min(placed, key=lambda e: e['position']) if placed else None
+    acts = {}
+    for r in weeks:
+        acts[r['activity']] = acts.get(r['activity'], 0) + 1
+    prizes = [e['prize'] for e in events if e['prize'] is not None]
+    led = season.ledgers.get(year, {}).get(gid)
+    t = TOUR_BY_KEY.get(g.tour) if g else None
+    first = _as_dict(weeks[0]['before']) if weeks else None
+    return {'year': year, 'golfer_id': gid, 'name': g.name if g else None, 'age': g.age(year) if g else None,
+            'status': g.status if g else None, 'lifestyle': g.lifestyle if g else None,
+            'tour': t.name if t else (g.tour if g else None),
+            'recorded_weeks': len(weeks), 'complete': len(weeks) == 52,
+            'events': len(events), 'wins': sum(1 for e in events if e['position'] == 1),
+            'top10': sum(1 for e in events if e['position'] is not None and e['position'] <= 10),
+            'missed_cuts': sum(1 for e in events if e['position'] is None),
+            'best_finish': {'position': best['position'], 'event': best['name'], 'tied': best['tied']} if best else None,
+            'prize_money': round(sum(prizes), 2) if events else 0.0,
+            'income': round(led.income, 2) if led is not None else None,
+            'activity': acts,
+            'overall_start': first['overall'] if first else None,
+            'overall_now': round(g.overall, 3) if g else None,
+            'world_rank': season.wr_pos.get(gid), 'amateur_rank': season.am_pos.get(gid),
+            'funds': round(season.funds(g, year), 2) if g else None}
+
+
+def _as_dict(x):
+    return x if isinstance(x, dict) else None
+
+
+def year_end_view(season, cursor):
+    """The year end as the player may see it now (docs/career/YEAR_END.md), or None outside it: the stage, the
+    season under review, the decision now open (its choices with their facts), the answers already given, the
+    newcomers on offer. Read only."""
+    c = getattr(season, 'career', None)
+    if c is None:
+        return None
+    y, w, ph = cursor['year'], cursor['week'], cursor['phase']
+    if ph == 'end' and c.status == 'active':
+        yr = y
+        stage = winter_stage(season, c, y)
+        gid = c.golfer_id
+    elif ph == 'start' and c.status == 'choosing':
+        yr, stage = y - 1, 'choose_newcomer'
+        gid = c.stints[-1]['golfer_id'] if c.stints else c.golfer_id
+    elif ph == 'end' and c.status == 'choosing':
+        yr, stage = y, 'winter_ai'                       # (switched: the AI runs the former golfer's winter)
+        gid = c.stints[-1]['golfer_id'] if c.stints else c.golfer_id
+    else:
+        return None
+    if stage == 'engine':
+        stage = 'winter_running'
+    pend = [d for d in c.pending(YEAR_END_KINDS)]
+    return {'year': yr, 'stage': stage, 'winter_parts_done': season.winter_parts_done(yr), 'version': c.version,
+            'review': season_review(season, c, gid, yr),
+            'decisions': [{'id': d['id'], 'kind': d['kind'], 'text': d['text'], 'options': list(d['options']),
+                           'choices': copy.deepcopy(d['payload'].get('choices', []))} for d in pend],
+            'offers': [d['id'] for d in c.pending(OFFER_KINDS)],
+            'answers': copy.deepcopy(c.winter.get(yr, {})),
+            'candidates': [dict(x['facts']) for x in pend[0]['payload']['choices'] if x['key'] != 'end_career']
+            if pend and pend[0]['kind'] == 'choose_newcomer' else None}
 
 
 def planner(season, cursor, year, w0):
@@ -764,7 +1150,7 @@ def finish_week_feedback(season, year, week, before, event_ids):
                            for j, cat in enumerate(D.CATS)}}
     action, category = season.plans.get(g.id, {}).get(week, ('rest', None))
     actual = season.week_activity.get(g.id, 'not recorded')
-    rec = {'year': year, 'week': week, 'activity': actual, 'planned': before['planned'],
+    rec = {'year': year, 'week': week, 'golfer_id': g.id, 'activity': actual, 'planned': before['planned'],
            'training_category': category if actual == 'train' else None,
            'before': before['before'], 'after': _snapshot(season, g, year), 'events': rows,
            'development': development,

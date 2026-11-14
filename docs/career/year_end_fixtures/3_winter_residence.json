@@ -1,0 +1,67 @@
+{
+ "year": 2028,
+ "stage": "winter_residence",
+ "winter_parts_done": 2,
+ "version": 47,
+ "review": {
+  "year": 2028,
+  "golfer_id": 146,
+  "name": "Alejandro Martín",
+  "age": 22,
+  "status": "amateur",
+  "lifestyle": "part_time",
+  "tour": "North American Amateur Series",
+  "recorded_weeks": 0,
+  "complete": false,
+  "events": 0,
+  "wins": 0,
+  "top10": 0,
+  "missed_cuts": 0,
+  "best_finish": null,
+  "prize_money": 0.0,
+  "income": 8440.0,
+  "activity": {},
+  "overall_start": null,
+  "overall_now": 55.602,
+  "world_rank": null,
+  "amateur_rank": 125,
+  "funds": 36661.47
+ },
+ "decisions": [
+  {
+   "id": "D18",
+   "kind": "winter_residence",
+   "text": "Winter 2028: move to Spain (your homeland) or stay where you live? Moving costs $6,000 from your own money; about $2,141 a season more travel to your events.",
+   "options": [
+    "stay",
+    "move:Spain"
+   ],
+   "choices": [
+    {
+     "key": "stay",
+     "label": "Stay in USA",
+     "facts": {}
+    },
+    {
+     "key": "move:Spain",
+     "label": "Move to Spain",
+     "facts": {
+      "cost": 6000.0,
+      "travel_saved": -2141.18,
+      "own": 28661.47
+     }
+    }
+   ]
+  }
+ ],
+ "offers": [],
+ "answers": {
+  "intent": "keep",
+  "career": "amateur_with_job",
+  "staff": {
+   "coach": "keep",
+   "caddie": "keep"
+  }
+ },
+ "candidates": null
+}

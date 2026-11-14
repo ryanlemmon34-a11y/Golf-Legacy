@@ -321,44 +321,41 @@ class WorkPathway(unittest.TestCase):
         self.assertEqual(len(s.advance_career('period', op_key='r')['weeks']), 4)
         s.close()
 
-    def test_unsupported_paid_work_stops_with_a_handback(self):
+    def test_a_professional_short_of_money_may_plan_paid_work(self):
+        # (formerly an unsupported stop: paid work weeks are now plannable, under the AI's own rule)
         s = started()
         s.advance_career('next', op_key='a')
         g = golfer(s)
         g.status, g.tour, g.cash, g.backing = 'pro', 'MN_US_SUNBELT', 0.0, 0.0
         s._commit()
         out = s.advance_career('next', op_key='b')
-        self.assertEqual(out['weeks'], [])
-        d = [x for x in s.season.career.pending() if x['kind'] == 'unsupported']
-        self.assertTrue(d and 'paid work' in d[0]['text'])
-        act(s, {'type': 'decide', 'decision': d[0]['id'], 'answer': 'return_to_ai'}, 'ai')
-        self.assertEqual(s.season.career.status, 'ended')
-        self.assertEqual(len(s.advance(2)), 2)                         # the world continues under AI
+        self.assertFalse([x for x in s.season.career.pending() if x['kind'] == 'unsupported'])
+        self.assertEqual(s.season.needs_paid_work(g, 2028),
+                         CA.planner(s.season, s.cursor, 2028, 1)['weeks'][0]['work']['available'])
         s.close()
 
 
 class SeasonEnd(unittest.TestCase):
-    def test_winter_stops_then_runs_once_after_handback(self):
+    def test_winter_stops_at_the_review_then_runs_once_after_ending(self):
         s = started()
         n = 0
         while True:
             out = s.advance_career('next', op_key=f'n{n}')
             n += 1
-            stop = out['stop'] or {}
             pend = s.season.career.pending()
-            if any(d['kind'] == 'season_end' for d in pend):
+            if any(d['kind'] == 'season_review' for d in pend):
                 break
             for d in pend:
                 if d['kind'] == 'plan':
                     plan(s, d['payload']['block'])
                 elif d['kind'] in ('coach_offer', 'caddie_offer', 'job'):
                     act(s, {'type': 'decide', 'decision': d['id'], 'answer': 'decline'}, f'd{d["id"]}')
-            self.assertLess(n, 60)
+            self.assertLess(n, 80)
         self.assertEqual(s.cursor, {'year': 2028, 'week': 52, 'phase': 'end'})
         self.assertNotIn(2029, s.season.juniors_added)                # the winter has not run
-        d = next(x for x in s.season.career.pending() if x['kind'] == 'season_end')
-        act(s, {'type': 'decide', 'decision': d['id'], 'answer': 'return_to_ai'}, 'ai')
-        out = s.advance(1)                                            # the winter, once, then 2029 week 1
+        d = next(x for x in s.season.career.pending() if x['kind'] == 'season_review')
+        act(s, {'type': 'decide', 'decision': d['id'], 'answer': 'end_career'}, 'end')
+        s.advance(1)                                                  # the winter, once, then 2029 week 1
         self.assertIn(2029, s.season.juniors_added)
         juniors = s.season.juniors_added[2029]
         path = s.dir

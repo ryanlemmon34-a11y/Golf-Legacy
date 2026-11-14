@@ -285,7 +285,7 @@ class Session:
                     raise CA.StaleCareer(f'drawn at career version {expected_version}; it is now {car.version}')
                 out = []
                 stop = None
-                active = car is not None and car.status == 'active'
+                active = car is not None and car.status in ('active', 'choosing')   # (choosing: a newcomer to pick)
                 v0 = car.version if car is not None else None
                 ran = False
                 try:
@@ -345,7 +345,8 @@ class Session:
         seen = {d['id'] for d in car.pending()} if car is not None else set()
         while True:
             cur = self.state['cursor']
-            active = car is not None and car.status == 'active'
+            car = self.season.career
+            active = car is not None and car.status in ('active', 'choosing')
             if mode is None and len(out) >= weeks:
                 break
             if mode == 'period' and (cur['year'], 0 if cur['phase'] == 'start' else cur['week']) > period_end \
@@ -374,9 +375,12 @@ class Session:
                 out.append(self._part_play())
                 if progress:
                     progress(out[-1])
-            else:                                            # 'end': the winter (only once the career has ended)
-                self._part_end()
-                if mode is not None:
+            else:                                            # 'end': the winter, one part at a time while the
+                self._part_end()                             # career's own stages stand between them
+                if mode is not None and self.state['cursor']['phase'] != 'end':
+                    car = self.season.career                 # (what the new season's 1 January asks first, if
+                    if car is not None and car.status in ('active', 'choosing'):    # anything: shown at once)
+                        stop = CA.gate(self.season, self.state['cursor'])
                     break
         return out, stop, ran
 
@@ -459,10 +463,21 @@ class Session:
         return {'completed': (year, week), 'events': events, 'changes': changes, 'cursor': dict(self.state['cursor'])}
 
     def _part_end(self):
-        """The winter after week 52: the season's evidence, tour cards, careers, aging, new entrants; archived."""
+        """The winter after week 52: the season's evidence, tour cards, careers, aging, new entrants; archived.
+        With a controlled golfer (career mode) the winter runs one part per call (Season.winter_part), the cursor
+        staying at week 52 'end' until the last, so the career's stages (career.gate) stand between the parts; the
+        same parts in the same order as an all-AI winter."""
         s, c = self.season, self.state['cursor']
         year = c['year']
-        s.finish_year(year)
+        car = getattr(s, 'career', None)
+        part = s.winter_parts_done(year)
+        if part or (car is not None and car.status == 'active'):
+            s.year = year
+            s.winter_part(year, part)
+            if part + 1 < s.WINTER_PARTS:
+                return {'winter_part': part + 1}
+        else:
+            s.finish_year(year)
         if self.on_season_end:
             self.on_season_end(s, year)
         e = {'career_decisions': dict(s.career_counts.get(year, {})), 'juniors': s.juniors_added.get(year + 1, 0)}
@@ -879,8 +894,11 @@ def _check_career(season):
     car = getattr(season, 'career', None)
     if car is None:
         return
-    from .career import FORMAT
+    from .career import FORMAT, upgrade
     fmt = getattr(car, 'format', None)
+    if fmt == 1:
+        upgrade(car)                                    # (its history kept as one control stint; nothing reinterpreted)
+        fmt = car.format
     if fmt != FORMAT:
         raise UnsupportedCareer(f'this save holds a career in format {fmt}; this build reads format {FORMAT} '
                                 '(a newer build made it): it is not continued here, and the save is left unchanged')

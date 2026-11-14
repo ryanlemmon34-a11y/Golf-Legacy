@@ -1,0 +1,2652 @@
+{
+ "year": 2028,
+ "stage": "choose_newcomer",
+ "winter_parts_done": 3,
+ "version": 45,
+ "review": {
+  "year": 2028,
+  "golfer_id": 1268,
+  "name": "Drew Rogers",
+  "age": 18,
+  "status": "amateur",
+  "lifestyle": "full_time",
+  "tour": "US Small College Golf",
+  "recorded_weeks": 52,
+  "complete": true,
+  "events": 1,
+  "wins": 0,
+  "top10": 0,
+  "missed_cuts": 0,
+  "best_finish": {
+   "position": 23,
+   "event": "Small College National Championship",
+   "tied": true
+  },
+  "prize_money": 0.0,
+  "income": null,
+  "activity": {
+   "rest": 51,
+   "play": 1
+  },
+  "overall_start": 32.546,
+  "overall_now": 32.896,
+  "world_rank": null,
+  "amateur_rank": 407,
+  "funds": 26369.9
+ },
+ "decisions": [
+  {
+   "id": "D17",
+   "kind": "choose_newcomer",
+   "text": "Choose who to play as from 2029: one of 10 juniors entering the world this season (a fixed draw from the class of 301; the others carry on under AI control), or end the career.",
+   "options": [
+    "1749",
+    "1758",
+    "1778",
+    "1808",
+    "1818",
+    "1852",
+    "1864",
+    "1886",
+    "1892",
+    "2013",
+    "end_career"
+   ],
+   "choices": [
+    {
+     "key": "1749",
+     "label": "Ángel Ortega",
+     "facts": {
+      "id": 1749,
+      "name": "Ángel Ortega",
+      "country": "Spain",
+      "age": 18,
+      "status": "amateur",
+      "lifestyle": "full_time",
+      "tour": "International University Golf",
+      "overall": 61.6,
+      "attrs": [
+       [
+        "Physical",
+        [
+         [
+          "power",
+          63.6
+         ],
+         [
+          "stamina",
+          76.4
+         ],
+         [
+          "recovery_rate",
+          63.8
+         ],
+         [
+          "injury_resistance",
+          67.7
+         ]
+        ]
+       ],
+       [
+        "Driving & Approach",
+        [
+         [
+          "driving_accuracy",
+          60.8
+         ],
+         [
+          "long_irons",
+          70.5
+         ],
+         [
+          "mid_irons",
+          52.1
+         ],
+         [
+          "wedges",
+          63.0
+         ],
+         [
+          "ball_flight",
+          65.5
+         ]
+        ]
+       ],
+       [
+        "Short Game",
+        [
+         [
+          "chipping",
+          63.0
+         ],
+         [
+          "bunker",
+          56.6
+         ],
+         [
+          "recovery_play",
+          71.5
+         ]
+        ]
+       ],
+       [
+        "Putting",
+        [
+         [
+          "short_putting",
+          59.0
+         ],
+         [
+          "lag_putting",
+          64.3
+         ],
+         [
+          "green_reading",
+          62.3
+         ]
+        ]
+       ],
+       [
+        "Consistency",
+        [
+         [
+          "striking_consistency",
+          45.8
+         ],
+         [
+          "putting_consistency",
+          61.2
+         ]
+        ]
+       ],
+       [
+        "Mental",
+        [
+         [
+          "composure",
+          63.6
+         ],
+         [
+          "resilience",
+          67.0
+         ],
+         [
+          "management",
+          45.6
+         ],
+         [
+          "focus",
+          61.0
+         ]
+        ]
+       ]
+      ],
+      "funds": 16097.86
+     }
+    },
+    {
+     "key": "1758",
+     "label": "Finn Dennison",
+     "facts": {
+      "id": 1758,
+      "name": "Finn Dennison",
+      "country": "USA",
+      "age": 18,
+      "status": "amateur",
+      "lifestyle": "full_time",
+      "tour": "US College Division I",
+      "overall": 60.3,
+      "attrs": [
+       [
+        "Physical",
+        [
+         [
+          "power",
+          67.7
+         ],
+         [
+          "stamina",
+          54.3
+         ],
+         [
+          "recovery_rate",
+          66.2
+         ],
+         [
+          "injury_resistance",
+          64.9
+         ]
+        ]
+       ],
+       [
+        "Driving & Approach",
+        [
+         [
+          "driving_accuracy",
+          56.4
+         ],
+         [
+          "long_irons",
+          56.2
+         ],
+         [
+          "mid_irons",
+          65.0
+         ],
+         [
+          "wedges",
+          56.2
+         ],
+         [
+          "ball_flight",
+          62.5
+         ]
+        ]
+       ],
+       [
+        "Short Game",
+        [
+         [
+          "chipping",
+          57.7
+         ],
+         [
+          "bunker",
+          50.2
+         ],
+         [
+          "recovery_play",
+          57.3
+         ]
+        ]
+       ],
+       [
+        "Putting",
+        [
+         [
+          "short_putting",
+          63.4
+         ],
+         [
+          "lag_putting",
+          61.4
+         ],
+         [
+          "green_reading",
+          60.8
+         ]
+        ]
+       ],
+       [
+        "Consistency",
+        [
+         [
+          "striking_consistency",
+          56.4
+         ],
+         [
+          "putting_consistency",
+          55.9
+         ]
+        ]
+       ],
+       [
+        "Mental",
+        [
+         [
+          "composure",
+          60.8
+         ],
+         [
+          "resilience",
+          52.6
+         ],
+         [
+          "management",
+          56.8
+         ],
+         [
+          "focus",
+          65.0
+         ]
+        ]
+       ]
+      ],
+      "funds": 20833.73
+     }
+    },
+    {
+     "key": "1778",
+     "label": "Thijs Maes",
+     "facts": {
+      "id": 1778,
+      "name": "Thijs Maes",
+      "country": "Belgium",
+      "age": 18,
+      "status": "amateur",
+      "lifestyle": "full_time",
+      "tour": "US College Division I",
+      "overall": 56.4,
+      "attrs": [
+       [
+        "Physical",
+        [
+         [
+          "power",
+          69.8
+         ],
+         [
+          "stamina",
+          57.3
+         ],
+         [
+          "recovery_rate",
+          58.4
+         ],
+         [
+          "injury_resistance",
+          53.9
+         ]
+        ]
+       ],
+       [
+        "Driving & Approach",
+        [
+         [
+          "driving_accuracy",
+          50.8
+         ],
+         [
+          "long_irons",
+          61.5
+         ],
+         [
+          "mid_irons",
+          61.2
+         ],
+         [
+          "wedges",
+          49.6
+         ],
+         [
+          "ball_flight",
+          43.4
+         ]
+        ]
+       ],
+       [
+        "Short Game",
+        [
+         [
+          "chipping",
+          49.6
+         ],
+         [
+          "bunker",
+          53.3
+         ],
+         [
+          "recovery_play",
+          51.8
+         ]
+        ]
+       ],
+       [
+        "Putting",
+        [
+         [
+          "short_putting",
+          54.1
+         ],
+         [
+          "lag_putting",
+          55.3
+         ],
+         [
+          "green_reading",
+          54.1
+         ]
+        ]
+       ],
+       [
+        "Consistency",
+        [
+         [
+          "striking_consistency",
+          50.9
+         ],
+         [
+          "putting_consistency",
+          53.2
+         ]
+        ]
+       ],
+       [
+        "Mental",
+        [
+         [
+          "composure",
+          45.2
+         ],
+         [
+          "resilience",
+          47.8
+         ],
+         [
+          "management",
+          61.9
+         ],
+         [
+          "focus",
+          56.8
+         ]
+        ]
+       ]
+      ],
+      "funds": 53117.38
+     }
+    },
+    {
+     "key": "1808",
+     "label": "Michael Hartley",
+     "facts": {
+      "id": 1808,
+      "name": "Michael Hartley",
+      "country": "Canada",
+      "age": 18,
+      "status": "amateur",
+      "lifestyle": "full_time",
+      "tour": "North American Amateur Series",
+      "overall": 51.4,
+      "attrs": [
+       [
+        "Physical",
+        [
+         [
+          "power",
+          51.2
+         ],
+         [
+          "stamina",
+          43.0
+         ],
+         [
+          "recovery_rate",
+          54.1
+         ],
+         [
+          "injury_resistance",
+          63.0
+         ]
+        ]
+       ],
+       [
+        "Driving & Approach",
+        [
+         [
+          "driving_accuracy",
+          52.0
+         ],
+         [
+          "long_irons",
+          54.2
+         ],
+         [
+          "mid_irons",
+          52.0
+         ],
+         [
+          "wedges",
+          48.0
+         ],
+         [
+          "ball_flight",
+          56.6
+         ]
+        ]
+       ],
+       [
+        "Short Game",
+        [
+         [
+          "chipping",
+          58.8
+         ],
+         [
+          "bunker",
+          50.3
+         ],
+         [
+          "recovery_play",
+          54.1
+         ]
+        ]
+       ],
+       [
+        "Putting",
+        [
+         [
+          "short_putting",
+          50.0
+         ],
+         [
+          "lag_putting",
+          50.1
+         ],
+         [
+          "green_reading",
+          50.1
+         ]
+        ]
+       ],
+       [
+        "Consistency",
+        [
+         [
+          "striking_consistency",
+          50.4
+         ],
+         [
+          "putting_consistency",
+          56.6
+         ]
+        ]
+       ],
+       [
+        "Mental",
+        [
+         [
+          "composure",
+          47.4
+         ],
+         [
+          "resilience",
+          48.6
+         ],
+         [
+          "management",
+          51.2
+         ],
+         [
+          "focus",
+          48.5
+         ]
+        ]
+       ]
+      ],
+      "funds": 39314.55
+     }
+    },
+    {
+     "key": "1818",
+     "label": "Corey Ross",
+     "facts": {
+      "id": 1818,
+      "name": "Corey Ross",
+      "country": "Australia",
+      "age": 18,
+      "status": "amateur",
+      "lifestyle": "full_time",
+      "tour": "Oceania Amateur Series",
+      "overall": 51.9,
+      "attrs": [
+       [
+        "Physical",
+        [
+         [
+          "power",
+          61.4
+         ],
+         [
+          "stamina",
+          47.2
+         ],
+         [
+          "recovery_rate",
+          52.5
+         ],
+         [
+          "injury_resistance",
+          54.2
+         ]
+        ]
+       ],
+       [
+        "Driving & Approach",
+        [
+         [
+          "driving_accuracy",
+          51.9
+         ],
+         [
+          "long_irons",
+          69.0
+         ],
+         [
+          "mid_irons",
+          59.4
+         ],
+         [
+          "wedges",
+          47.4
+         ],
+         [
+          "ball_flight",
+          57.3
+         ]
+        ]
+       ],
+       [
+        "Short Game",
+        [
+         [
+          "chipping",
+          43.4
+         ],
+         [
+          "bunker",
+          41.7
+         ],
+         [
+          "recovery_play",
+          38.7
+         ]
+        ]
+       ],
+       [
+        "Putting",
+        [
+         [
+          "short_putting",
+          40.5
+         ],
+         [
+          "lag_putting",
+          44.0
+         ],
+         [
+          "green_reading",
+          51.0
+         ]
+        ]
+       ],
+       [
+        "Consistency",
+        [
+         [
+          "striking_consistency",
+          52.6
+         ],
+         [
+          "putting_consistency",
+          43.7
+         ]
+        ]
+       ],
+       [
+        "Mental",
+        [
+         [
+          "composure",
+          55.8
+         ],
+         [
+          "resilience",
+          46.3
+         ],
+         [
+          "management",
+          43.2
+         ],
+         [
+          "focus",
+          34.6
+         ]
+        ]
+       ]
+      ],
+      "funds": 37046.66
+     }
+    },
+    {
+     "key": "1852",
+     "label": "Ji-ho Noh",
+     "facts": {
+      "id": 1852,
+      "name": "Ji-ho Noh",
+      "country": "South Korea",
+      "age": 18,
+      "status": "amateur",
+      "lifestyle": "full_time",
+      "tour": "US College Division I",
+      "overall": 48.6,
+      "attrs": [
+       [
+        "Physical",
+        [
+         [
+          "power",
+          41.1
+         ],
+         [
+          "stamina",
+          52.6
+         ],
+         [
+          "recovery_rate",
+          49.3
+         ],
+         [
+          "injury_resistance",
+          53.6
+         ]
+        ]
+       ],
+       [
+        "Driving & Approach",
+        [
+         [
+          "driving_accuracy",
+          43.9
+         ],
+         [
+          "long_irons",
+          38.6
+         ],
+         [
+          "mid_irons",
+          41.7
+         ],
+         [
+          "wedges",
+          53.4
+         ],
+         [
+          "ball_flight",
+          50.5
+         ]
+        ]
+       ],
+       [
+        "Short Game",
+        [
+         [
+          "chipping",
+          61.6
+         ],
+         [
+          "bunker",
+          57.5
+         ],
+         [
+          "recovery_play",
+          61.3
+         ]
+        ]
+       ],
+       [
+        "Putting",
+        [
+         [
+          "short_putting",
+          62.3
+         ],
+         [
+          "lag_putting",
+          60.4
+         ],
+         [
+          "green_reading",
+          45.4
+         ]
+        ]
+       ],
+       [
+        "Consistency",
+        [
+         [
+          "striking_consistency",
+          55.8
+         ],
+         [
+          "putting_consistency",
+          44.3
+         ]
+        ]
+       ],
+       [
+        "Mental",
+        [
+         [
+          "composure",
+          40.4
+         ],
+         [
+          "resilience",
+          46.5
+         ],
+         [
+          "management",
+          44.2
+         ],
+         [
+          "focus",
+          55.7
+         ]
+        ]
+       ]
+      ],
+      "funds": 14475.22
+     }
+    },
+    {
+     "key": "1864",
+     "label": "Jonah Lewis",
+     "facts": {
+      "id": 1864,
+      "name": "Jonah Lewis",
+      "country": "USA",
+      "age": 18,
+      "status": "amateur",
+      "lifestyle": "full_time",
+      "tour": "US College Division I",
+      "overall": 47.6,
+      "attrs": [
+       [
+        "Physical",
+        [
+         [
+          "power",
+          60.7
+         ],
+         [
+          "stamina",
+          53.3
+         ],
+         [
+          "recovery_rate",
+          57.3
+         ],
+         [
+          "injury_resistance",
+          53.8
+         ]
+        ]
+       ],
+       [
+        "Driving & Approach",
+        [
+         [
+          "driving_accuracy",
+          42.5
+         ],
+         [
+          "long_irons",
+          50.3
+         ],
+         [
+          "mid_irons",
+          37.3
+         ],
+         [
+          "wedges",
+          43.1
+         ],
+         [
+          "ball_flight",
+          49.8
+         ]
+        ]
+       ],
+       [
+        "Short Game",
+        [
+         [
+          "chipping",
+          40.2
+         ],
+         [
+          "bunker",
+          44.5
+         ],
+         [
+          "recovery_play",
+          59.0
+         ]
+        ]
+       ],
+       [
+        "Putting",
+        [
+         [
+          "short_putting",
+          57.8
+         ],
+         [
+          "lag_putting",
+          50.3
+         ],
+         [
+          "green_reading",
+          41.8
+         ]
+        ]
+       ],
+       [
+        "Consistency",
+        [
+         [
+          "striking_consistency",
+          40.5
+         ],
+         [
+          "putting_consistency",
+          44.9
+         ]
+        ]
+       ],
+       [
+        "Mental",
+        [
+         [
+          "composure",
+          43.5
+         ],
+         [
+          "resilience",
+          46.9
+         ],
+         [
+          "management",
+          32.9
+         ],
+         [
+          "focus",
+          47.3
+         ]
+        ]
+       ]
+      ],
+      "funds": 56498.58
+     }
+    },
+    {
+     "key": "1886",
+     "label": "Derek Brooks",
+     "facts": {
+      "id": 1886,
+      "name": "Derek Brooks",
+      "country": "USA",
+      "age": 18,
+      "status": "amateur",
+      "lifestyle": "full_time",
+      "tour": "US College Division I",
+      "overall": 45.7,
+      "attrs": [
+       [
+        "Physical",
+        [
+         [
+          "power",
+          48.0
+         ],
+         [
+          "stamina",
+          48.3
+         ],
+         [
+          "recovery_rate",
+          44.7
+         ],
+         [
+          "injury_resistance",
+          40.9
+         ]
+        ]
+       ],
+       [
+        "Driving & Approach",
+        [
+         [
+          "driving_accuracy",
+          46.6
+         ],
+         [
+          "long_irons",
+          46.9
+         ],
+         [
+          "mid_irons",
+          49.0
+         ],
+         [
+          "wedges",
+          38.7
+         ],
+         [
+          "ball_flight",
+          49.4
+         ]
+        ]
+       ],
+       [
+        "Short Game",
+        [
+         [
+          "chipping",
+          43.5
+         ],
+         [
+          "bunker",
+          40.5
+         ],
+         [
+          "recovery_play",
+          43.8
+         ]
+        ]
+       ],
+       [
+        "Putting",
+        [
+         [
+          "short_putting",
+          41.9
+         ],
+         [
+          "lag_putting",
+          47.1
+         ],
+         [
+          "green_reading",
+          45.3
+         ]
+        ]
+       ],
+       [
+        "Consistency",
+        [
+         [
+          "striking_consistency",
+          40.4
+         ],
+         [
+          "putting_consistency",
+          45.4
+         ]
+        ]
+       ],
+       [
+        "Mental",
+        [
+         [
+          "composure",
+          43.0
+         ],
+         [
+          "resilience",
+          52.4
+         ],
+         [
+          "management",
+          46.5
+         ],
+         [
+          "focus",
+          43.9
+         ]
+        ]
+       ]
+      ],
+      "funds": 16695.57
+     }
+    },
+    {
+     "key": "1892",
+     "label": "Viktor Hermansson",
+     "facts": {
+      "id": 1892,
+      "name": "Viktor Hermansson",
+      "country": "Sweden",
+      "age": 18,
+      "status": "amateur",
+      "lifestyle": "full_time",
+      "tour": "European Amateur Series",
+      "overall": 43.1,
+      "attrs": [
+       [
+        "Physical",
+        [
+         [
+          "power",
+          34.6
+         ],
+         [
+          "stamina",
+          49.2
+         ],
+         [
+          "recovery_rate",
+          52.1
+         ],
+         [
+          "injury_resistance",
+          47.8
+         ]
+        ]
+       ],
+       [
+        "Driving & Approach",
+        [
+         [
+          "driving_accuracy",
+          47.9
+         ],
+         [
+          "long_irons",
+          42.6
+         ],
+         [
+          "mid_irons",
+          50.4
+         ],
+         [
+          "wedges",
+          40.3
+         ],
+         [
+          "ball_flight",
+          32.8
+         ]
+        ]
+       ],
+       [
+        "Short Game",
+        [
+         [
+          "chipping",
+          50.0
+         ],
+         [
+          "bunker",
+          36.0
+         ],
+         [
+          "recovery_play",
+          41.0
+         ]
+        ]
+       ],
+       [
+        "Putting",
+        [
+         [
+          "short_putting",
+          43.0
+         ],
+         [
+          "lag_putting",
+          39.3
+         ],
+         [
+          "green_reading",
+          36.9
+         ]
+        ]
+       ],
+       [
+        "Consistency",
+        [
+         [
+          "striking_consistency",
+          46.4
+         ],
+         [
+          "putting_consistency",
+          42.2
+         ]
+        ]
+       ],
+       [
+        "Mental",
+        [
+         [
+          "composure",
+          40.1
+         ],
+         [
+          "resilience",
+          46.6
+         ],
+         [
+          "management",
+          51.7
+         ],
+         [
+          "focus",
+          43.2
+         ]
+        ]
+       ]
+      ],
+      "funds": 58777.39
+     }
+    },
+    {
+     "key": "2013",
+     "label": "Mark Andrada",
+     "facts": {
+      "id": 2013,
+      "name": "Mark Andrada",
+      "country": "Philippines",
+      "age": 18,
+      "status": "amateur",
+      "lifestyle": "full_time",
+      "tour": "Asian Amateur Series",
+      "overall": 26.4,
+      "attrs": [
+       [
+        "Physical",
+        [
+         [
+          "power",
+          25.7
+         ],
+         [
+          "stamina",
+          22.3
+         ],
+         [
+          "recovery_rate",
+          30.8
+         ],
+         [
+          "injury_resistance",
+          20.0
+         ]
+        ]
+       ],
+       [
+        "Driving & Approach",
+        [
+         [
+          "driving_accuracy",
+          25.9
+         ],
+         [
+          "long_irons",
+          24.2
+         ],
+         [
+          "mid_irons",
+          26.7
+         ],
+         [
+          "wedges",
+          21.5
+         ],
+         [
+          "ball_flight",
+          28.3
+         ]
+        ]
+       ],
+       [
+        "Short Game",
+        [
+         [
+          "chipping",
+          27.1
+         ],
+         [
+          "bunker",
+          22.3
+         ],
+         [
+          "recovery_play",
+          25.8
+         ]
+        ]
+       ],
+       [
+        "Putting",
+        [
+         [
+          "short_putting",
+          19.9
+         ],
+         [
+          "lag_putting",
+          33.4
+         ],
+         [
+          "green_reading",
+          26.2
+         ]
+        ]
+       ],
+       [
+        "Consistency",
+        [
+         [
+          "striking_consistency",
+          24.5
+         ],
+         [
+          "putting_consistency",
+          36.1
+         ]
+        ]
+       ],
+       [
+        "Mental",
+        [
+         [
+          "composure",
+          27.8
+         ],
+         [
+          "resilience",
+          25.4
+         ],
+         [
+          "management",
+          43.5
+         ],
+         [
+          "focus",
+          25.4
+         ]
+        ]
+       ]
+      ],
+      "funds": 42696.76
+     }
+    },
+    {
+     "key": "end_career",
+     "label": "End the career",
+     "facts": {
+      "detail": "Every golfer is under AI control from now on. This cannot be undone."
+     }
+    }
+   ]
+  }
+ ],
+ "offers": [],
+ "answers": {
+  "intent": "switch"
+ },
+ "candidates": [
+  {
+   "id": 1749,
+   "name": "Ángel Ortega",
+   "country": "Spain",
+   "age": 18,
+   "status": "amateur",
+   "lifestyle": "full_time",
+   "tour": "International University Golf",
+   "overall": 61.6,
+   "attrs": [
+    [
+     "Physical",
+     [
+      [
+       "power",
+       63.6
+      ],
+      [
+       "stamina",
+       76.4
+      ],
+      [
+       "recovery_rate",
+       63.8
+      ],
+      [
+       "injury_resistance",
+       67.7
+      ]
+     ]
+    ],
+    [
+     "Driving & Approach",
+     [
+      [
+       "driving_accuracy",
+       60.8
+      ],
+      [
+       "long_irons",
+       70.5
+      ],
+      [
+       "mid_irons",
+       52.1
+      ],
+      [
+       "wedges",
+       63.0
+      ],
+      [
+       "ball_flight",
+       65.5
+      ]
+     ]
+    ],
+    [
+     "Short Game",
+     [
+      [
+       "chipping",
+       63.0
+      ],
+      [
+       "bunker",
+       56.6
+      ],
+      [
+       "recovery_play",
+       71.5
+      ]
+     ]
+    ],
+    [
+     "Putting",
+     [
+      [
+       "short_putting",
+       59.0
+      ],
+      [
+       "lag_putting",
+       64.3
+      ],
+      [
+       "green_reading",
+       62.3
+      ]
+     ]
+    ],
+    [
+     "Consistency",
+     [
+      [
+       "striking_consistency",
+       45.8
+      ],
+      [
+       "putting_consistency",
+       61.2
+      ]
+     ]
+    ],
+    [
+     "Mental",
+     [
+      [
+       "composure",
+       63.6
+      ],
+      [
+       "resilience",
+       67.0
+      ],
+      [
+       "management",
+       45.6
+      ],
+      [
+       "focus",
+       61.0
+      ]
+     ]
+    ]
+   ],
+   "funds": 16097.86
+  },
+  {
+   "id": 1758,
+   "name": "Finn Dennison",
+   "country": "USA",
+   "age": 18,
+   "status": "amateur",
+   "lifestyle": "full_time",
+   "tour": "US College Division I",
+   "overall": 60.3,
+   "attrs": [
+    [
+     "Physical",
+     [
+      [
+       "power",
+       67.7
+      ],
+      [
+       "stamina",
+       54.3
+      ],
+      [
+       "recovery_rate",
+       66.2
+      ],
+      [
+       "injury_resistance",
+       64.9
+      ]
+     ]
+    ],
+    [
+     "Driving & Approach",
+     [
+      [
+       "driving_accuracy",
+       56.4
+      ],
+      [
+       "long_irons",
+       56.2
+      ],
+      [
+       "mid_irons",
+       65.0
+      ],
+      [
+       "wedges",
+       56.2
+      ],
+      [
+       "ball_flight",
+       62.5
+      ]
+     ]
+    ],
+    [
+     "Short Game",
+     [
+      [
+       "chipping",
+       57.7
+      ],
+      [
+       "bunker",
+       50.2
+      ],
+      [
+       "recovery_play",
+       57.3
+      ]
+     ]
+    ],
+    [
+     "Putting",
+     [
+      [
+       "short_putting",
+       63.4
+      ],
+      [
+       "lag_putting",
+       61.4
+      ],
+      [
+       "green_reading",
+       60.8
+      ]
+     ]
+    ],
+    [
+     "Consistency",
+     [
+      [
+       "striking_consistency",
+       56.4
+      ],
+      [
+       "putting_consistency",
+       55.9
+      ]
+     ]
+    ],
+    [
+     "Mental",
+     [
+      [
+       "composure",
+       60.8
+      ],
+      [
+       "resilience",
+       52.6
+      ],
+      [
+       "management",
+       56.8
+      ],
+      [
+       "focus",
+       65.0
+      ]
+     ]
+    ]
+   ],
+   "funds": 20833.73
+  },
+  {
+   "id": 1778,
+   "name": "Thijs Maes",
+   "country": "Belgium",
+   "age": 18,
+   "status": "amateur",
+   "lifestyle": "full_time",
+   "tour": "US College Division I",
+   "overall": 56.4,
+   "attrs": [
+    [
+     "Physical",
+     [
+      [
+       "power",
+       69.8
+      ],
+      [
+       "stamina",
+       57.3
+      ],
+      [
+       "recovery_rate",
+       58.4
+      ],
+      [
+       "injury_resistance",
+       53.9
+      ]
+     ]
+    ],
+    [
+     "Driving & Approach",
+     [
+      [
+       "driving_accuracy",
+       50.8
+      ],
+      [
+       "long_irons",
+       61.5
+      ],
+      [
+       "mid_irons",
+       61.2
+      ],
+      [
+       "wedges",
+       49.6
+      ],
+      [
+       "ball_flight",
+       43.4
+      ]
+     ]
+    ],
+    [
+     "Short Game",
+     [
+      [
+       "chipping",
+       49.6
+      ],
+      [
+       "bunker",
+       53.3
+      ],
+      [
+       "recovery_play",
+       51.8
+      ]
+     ]
+    ],
+    [
+     "Putting",
+     [
+      [
+       "short_putting",
+       54.1
+      ],
+      [
+       "lag_putting",
+       55.3
+      ],
+      [
+       "green_reading",
+       54.1
+      ]
+     ]
+    ],
+    [
+     "Consistency",
+     [
+      [
+       "striking_consistency",
+       50.9
+      ],
+      [
+       "putting_consistency",
+       53.2
+      ]
+     ]
+    ],
+    [
+     "Mental",
+     [
+      [
+       "composure",
+       45.2
+      ],
+      [
+       "resilience",
+       47.8
+      ],
+      [
+       "management",
+       61.9
+      ],
+      [
+       "focus",
+       56.8
+      ]
+     ]
+    ]
+   ],
+   "funds": 53117.38
+  },
+  {
+   "id": 1808,
+   "name": "Michael Hartley",
+   "country": "Canada",
+   "age": 18,
+   "status": "amateur",
+   "lifestyle": "full_time",
+   "tour": "North American Amateur Series",
+   "overall": 51.4,
+   "attrs": [
+    [
+     "Physical",
+     [
+      [
+       "power",
+       51.2
+      ],
+      [
+       "stamina",
+       43.0
+      ],
+      [
+       "recovery_rate",
+       54.1
+      ],
+      [
+       "injury_resistance",
+       63.0
+      ]
+     ]
+    ],
+    [
+     "Driving & Approach",
+     [
+      [
+       "driving_accuracy",
+       52.0
+      ],
+      [
+       "long_irons",
+       54.2
+      ],
+      [
+       "mid_irons",
+       52.0
+      ],
+      [
+       "wedges",
+       48.0
+      ],
+      [
+       "ball_flight",
+       56.6
+      ]
+     ]
+    ],
+    [
+     "Short Game",
+     [
+      [
+       "chipping",
+       58.8
+      ],
+      [
+       "bunker",
+       50.3
+      ],
+      [
+       "recovery_play",
+       54.1
+      ]
+     ]
+    ],
+    [
+     "Putting",
+     [
+      [
+       "short_putting",
+       50.0
+      ],
+      [
+       "lag_putting",
+       50.1
+      ],
+      [
+       "green_reading",
+       50.1
+      ]
+     ]
+    ],
+    [
+     "Consistency",
+     [
+      [
+       "striking_consistency",
+       50.4
+      ],
+      [
+       "putting_consistency",
+       56.6
+      ]
+     ]
+    ],
+    [
+     "Mental",
+     [
+      [
+       "composure",
+       47.4
+      ],
+      [
+       "resilience",
+       48.6
+      ],
+      [
+       "management",
+       51.2
+      ],
+      [
+       "focus",
+       48.5
+      ]
+     ]
+    ]
+   ],
+   "funds": 39314.55
+  },
+  {
+   "id": 1818,
+   "name": "Corey Ross",
+   "country": "Australia",
+   "age": 18,
+   "status": "amateur",
+   "lifestyle": "full_time",
+   "tour": "Oceania Amateur Series",
+   "overall": 51.9,
+   "attrs": [
+    [
+     "Physical",
+     [
+      [
+       "power",
+       61.4
+      ],
+      [
+       "stamina",
+       47.2
+      ],
+      [
+       "recovery_rate",
+       52.5
+      ],
+      [
+       "injury_resistance",
+       54.2
+      ]
+     ]
+    ],
+    [
+     "Driving & Approach",
+     [
+      [
+       "driving_accuracy",
+       51.9
+      ],
+      [
+       "long_irons",
+       69.0
+      ],
+      [
+       "mid_irons",
+       59.4
+      ],
+      [
+       "wedges",
+       47.4
+      ],
+      [
+       "ball_flight",
+       57.3
+      ]
+     ]
+    ],
+    [
+     "Short Game",
+     [
+      [
+       "chipping",
+       43.4
+      ],
+      [
+       "bunker",
+       41.7
+      ],
+      [
+       "recovery_play",
+       38.7
+      ]
+     ]
+    ],
+    [
+     "Putting",
+     [
+      [
+       "short_putting",
+       40.5
+      ],
+      [
+       "lag_putting",
+       44.0
+      ],
+      [
+       "green_reading",
+       51.0
+      ]
+     ]
+    ],
+    [
+     "Consistency",
+     [
+      [
+       "striking_consistency",
+       52.6
+      ],
+      [
+       "putting_consistency",
+       43.7
+      ]
+     ]
+    ],
+    [
+     "Mental",
+     [
+      [
+       "composure",
+       55.8
+      ],
+      [
+       "resilience",
+       46.3
+      ],
+      [
+       "management",
+       43.2
+      ],
+      [
+       "focus",
+       34.6
+      ]
+     ]
+    ]
+   ],
+   "funds": 37046.66
+  },
+  {
+   "id": 1852,
+   "name": "Ji-ho Noh",
+   "country": "South Korea",
+   "age": 18,
+   "status": "amateur",
+   "lifestyle": "full_time",
+   "tour": "US College Division I",
+   "overall": 48.6,
+   "attrs": [
+    [
+     "Physical",
+     [
+      [
+       "power",
+       41.1
+      ],
+      [
+       "stamina",
+       52.6
+      ],
+      [
+       "recovery_rate",
+       49.3
+      ],
+      [
+       "injury_resistance",
+       53.6
+      ]
+     ]
+    ],
+    [
+     "Driving & Approach",
+     [
+      [
+       "driving_accuracy",
+       43.9
+      ],
+      [
+       "long_irons",
+       38.6
+      ],
+      [
+       "mid_irons",
+       41.7
+      ],
+      [
+       "wedges",
+       53.4
+      ],
+      [
+       "ball_flight",
+       50.5
+      ]
+     ]
+    ],
+    [
+     "Short Game",
+     [
+      [
+       "chipping",
+       61.6
+      ],
+      [
+       "bunker",
+       57.5
+      ],
+      [
+       "recovery_play",
+       61.3
+      ]
+     ]
+    ],
+    [
+     "Putting",
+     [
+      [
+       "short_putting",
+       62.3
+      ],
+      [
+       "lag_putting",
+       60.4
+      ],
+      [
+       "green_reading",
+       45.4
+      ]
+     ]
+    ],
+    [
+     "Consistency",
+     [
+      [
+       "striking_consistency",
+       55.8
+      ],
+      [
+       "putting_consistency",
+       44.3
+      ]
+     ]
+    ],
+    [
+     "Mental",
+     [
+      [
+       "composure",
+       40.4
+      ],
+      [
+       "resilience",
+       46.5
+      ],
+      [
+       "management",
+       44.2
+      ],
+      [
+       "focus",
+       55.7
+      ]
+     ]
+    ]
+   ],
+   "funds": 14475.22
+  },
+  {
+   "id": 1864,
+   "name": "Jonah Lewis",
+   "country": "USA",
+   "age": 18,
+   "status": "amateur",
+   "lifestyle": "full_time",
+   "tour": "US College Division I",
+   "overall": 47.6,
+   "attrs": [
+    [
+     "Physical",
+     [
+      [
+       "power",
+       60.7
+      ],
+      [
+       "stamina",
+       53.3
+      ],
+      [
+       "recovery_rate",
+       57.3
+      ],
+      [
+       "injury_resistance",
+       53.8
+      ]
+     ]
+    ],
+    [
+     "Driving & Approach",
+     [
+      [
+       "driving_accuracy",
+       42.5
+      ],
+      [
+       "long_irons",
+       50.3
+      ],
+      [
+       "mid_irons",
+       37.3
+      ],
+      [
+       "wedges",
+       43.1
+      ],
+      [
+       "ball_flight",
+       49.8
+      ]
+     ]
+    ],
+    [
+     "Short Game",
+     [
+      [
+       "chipping",
+       40.2
+      ],
+      [
+       "bunker",
+       44.5
+      ],
+      [
+       "recovery_play",
+       59.0
+      ]
+     ]
+    ],
+    [
+     "Putting",
+     [
+      [
+       "short_putting",
+       57.8
+      ],
+      [
+       "lag_putting",
+       50.3
+      ],
+      [
+       "green_reading",
+       41.8
+      ]
+     ]
+    ],
+    [
+     "Consistency",
+     [
+      [
+       "striking_consistency",
+       40.5
+      ],
+      [
+       "putting_consistency",
+       44.9
+      ]
+     ]
+    ],
+    [
+     "Mental",
+     [
+      [
+       "composure",
+       43.5
+      ],
+      [
+       "resilience",
+       46.9
+      ],
+      [
+       "management",
+       32.9
+      ],
+      [
+       "focus",
+       47.3
+      ]
+     ]
+    ]
+   ],
+   "funds": 56498.58
+  },
+  {
+   "id": 1886,
+   "name": "Derek Brooks",
+   "country": "USA",
+   "age": 18,
+   "status": "amateur",
+   "lifestyle": "full_time",
+   "tour": "US College Division I",
+   "overall": 45.7,
+   "attrs": [
+    [
+     "Physical",
+     [
+      [
+       "power",
+       48.0
+      ],
+      [
+       "stamina",
+       48.3
+      ],
+      [
+       "recovery_rate",
+       44.7
+      ],
+      [
+       "injury_resistance",
+       40.9
+      ]
+     ]
+    ],
+    [
+     "Driving & Approach",
+     [
+      [
+       "driving_accuracy",
+       46.6
+      ],
+      [
+       "long_irons",
+       46.9
+      ],
+      [
+       "mid_irons",
+       49.0
+      ],
+      [
+       "wedges",
+       38.7
+      ],
+      [
+       "ball_flight",
+       49.4
+      ]
+     ]
+    ],
+    [
+     "Short Game",
+     [
+      [
+       "chipping",
+       43.5
+      ],
+      [
+       "bunker",
+       40.5
+      ],
+      [
+       "recovery_play",
+       43.8
+      ]
+     ]
+    ],
+    [
+     "Putting",
+     [
+      [
+       "short_putting",
+       41.9
+      ],
+      [
+       "lag_putting",
+       47.1
+      ],
+      [
+       "green_reading",
+       45.3
+      ]
+     ]
+    ],
+    [
+     "Consistency",
+     [
+      [
+       "striking_consistency",
+       40.4
+      ],
+      [
+       "putting_consistency",
+       45.4
+      ]
+     ]
+    ],
+    [
+     "Mental",
+     [
+      [
+       "composure",
+       43.0
+      ],
+      [
+       "resilience",
+       52.4
+      ],
+      [
+       "management",
+       46.5
+      ],
+      [
+       "focus",
+       43.9
+      ]
+     ]
+    ]
+   ],
+   "funds": 16695.57
+  },
+  {
+   "id": 1892,
+   "name": "Viktor Hermansson",
+   "country": "Sweden",
+   "age": 18,
+   "status": "amateur",
+   "lifestyle": "full_time",
+   "tour": "European Amateur Series",
+   "overall": 43.1,
+   "attrs": [
+    [
+     "Physical",
+     [
+      [
+       "power",
+       34.6
+      ],
+      [
+       "stamina",
+       49.2
+      ],
+      [
+       "recovery_rate",
+       52.1
+      ],
+      [
+       "injury_resistance",
+       47.8
+      ]
+     ]
+    ],
+    [
+     "Driving & Approach",
+     [
+      [
+       "driving_accuracy",
+       47.9
+      ],
+      [
+       "long_irons",
+       42.6
+      ],
+      [
+       "mid_irons",
+       50.4
+      ],
+      [
+       "wedges",
+       40.3
+      ],
+      [
+       "ball_flight",
+       32.8
+      ]
+     ]
+    ],
+    [
+     "Short Game",
+     [
+      [
+       "chipping",
+       50.0
+      ],
+      [
+       "bunker",
+       36.0
+      ],
+      [
+       "recovery_play",
+       41.0
+      ]
+     ]
+    ],
+    [
+     "Putting",
+     [
+      [
+       "short_putting",
+       43.0
+      ],
+      [
+       "lag_putting",
+       39.3
+      ],
+      [
+       "green_reading",
+       36.9
+      ]
+     ]
+    ],
+    [
+     "Consistency",
+     [
+      [
+       "striking_consistency",
+       46.4
+      ],
+      [
+       "putting_consistency",
+       42.2
+      ]
+     ]
+    ],
+    [
+     "Mental",
+     [
+      [
+       "composure",
+       40.1
+      ],
+      [
+       "resilience",
+       46.6
+      ],
+      [
+       "management",
+       51.7
+      ],
+      [
+       "focus",
+       43.2
+      ]
+     ]
+    ]
+   ],
+   "funds": 58777.39
+  },
+  {
+   "id": 2013,
+   "name": "Mark Andrada",
+   "country": "Philippines",
+   "age": 18,
+   "status": "amateur",
+   "lifestyle": "full_time",
+   "tour": "Asian Amateur Series",
+   "overall": 26.4,
+   "attrs": [
+    [
+     "Physical",
+     [
+      [
+       "power",
+       25.7
+      ],
+      [
+       "stamina",
+       22.3
+      ],
+      [
+       "recovery_rate",
+       30.8
+      ],
+      [
+       "injury_resistance",
+       20.0
+      ]
+     ]
+    ],
+    [
+     "Driving & Approach",
+     [
+      [
+       "driving_accuracy",
+       25.9
+      ],
+      [
+       "long_irons",
+       24.2
+      ],
+      [
+       "mid_irons",
+       26.7
+      ],
+      [
+       "wedges",
+       21.5
+      ],
+      [
+       "ball_flight",
+       28.3
+      ]
+     ]
+    ],
+    [
+     "Short Game",
+     [
+      [
+       "chipping",
+       27.1
+      ],
+      [
+       "bunker",
+       22.3
+      ],
+      [
+       "recovery_play",
+       25.8
+      ]
+     ]
+    ],
+    [
+     "Putting",
+     [
+      [
+       "short_putting",
+       19.9
+      ],
+      [
+       "lag_putting",
+       33.4
+      ],
+      [
+       "green_reading",
+       26.2
+      ]
+     ]
+    ],
+    [
+     "Consistency",
+     [
+      [
+       "striking_consistency",
+       24.5
+      ],
+      [
+       "putting_consistency",
+       36.1
+      ]
+     ]
+    ],
+    [
+     "Mental",
+     [
+      [
+       "composure",
+       27.8
+      ],
+      [
+       "resilience",
+       25.4
+      ],
+      [
+       "management",
+       43.5
+      ],
+      [
+       "focus",
+       25.4
+      ]
+     ]
+    ]
+   ],
+   "funds": 42696.76
+  }
+ ]
+}

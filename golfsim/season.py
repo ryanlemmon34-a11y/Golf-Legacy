@@ -2704,7 +2704,31 @@ class Season:
                     if any(pos != 1 for _, pos in rows):
                         sites[site] = [(gid, pos) for gid, pos in rows if pos == 1]
 
+    # The winter in three parts (career year-end, docs/career/YEAR_END.md): the season closed; the career decisions,
+    # aging, new entrants and the staff year; residence and settling. An all-AI world runs them back to back here, in
+    # this order, exactly as before; a career world runs them one at a time (Session), with the player's own stages in
+    # between, and the controlled golfer's choices taken from the career (never made by the AI).
+    WINTER_PARTS = 3
+
     def end_of_season(self, year):
+        for part in range(self.WINTER_PARTS):
+            self.winter_part(year, part)
+
+    def winter_part(self, year, part):
+        """Run one part of the winter after week 52 (0: the season closed; 1: career decisions, aging, new entrants,
+        the staff year; 2: residence and settling). Each part runs once and in order."""
+        done = self.__dict__.setdefault('winter_done', {})
+        if done.get(year, 0) != part:
+            raise RuntimeError(f'winter part {part} of {year} out of order (done: {done.get(year, 0)})')
+        (self._winter_close, self._winter_decide, self._winter_settle)[part](year)
+        done[year] = part + 1
+        for y in [y for y in done if y < year]:
+            del done[y]
+
+    def winter_parts_done(self, year):
+        return self.__dict__.get('winter_done', {}).get(year, 0)
+
+    def _winter_close(self, year):
         self.prune_history(year)
         for (tour, y), m in list(self.money.items()):
             if y != year:
@@ -2740,6 +2764,9 @@ class Season:
         # caddies' reputations, and with them their fees, follow the season before anyone decides on the next:
         # the costs the winter's decisions weigh (backers stepping aside among them) are next season's
         ST.caddie_reputations(self, year, snap)
+
+    def _winter_decide(self, year):
+        snap = self.snapshots[year]
         if self.development:
             from . import careers
             self.note_peaks(year, 52)                        # the season's ratings, before retirements and aging
@@ -2767,6 +2794,9 @@ class Season:
         self.week = 0
         ST.end_of_season(self, year, snap)                   # coaches' and caddies' year
         self._active = None                                  # retirements and arrivals: rebuilt when next needed
+
+    def _winter_settle(self, year):
+        snap = self.snapshots[year]
         if self.development:
             RES.review_moves(self, year, snap)               # career moves (and staying put, or going home)
             RES.staff_moves(self, year)

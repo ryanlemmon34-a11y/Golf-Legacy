@@ -1092,6 +1092,15 @@ def caddie_reputations(season, year, snap):
     return during
 
 
+def _player_staff(season, gid, year, kind):
+    """Career mode: the player's winter answer for the controlled golfer's coach or caddie ('keep' or 'let_go'), or
+    None for any golfer the player does not control (the AI's rule then decides, as always)."""
+    car = getattr(season, 'career', None)
+    if car is None or not car.controls(gid):
+        return None
+    return (car.winter_answer(year, 'staff') or {}).get(kind, 'keep')
+
+
 def end_of_season(season, year, snap):
     """Reputations follow results (a caddie's already set as the season ended, caddie_reputations); either
     side may end a relationship; staff gain experience, age and retire; the profession recruits from outside
@@ -1154,7 +1163,13 @@ def end_of_season(season, year, snap):
         p_golfer = p_golfer_changes_caddie(tr, ev, rap, fit)
         p_caddie = p_caddie_moves_on(receipts.get(('caddie', kid), 0.0), k.reputation, rap, fit)
         r = rng.random()
-        if r < p_golfer:
+        mine = _player_staff(season, gid, year, 'caddie')     # career mode: the golfer's side is the player's answer
+        if mine is not None:                                  # (the same draw is taken; the caddie's side unchanged)
+            if mine == 'let_go':
+                st.end_caddie(season, gid, when, 'the golfer let them go', 'golfer')
+            elif p_golfer <= r < p_golfer + p_caddie:
+                st.end_caddie(season, gid, when, 'the caddie moved on looking for a better-paying bag', 'staff')
+        elif r < p_golfer:
             st.end_caddie(season, gid, when, 'the golfer wanted a change after a difficult run' if tr < 0
                           else 'the golfer wanted a change', 'golfer')
         elif r < p_golfer + p_caddie:
@@ -1175,7 +1190,13 @@ def end_of_season(season, year, snap):
         p_coach = p_coach_moves_on(deal, tr, ev, fit)
         why = 'the promise they saw had not come through' if deal == 'share' else 'the coach felt they were not the right fit'
         r = rng.random()
-        if r < p_golfer:
+        mine = _player_staff(season, gid, year, 'coach')      # career mode: the golfer's side is the player's answer
+        if mine is not None:                                  # (the same draw is taken; the coach's side unchanged)
+            if mine == 'let_go':
+                st.end_coach(season, gid, when, 'the golfer let them go', 'golfer')
+            elif p_golfer <= r < p_golfer + p_coach:
+                st.end_coach(season, gid, when, why, 'staff')
+        elif r < p_golfer:
             st.end_coach(season, gid, when, 'the golfer wanted a change after a difficult run' if tr < 0
                          else 'could no longer afford the fee' if afford > 0.3 else 'the golfer wanted a change', 'golfer')
         elif r < p_golfer + p_coach:

@@ -1,0 +1,75 @@
+{
+ "year": 2028,
+ "stage": "season_review",
+ "winter_parts_done": 0,
+ "version": 41,
+ "review": {
+  "year": 2028,
+  "golfer_id": 1268,
+  "name": "Drew Rogers",
+  "age": 18,
+  "status": "amateur",
+  "lifestyle": "full_time",
+  "tour": "North American Amateur Series",
+  "recorded_weeks": 52,
+  "complete": true,
+  "events": 1,
+  "wins": 0,
+  "top10": 0,
+  "missed_cuts": 0,
+  "best_finish": {
+   "position": 23,
+   "event": "Small College National Championship",
+   "tied": true
+  },
+  "prize_money": 0.0,
+  "income": null,
+  "activity": {
+   "rest": 51,
+   "play": 1
+  },
+  "overall_start": 32.546,
+  "overall_now": 32.886,
+  "world_rank": null,
+  "amateur_rank": 407,
+  "funds": 26369.9
+ },
+ "decisions": [
+  {
+   "id": "D15",
+   "kind": "season_review",
+   "text": "The 2028 season is over. Keep playing as Drew Rogers, switch to one of the juniors entering the world for 2029 (chosen on 1 January, after the winter; Drew Rogers carries on under AI control through the winter), or end the career.",
+   "options": [
+    "keep",
+    "switch",
+    "end_career"
+   ],
+   "choices": [
+    {
+     "key": "keep",
+     "label": "Keep playing as Drew Rogers",
+     "facts": {
+      "detail": "You make Drew Rogers's winter choices next (career path, staff, residence)."
+     }
+    },
+    {
+     "key": "switch",
+     "label": "Switch to a newcomer",
+     "facts": {
+      "detail": "Drew Rogers returns to AI control now, before the winter: the AI makes all their winter decisions. On 1 January 2029 you choose one of 10 juniors entering the world (they exist whoever you choose)."
+     }
+    },
+    {
+     "key": "end_career",
+     "label": "End the career",
+     "facts": {
+      "detail": "Every golfer is under AI control from now on. This cannot be undone."
+     }
+    }
+   ]
+  }
+ ],
+ "offers": [],
+ "answers": {},
+ "candidates": null
+}

@@ -1,0 +1,48 @@
+{
+ "year": 2028,
+ "stage": "winter_choices",
+ "winter_parts_done": 1,
+ "version": 46,
+ "review": {
+  "year": 2028,
+  "golfer_id": 1268,
+  "name": "Drew Rogers",
+  "age": 18,
+  "status": "amateur",
+  "lifestyle": "full_time",
+  "tour": "North American Amateur Series",
+  "recorded_weeks": 52,
+  "complete": true,
+  "events": 1,
+  "wins": 0,
+  "top10": 0,
+  "missed_cuts": 0,
+  "best_finish": {
+   "position": 23,
+   "event": "Small College National Championship",
+   "tied": true
+  },
+  "prize_money": 0.0,
+  "income": null,
+  "activity": {
+   "rest": 51,
+   "play": 1
+  },
+  "overall_start": 32.546,
+  "overall_now": 32.886,
+  "world_rank": null,
+  "amateur_rank": 407,
+  "funds": 26369.9
+ },
+ "decisions": [],
+ "offers": [],
+ "answers": {
+  "intent": "keep",
+  "career": "turn_pro",
+  "staff": {
+   "coach": "keep",
+   "caddie": "let_go"
+  }
+ },
+ "candidates": null
+}
