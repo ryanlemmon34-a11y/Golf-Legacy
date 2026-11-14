@@ -53,3 +53,14 @@ class CareerPresentation(unittest.TestCase):
         html = UI.readiness_card(v)
         self.assertIn('Injured', html)
         self.assertNotIn('After one training week', html)
+
+    def test_college_coaching_is_not_mistaken_for_no_support(self):
+        g = {'tour_key':'CO_TEST','coach':None,'caddie':None,'spendable':100,'funds':100}
+        html = UI.support_card(g)
+        self.assertIn('College team coaching', html)
+        self.assertIn('No personal coach', html)
+        self.assertIn('do not stack', html)
+        g['coach'] = 'Named coach'
+        self.assertIn('Named coach', UI.support_card(g))
+        g['tour_key'] = 'PRO'
+        self.assertNotIn('College team coaching', UI.support_card(g))

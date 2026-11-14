@@ -166,10 +166,13 @@ def summary_stat(label, value, note=''):
 
 
 def support_card(g):
+    college = (g.get('tour_key') or '').startswith('CO_')
+    team = ('<dt>Team support</dt><dd>College team coaching</dd>' if college else '')
+    note = ('<p class="muted">Your college provides coaching even without a personal coach. Team and personal coaching do not stack; the stronger instruction applies.</p>' if college else '')
     return ('<section class="career-panel"><div class="eyebrow">Your support team</div><h2>Off the course</h2>'
-            + f'<dl class="kv"><dt>Coach</dt><dd>{esc(g["coach"] or "No coach")}</dd>'
-            + f'<dt>Caddie</dt><dd>{esc(g["caddie"] or "No caddie")}</dd></dl>'
-            + f'<div class="career-money">{money(g["spendable"])}<span>Available for golf</span></div>'
+            + f'<dl class="kv"><dt>Personal coach</dt><dd>{esc(g["coach"] or "No personal coach")}</dd>'
+            + team + f'<dt>Caddie</dt><dd>{esc(g["caddie"] or "No caddie")}</dd></dl>'
+            + note + f'<div class="career-money">{money(g["spendable"])}<span>Available for golf</span></div>'
             + f'<p class="muted">Funds: {money(g["funds"])}. Available money accounts for committed costs and amateur support.</p></section>')
 
 
