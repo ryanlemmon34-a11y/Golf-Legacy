@@ -64,3 +64,22 @@ class CareerPresentation(unittest.TestCase):
         self.assertIn('Named coach', UI.support_card(g))
         g['tour_key'] = 'PRO'
         self.assertNotIn('College team coaching', UI.support_card(g))
+
+    def test_profile_and_career_share_display_groups_not_training_groups(self):
+        from golfsim import career as CA, development as D
+        from golfsim.ratings import ATTRIBUTE_GROUPS, ATTRIBUTE_KEYS
+        flattened = {key: label for label, keys in CA.ATTR_GROUPS for key in keys}
+        self.assertEqual(flattened, ATTRIBUTE_GROUPS)
+        self.assertEqual(sum(len(keys) for _, keys in CA.ATTR_GROUPS), len(ATTRIBUTE_KEYS))
+        self.assertEqual(flattened['wedges'], 'Driving & Approach')
+        self.assertEqual(flattened['mid_irons'], 'Driving & Approach')
+        self.assertEqual(flattened['power'], 'Physical')
+        self.assertEqual(flattened['striking_consistency'], 'Consistency')
+        self.assertIn('wedges', D.CATEGORIES['short_game'])
+        self.assertNotIn('wedges', D.CATEGORIES['long_game'])
+        html = UI.training_categories_help()
+        self.assertIn('short-game practice includes wedge play', html)
+        for keys in D.CATEGORIES.values():
+            from golfsim.ratings import ATTRIBUTE_LABELS
+            for key in keys:
+                self.assertIn(ATTRIBUTE_LABELS[key], html)

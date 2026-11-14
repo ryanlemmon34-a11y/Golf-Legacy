@@ -316,7 +316,7 @@ def golfer_card(g, recap=None):
     return ('<div class="eyebrow">Player development</div><div class="section-heading"><h2>Your attributes</h2>'
             f'<a href="/golfer/{g["id"]}?tab=playing#career-ratings">Full development history ↗</a></div>'
             '<p class="muted">Current ratings on the same 0–100 scale as player profiles. Change is since the start of the latest recorded period, '
-            'not training alone. Potential stays hidden.</p><div class="career-ratings">' + ''.join(cards) + '</div>')
+            'not training alone. These are profile groups, not training categories. Potential stays hidden.</p><div class="career-ratings">' + ''.join(cards) + '</div>')
 
 def plan_card(w, v):
     out = ['<div class="eyebrow">Look ahead</div><h2>Your next period</h2><p class="muted">Planning is in four-week periods (the engine\'s thirteen blocks a season, '
@@ -398,6 +398,19 @@ def scope_note():
 
 # ---- the planner ----------------------------------------------------------------------------------------------------
 
+
+def training_categories_help():
+    from golfsim.development import CATEGORIES
+    from golfsim.ratings import ATTRIBUTE_LABELS
+    rows = ''.join('<dt>' + esc(LABEL[k]) + '</dt><dd>' +
+                   esc(', '.join(ATTRIBUTE_LABELS[a] for a in attrs)) + '</dd>'
+                   for k, attrs in CATEGORIES.items())
+    return ('<details class="career-details"><summary>What each training focus covers</summary>'
+            '<p>Profile groups describe shot skills. Training groups describe practice sessions and differ: '
+            'short-game practice includes wedge play; long-game practice includes ball-striking consistency. '
+            'Choosing a focus does not guarantee an equal gain in every skill.</p><dl class="kv">' + rows + '</dl></details>')
+
+
 def plan_page(w, q):
     v = getattr(w.live, 'career', None)
     if v is None or v['status'] != 'active':
@@ -469,7 +482,7 @@ def plan_page(w, q):
             'the rule that keeps you out. An entry is not a place: fields fill in each event\'s entry order, and if yours '
             'is not accepted the week falls back to what you choose here. Events that choose their own fields are covered '
             'by the period\'s policy below.</p>')
-    return f'Plan weeks {w0}–{min(52, w0 + 3)} of {y}', STYLE + '<div class="career-hub"><p class="back"><a href="/career">← Career overview</a></p><div class="planner-intro"><p>Build a period that balances competition, development and recovery.</p></div>' + readiness_card(v) + '<details><summary>How event entry works</summary>' + note + '</details>' + form + '</div>'
+    return f'Plan weeks {w0}–{min(52, w0 + 3)} of {y}', STYLE + '<div class="career-hub"><p class="back"><a href="/career">← Career overview</a></p><div class="planner-intro"><p>Build a period that balances competition, development and recovery.</p></div>' + readiness_card(v) + '<details><summary>How event entry works</summary>' + note + '</details>' + training_categories_help() + form + '</div>'
 
 
 # ---- reading forms into commands ------------------------------------------------------------------------------------

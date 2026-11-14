@@ -582,11 +582,10 @@ def _end_control(season, c, cursor, action):
 
 # ---- views (plain data for any interface; never hidden potential, ceilings or development figures) -----------------------
 
-ATTR_GROUPS = (('Long game', ('driving_accuracy', 'long_irons', 'mid_irons', 'ball_flight', 'striking_consistency', 'power')),
-               ('Short game', ('wedges', 'chipping', 'bunker', 'recovery_play')),
-               ('Putting', ('short_putting', 'lag_putting', 'green_reading', 'putting_consistency')),
-               ('Mental', ('composure', 'resilience', 'management', 'focus')),
-               ('Body', ('stamina', 'recovery_rate', 'injury_resistance')))
+# The same presentation taxonomy as every player profile; training categories are separate.
+from .ratings import ATTRIBUTES as _RATED_ATTRIBUTES
+ATTR_GROUPS = tuple((group, tuple(k for k, _, section, _ in _RATED_ATTRIBUTES if section == group))
+                    for group in dict.fromkeys(section for _, _, section, _ in _RATED_ATTRIBUTES))
 
 
 def choice_text(season, year, ch):
