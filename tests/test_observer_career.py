@@ -95,10 +95,15 @@ class ObserverCareer(unittest.TestCase):
         srv = Server(self)
         pl = start_and_reach_the_plan(self, srv)
         ff = fields(pl, '/career/plan')
-        events = re.findall(r'name="w1" value="event:([^"]+)"', pl)
+        event_select = pl.split('name="e1"')[1].split('</select>')[0]
+        events = re.findall(r'<option value="([^"]+)"', event_select)
         self.assertTrue(events)
         car = srv.session().season.career
         v0 = car.version
+        missing = dict(ff, w1='event', e1='', w2='rest', w3='rest', w4='rest', selected='accept', qualifying='skip')
+        refused = srv.post('/career/plan', missing)
+        self.assertIn('incomplete', banners(refused)[0][1])
+        self.assertEqual(srv.session().season.career.version, v0)
         bad = dict(ff, w1='event:2028:NO_SUCH_EVENT', f1='rest', w2='rest', w3='rest', w4='rest', selected='accept',
                    qualifying='skip')
         p = srv.post('/career/plan', bad)
@@ -107,7 +112,7 @@ class ObserverCareer(unittest.TestCase):
         self.assertIn('not saved', text)
         self.assertEqual(srv.session().season.career.version, v0)        # nothing changed
         self.assertIn('action="/career/plan"', p)                        # still on the planner
-        good = dict(ff, w1='event:' + events[0], f1='train:putting', w2='train', c2='long_game', w3='rest', w4='train',
+        good = dict(ff, w1='event', e1=events[0], f1='train:putting', w2='train', c2='long_game', w3='rest', w4='train',
                     c4='mental', selected='accept', qualifying='skip')
         p = srv.post('/career/plan', good)
         self.assertEqual(banners(p)[0][0], 'ok')
