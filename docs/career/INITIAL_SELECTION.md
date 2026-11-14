@@ -60,3 +60,17 @@ Fixtures: `docs/career/initial_selection_fixtures/`.
   (`first_year + 1`); `start_view` itself is available at any season's 1 January with a class. Which to use is a UI
   decision.
 * No prologue or auto-simulation is added.
+
+## Picker UI integration
+
+The observer now presents the committed `career_start` candidates using the annual newcomer's profile cards. Every
+start button submits its explicit `golfer` ID. The HTTP path refuses a missing selection rather than invoking the
+legacy random-assignment API. Read-only worlds have no selection forms.
+
+The existing New Career job still creates a world and plays its first season under AI. It now stops at the start of
+the second season with no controlled golfer, ready for selection. There is no additional prologue or simulation.
+
+HTTP regressions verify the unchanged population, stable refresh/reload list, invalid/missing ID refusal, duplicate
+submission safety, and the real creation job stopping before selection. Candidate cards show public current ratings,
+attributes, tour, funds and country; no hidden future-growth data. Browser visual signoff remains outstanding in the
+current execution environment.

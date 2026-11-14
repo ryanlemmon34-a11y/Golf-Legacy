@@ -57,7 +57,7 @@ def facts_html(facts):
     return out + ('<dl class="annual-facts">' + ''.join(pairs) + '</dl>' if pairs else '')
 
 
-def candidate_card(w, v, decision, choice):
+def candidate_card(w, v, decision, choice, submit_html=None):
     from golfsim.ratings import ATTRIBUTE_LABELS
     g = choice['facts']
     attrs = []
@@ -66,9 +66,9 @@ def candidate_card(w, v, decision, choice):
             f'<dt>{esc(ATTRIBUTE_LABELS.get(key,key))}</dt><dd>{known(value)}</dd>' for key,value in rows) + '</dl>')
     return ('<article class="newcomer-card"><div class="newcomer-heading"><div><h3>' + esc(g['name']) + '</h3>'
             + f'<p>{esc(g["country"])} · Age {g["age"]}</p></div><div class="newcomer-rating">{known(g["overall"])}<small>Overall · 0–100</small></div></div>'
-            + f'<p>{esc(g["tour"])} · {esc(g["status"])} · {esc(g["lifestyle"].replace("_"," "))}</p>'
+            + f'<p>{esc(g["tour"] or "Tour not recorded")} · {esc(g["status"])} · {esc(g["lifestyle"].replace("_"," "))}</p>'
             + '<p>Funds: ' + known(g['funds'],True) + '</p><details><summary>View attributes</summary>' + ''.join(attrs) + '</details>'
-            + button(w,v,decision,{'key':choice['key'],'label':'Play as ' + g['name']}) + '</article>')
+            + (submit_html if submit_html is not None else button(w,v,decision,{'key':choice['key'],'label':'Play as ' + g['name']})) + '</article>')
 
 
 def review_html(review):

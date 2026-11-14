@@ -255,7 +255,10 @@ class App:
             return ('warn', f'{esc(run.title)} is running: one operation at a time.'), '/career'
         stay = '/career'
         if kind == 'start':
-            body = {'schema': CA.SCHEMA, 'type': 'new_career'}
+            golfer = O.one(form, 'golfer')
+            if not golfer:
+                return ('err', 'Choose one of the listed golfers before starting. Nothing was changed.'), '/career'
+            body = {'schema': CA.SCHEMA, 'type': 'new_career', 'golfer': golfer}
         elif kind == 'plan':
             body = OCAR.plan_command(form, O.one)
             if body is None:
@@ -370,7 +373,7 @@ class App:
 
     def new_career(self, form):
         """New Career from the library: create a world, play its first season under AI (so that the world's own rules
-        have created its first junior class), then start a career with one of those newcomers at the start of the
+        have created its first junior class), then show the player chooser at the start of the
         second season. One job; stopping it keeps the world, and the career can be started later from its Career
         page at the start of the second season."""
         try:
@@ -403,11 +406,10 @@ class App:
                 job.finish('stopped', f'Stopped at your request at {O.date_text(s.cursor)}; the world is saved. Advance it '
                                       f'to the start of {start + 1} and start the career from its Career page.')
                 return
-            job.update(phase='starting the career')
-            res = s.career_action({'schema': CA.SCHEMA, 'type': 'new_career'}, op_key=f'new-career-{d.name}')
+            job.update(phase='ready to choose a golfer')
             self.renderer.call(self._install, d, s)
-            job.finish('done', f'World “{d.name}” created (seed {seed}) and its first season played. Your career has '
-                               f'started: you play {res.get("name")}. Open Career to plan the first four weeks.')
+            job.finish('done', f'World “{d.name}” created (seed {seed}) and its first season played. Open Career to '
+                               'choose your golfer from the existing newcomer class. No golfer has been selected yet.')
         _, started = self.start('new-career', f'New career in “{d.name}”', run, world_dir=None, cancellable=True)
         return None if started else ('warn', 'Another operation is running: one at a time.')
 
@@ -701,8 +703,8 @@ class App:
                    f'<label>Seed<input name="seed" type="number" min="0" max="2147483647" value="{random.randrange(1, 1000000)}">'
                    '</label><button class="primary">New Career</button></form>'
                    '<p class="muted">Creates a world, plays its first season under AI (a few minutes) so that the '
-                   'world\'s own rules create its first class of juniors, and gives you one of them, chosen by a seeded '
-                   'draw, at the start of the second season. Nobody is added to the world for you.</p>')
+                   'world\'s own rules create its first class of juniors, then lets you choose from up to ten existing golfers '
+                   'at the start of the second season. Nobody is added to the world for you.</p>')
         trash = WL.trashed(self.lib)
         if trash:
             out.append('<h2>Removed worlds (trash)</h2>' + O.table(['World', 'Removed', 'Size', ''], [

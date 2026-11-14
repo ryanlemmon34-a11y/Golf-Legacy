@@ -300,20 +300,26 @@ def render_recap(r, latest=False):
     return out + '</div><p class="muted fine-print">Rating changes are observations, not a prediction of potential. Total growth can include competition and natural maturation as well as training.</p>'
 
 def no_career(w):
-    can = getattr(w.live, 'career_can_start', None)
-    out = ['<p>This world has no career. A career is played as one genuine newcomer in this world: a golfer from '
-           'the junior class the world\'s own rules create for a season. Nobody is added to the world for you.</p>']
-    if can and not w.read_only:
-        out.append(f'<p>This world is at the start of {can["year"]}, its second season, and its first junior class '
-                   f'({can["class_size"]} golfers) has just entered. The career takes one of them, chosen by a seeded draw '
-                   '(not by ability).</p>'
-                   f'<form method="post" action="/career/start">{hidden(w)}<button class="primary">Start the career</button>'
-                   '</form>')
-    else:
-        out.append('<p>Start one from the <a href="/worlds">World library</a> with <strong>New Career</strong>: it creates a '
-                   'world, plays its first season under AI so that the first newcomer class exists, and gives you one of '
-                   'them at the start of the second season.</p>')
-    return ''.join(out)
+    from observer_career_yearend import STYLE as CHOICE_STYLE, candidate_card
+    start = getattr(w.live, 'career_start', None)
+    if start and not w.read_only:
+        cards = []
+        for choice in start['choices']:
+            submit = (f'<form method="post" action="/career/start">{hidden(w, extra=(("golfer",choice["key"]),))}'
+                      f'<button class="primary">Start career as {esc(choice["label"])}</button></form>')
+            cards.append(candidate_card(w, {}, None, choice, submit_html=submit))
+        return (CHOICE_STYLE + '<section class="career-panel annual-panel"><div class="eyebrow">Start the career</div>'
+                '<h2>Choose your golfer</h2>' + f'<p>{esc(start["text"])}</p>'
+                '<p>Everyone here already exists in this world. The list stays the same when you refresh or reopen '
+                'the save. The golfers you do not choose continue their careers under AI control.</p>'
+                '<p class="muted">Compare current ability, playing pathway, funds and attributes. These are current '
+                'ratings, not a promise of future growth. No golfer is chosen until you press their start button.</p>'
+                '<div class="newcomer-grid">' + ''.join(cards) + '</div></section>')
+    return ('<p>This world has no player-controlled career.</p>'
+            '<p>Start one from the <a href="/worlds">World library</a> with <strong>New Career</strong>: it creates a '
+            'world and plays its first season under AI so that the first newcomer class exists. At the start of '
+            'the second season, choose from up to ten of those existing golfers. Nobody is added just for the picker.</p>'
+            + ('<p class="banner warn">This world is open for browsing only. Player selection cannot change this save.</p>' if w.read_only else ''))
 
 
 def golfer_card(g, recap=None):

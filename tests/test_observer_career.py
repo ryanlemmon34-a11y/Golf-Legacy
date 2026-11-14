@@ -139,6 +139,14 @@ class ObserverCareer(unittest.TestCase):
         j = srv.job()
         self.assertEqual(j['state'], 'refused')
         self.assertEqual(srv.session().cursor['week'], 5)
+        # An explicitly selected newcomer may receive offers where the old seeded-random golfer did not.
+        # Answer those real decisions before exercising handback, rather than assuming none exist.
+        for decision in srv.session().season.career.pending(CA.OFFER_KINDS):
+            for segment in srv.get('/career').split('<form ')[1:]:
+                values = dict(re.findall(r'<input type="hidden" name="(\w+)" value="([^"]*)">',segment.split('</form>')[0]))
+                if values.get('decision') == decision['id'] and values.get('answer') == 'decline':
+                    self.assertEqual(banners(srv.post('/career/decide', values))[0][0], 'ok')
+                    break
         e = fields(srv.get('/career'), '/career/end')
         p = srv.post('/career/end', e)
         self.assertEqual(banners(p)[0][0], 'warn')                       # confirmation required
