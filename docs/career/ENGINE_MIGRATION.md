@@ -56,8 +56,27 @@ A separate command, run only on request, e.g. `python tools/migrate_world.py <so
 
 For Patrick Newton's CareerTest1 (career ended at 2028's end, cursor 2029 week 2, golfer under AI): the migrated copy
 would be an all-AI world continuable from 2029 week 2, Patrick an AI golfer, his career record unchanged except the
-format upgrade. Which class it falls in depends on the engine id in its save metadata (to be read from Ryan's copy,
-not assumed: 30b9fed → equivalent; 18d6524 → rules_changed).
+format upgrade.
+
+**Its source engine, from evidence:** HAL read the extracted save's `CareerTest1/gen_000032/meta.json`
+(not modified): engine `02da83dd49b7d16d5c06dd3da719a6a65e17aeed`, commit `unknown`, cursor 2029 week 2 'week',
+generation 32. The git engine-id history matches it exactly to commit
+`57c47193bf605c2bb71ea953aea6e3d37969c11a` ("Overhaul career experience with factual period reviews, readiness and
+injury feedback"), computed independently here:
+
+| commit | engine id |
+|---|---|
+| 57c4719 | `02da83dd49b7d16d5c06dd3da719a6a65e17aeed` (= CareerTest1) |
+| 27fdf93 (training-fatigue fix), 999d83e | `3a6dd75218b90c90b94c2c9f78f3350cc4f450a0` |
+| 30b9fed | `1b5da4a4d1f0a8bf637eeb156522b1311fc62a71` |
+| 18d6524 / d2554f5 | `50c433588f5ce93bbc658f01b42664ad150c59f0` |
+
+So CareerTest1 is **rules_changed**, not equivalent: between 57c4719 and this branch the simulation gained the
+training-fatigue zero-boundary fix (27fdf93; practice accrues fatigue from zero, an approved AI-outcome change),
+then engine edits that the all-AI goldens show do not change outcomes (30b9fed: attribute group names, career
+view text; 999d83e changed no engine file), then this branch. A migrated copy would continue under the fatigue fix from 2029 week 2. Still to do before enabling:
+build a world with 57c4719, continue it with 57c4719 and with this engine, and confirm the only difference is the
+fatigue rule (e.g. identical with the fix reverted).
 
 ## Risks and open points
 
