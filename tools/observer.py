@@ -32,6 +32,12 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, quote, unquote, urlencode, urlparse
 
+# Run as a script (the Windows launcher runs `tools/observer.py`; a spawned worker re-runs it as '__mp_main__'), this
+# module is also the `observer` the page modules import (observer_career takes esc and table from it at import time).
+# Without this, that import would execute a second, half-built copy of this file and fail on its page table.
+if __name__ in ('__main__', '__mp_main__'):
+    sys.modules['observer'] = sys.modules[__name__]
+
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / 'tools'))
