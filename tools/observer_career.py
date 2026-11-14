@@ -80,8 +80,11 @@ STYLE = '''<style>
 .career-hub .filters { margin-bottom:0; }
 .career-hub .scroll table { min-width:0; width:100%; }
 .planner-intro { display:flex; align-items:center; justify-content:space-between; gap:20px; }
-.planner-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; margin:22px 0; }
+.planner-grid { display:grid; grid-auto-rows:1fr; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; margin:22px 0; }
 .planner-week { border:1px solid var(--line); border-radius:10px; background:var(--panel); padding:20px; min-width:0; }
+.planner-event-details { max-height:210px; overflow:auto; margin-top:10px; }
+.planner-event-details li { margin:10px 0; font-size:12px; }
+.planner-week select { max-width:100%; min-width:0; }
 .planner-week legend { font-weight:750; padding:0 8px; color:var(--accent); }
 .plan-option { display:block; border:1px solid var(--line); border-radius:7px; padding:11px; margin:8px 0; cursor:pointer; }
 .plan-option:has(input:checked) { border-color:var(--accent); background:var(--hover); }
@@ -411,6 +414,34 @@ def training_categories_help():
             'Choosing a focus does not guarantee an equal gain in every skill.</p><dl class="kv">' + rows + '</dl></details>')
 
 
+
+def event_choice(o, cur):
+    """A bounded event selector; all details remain readable without JavaScript."""
+    n = o['week']
+    events = [e for e in o['events'] if e['eligible'] and e.get('affordable')]
+    available = bool(events) and not o['injured_until']
+    disabled = '' if available else ' disabled'
+    chosen = cur.get('event_id') if cur.get('kind') == 'event' else None
+    selected = ' checked' if chosen and available else ''
+    options = ['<option value=""' + (' selected' if chosen not in {e['event_id'] for e in events} else '') +
+               '>' + ('Choose a tournament' if available else 'No tournament available to enter') + '</option>']
+    for e in events:
+        pick = ' selected' if e['event_id'] == chosen else ''
+        options.append(f'<option value="{esc(e["event_id"])}"{pick}>{esc(e["name"])} · {money(e["cost"])} estimated</option>')
+    details = []
+    for e in o['events']:
+        reason = ('Unavailable while injured' if o['injured_until'] else
+                  'Eligible to request entry' if e['eligible'] and e.get('affordable') else e['why'])
+        cost_label = f'Estimated cost {money(e["cost"])}' if e.get('cost') is not None else 'Cost not quoted'
+        details.append(f'<li><a href="/event/{quote(e["event_id"])}">{esc(e["name"])}</a><br>'
+                       f'{esc(e["city"])}, {esc(e["country"])} · {esc(e["tour"])} · {cost_label}<br>{esc(reason)}</li>')
+    return (f'<div class="plan-option"><label><input type="radio" name="w{n}" value="event"{selected}{disabled} required> '
+            f'Enter a tournament</label><select name="e{n}" aria-label="Tournament for week {n}"{disabled}>' + ''.join(options) +
+            '</select><small>Request an entry. Your fallback applies if it is not accepted.</small></div>'
+            '<details><summary>Event details &amp; eligibility</summary><div class="planner-event-details">' +
+            ('<ul>' + ''.join(details) + '</ul>' if details else '<p>No events are listed for this week.</p>') + '</div></details>')
+
+
 def plan_page(w, q):
     v = getattr(w.live, 'career', None)
     if v is None or v['status'] != 'active':
@@ -430,14 +461,7 @@ def plan_page(w, q):
     for o in p['weeks']:
         n = o['week']
         cur = o['current'] or {}
-        opts = []
-        for e in o['events']:
-            if not e['eligible'] or not e.get('affordable'):
-                continue
-            sel = ' checked' if cur.get('kind') == 'event' and cur.get('event_id') == e['event_id'] else ''
-            opts.append(f'<label class="plan-option"><input type="radio" name="w{n}" value="event:{esc(e["event_id"])}"{sel} required> '
-                        f'<a href="/event/{quote(e["event_id"])}">{esc(e["name"])}</a><small>{esc(e["city"])}, {esc(e["country"])} · '
-                        f'{esc(e["tour"])} · Estimated cost {money(e["cost"])}</small></label>')
+        opts = [event_choice(o, cur)]
         train_disabled = ' disabled' if o['injured_until'] else ''
         tsel = ' checked' if cur.get('kind') == 'train' and not o['injured_until'] else ''
         rsel = ' checked' if cur.get('kind') == 'rest' else ''
@@ -452,13 +476,10 @@ def plan_page(w, q):
         fallback = (f'<select name="f{n}" aria-label="If the entry is not accepted in week {n}">'
                     + ''.join(f'<option value="train:{k}"{fsel("train:" + k)}>train {esc(label.lower())}</option>' for k, label in CATS)
                     + f'<option value="rest"{fsel("rest")}>rest</option></select>')
-        closed = [e for e in o['events'] if not e['eligible'] or not e.get('affordable')]
-        why = ('<details><summary>' + f'{len(closed)} event{"s" if len(closed) != 1 else ""} you cannot enter</summary><ul>'
-               + ''.join(f'<li>{esc(e["name"])}: {esc(e["why"])}</li>' for e in closed) + '</ul></details>') if closed else ''
         sel_ev = ('<ul>' + ''.join(f'<li>{esc(e["name"])} ({esc(e["rule"])})</li>' for e in o['selected']) + '</ul>'
                   if o['selected'] else '<span class="muted">none</span>')
         inj = f'<p class="banner warn">Injured this week: only rest is possible.</p>' if o['injured_until'] else ''
-        rows.append(f'<fieldset class="planner-week"><legend>Week {n}</legend>' + inj + ''.join(opts) + why
+        rows.append(f'<fieldset class="planner-week"><legend>Week {n}</legend>' + inj + ''.join(opts)
                     + '<div class="planner-fallback"><strong>If your event entry is not accepted</strong>' + fallback
                     + '</div><details><summary>Selection-only events</summary>' + sel_ev + '</details></fieldset>')
     pol = p['policy'] or {}
@@ -498,6 +519,11 @@ def plan_command(form, one):
         val = one(form, f'w{n}')
         if val is None:
             continue
+        if val == 'event':
+            event_id = one(form, f'e{n}')
+            if not event_id:
+                return None  # Let the existing incomplete-form path refuse without changing the world.
+            val = 'event:' + event_id
         if val.startswith('event:'):
             fb = one(form, f'f{n}') or ''
             weeks[str(n)] = {'kind': 'event', 'event_id': val[6:],

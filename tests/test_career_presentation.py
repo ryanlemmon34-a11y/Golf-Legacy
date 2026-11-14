@@ -83,3 +83,42 @@ class CareerPresentation(unittest.TestCase):
             from golfsim.ratings import ATTRIBUTE_LABELS
             for key in keys:
                 self.assertIn(ATTRIBUTE_LABELS[key], html)
+
+    def test_event_dropdown_is_one_control_with_details_for_any_field_size(self):
+        def event(i, eligible=True):
+            return {'event_id':f'2028:{i}','name':f'Event <{i}>','eligible':eligible,'affordable':eligible,
+                    'city':'City','country':'Country','tour':'Tour','cost':123,'why':'Not eligible'}
+        for count in (0, 1, 30):
+            o = {'week':2,'events':[event(i) for i in range(count)],'injured_until':None}
+            html = UI.event_choice(o, {})
+            self.assertEqual(html.count('type="radio"'), 1)
+            self.assertEqual(html.count('<select'), 1)
+            self.assertIn('name="e2"', html)
+            self.assertIn('Event details &amp; eligibility', html)
+            if count:
+                self.assertIn('Event &lt;0&gt;', html)
+                self.assertIn('$123 estimated', html)
+                self.assertIn('City, Country', html)
+            else:
+                self.assertIn('No tournament available to enter', html)
+        o = {'week':2,'events':[event(1),event(2,False)],'injured_until':None}
+        del o['events'][1]['cost']
+        html = UI.event_choice(o, {'kind':'event','event_id':'2028:1'})
+        self.assertIn('value="2028:1" selected', html)
+        self.assertNotIn('<option value="2028:2"', html)
+        self.assertIn('Not eligible', html)
+        self.assertIn('Cost not quoted', html)
+        o['injured_until'] = 100
+        self.assertIn('value="event" disabled', UI.event_choice(o, {}))
+
+    def test_dropdown_form_maps_to_existing_command_and_requires_event(self):
+        form = {'block':'2028-1','w1':'event','e1':'2028:TEST','f1':'train:putting',
+                'w2':'train','c2':'long_game','w3':'rest','w4':'rest','selected':'accept','qualifying':'skip'}
+        one = lambda f,k:f.get(k)
+        command = UI.plan_command(form,one)
+        self.assertEqual(command['weeks']['1'], {'kind':'event','event_id':'2028:TEST',
+                                               'fallback':{'kind':'train','category':'putting'}})
+        self.assertEqual(command['weeks']['2'], {'kind':'train','category':'long_game'})
+        legacy = dict(form,w1='event:2028:TEST')
+        self.assertEqual(command,UI.plan_command(legacy,one))
+        self.assertIsNone(UI.plan_command(dict(form,e1=''),one))
