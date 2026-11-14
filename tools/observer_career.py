@@ -134,9 +134,12 @@ def career_page(w, q):
         return 'Career', '<div class="career-hub">' + STYLE + no_career(w) + '</div>'
     g = v['golfer']
     y, week = v['date']
-    recaps = v.get('recaps', [])
+    recaps = current_recaps(v)
     latest = recaps[0] if recaps else None
-    state = 'Your career' if v['status'] == 'active' else f'under AI control since {esc(wk(*v["ended"]))}'
+    state = ('Your career' if v['status'] == 'active' else 'Choosing your next golfer' if v['status'] == 'choosing'
+             else f'under AI control since {esc(wk(*v["ended"]))}' if v.get('ended') else 'Career history')
+    from observer_career_yearend import panel as annual_panel, history as stint_history
+    annual = annual_panel(w, v)
     hero = (f'<section class="career-hero"><div><div class="eyebrow">{state} · {y} season</div>'
             f'<h2>{esc(g["name"])}</h2><p>{esc(g["country"])} · Age {g["age"]} · {esc(g["tour"])}'
             f' · {esc(g["status"].title())}</p><a href="/golfer/{g["id"]}">Full player profile ↗</a></div>'
@@ -146,14 +149,14 @@ def career_page(w, q):
                   '<a href="#career-attributes">Attributes</a><a href="#career-inbox">Inbox</a></div>')
     inbox = '<section id="career-inbox" class="career-panel">' + decisions_card(w, v) + notices_card(v) + '</section>'
     body = (STYLE + '<div class="career-hub">' + hero + navigation
-            + '<div class="career-dashboard"><div class="career-main">' + recap_card(v)
-            + '<section id="career-plan" class="career-panel">' + plan_card(w, v)
-            + (advance_card(w, v) if v['status'] == 'active' else '') + '</section></div>'
+            + annual + '<div class="career-dashboard"><div class="career-main">' + recap_card(v)
+            + '<section id="career-plan" class="career-panel">' + ('<h2>Next season planning</h2><p>Complete the season-transition choices above before making your next weekly plan.</p>' if annual else plan_card(w, v))
+            + (advance_card(w, v) if v['status'] == 'active' and not v.get('year_end') else '') + '</section></div>'
             + '<aside class="career-aside">' + readiness_card(v) + support_card(g) + inbox + '</aside></div>'
             + '<section id="career-attributes" class="career-panel">' + golfer_card(g, latest) + '</section>'
             + '<details class="career-details"><summary>Career details &amp; hand control back</summary>'
             + f'<p>Started {esc(wk(*v["started"]))}. Current date: {esc(wk(y, week))}.</p>'
-            + end_card(w, v) + scope_note() + '</details></div>')
+            + stint_history(v) + end_card(w, v) + scope_note() + '</details></div>')
     return 'Career', body
 
 
@@ -207,8 +210,19 @@ def readiness_card(v):
     return out
 
 
+
+def current_recaps(v):
+    """Never compare a newly selected golfer with their predecessor's recorded ratings."""
+    gid = (v.get('golfer') or {}).get('id')
+    rows = v.get('recaps', [])
+    if gid is None:
+        return rows
+    original = (v.get('stints') or [{'golfer_id': gid}])[0]['golfer_id']
+    return [r for r in rows if all(w.get('golfer_id', original) == gid for w in r.get('weeks', []))]
+
+
 def recap_card(v):
-    recaps = v.get('recaps', [])
+    recaps = current_recaps(v)
     if not recaps:
         return ('<section id="period-review" class="career-panel recap"><div class="eyebrow">Your story this season</div>'
                 '<h2>Your next chapter starts here</h2><p>Plan a period, then play it. Your tournament finishes, training gains and recovery '
@@ -340,7 +354,12 @@ def decisions_card(w, v):
     if not v['pending']:
         return '<h2>Decisions</h2><p class="muted">Nothing to decide now.</p>' + resolved_list(v)
     out = ['<h2>Decisions</h2>']
+    annual_ids = {d['id'] for d in (v.get('year_end') or {}).get('decisions', [])}
+    if annual_ids:
+        out.append('<p><a href="#annual-review">Make your season-transition choices above</a></p>')
     for d in v['pending']:
+        if d['id'] in annual_ids:
+            continue
         due = ('before ' + wk(*d['deadline']) + ' is played') if d['deadline'] else 'now'
         acts = ''
         if d['kind'] in ('plan', 'replan'):
@@ -395,8 +414,8 @@ def end_card(w, v):
 
 def scope_note():
     return ('<p class="muted">This first career build covers planning, entries, training and rest, offers, the work '
-            'pathway and saving. Season-end decisions, customization, switching golfers and hiring staff yourself come in '
-            'later builds: the career stops at the end of a season, where the golfer can be returned to AI control.</p>')
+            'pathway, saving and annual decisions. At the season review, continue this golfer, switch to a newcomer next year, or end player control. '
+            'Existing saves from earlier engines may be browse-only; an ended career is not automatically resumed.</p>')
 
 
 # ---- the planner ----------------------------------------------------------------------------------------------------
@@ -470,6 +489,11 @@ def plan_page(w, q):
         opts.append(f'<label class="plan-option"><input type="radio" name="w{n}" value="train"{tsel}{train_disabled} required> Focused training '
                     f'<small>Develop one part of your game. Changes are recorded in your period review.</small><select name="c{n}" aria-label="Training for week {n}"{train_disabled}>{catsel}</select></label>')
         opts.append(f'<label class="plan-option"><input type="radio" name="w{n}" value="rest"{rsel} required> Rest &amp; recover<small>Clear fatigue faster. No direct skill training this week.</small></label>')
+        work = o.get('work', {})
+        if work.get('available'):
+            work_selected = ' checked' if cur.get('kind') == 'work' else ''
+            opts.append(f'<label class="plan-option"><input type="radio" name="w{n}" value="work"{work_selected} required> Paid work '
+                        f'<small>Weekly wage: {money(work.get("wage"))}. No direct skill training this week.</small></label>')
         fb = cur.get('fallback') or {}
         fsel = lambda val: ' selected' if (fb.get('kind') == 'train' and val == f'train:{fb.get("category")}') or \
             (fb.get('kind') == 'rest' and val == 'rest') else ''
@@ -530,8 +554,8 @@ def plan_command(form, one):
                              'fallback': ({'kind': 'train', 'category': fb[6:]} if fb.startswith('train:') else {'kind': 'rest'})}
         elif val == 'train':
             weeks[str(n)] = {'kind': 'train', 'category': one(form, f'c{n}')}
-        elif val == 'rest':
-            weeks[str(n)] = {'kind': 'rest'}
+        elif val in ('rest', 'work'):
+            weeks[str(n)] = {'kind': val}
     return {'schema': 1, 'type': 'plan_block', 'block': [y, w0], 'weeks': weeks,
             'policy': {'selected': one(form, 'selected'), 'qualifying': one(form, 'qualifying')},
             'version': int(one(form, 'version')) if one(form, 'version') not in (None, '') else None}
