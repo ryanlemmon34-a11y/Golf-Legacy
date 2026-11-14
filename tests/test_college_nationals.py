@@ -49,6 +49,7 @@ class Stub(Season):
         self.ctx = NS(finishers=lambda sid, year: self._finishers[int(sid.rsplit('_', 1)[1])])
         # what update_fatigue reads (the injury clock)
         self.fatigue = defaultdict(float)
+        self.week_activity = {}
         self._week_load, self._week_event, self.week_rounds = {}, {}, {}
 
     def active_golfers(self):

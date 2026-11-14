@@ -1,11 +1,25 @@
 """Regression: practice incurs its existing load even when starting completely fresh."""
 import unittest
+from unittest import mock
 from tests.test_career_foundation import started, plan, golfer
 import career_fixture as F
 from golfsim import career as CA
 from golfsim.session import Session
 
 class TrainingFatigue(unittest.TestCase):
+    def test_retired_golfer_with_stale_training_is_not_updated(self):
+        s = started('retired-training-fatigue')
+        season, g, y = s.season, golfer(s), s.cursor['year']
+        g.lifestyle = 'retired'
+        season.fatigue[g.id] = g.fatigue = 0
+        season.week_activity[g.id] = 'train'
+        season._week_load.clear()
+        with mock.patch.object(season, 'active_golfers', return_value=season.world.golfers):
+            season.update_fatigue(y, 1)
+        self.assertEqual(g.fatigue, 0)
+        self.assertEqual(season.fatigue[g.id], 0)
+        s.close()
+
     def test_boundaries_sequences_and_forecast_parity(self):
         s = started('training-fatigue-boundary')
         g, season, y = golfer(s), s.season, s.cursor['year']

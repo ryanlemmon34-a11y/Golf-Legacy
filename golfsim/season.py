@@ -2556,6 +2556,8 @@ class Season:
             del self.injured[gid]                            # (fit for next week's entries)
         played = set(self._week_load)
         for g in self.active_golfers():                      # (retired golfers' fatigue was reset to 0)
+            if g.lifestyle == 'retired':
+                continue                                    # stale plans must not train retired golfers, even in a full-world walk
             f = self.fatigue[g.id]
             if g.id in played:
                 load = self._week_load[g.id]
