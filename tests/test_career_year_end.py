@@ -356,6 +356,48 @@ class PaidWork(unittest.TestCase):
         self.assertFalse([d for d in s.season.career.pending() if d['kind'] == 'unsupported'])
         s.close()
 
+    def test_the_monthly_plans_work_rule_also_opens_paid_work(self):
+        # a professional not under the three-month test whom the AI's monthly rule would still send to work (stuck,
+        # or money short and results not paying): Season.block_work_case, the AI planner's own rule, decides
+        s = at_review()
+        gid = s.season.career.golfer_id
+        g = s.season.g[gid]
+        g.status, g.tour = 'pro', 'MN_US_SUNBELT'
+        s._commit()
+        weeks = [1, 2, 3, 4]
+        with mock.patch.object(type(s.season), 'needs_paid_work', return_value=False):
+            with mock.patch.object(type(s.season), 'block_work_case', return_value=(True, 'stuck')):
+                self.assertEqual(CA.work_unavailable(s.season, g, 2029, True, weeks), '')
+            with mock.patch.object(type(s.season), 'block_work_case', return_value=(False, None)):
+                self.assertIn('short of money', CA.work_unavailable(s.season, g, 2029, True, weeks))
+        s.close()
+
+    def test_block_work_case_is_the_planners_rule(self):
+        # for every full-time professional of the world, the shared rule gives what the AI planner's search used
+        s = at_review()
+        se = s.season
+        seen = 0
+        for g in se.world.golfers:
+            if g.status != 'pro' or g.lifestyle != 'full_time':
+                continue
+            weeks = [49, 50, 51, 52]
+            eds = [e for e in se.cal.editions(2028) if e.week in weeks and not se.is_special(e.series)]
+            venues = se.venues(2028)
+            city = {e.event_id: venues[e.event_id][0].city for e in eds}
+            by_week = {w: [e for e in eds if e.week == w] for w in weeks}
+            from golfsim.geography import CITY_BY_NAME, COUNTRIES
+            lw = {w: {(COUNTRIES[CITY_BY_NAME[city[e.event_id]].country].region, e.series.tier) for e in by_week[w]}
+                  for w in weeks}
+            _, money0, base, costs, _, _, stuck = se._block_options(g, 2028, weeks, by_week, city, lw, {})
+            from golfsim import development as D
+            ins = se.staff.insight(g, 2028)
+            _, ev = se._plan_acts(g, 2028, 49, weeks, base, costs, money0, stuck, 'physical', ins,
+                                  D.perceived_gaps(g, ins))
+            self.assertEqual(se.block_work_case(g, 2028, weeks)[0], ev['can_work'])
+            seen += 1
+        self.assertGreater(seen, 0)
+        s.close()
+
     def test_an_amateur_cannot_plan_paid_work(self):
         s = at_review()
         decide(s, one(s, 'season_review'), 'keep')

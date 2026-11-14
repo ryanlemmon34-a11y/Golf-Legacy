@@ -3093,6 +3093,35 @@ class Season:
         stuck = (money0 < 0 and self.committed_weekly(g) > 0) or (eligible_any and not any(base))
         return options, money0, base, costs, avail, eligible_any, stuck
 
+    def _can_work(self, g, base, costs, money0, stuck):
+        """The paid-work rule of the monthly plan (pure): (expected prize kept per week, whether paid work weeks
+        are open to this golfer this block). Shared by the AI planner and the player's planner."""
+        prizes = [self.expected_kept(g, b[1].series) if b else 0.0 for b in base]
+        # Paid work only makes sense when money is genuinely short: funds would not last three
+        # months and their own results are not paying for their golf.
+        burn = FIN.weekly_living(g)[1] + (sum(costs) / max(1, sum(1 for b in base if b)))
+        # ... and they must earn if they cannot cover the next weeks' committed costs, or cannot
+        # afford any trip this month (otherwise a golfer just short of a trip would wait for ever).
+        can_work = (g.status == 'pro' and g.lifestyle == 'full_time'
+                    and (stuck or money0 < 13 * burn and sum(prizes) <= sum(costs)))
+        return prizes, can_work
+
+    def block_work_case(self, g, year, weeks):
+        """Whether the monthly plan's paid-work rule (_can_work) opens paid work to this golfer for these weeks of a
+        block, judged now exactly as the AI planner judges it (pure: the same option search, no draw, no change).
+        Returns (open, 'stuck' | 'short' | None)."""
+        if g.status != 'pro' or g.lifestyle != 'full_time':
+            return False, None
+        eds = [e for e in self.cal.editions(year) if e.week in weeks and not self.is_special(e.series)]
+        venues = self.venues(year)
+        city = {e.event_id: venues[e.event_id][0].city for e in eds}
+        by_week = {w: [e for e in eds if e.week == w] for w in weeks}
+        level_weeks = {w: {(COUNTRIES[CITY_BY_NAME[city[e.event_id]].country].region, e.series.tier)
+                           for e in by_week[w]} for w in weeks}
+        _, money0, base, costs, _, _, stuck = self._block_options(g, year, weeks, by_week, city, level_weeks, {})
+        _, can = self._can_work(g, base, costs, money0, stuck)
+        return can, ('stuck' if stuck else 'short') if can else None
+
     def _plan_acts(self, g, year, week0, weeks, base, costs, money0, stuck, cat, insight, gaps):
         """The plan search for one golfer's weeks (pure). Returns (an act per week, the evidence figures)."""
         age = g.age(year)
@@ -3111,14 +3140,7 @@ class Season:
         rest_rec = 0.40 + 0.30 * (1 - g.attrs['recovery_rate'] / 100)
         top100 = self.wr_pos.get(g.id, 9999) <= 100
         unit = FIN.money_unit(self.funds(g, year))
-        prizes = [self.expected_kept(g, b[1].series) if b else 0.0 for b in base]
-        # Paid work only makes sense when money is genuinely short: funds would not last three
-        # months and their own results are not paying for their golf.
-        burn = FIN.weekly_living(g)[1] + (sum(costs) / max(1, sum(1 for b in base if b)))
-        # ... and they must earn if they cannot cover the next weeks' committed costs, or cannot
-        # afford any trip this month (otherwise a golfer just short of a trip would wait for ever).
-        can_work = (g.status == 'pro' and g.lifestyle == 'full_time'
-                    and (stuck or money0 < 13 * burn and sum(prizes) <= sum(costs)))
+        prizes, can_work = self._can_work(g, base, costs, money0, stuck)
         work_v = min(20.0, FIN.WORK_WAGE / unit) if can_work else -1.0
         if can_work and stuck:
             work_v = 40.0

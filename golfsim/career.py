@@ -260,30 +260,36 @@ def explain_ineligible(season, g, s, week):
     return 'not open to this golfer'
 
 
-def work_unavailable(season, g, year, planning=True):
-    """Why the golfer may not plan a week of paid work ('' if they may): the engine's own rule -- a full-time
-    professional whose funds would not cover three months of living costs (Season.needs_paid_work), the same test
-    the AI planner's paid work rests on. Once planned, a work week stands (as the AI's planned work weeks do) even if
-    a prize arrives meanwhile; it is paid WORK_WAGE, like any golfer's."""
+def work_unavailable(season, g, year, planning=True, weeks=None):
+    """Why the golfer may not plan a week of paid work ('' if they may): the engine's own rules -- a full-time
+    professional whose funds would not cover three months of living costs (Season.needs_paid_work), or for whom the
+    monthly plan's paid-work rule opens work this block (Season.block_work_case: money short and results not paying
+    for their golf, or stuck -- unable to afford any trip or their committed costs), exactly as the AI planner
+    judges it. Once planned, a work week stands (as the AI's planned work weeks do) even if a prize arrives
+    meanwhile; it is paid WORK_WAGE, like any golfer's."""
     if g.status != 'pro' or g.lifestyle != 'full_time':
         return 'only a full-time professional takes paid work weeks (amateurs and part-time professionals have jobs)'
-    if planning and not season.needs_paid_work(g, year):
-        return ('paid work is for a professional whose money would not cover three months of living costs; '
-                'yours does')
-    return ''
+    if not planning or season.needs_paid_work(g, year):
+        return ''
+    if weeks and season.block_work_case(g, year, list(weeks))[0]:
+        return ''
+    return ('paid work is for a professional short of money (funds under three months of living costs, or unable '
+            'to pay for their golf this period); yours is not')
 
 
 def check_choice(season, g, year, week, ch, planning=False):
     """('ok' | 'injured' | 'invalid', reason) for one week's choice, judged now by the engine's own rules
-    (planning: as the plan is made; otherwise as a planned week is about to be played)."""
+    (planning: as the plan is made -- the block's open weeks, or True; otherwise as a planned week is about to be
+    played)."""
     if not isinstance(ch, dict):
         return 'invalid', 'no choice for this week'
     kind = ch.get('kind')
     inj = injured_until(season, g.id, year, week)
     if kind == 'rest':
         return 'ok', ''
-    if kind == 'work':                                 # paid work: the AI's rule (Season.needs_paid_work) decides who
-        why = work_unavailable(season, g, year, planning)   # may; an injured golfer does light work, as the AI's do
+    if kind == 'work':                                 # paid work: the AI's rules decide who may; an injured golfer
+        why = work_unavailable(season, g, year, bool(planning),     # does light work, as the AI's do
+                               planning if isinstance(planning, (list, tuple)) else None)
         return ('invalid', why) if why else ('ok', '')
     if kind not in ('train', 'event'):
         return 'invalid', 'unknown choice'
@@ -716,7 +722,7 @@ def _plan_block(season, c, cursor, action):
     errors = []
     for w in weeks:
         ch = given.get(w)
-        code, why = check_choice(season, g, y, w, ch, planning=True)
+        code, why = check_choice(season, g, y, w, ch, planning=weeks)
         if code == 'injured':
             errors.append(f'week {w}: {why}; choose rest')
         elif code == 'invalid':
@@ -906,7 +912,7 @@ def choice_text(season, year, ch):
             + ('rest' if fb['kind'] == 'rest' else f'train {CATEGORY_LABEL[fb["category"]].lower()}') + ')')
 
 
-def week_options(season, g, year, week):
+def week_options(season, g, year, week, weeks=None):
     """What the golfer could do in one week, judged now by the engine's rules: events open to entry (eligible or not,
     with the reason; cost and whether it is affordable now) and the week's rule-selected events (not entered: covered
     by the period's policy)."""
@@ -936,7 +942,8 @@ def week_options(season, g, year, week):
                 row['why'] = f'costs ${cost:,.0f}; ${max(0.0, money):,.0f} available for golf'
         events.append(row)
     from .finance import WORK_WAGE
-    why = work_unavailable(season, g, year)
+    w0 = block_start(week)
+    why = work_unavailable(season, g, year, weeks=[x for x in block_weeks(w0) if x >= week] if weeks is None else weeks)
     return {'week': week, 'events': events, 'selected': selected, 'money': round(money, 2),
             'injured_until': inj, 'work': {'available': not why, 'wage': WORK_WAGE, 'why': why}}
 
@@ -1081,8 +1088,9 @@ def planner(season, cursor, year, w0):
         raise CareerError(f'Weeks {w0}–{block_weeks(w0)[-1]} of {year} cannot be planned now.')
     p = c.plans.get((year, w0))
     weeks = []
-    for w in open_weeks(cursor, w0):
-        o = week_options(season, g, year, w)
+    ow = open_weeks(cursor, w0)
+    for w in ow:
+        o = week_options(season, g, year, w, ow)
         o['current'] = p['weeks'].get(w) if p else None
         weeks.append(o)
     return {'block': [year, w0], 'weeks': weeks, 'policy': dict(p['policy']) if p else None,
