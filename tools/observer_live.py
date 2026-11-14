@@ -161,8 +161,9 @@ def capture(session):
     if car is None and c0['phase'] == 'start' and c0['week'] == 1 and c0['year'] == s.first_year + 1:
         n = sum(1 for r in s.creations.get(c0['year'], {}).values() if r.get('path') == 'junior')
         career_can_start = {'year': c0['year'], 'class_size': n} if n else None
+    career_start = CA.start_view(s, session.cursor) if car is None else None   # the newcomers to choose from
     view = LiveView(
-        career=career, career_planner=career_planner, career_can_start=career_can_start,
+        career=career, career_planner=career_planner, career_can_start=career_can_start, career_start=career_start,
         world_id=session.state.get('world_id'), seed=session.state.get('seed', getattr(s, 'seed', None)),
         cursor=session.cursor, generation=session.generation, history_generation=session.history_generation,
         history_years=sorted(archived), weeks_played=session.state.get('weeks_played'), engine=meta.get('engine'), commit=meta.get('commit'),

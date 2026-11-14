@@ -1,0 +1,24 @@
+{
+ "command": {
+  "schema": 1,
+  "type": "new_career",
+  "golfer": "1009"
+ },
+ "expected_cursor": {
+  "year": 2028,
+  "week": 1,
+  "phase": "start"
+ },
+ "result": {
+  "ok": true,
+  "golfer": 1009,
+  "name": "Nick Marsh"
+ },
+ "entry": {
+  "kind": "junior",
+  "class": 2028,
+  "class_size": 287,
+  "candidates": 10,
+  "rule": "chosen by the player from a seeded sample of the season's junior class"
+ }
+}

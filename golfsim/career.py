@@ -632,23 +632,60 @@ def _answer_year_end(season, c, d, cursor, answer):
 
 # ---- commands -----------------------------------------------------------------------------------------------------------
 
+def _start_class(season, y):
+    return sorted(gid for gid, r in season.creations.get(y, {}).items()
+                  if r.get('path') == 'junior' and gid in season.g and season.g[gid].lifestyle != 'retired')
+
+
+def start_view(season, cursor):
+    """Before a career: the newcomers the player may start as now (docs/career/INITIAL_SELECTION.md), or None when no
+    career can start here (a career exists, the cursor is not a season's 1 January, or there is no junior class yet).
+    The candidates are career.candidates(season, year) -- the same seeded sample of the genuine class as the annual
+    newcomer choice -- with the same public facts. Read only: no golfer is created, no draw of the world is made."""
+    if getattr(season, 'career', None) is not None:
+        return None
+    if cursor['phase'] != 'start' or cursor['week'] != 1:
+        return None
+    y = cursor['year']
+    cls = _start_class(season, y)
+    if not cls:
+        return None
+    ids = candidates(season, y)
+    choices = [{'key': str(i), 'label': season.g[i].name, 'facts': candidate_facts(season, season.g[i], y)}
+               for i in ids]
+    return {'year': y, 'cursor': dict(cursor), 'class_size': len(cls), 'options': [x['key'] for x in choices],
+            'choices': choices, 'candidates': [dict(x['facts']) for x in choices],
+            'text': f'Choose who to play as from {y}: one of {len(ids)} juniors entering the world this season (a fixed '
+                    f'draw from the class of {len(cls)}; the others carry on under AI control).'}
+
+
 def new_career(season, cursor, action):
-    """Take control of one genuine newcomer: a member of the junior class the normal entrant rules created for this
-    season, picked by a seeded uniform draw over the class (no ability, potential or other hidden fact is read). No
-    golfer is created; the person already exists in the world."""
+    """Take control of one genuine newcomer of this season's junior class (the normal entrant rules created it; no
+    golfer is created here; no ability, potential or other hidden fact is read):
+    * {'golfer': '<id>'}: the player's choice among start_view's candidates (the same seeded sample as the annual
+      newcomer choice);
+    * no 'golfer' (the original command): a seeded uniform draw over the whole class, as before."""
     if getattr(season, 'career', None) is not None:
         raise CareerError('This world already has a career. One career per world in this build.')
     if cursor['phase'] != 'start' or cursor['week'] != 1:
         raise CareerError('A career starts on 1 January of a season, before anything of that season has been played.')
     y = cursor['year']
-    cls = sorted(gid for gid, r in season.creations.get(y, {}).items()
-                 if r.get('path') == 'junior' and gid in season.g and season.g[gid].lifestyle != 'retired')
+    cls = _start_class(season, y)
     if not cls:
         raise CareerError(f'There is no newcomer class for {y} yet: a world creates its first one at the end of its '
                           'first season.')
-    pick = random.Random(f'{season.seed}:career:newcomer:{y}').choice(cls)
-    c = Career(pick, y, 1, {'kind': 'junior', 'class': y, 'class_size': len(cls),
-                            'rule': 'a seeded uniform draw over the season\'s junior class'})
+    if 'golfer' in action:
+        ids = candidates(season, y)
+        if not isinstance(action['golfer'], str) or action['golfer'] not in [str(i) for i in ids]:
+            raise CareerError('Choose one of the newcomers offered for this season.')
+        pick = int(action['golfer'])
+        entry = {'kind': 'junior', 'class': y, 'class_size': len(cls), 'candidates': len(ids),
+                 'rule': 'chosen by the player from a seeded sample of the season\'s junior class'}
+    else:
+        pick = random.Random(f'{season.seed}:career:newcomer:{y}').choice(cls)
+        entry = {'kind': 'junior', 'class': y, 'class_size': len(cls),
+                 'rule': 'a seeded uniform draw over the season\'s junior class'}
+    c = Career(pick, y, 1, entry)
     g = season.g[pick]
     c.note(y, 1, 'start', f'You now control {g.name}, one of the {len(cls)} juniors who entered the world for {y}.')
     season.career = c
