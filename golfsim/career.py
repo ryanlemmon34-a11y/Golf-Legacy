@@ -805,7 +805,7 @@ def readiness(season, g, year, week):
     f = season.fatigue.get(g.id, 0.0)
     inj = injured_until(season, g.id, year, week)
     rest = f * (0.40 + 0.30 * (1 - g.attrs['recovery_rate'] / 100)) if f else 0.0
-    train = 0.85 * f + 0.02 * (1.4 - 0.8 * g.attrs['stamina'] / 100) if f else 0.0
+    train = 0.85 * f + 0.02 * (1.4 - 0.8 * g.attrs['stamina'] / 100)
     rest, train = (x if x > 0.005 else 0.0 for x in (rest, train))
     enabled = bool(season.development and g.ceilings)
     label = 'Recovering from injury' if inj else 'Rest would help' if f > 0.2 else 'Ready to train or compete'

@@ -2578,7 +2578,7 @@ class Season:
                     f = 1 - (1 - 0.9 * f) * (1 - min(0.9, load))
             elif f and self.week_activity.get(g.id) == 'work':
                 f *= 0.8
-            elif f and self.week_activity.get(g.id) == 'train':
+            elif self.week_activity.get(g.id) == 'train':
                 f = 0.85 * f + 0.02 * (1.4 - 0.8 * g.attrs['stamina'] / 100)    # practice is lighter work
             elif f:
                 f *= 0.40 + 0.30 * (1 - g.attrs['recovery_rate'] / 100)

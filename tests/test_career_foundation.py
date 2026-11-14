@@ -21,15 +21,13 @@ from golfsim import staff as ST                                        # noqa: E
 from golfsim.season import Season                                      # noqa: E402
 from golfsim.session import Session, StaleCursor, UnsupportedCareer    # noqa: E402
 
-# digests of the fixture world (all AI) after its first season, and after 12 more weeks advanced one committed week
-# at a time, under the engine this integration build builds on: the realism test build 52870f5 (engine of 7e88aa2:
-# dev-3 rules for new worlds, the long-irons table of rules 2026-11-16, standing-based seeded money), computed with
-# the same procedure on 52870f5 itself (docs/career/INTEGRATION.md). The career branch's earlier reference, main
-# 18a8e23 + the engine fix (4d9be6cb...2097 and 1ce30676...e7a), cannot hold here: the long-irons table changes play
-# in every world, whatever its development rules (a dev-1 fixture gives 360fed3a...a165 on both 52870f5 and this
-# build).
-MAIN_SEASON1 = 'c6230d8ec521c39b53e8829585ddb3e59ff646e1f795b2e67130150dc233c25b'
-MAIN_2028_W12 = '80ad8e6f1cbccef2a72a6e323de52bb675da401a455808cca11a0908df54b8a9'
+# All-AI golden digests for this integration engine, including the approved training-fatigue
+# zero-boundary correction. Practice now incurs its existing load when fatigue starts at zero.
+# This intentionally changes future AI simulation outcomes; coefficients and random draw sites
+# are unchanged. Recomputed from seed 11 / scale .05 (career_fixture.first_boundary), then
+# twelve advance_one_week calls. Pre-fix realism reference hashes remain documented in INTEGRATION.md.
+MAIN_SEASON1 = 'b9eeaa015d2f437b9c4d2518ca86e8f20b51a3f41811e686c9864b551258b6aa'
+MAIN_2028_W12 = '507d5fe46238ea772fd79455cdae4616e9ba316575a8dca112bd8b922a02f311'
 
 REST = {'kind': 'rest'}
 POLICY = {'selected': 'accept', 'qualifying': 'skip'}
@@ -65,10 +63,9 @@ def golfer(s):
 
 
 class AllAI(unittest.TestCase):
-    def test_all_ai_worlds_equal_main(self):
-        """Without a career the engine and session behave exactly as the engine this build builds on (the realism
-        test build 52870f5, dev-3): the same world after a season and after twelve more weeks advanced one committed
-        week at a time."""
+    def test_all_ai_worlds_match_corrected_engine_baseline(self):
+        """Without a career, the corrected engine reproduces its golden world after a season and
+        twelve more committed weeks. This is a deterministic regression, not pre-fix engine equivalence."""
         s = Session.open(F.copy_of(F.first_boundary()))
         self.assertEqual(F.digest(s), MAIN_SEASON1)
         for _ in range(12):

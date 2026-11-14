@@ -89,7 +89,7 @@ class CareerFeedback(unittest.TestCase):
         self.assertLess(r['rest_after'], r['train_after'])
         s.season.fatigue[g.id] = 0
         r = CA.readiness(s.season, g, s.cursor['year'], 1)
-        self.assertEqual(r['train_after'], 0)
+        self.assertAlmostEqual(r['train_after'], .02 * (1.4 - .8 * g.attrs['stamina'] / 100), places=3)
         s.close()
 
 if __name__ == '__main__':

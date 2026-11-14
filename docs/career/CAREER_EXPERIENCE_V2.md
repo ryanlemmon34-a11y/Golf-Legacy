@@ -28,3 +28,11 @@ Recorded overall changes are rounded to three decimals and source contributions 
 ## Suggested acceptance pass
 
 Open an existing career, plan an event/training/rest period, advance it, and compare the review with the linked event result. Verify a new career's empty state, pending decision controls, planner cancellation, narrow/desktop layouts and both themes. Existing saves will need one newly played week before feedback appears.
+
+## Training fatigue zero-boundary correction
+
+The approved follow-up removes the positive-fatigue prerequisite from training only. Training now uses `0.85 * fatigue + 0.02 * (1.4 - 0.8 * stamina / 100)` even from zero, and the readiness forecast uses the same formula. The existing coefficients, small-value cutoff, rest/work/tournament behavior and random draw sites are unchanged.
+
+This applies to AI and controlled golfers alike. Future trajectories may differ from pre-fix runs; replaying the corrected engine remains deterministic. Existing saves keep their recorded historical values and accrue corrected fatigue from the next training week. No past fatigue or recap is reconstructed.
+
+Regression tests cover zero and nonzero starts, stamina extremes, consecutive training, rest recovery, actual-versus-forecast parity, saved weekly feedback, and save/reload determinism. All-AI golden digests were explicitly regenerated for this intentional engine correction rather than falsely asserting equivalence with the old engine.
