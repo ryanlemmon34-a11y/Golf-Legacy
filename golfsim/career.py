@@ -21,6 +21,7 @@ Design and boundaries: docs/career/PHASE_AB_PLAN.md. In short:
 from __future__ import annotations
 
 import random
+import copy
 
 FORMAT = 1                  # the career record's format: a save with a newer one is refused, never guessed at
 SCHEMA = 1                  # the command payloads' schema
@@ -74,6 +75,7 @@ class Career:
         self.decisions = {}                   # id -> decision (pending, accepted, declined, withdrawn, closed)
         self.notices = []                     # information only, newest last
         self.log = []                         # (year, week, what the player did)
+        self.weekly_recaps = {}               # observation only, (year, week) -> played-week evidence
 
     # ---- reading -------------------------------------------------------------------------------------------------
     def controls(self, gid):
@@ -654,12 +656,13 @@ def view(season, cursor):
     inj = injured_until(season, g.id, y, w)
     golfer = {'id': g.id, 'name': g.name, 'country': g.country, 'age': g.age(y), 'status': g.status,
               'lifestyle': g.lifestyle, 'tour': t.name if t else (g.tour or '—'), 'tour_key': g.tour,
-              'overall': round(g.overall, 1), 'attrs': attrs, 'prestige': round(season.player_prestige(g.id), 1),
+              'overall': round(g.overall, 1), 'overall_exact': round(g.overall, 3),
+              'attrs_exact': {k: round(x, 3) for k, x in g.attrs.items()}, 'attrs': attrs, 'prestige': round(season.player_prestige(g.id), 1),
               'world_rank': season.wr_pos.get(g.id), 'amateur_rank': season.am_pos.get(g.id),
               'funds': round(season.funds(g, y), 2), 'spendable': round(season.spendable(g, y), 2),
               'coach': coach.name if coach else None, 'coach_id': coach.id if coach else None,
               'caddie': caddie.name if caddie else None, 'caddie_id': caddie.id if caddie else None,
-              'injured_until': inj, 'fatigue': round(season.fatigue.get(g.id, 0.0), 1),
+              'injured_until': inj, 'fatigue': round(season.fatigue.get(g.id, 0.0), 4),
               'played': len(season.played.get(y, {}).get(g.id, ())),
               'activity': dict(season.activity_counts.get(y, {}).get(g.id, {}))}
     blocks = []
@@ -681,7 +684,8 @@ def view(season, cursor):
             'plan_next': plan_now,
             'pending': [dict(d) for d in c.pending()],
             'resolved': [dict(d) for d in c.decisions.values() if d['status'] != 'pending'][-10:],
-            'notices': list(c.notices[-20:]), 'log': list(c.log[-20:])}
+            'notices': list(c.notices[-20:]), 'log': list(c.log[-20:]),
+            'recaps': period_recaps(c), 'readiness': readiness(season, g, y, w)}
 
 
 def planner(season, cursor, year, w0):
@@ -698,3 +702,122 @@ def planner(season, cursor, year, w0):
         weeks.append(o)
     return {'block': [year, w0], 'weeks': weeks, 'policy': dict(p['policy']) if p else None,
             'categories': [(k, CATEGORY_LABEL[k]) for k in CATEGORIES], 'version': c.version}
+
+
+# ---- recorded career feedback (observation only, never read by simulation decisions) -------------------------------
+
+def _snapshot(season, g, year):
+    from .ratings import ATTRIBUTE_KEYS
+    return {'overall': round(g.overall, 3), 'attrs': {k: round(g.attrs[k], 3) for k in ATTRIBUTE_KEYS},
+            'fatigue': round(season.fatigue.get(g.id, 0.0), 4),
+            'funds': round(season.funds(g, year), 2), 'cash': round(g.cash, 2)}
+
+
+def begin_week_feedback(season, year, week):
+    """Read only the controlled golfer, before the prepared week runs. No random draws or accumulator creation."""
+    from . import development as D
+    c = getattr(season, 'career', None)
+    if c is None or c.status != 'active':
+        return None
+    g = season.g.get(c.golfer_id)
+    if g is None:
+        return None
+    return {'before': _snapshot(season, g, year),
+            'acc': list(season.dev_acc.get(year, {}).get(g.id, [0.0] * D.ACC_LEN)),
+            'planned': choice_text(season, year, c.choice(year, week))}
+
+
+def finish_week_feedback(season, year, week, before, event_ids):
+    """Persist actual outcomes. Older saves start recording here; no invented historical deltas."""
+    if before is None:
+        return
+    from . import development as D
+    c = season.career
+    g = season.g[c.golfer_id]
+    rows = []
+    series = {s.series_id: s for s in season.cal.series}
+    for eid in event_ids:
+        r = season.results[eid]
+        ser = series.get(r.series_id)
+        for site, finish in enumerate(r.finish):
+            mine = next((x for x in finish if x[0] == g.id), None)
+            if mine is None:
+                continue
+            _, pos, total = mine
+            scores = getattr(r, 'scores', [])
+            prizes = getattr(r, 'prizes', [])
+            points = getattr(r, 'points', [])
+            rounds = scores[site].get(g.id) if site < len(scores) else None
+            rows.append({'id': eid, 'name': ser.name if ser else eid, 'position': pos, 'score': total,
+                         'rounds': list(rounds) if rounds is not None else None,
+                         'prize': prizes[site].get(g.id, 0.0) if site < len(prizes) else None,
+                         'points': points[site].get(g.id, 0.0) if site < len(points) else None,
+                         'field': len(finish), 'site': site, 'match_play': bool(ser and ser.match_play),
+                         'tied': pos is not None and sum(1 for _, p, _ in finish if p == pos) > 1,
+                         'finish_label': ('Winner' if pos == 1 else f'Finished {pos}' if pos is not None
+                                          else 'Out before the final bracket' if ser and ser.match_play else 'Missed cut')})
+    current = season.dev_acc.get(year, {}).get(g.id, [0.0] * D.ACC_LEN)
+    development = {}
+    for i, source in enumerate(D.SOURCES):
+        development[source] = {
+            'overall': round(current[D.OVERALL + i] - before['acc'][D.OVERALL + i], 4),
+            'categories': {cat: round(current[i * 5 + j] - before['acc'][i * 5 + j], 4)
+                           for j, cat in enumerate(D.CATS)}}
+    action, category = season.plans.get(g.id, {}).get(week, ('rest', None))
+    actual = season.week_activity.get(g.id, 'not recorded')
+    rec = {'year': year, 'week': week, 'activity': actual, 'planned': before['planned'],
+           'training_category': category if actual == 'train' else None,
+           'before': before['before'], 'after': _snapshot(season, g, year), 'events': rows,
+           'development': development,
+           'development_recorded': bool(season.development and g.ceilings),
+           'injuries': [dict(x) for x in season.injury_episodes(year).get(g.id, []) if x['week'] == week]}
+    if not hasattr(c, 'weekly_recaps'):
+        c.weekly_recaps = {}
+    c.weekly_recaps[(year, week)] = rec
+
+
+def period_recaps(c):
+    """Public, copied period evidence. Partial old-save/unfinished blocks are explicitly identified."""
+    grouped = {}
+    for (year, week), rec in sorted(getattr(c, 'weekly_recaps', {}).items()):
+        grouped.setdefault((year, block_start(week)), []).append(copy.deepcopy(rec))
+    out = []
+    for (year, first), rows in sorted(grouped.items(), reverse=True):
+        sums = {}
+        for row in rows:
+            for source, change in row['development'].items():
+                d = sums.setdefault(source, {'overall': 0.0, 'categories': {}})
+                d['overall'] += change['overall']
+                for cat, value in change['categories'].items():
+                    d['categories'][cat] = d['categories'].get(cat, 0.0) + value
+        for d in sums.values():
+            d['overall'] = round(d['overall'], 4)
+            d['categories'] = {k: round(v, 4) for k, v in d['categories'].items()}
+        out.append({'year': year, 'start_week': first, 'end_week': min(52, first + BLOCK - 1),
+                    'complete': [r['week'] for r in rows] == block_weeks(first), 'weeks': rows,
+                    'before': rows[0]['before'], 'after': rows[-1]['after'], 'development': sums,
+                    'recorded_weeks': [r['week'] for r in rows]})
+    return out
+
+
+def readiness(season, g, year, week):
+    """Transparent fatigue guidance from the actual end-of-week formulas, never hidden potential."""
+    f = season.fatigue.get(g.id, 0.0)
+    inj = injured_until(season, g.id, year, week)
+    rest = f * (0.40 + 0.30 * (1 - g.attrs['recovery_rate'] / 100)) if f else 0.0
+    train = 0.85 * f + 0.02 * (1.4 - 0.8 * g.attrs['stamina'] / 100) if f else 0.0
+    rest, train = (x if x > 0.005 else 0.0 for x in (rest, train))
+    enabled = bool(season.development and g.ceilings)
+    label = 'Recovering from injury' if inj else 'Rest would help' if f > 0.2 else 'Ready to train or compete'
+    detail = ('An injury currently prevents tournament entry. Follow the recovery window.' if inj else
+              'Fatigue is above 20%; the engine reduces distance and increases physical tiredness during play. '
+              'A rest week clears more fatigue than training.' if f > 0.2 else
+              'Fatigue is at or below 20%, so there is no season-fatigue performance penalty. ' +
+              ('Training builds skills; competition also develops the mental game.' if enabled else
+               'Attribute development is not enabled for this golfer in this world.'))
+    return {'label': label, 'detail': detail, 'fatigue': round(f, 4), 'performance_threshold': 0.2,
+            'rest_after': round(rest, 4), 'train_after': round(train, 4), 'injured_until': inj,
+            'forecast_note': 'Next-week fatigue if you only rest or train, with no tournament. Estimates are not an automatic plan.',
+            'training_note': 'Weekly changes can be small. Recorded training gains are separated from natural maturing, '
+                             'tournament development and injury changes.',
+            'part_time_training': g.lifestyle == 'part_time', 'training_enabled': enabled}

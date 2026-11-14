@@ -17,6 +17,90 @@ CATS = (('physical', 'Physical'), ('long_game', 'Long game'), ('short_game', 'Sh
 LABEL = dict(CATS)
 
 
+STYLE = '''<style>
+.career-hub { --career-gold:#b08a3e; }
+.career-hub h2 { margin:0 0 14px; } .career-hub h3 { margin:0 0 8px; }
+.career-hero { display:flex; justify-content:space-between; align-items:center; gap:28px; padding:26px 30px;
+ background:linear-gradient(110deg,var(--soft),var(--panel)); border:1px solid var(--line); border-top:4px solid var(--accent); border-radius:12px; }
+.career-hero h2 { font-size:34px; letter-spacing:-.04em; margin:7px 0; }
+.career-hero p { margin:6px 0 12px; color:var(--muted); }
+.eyebrow { font-size:10px; font-weight:750; text-transform:uppercase; letter-spacing:.14em; color:var(--muted); margin-bottom:8px; }
+.career-overall { display:flex; flex-direction:column; min-width:170px; text-align:center; border-left:1px solid var(--line); padding-left:24px; }
+.career-overall > span { font-size:11px; text-transform:uppercase; letter-spacing:.1em; color:var(--muted); }
+.career-overall strong { font-size:48px; line-height:1.2; color:var(--accent); font-variant-numeric:tabular-nums; }
+.career-overall small { font-size:11px; color:var(--muted); }
+.career-nav { display:flex; flex-wrap:wrap; gap:8px; margin:18px 0 24px; }
+.career-nav a { font-size:13px; font-weight:650; padding:8px 14px; border-radius:6px; background:var(--panel); border:1px solid var(--line); }
+.career-dashboard { display:grid; grid-template-columns:minmax(0,2.2fr) minmax(300px,1fr); align-items:start; gap:22px; }
+.career-main, .career-aside { min-width:0; }
+.career-panel { border:1px solid var(--line); background:var(--panel); border-radius:10px; padding:22px; margin:0 0 22px; scroll-margin-top:120px; }
+.career-panel > p:first-of-type { margin-top:8px; }
+.section-heading { display:flex; align-items:center; flex-wrap:wrap; justify-content:space-between; gap:12px; margin-bottom:16px; }
+.section-heading h2 { margin:0; } .section-heading > a { font-size:12px; }
+.status-pill { border:1px solid var(--line); padding:4px 9px; border-radius:20px; font-size:11px; color:var(--muted); }
+.recap-stats { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:1px; background:var(--line); border:1px solid var(--line); border-radius:8px; overflow:hidden; margin:18px 0; }
+.career-stat { background:var(--soft); padding:14px; display:flex; flex-direction:column; min-width:0; }
+.career-stat > span { font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
+.career-stat strong { font-size:22px; font-weight:650; margin:4px 0; font-variant-numeric:tabular-nums; white-space:normal; }
+.career-stat small { font-size:10px; color:var(--muted); }
+.week-review { display:flex; gap:16px; padding:18px 0; border-bottom:1px solid var(--line); }
+.week-review:last-child { border-bottom:0; }
+.week-stamp { flex:0 0 42px; height:42px; display:grid; place-items:center; border:1px solid var(--line); background:var(--soft); color:var(--accent); font-size:12px; font-weight:750; border-radius:8px; }
+.week-story { min-width:0; flex:1; } .week-story h3 { font-size:15px; }
+.week-story p { font-size:12px; margin:5px 0; }
+.week-outcomes { font-variant-numeric:tabular-nums; } .week-outcomes > span { padding:0 5px; }
+.result-row { display:flex; align-items:center; gap:14px; margin:9px 0; }
+.result-row a { font-weight:650; } .result-place { background:var(--soft); border-radius:6px; padding:8px; color:var(--accent); font-size:20px; min-width:52px; text-align:center; }
+.career-panel .fine-print { font-size:11px; padding-top:12px; border-top:1px solid var(--line); }
+.career-empty { border:1px dashed var(--line); border-radius:8px; padding:35px 20px; margin:20px 0; text-align:center; color:var(--muted); background:var(--soft); }
+.career-history { padding-top:16px; margin-top:16px; border-top:1px solid var(--line); }
+.career-history > summary { color:var(--accent); font-weight:650; font-size:13px; }
+.career-details { margin:18px 0; border:1px solid var(--line); border-radius:8px; padding:16px; background:var(--panel); }
+.career-details > summary { font-size:13px; font-weight:650; } .career-details[open] > summary { margin-bottom:18px; }
+.fatigue-number { font-size:38px; font-weight:650; font-variant-numeric:tabular-nums; }
+.fatigue-number span { font-size:12px; font-weight:400; color:var(--muted); margin-left:6px; }
+.readiness meter { display:block; width:100%; height:16px; margin:8px 0 3px; accent-color:var(--accent); }
+.meter-labels { display:flex; justify-content:space-between; color:var(--muted); font-size:10px; }
+.readiness p, .readiness details { font-size:12px; }
+.recovery-options { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:16px 0; }
+.recovery-options .career-stat { border-radius:6px; padding:10px; }
+.recovery-options strong { font-size:19px; }
+.career-money { font-size:26px; font-weight:650; margin-top:18px; }
+.career-money span { display:block; font-size:11px; color:var(--muted); font-weight:400; text-transform:uppercase; }
+.career-aside .kv { font-size:12px; } .career-aside p.muted { font-size:11px; }
+.career-aside .scroll table { min-width:0; width:100%; } .career-aside .scroll td { font-size:11px; padding:6px; }
+.career-ratings { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:18px; }
+.attribute-card { border:1px solid var(--line); border-radius:8px; padding:16px; background:var(--soft); }
+.attribute-card h3 { font-size:11px; text-transform:uppercase; letter-spacing:.1em; color:var(--muted); padding-bottom:12px; border-bottom:1px solid var(--line); }
+.attribute-row { display:grid; grid-template-columns:minmax(0,1fr) 40px 48px; gap:6px; padding:9px 0; align-items:center; font-size:12px; }
+.attribute-row strong { text-align:right; font-size:14px; font-variant-numeric:tabular-nums; }
+.attribute-delta { text-align:right; font-size:10px; }
+.attribute-track { grid-column:1 / -1; height:4px; border-radius:4px; background:var(--line); overflow:hidden; }
+.attribute-track i { display:block; height:100%; background:var(--accent); opacity:.65; border-radius:4px; }
+.career-hub .filters { margin-bottom:0; }
+.career-hub .scroll table { min-width:0; width:100%; }
+.planner-intro { display:flex; align-items:center; justify-content:space-between; gap:20px; }
+.planner-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; margin:22px 0; }
+.planner-week { border:1px solid var(--line); border-radius:10px; background:var(--panel); padding:20px; min-width:0; }
+.planner-week legend { font-weight:750; padding:0 8px; color:var(--accent); }
+.plan-option { display:block; border:1px solid var(--line); border-radius:7px; padding:11px; margin:8px 0; cursor:pointer; }
+.plan-option:has(input:checked) { border-color:var(--accent); background:var(--hover); }
+.plan-option input { min-height:0; accent-color:var(--accent); margin-right:6px; }
+.plan-option small { display:block; margin:5px 0 0 23px; color:var(--muted); font-size:11px; }
+.plan-option select { margin-top:8px; width:100%; }
+.planner-fallback { border-top:1px solid var(--line); margin-top:14px; padding-top:14px; font-size:12px; }
+.planner-fallback select { display:block; width:100%; margin-top:6px; }
+.planner-policies { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+.planner-policies fieldset { border:1px solid var(--line); border-radius:8px; padding:15px; min-width:0; }
+.planner-policies legend { font-size:12px; font-weight:650; } .planner-policies label { display:block; font-size:12px; margin:8px 0; }
+.planner-policies input { min-height:0; }
+.planner-save { display:flex; align-items:center; gap:18px; border-top:1px solid var(--line); padding-top:20px; margin-top:22px; }
+@media(min-width:2100px){ .career-dashboard { grid-template-columns:minmax(0,3fr) minmax(340px,1fr); } .career-ratings { grid-template-columns:repeat(6,minmax(0,1fr)); } }
+@media(max-width:1250px){ .career-dashboard { grid-template-columns:minmax(0,1fr) 300px; } .recap-stats { grid-template-columns:repeat(2,minmax(0,1fr)); } .career-ratings { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media(max-width:950px){ .career-dashboard { grid-template-columns:1fr; } .career-aside { display:grid; grid-template-columns:1fr 1fr; gap:18px; } .career-aside #career-inbox { grid-column:1 / -1; } }
+@media(max-width:650px){ .career-hero { padding:20px; align-items:flex-start; } .career-hero h2 { font-size:24px; } .career-overall { min-width:95px; padding-left:12px; } .career-overall strong { font-size:32px; } .career-overall small { display:none; } .career-panel { padding:16px; } .career-ratings,.planner-grid,.planner-policies,.career-aside { grid-template-columns:1fr; } .career-aside #career-inbox { grid-column:auto; } .planner-intro { display:block; } }
+</style>'''
+
 def money(x):
     return f'${x:,.0f}' if x is not None else '—'
 
@@ -44,25 +128,156 @@ def career_link(w):
 def career_page(w, q):
     v = getattr(w.live, 'career', None)
     if v is None:
-        return 'Career', no_career(w)
+        return 'Career', '<div class="career-hub">' + STYLE + no_career(w) + '</div>'
     g = v['golfer']
-    y, wkn = v['date']
-    state = ('<span class="tag">you control this golfer</span>' if v['status'] == 'active'
-             else f'<span class="tag">under AI control since {esc(wk(*v["ended"]))}</span>')
-    head = (f'<p>{state} <a href="/golfer/{g["id"]}"><strong>{esc(g["name"])}</strong></a> · {esc(g["country"])} · '
-            f'age {g["age"]} · {esc(g["status"])}{" (part-time: working)" if g["lifestyle"] == "part_time" else ""} · '
-            f'{esc(g["tour"])}. Started {esc(wk(*v["started"]))} as one of {v["entry"]["class_size"]} newcomers '
-            f'(chosen by {esc(v["entry"]["rule"])}). The date is <strong>{esc(wk(y, wkn))}</strong>'
-            + (' (1 January not yet played)' if v['cursor']['phase'] == 'start' else '')
-            + (' (week prepared; not yet played)' if v['cursor']['phase'] == 'planned' else '')
-            + (' (the season is over; the winter has not run)' if v['cursor']['phase'] == 'end' else '') + '.</p>')
-    left = [golfer_card(g), plan_card(w, v)]
-    right = [decisions_card(w, v), notices_card(v)]
-    controls = advance_card(w, v) if v['status'] == 'active' else ''
-    body = (head + controls + '<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:1.5rem">'
-            f'<div>{"".join(left)}</div><div>{"".join(right)}</div></div>' + end_card(w, v) + scope_note())
+    y, week = v['date']
+    recaps = v.get('recaps', [])
+    latest = recaps[0] if recaps else None
+    state = 'Your career' if v['status'] == 'active' else f'under AI control since {esc(wk(*v["ended"]))}'
+    hero = (f'<section class="career-hero"><div><div class="eyebrow">{state} · {y} season</div>'
+            f'<h2>{esc(g["name"])}</h2><p>{esc(g["country"])} · Age {g["age"]} · {esc(g["tour"])}'
+            f' · {esc(g["status"].title())}</p><a href="/golfer/{g["id"]}">Full player profile ↗</a></div>'
+            f'<div class="career-overall"><span>Overall</span><strong>{g["overall"]:.1f}</strong>'
+            '<small>Current ability · 0–100</small></div></section>')
+    navigation = ('<div class="career-nav"><a href="#period-review">Period review</a><a href="#career-plan">Next period</a>'
+                  '<a href="#career-attributes">Attributes</a><a href="#career-inbox">Inbox</a></div>')
+    inbox = '<section id="career-inbox" class="career-panel">' + decisions_card(w, v) + notices_card(v) + '</section>'
+    body = (STYLE + '<div class="career-hub">' + hero + navigation
+            + '<div class="career-dashboard"><div class="career-main">' + recap_card(v)
+            + '<section id="career-plan" class="career-panel">' + plan_card(w, v)
+            + (advance_card(w, v) if v['status'] == 'active' else '') + '</section></div>'
+            + '<aside class="career-aside">' + readiness_card(v) + support_card(g) + inbox + '</aside></div>'
+            + '<section id="career-attributes" class="career-panel">' + golfer_card(g, latest) + '</section>'
+            + '<details class="career-details"><summary>Career details &amp; hand control back</summary>'
+            + f'<p>Started {esc(wk(*v["started"]))}. Current date: {esc(wk(y, week))}.</p>'
+            + end_card(w, v) + scope_note() + '</details></div>')
     return 'Career', body
 
+
+def change(value, precision=2, suffix=''):
+    if value is None:
+        return '<span class="muted">Not recorded</span>'
+    cls = 'up' if value > 0 else 'down' if value < 0 else 'muted'
+    return f'<span class="{cls}">{value:+.{precision}f}{suffix}</span>'
+
+
+def summary_stat(label, value, note=''):
+    return f'<div class="career-stat"><span>{esc(label)}</span><strong>{value}</strong><small>{note}</small></div>'
+
+
+def support_card(g):
+    return ('<section class="career-panel"><div class="eyebrow">Your support team</div><h2>Off the course</h2>'
+            + f'<dl class="kv"><dt>Coach</dt><dd>{esc(g["coach"] or "No coach")}</dd>'
+            + f'<dt>Caddie</dt><dd>{esc(g["caddie"] or "No caddie")}</dd></dl>'
+            + f'<div class="career-money">{money(g["spendable"])}<span>Available for golf</span></div>'
+            + f'<p class="muted">Funds: {money(g["funds"])}. Available money accounts for committed costs and amateur support.</p></section>')
+
+
+def readiness_card(v):
+    g = v['golfer']
+    r = v.get('readiness', {})
+    f = r.get('fatigue', g['fatigue'])
+    pct = max(0, min(100, f * 100))
+    label = r.get('label', 'Fresh' if pct <= 20 else 'Fatigue is affecting play')
+    detail = r.get('detail', 'Fatigue above 20% reduces playing performance. Rest recovers more fatigue than practice.')
+    out = ('<section class="career-panel readiness"><div class="eyebrow">Before you plan</div>'
+           f'<h2>{esc(label)}</h2><div class="fatigue-number">{pct:.1f}<span>% fatigue</span></div>'
+           f'<meter min="0" max="100" value="{pct}" aria-label="Fatigue: {pct:.1f} percent"></meter>'
+           '<div class="meter-labels"><span>Fresh</span><span>Exhausted</span></div>'
+           f'<p>{esc(detail)}</p>')
+    if g['injured_until']:
+        out += '<p class="banner warn">Injured: recovery comes first. The planner shows which weeks are unavailable.</p>'
+    if 'rest_after' in r and 'train_after' in r and not g['injured_until']:
+        out += ('<div class="recovery-options">'
+                + summary_stat('After one rest week', f'{r["rest_after"] * 100:.1f}%', 'Estimated fatigue')
+                + summary_stat('After one training week', f'{r["train_after"] * 100:.1f}%', 'Estimated fatigue') + '</div>')
+    if r.get('forecast_note'):
+        out += f'<p class="muted fine-print">{esc(r["forecast_note"])}</p>'
+    if r.get('training_note'):
+        out += f'<p class="muted">{esc(r["training_note"])}</p>'
+    out += ('<details><summary>How to choose training or rest</summary><p>Rest clears fatigue faster. When development is enabled, training develops a selected skill group, '
+            'but changes can be small. Competition also develops your game, particularly mental skills. '
+            'Compare the recorded training gains below rather than judging a single week by rounded ratings.</p></details></section>')
+    return out
+
+
+def recap_card(v):
+    recaps = v.get('recaps', [])
+    if not recaps:
+        return ('<section id="period-review" class="career-panel recap"><div class="eyebrow">Your story this season</div>'
+                '<h2>Your next chapter starts here</h2><p>Plan a period, then play it. Your tournament finishes, training gains and recovery '
+                'will appear here after each completed week.</p><div class="career-empty">No recorded period yet</div>'
+                '<p class="muted">Older saves cannot show before-and-after details from weeks played before this update. New weeks will be recorded.</p></section>')
+    out = '<section id="period-review" class="career-panel recap">' + render_recap(recaps[0], True)
+    if len(recaps) > 1:
+        out += '<details class="career-history"><summary>Earlier periods (' + str(len(recaps)-1) + ')</summary>'
+        for r in recaps[1:]:
+            out += '<details class="career-details"><summary>' + f'{r["year"]} · Weeks {r["start_week"]}–{r["end_week"]}' + '</summary>' + render_recap(r) + '</details>'
+        out += '</details>'
+    return out + '</section>'
+
+
+def render_recap(r, latest=False):
+    weeks = r.get('weeks', [])
+    before = r.get('before') or (weeks[0].get('before', {}) if weeks else {})
+    after = r.get('after') or (weeks[-1].get('after', {}) if weeks else {})
+    events = [e for w in weeks for e in w.get('events', [])]
+    train = sum(w.get('activity') == 'train' for w in weeks)
+    rest = sum(w.get('activity') == 'rest' for w in weeks)
+    delta = after.get('overall', 0) - before.get('overall', 0) if 'overall' in before and 'overall' in after else None
+    f0, f1 = before.get('fatigue'), after.get('fatigue')
+    fatigue = f'{f0*100:.1f}% → {f1*100:.1f}%' if f0 is not None and f1 is not None else 'Not recorded'
+    out = (f'<div class="eyebrow">{"Latest period" if latest else "Period review"} · {r["year"]}</div>'
+           f'<div class="section-heading"><h2>Weeks {r["start_week"]}–{r["end_week"]}</h2>'
+           f'<span class="status-pill">{"Complete" if r.get("complete") else "Partial record"}</span></div>'
+           '<div class="recap-stats">' + summary_stat('Tournament starts', str(len(events)), 'Recorded appearances')
+           + summary_stat('Training / rest', f'{train} / {rest}', 'Weeks in this period')
+           + summary_stat('Overall change', change(delta, 3), 'All recorded sources combined')
+           + summary_stat('Fatigue', fatigue, 'Start → latest completed week') + '</div>')
+    dev = r.get('development', {})
+    if dev and any(w.get('development_recorded') for w in weeks):
+        out += '<div class="development-summary"><strong>Where the growth came from</strong><p>'
+        out += ' · '.join(f'{esc(k.title())} {change(x["overall"], 3)} OVR' for k, x in dev.items() if abs(x['overall']) > 0.00001)
+        if not any(abs(x['overall']) > 0.00001 for x in dev.values()):
+            out += 'No measurable development recorded.'
+        out += '</p></div>'
+    if not r.get('complete'):
+        out += '<p class="muted">Recorded weeks: ' + ', '.join(str(w['week']) for w in weeks) + '. This is not a full-period comparison yet.</p>'
+    out += '<div class="week-reviews">'
+    for w in weeks:
+        activity = w.get('activity', 'unknown')
+        activity_label = {'play':'Competition', 'train':'Training', 'rest':'Recovery', 'work':'Work'}.get(activity, activity.title())
+        out += f'<article class="week-review"><div class="week-stamp">W{w["week"]}</div><div class="week-story"><h3>{esc(activity_label)}</h3>'
+        for e in w.get('events', []):
+            pos = e.get('position')
+            place = (('T' if e.get('tied') else '') + ('1st' if pos == 1 else str(pos))) if pos is not None else e.get('finish_label', 'Unplaced')
+            out += f'<div class="result-row"><strong class="result-place">{esc(place)}</strong><div><a href="/event/{quote(str(e["id"]))}">{esc(e["name"])}</a>'
+            rounds = e.get('rounds') or []
+            out += '<p class="muted">' + (f'Rounds: {esc(" · ".join(map(str, rounds)))}' if rounds else 'Round scores not recorded')
+            if e.get('prize') is not None:
+                out += f' · Prize {money(e["prize"])}'
+            out += '</p></div></div>'
+        if activity == 'train':
+            out += f'<p>Focus: <strong>{esc(LABEL.get(w.get("training_category"), w.get("training_category") or "Recorded training"))}</strong></p>'
+        if w.get('planned'):
+            out += f'<p class="muted">Planned: {esc(w["planned"])}</p>'
+        for injury in w.get('injuries', []):
+            available = injury.get('available')
+            when = f' Eligible to return {esc(wk(*available))}.' if available else ''
+            out += f'<p class="banner warn">Injury: {esc(injury.get("kind", "Recorded injury"))}. Out for {injury.get("out", "unrecorded")} weeks.{when} Low fatigue does not mean the injury has healed.</p>'
+        b, a = w.get('before', {}), w.get('after', {})
+        if 'fatigue' in b and 'fatigue' in a:
+            out += f'<p class="week-outcomes">Fatigue {b["fatigue"]*100:.1f}% → {a["fatigue"]*100:.1f}%'
+            if 'overall' in b and 'overall' in a:
+                out += ' <span>·</span> Overall ' + change(a['overall']-b['overall'], 3)
+            out += '</p>'
+        development = w.get('development', {})
+        if w.get('development_recorded') and any(abs(x['overall']) > 0.00001 for x in development.values()):
+            out += '<p class="development-line">' + ' · '.join(f'{esc(k.title())}: {change(x["overall"], 3)} OVR' for k,x in development.items() if abs(x['overall']) > 0.00001) + '</p>'
+        elif activity == 'train':
+            out += ('<p class="muted">No measurable training gain recorded this week.</p>' if w.get('development_recorded') else '<p class="muted">Training-specific contribution is not recorded for this week.</p>')
+        out += '</div></article>'
+    return out + '</div><p class="muted fine-print">Rating changes are observations, not a prediction of potential. Total growth can include competition and natural maturation as well as training.</p>'
 
 def no_career(w):
     can = getattr(w.live, 'career_can_start', None)
@@ -81,30 +296,27 @@ def no_career(w):
     return ''.join(out)
 
 
-def golfer_card(g):
-    ranks = []
-    if g['world_rank']:
-        ranks.append(f'world ranking {g["world_rank"]}')
-    if g['amateur_rank']:
-        ranks.append(f'amateur ranking {g["amateur_rank"]}')
-    inj = (f'<dt>Health</dt><dd>injured (absolute week {g["injured_until"]})</dd>' if g['injured_until']
-           else '<dt>Health</dt><dd>fit</dd>')
-    act = ', '.join(f'{k} {n}' for k, n in sorted(g['activity'].items())) or 'nothing yet'
-    kv = ('<dl class="kv">'
-          f'<dt>Overall</dt><dd>{g["overall"]}</dd><dt>Prestige</dt><dd>{g["prestige"]}</dd>'
-          f'<dt>Ranking</dt><dd>{esc(", ".join(ranks) or "not ranked yet")}</dd>{inj}'
-          f'<dt>Fatigue</dt><dd>{g["fatigue"]}</dd>'
-          f'<dt>Money for golf</dt><dd>{money(g["spendable"])} (funds {money(g["funds"])}, less the next weeks\' '
-          'committed costs, plus any amateur support)</dd>'
-          f'<dt>Coach</dt><dd>{esc(g["coach"] or "none")}</dd><dt>Caddie</dt><dd>{esc(g["caddie"] or "none")}</dd>'
-          f'<dt>This season</dt><dd>{esc(act)} (weeks)</dd></dl>')
-    attrs = table(['Group', 'Ratings'], [[esc(label), esc(', '.join(f'{k.replace("_", " ")} {x}' for k, x in vals))]
-                                         for label, vals in g['attrs']])
-    return f'<h2>Golfer</h2>{kv}<h3>Ratings now</h3>{attrs}<p class="muted">Potential is never shown.</p>'
-
+def golfer_card(g, recap=None):
+    from golfsim.ratings import ATTRIBUTE_LABELS
+    weeks = (recap or {}).get('weeks', [])
+    before = (recap or {}).get('before') or (weeks[0].get('before', {}) if weeks else {})
+    base = before.get('attrs', {})
+    cards = []
+    for label, attrs in g['attrs']:
+        rows = []
+        for key, value in attrs:
+            delta = g.get('attrs_exact', {}).get(key, value) - base[key] if key in base else None
+            rows.append(f'<div class="attribute-row"><span>{esc(ATTRIBUTE_LABELS.get(key, key.replace("_", " ").title()))}</span>'
+                        f'<strong>{value:.1f}</strong><span class="attribute-delta">{change(delta, 2) if delta is not None else "—"}</span>'
+                        f'<div class="attribute-track"><i style="width:{max(0,min(100,value)):.1f}%"></i></div></div>')
+        cards.append(f'<div class="attribute-card"><h3>{esc(label)}</h3>' + ''.join(rows) + '</div>')
+    return ('<div class="eyebrow">Player development</div><div class="section-heading"><h2>Your attributes</h2>'
+            f'<a href="/golfer/{g["id"]}?tab=playing#career-ratings">Full development history ↗</a></div>'
+            '<p class="muted">Current ratings on the same 0–100 scale as player profiles. Change is since the start of the latest recorded period, '
+            'not training alone. Potential stays hidden.</p><div class="career-ratings">' + ''.join(cards) + '</div>')
 
 def plan_card(w, v):
-    out = ['<h2>Plan</h2><p class="muted">Planning is in four-week periods (the engine\'s thirteen blocks a season, '
+    out = ['<div class="eyebrow">Look ahead</div><h2>Your next period</h2><p class="muted">Planning is in four-week periods (the engine\'s thirteen blocks a season, '
            'not calendar months). A plan is an intention: entry, selection and payment are decided by the same rules as '
            'for every golfer when the week comes.</p>']
     for b in v['blocks']:
@@ -160,9 +372,9 @@ def advance_card(w, v):
     note = (f'<p class="muted">{len(due)} decision{"s" if len(due) != 1 else ""} must be answered before the next week '
             'can be played: advancing stops at once until then.</p>') if due else ''
     return (f'<div class="filters"><form method="post" action="/career/advance">{hidden(w, v["version"], (("mode", "next"),))}'
-            '<button class="primary" title="Plays on until something needs your decision">Advance to next decision</button>'
+            '<button title="Plays on until something needs your decision">Advance to next decision</button>'
             f'</form><form method="post" action="/career/advance">{hidden(w, v["version"], (("mode", "period"),))}'
-            '<button title="Plays to the end of the current four-week period, stopping earlier only if a decision is due">'
+            '<button class="primary" title="Plays to the end of the current four-week period, stopping earlier only if a decision is due">'
             'Advance through planned period</button></form></div>' + note)
 
 
@@ -207,16 +419,17 @@ def plan_page(w, q):
             if not e['eligible'] or not e.get('affordable'):
                 continue
             sel = ' checked' if cur.get('kind') == 'event' and cur.get('event_id') == e['event_id'] else ''
-            opts.append(f'<label><input type="radio" name="w{n}" value="event:{esc(e["event_id"])}"{sel} required> '
-                        f'<a href="/event/{quote(e["event_id"])}">{esc(e["name"])}</a> · {esc(e["city"])}, {esc(e["country"])} · '
-                        f'{esc(e["tour"])} · cost {money(e["cost"])}</label>')
-        tsel = ' checked' if cur.get('kind') == 'train' else ''
+            opts.append(f'<label class="plan-option"><input type="radio" name="w{n}" value="event:{esc(e["event_id"])}"{sel} required> '
+                        f'<a href="/event/{quote(e["event_id"])}">{esc(e["name"])}</a><small>{esc(e["city"])}, {esc(e["country"])} · '
+                        f'{esc(e["tour"])} · Estimated cost {money(e["cost"])}</small></label>')
+        train_disabled = ' disabled' if o['injured_until'] else ''
+        tsel = ' checked' if cur.get('kind') == 'train' and not o['injured_until'] else ''
         rsel = ' checked' if cur.get('kind') == 'rest' else ''
         csel = cur.get('category') if cur.get('kind') == 'train' else None
         catsel = ''.join(f'<option value="{k}"{" selected" if k == csel else ""}>{esc(label)}</option>' for k, label in CATS)
-        opts.append(f'<label><input type="radio" name="w{n}" value="train"{tsel} required> Train: '
-                    f'<select name="c{n}" aria-label="Training for week {n}">{catsel}</select></label>')
-        opts.append(f'<label><input type="radio" name="w{n}" value="rest"{rsel} required> Rest</label>')
+        opts.append(f'<label class="plan-option"><input type="radio" name="w{n}" value="train"{tsel}{train_disabled} required> Focused training '
+                    f'<small>Develop one part of your game. Changes are recorded in your period review.</small><select name="c{n}" aria-label="Training for week {n}"{train_disabled}>{catsel}</select></label>')
+        opts.append(f'<label class="plan-option"><input type="radio" name="w{n}" value="rest"{rsel} required> Rest &amp; recover<small>Clear fatigue faster. No direct skill training this week.</small></label>')
         fb = cur.get('fallback') or {}
         fsel = lambda val: ' selected' if (fb.get('kind') == 'train' and val == f'train:{fb.get("category")}') or \
             (fb.get('kind') == 'rest' and val == 'rest') else ''
@@ -229,8 +442,9 @@ def plan_page(w, q):
         sel_ev = ('<ul>' + ''.join(f'<li>{esc(e["name"])} ({esc(e["rule"])})</li>' for e in o['selected']) + '</ul>'
                   if o['selected'] else '<span class="muted">none</span>')
         inj = f'<p class="banner warn">Injured this week: only rest is possible.</p>' if o['injured_until'] else ''
-        rows.append([f'<strong>{n}</strong>', inj + '<div style="display:grid;gap:.25rem">' + ''.join(opts) + '</div>' + why,
-                     fallback, sel_ev])
+        rows.append(f'<fieldset class="planner-week"><legend>Week {n}</legend>' + inj + ''.join(opts) + why
+                    + '<div class="planner-fallback"><strong>If your event entry is not accepted</strong>' + fallback
+                    + '</div><details><summary>Selection-only events</summary>' + sel_ev + '</details></fieldset>')
     pol = p['policy'] or {}
     chk = lambda k, val: ' checked' if pol.get(k) == val else ''
     policy = ('<fieldset><legend>Selections and invitations in this period (majors, championships, invitations, '
@@ -246,13 +460,13 @@ def plan_page(w, q):
     money_line = (f'<p>Money for golf now: <strong>{money(p["weeks"][0]["money"])}</strong>. Costs are this week\'s '
                   'estimate (travel and fees); they are checked again when the week comes.</p>') if p['weeks'] else ''
     form = (f'<form method="post" action="/career/plan">{hidden(w, p["version"], (("block", f"{y}-{w0}"),))}'
-            + money_line + table(['Week', 'Choose', 'If the entry is not accepted', 'Fields chosen by the event\'s rules'], rows)
-            + policy + '<p><button class="primary">Save the plan</button> <a href="/career">Cancel</a></p></form>')
+            + money_line + '<div class="planner-grid">' + ''.join(rows) + '</div>'
+            + '<div class="planner-policies">' + policy + '</div><div class="planner-save"><button class="primary">Save the plan</button> <a href="/career">Cancel</a></div></form>')
     note = ('<p class="muted">Events you can enter are listed with their cost; the others are folded under each week with '
             'the rule that keeps you out. An entry is not a place: fields fill in each event\'s entry order, and if yours '
             'is not accepted the week falls back to what you choose here. Events that choose their own fields are covered '
             'by the period\'s policy below.</p>')
-    return f'Plan weeks {w0}–{min(52, w0 + 3)} of {y}', note + form
+    return f'Plan weeks {w0}–{min(52, w0 + 3)} of {y}', STYLE + '<div class="career-hub"><p class="back"><a href="/career">← Career overview</a></p><div class="planner-intro"><p>Build a period that balances competition, development and recovery.</p></div>' + readiness_card(v) + '<details><summary>How event entry works</summary>' + note + '</details>' + form + '</div>'
 
 
 # ---- reading forms into commands ------------------------------------------------------------------------------------

@@ -1148,6 +1148,7 @@ class Season:
             self.plan_block(year, week)
 
     def play_prepared_week(self, year, week, eds):
+        feedback_before = CA.begin_week_feedback(self, year, week)
         self.week = week
         rng = random.Random(_seed(self.seed, year, week, 'entries'))
         venues = self.venues(year)
@@ -1205,6 +1206,8 @@ class Season:
         self.update_fame(year, week)
         self.snapshot_standings(year, week)
         self.update_fatigue(year, week)
+        CA.finish_week_feedback(self, year, week, feedback_before,
+                                [e.event_id for e in eds if e.event_id in self.results])
 
     def is_special(self, s):
         return (s.kind in ('major', 'qualifying') or s.category in ('elite_amateur', 'national_amateur',
