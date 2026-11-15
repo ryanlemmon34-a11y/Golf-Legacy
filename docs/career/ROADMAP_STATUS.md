@@ -29,9 +29,9 @@ Status words: **done** (engine and tests on this branch), **partial**, **in prog
 | Distinctive fictional tournament names | **not implemented** — needs a scoped decision | Renaming series changes names in every world (and engine fingerprint); history must keep the names it was recorded with. Proposal: a new calendar version or display-name table keyed by series id with the old name kept for recorded years. Not started (kept out of the duplicate-label fix). |
 | College qualifier overhaul (4 early-spring qualifiers, 39 each, all US college tours, heats) | **done (engine), calendar v3** | docs/career/COLLEGE_QUALIFIERS.md; `schedule.NEW_WORLD = 'v3'` for the app (HAL: observer_app new-world calendar); engine DEFAULT stays v2; v1/v2 unchanged. |
 | Same-year USA Open place for the college national champion (amateur) | **built, switched off — flagged for scope accounting** | Route `U2C` (v3 only), tested; `college_champion_usa_open=False` until confirmed. |
-| Finance trace | **partial** | Ledgers and money evidence exist per season (pruned after a season, archived); no career-facing trace read model. |
-| Sponsor / backer explanations | **partial** | Backer reviews and sponsor offers are recorded with reasons in the AI; career-facing explanations not built. |
-| Annual tracking | **partial** | Year-end review per season; stints; multi-season summary read model not built. |
+| Finance trace | **done (engine read model)** | `career.view()['money']`: funds now (cash, family backing, backers' money, spendable), this and last season's ledgers line by line (null when nothing was booked), golfsim/career_money.py. |
+| Sponsor / backer explanations | **done (engine read model, first version)** | `money.sponsor` (contract, Prestige, the rule) and `money.backer` (deal, put up / returned this season, last deal ended). |
+| Annual tracking | **done (engine read model)** | `career.view()['seasons_summary']`: one row per controlled season (events, wins, top 10s, prize money, ranks), from the recorded weeks. |
 | Old-save continuation (Patrick / CareerTest saves) | **blocked** | Source engine 57c4719 is `rules_changed` (fatigue fix); migration proposal only (ENGINE_MIGRATION.md). Not enabled. |
 | Encyclopedia entry | **deferred** | After career testing (BACKLOG item 6). |
 | Performance target (120 s) | **deferred / unmeasured on this branch** | Needs a measured benchmark on the full world before any claim. |

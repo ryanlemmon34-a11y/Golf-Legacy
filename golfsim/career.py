@@ -1166,8 +1166,30 @@ def view(season, cursor):
             'opportunities': _opportunities(season, c, g, y, w),
             'goals': _story(season, c, cursor, 'goals'),
             'staff_policy': dict({'seek_coach': 'no', 'seek_caddie': 'no'}, **getattr(c, 'staff_policy', {})),
+            'money': _money(season, g, y),
+            'seasons_summary': _seasons(season, c),
             'timeline': _story(season, c, cursor, 'timeline'),
             'year_end': year_end_view(season, cursor)}
+
+
+def _money(season, g, y):
+    """Where the golfer's money came from and went, and the sponsor and backer rules (golfsim.career_money)."""
+    from . import career_money
+    return career_money.money_view(season, g, y) if g is not None else None
+
+
+def _seasons(season, c):
+    """One line per season the player controlled a golfer (annual tracking), from the year-end reviews' sources."""
+    rows = []
+    for st in getattr(c, 'stints', []):
+        last = st['to'][0] if st['to'] else season.year
+        for yr in range(st['from'][0], last + 1):
+            r = season_review(season, c, st['golfer_id'], yr)
+            if r['recorded_weeks']:
+                rows.append({k: r[k] for k in ('year', 'golfer_id', 'name', 'status', 'tour', 'recorded_weeks',
+                                               'events', 'wins', 'top10', 'missed_cuts', 'prize_money',
+                                               'overall_start', 'world_rank', 'amateur_rank')})
+    return rows
 
 
 def _story(season, c, cursor, what):
