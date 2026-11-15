@@ -979,6 +979,7 @@ def week_options(season, g, year, week, weeks=None):
     with the reason; cost and whether it is affordable now) and the week's rule-selected events (not entered: covered
     by the period's policy)."""
     from .calendar import TOUR_BY_KEY
+    from . import event_labels as EL
     events, selected = [], []
     money = season.spendable(g, year)
     inj = injured_until(season, g.id, year, week)
@@ -986,7 +987,7 @@ def week_options(season, g, year, week, weeks=None):
         s = ed.series
         city = city_of(season, year, ed.event_id)
         t = TOUR_BY_KEY.get(s.tour)
-        row = {'event_id': ed.event_id, 'name': s.name, 'tier': s.tier, 'tour': t.name if t else s.tour, 'city': city,
+        row = {'event_id': ed.event_id, 'name': EL.label(season.cal, s.series_id), 'target': EL.target(season.cal, s.series_id), 'tier': s.tier, 'tour': t.name if t else s.tour, 'city': city,
                'country': _country(city), 'days': ','.join(str(d) for d in sorted(s.day_set))}
         if season.is_special(s):
             row['rule'] = ('qualifying: entrants decide (your period policy)' if entrant_decides(s)
@@ -1204,7 +1205,8 @@ def finish_week_feedback(season, year, week, before, event_ids):
             prizes = getattr(r, 'prizes', [])
             points = getattr(r, 'points', [])
             rounds = scores[site].get(g.id) if site < len(scores) else None
-            rows.append({'id': eid, 'name': ser.name if ser else eid, 'position': pos, 'score': total,
+            from . import event_labels as EL
+            rows.append({'id': eid, 'name': EL.label(season.cal, ser.series_id) if ser else eid, 'position': pos, 'score': total,
                          'rounds': list(rounds) if rounds is not None else None,
                          'prize': prizes[site].get(g.id, 0.0) if site < len(prizes) else None,
                          'points': points[site].get(g.id, 0.0) if site < len(points) else None,

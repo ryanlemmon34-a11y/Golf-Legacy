@@ -240,6 +240,7 @@ def recap_card(v):
 
 
 def render_recap(r, latest=False):
+    from observer_career_context import entry_note
     weeks = r.get('weeks', [])
     before = r.get('before') or (weeks[0].get('before', {}) if weeks else {})
     after = r.get('after') or (weeks[-1].get('after', {}) if weeks else {})
@@ -279,6 +280,7 @@ def render_recap(r, latest=False):
             if e.get('prize') is not None:
                 out += f' · Prize {money(e["prize"])}'
             out += '</p></div></div>'
+        out += entry_note(w.get('entry'))
         if activity == 'train':
             out += f'<p>Focus: <strong>{esc(LABEL.get(w.get("training_category"), w.get("training_category") or "Recorded training"))}</strong></p>'
         if w.get('planned'):
@@ -443,6 +445,7 @@ def training_categories_help():
 
 
 def event_choice(o, cur):
+    from observer_career_context import target_note
     """A bounded event selector; all details remain readable without JavaScript."""
     n = o['week']
     events = [e for e in o['events'] if e['eligible'] and e.get('affordable')]
@@ -461,7 +464,7 @@ def event_choice(o, cur):
                   'Eligible to request entry' if e['eligible'] and e.get('affordable') else e['why'])
         cost_label = f'Estimated cost {money(e["cost"])}' if e.get('cost') is not None else 'Cost not quoted'
         details.append(f'<li><a href="/event/{quote(e["event_id"])}">{esc(e["name"])}</a><br>'
-                       f'{esc(e["city"])}, {esc(e["country"])} · {esc(e["tour"])} · {cost_label}<br>{esc(reason)}<br><small>Entry likelihood: not yet estimated.</small></li>')
+                       f'{esc(e["city"])}, {esc(e["country"])} · {esc(e["tour"])} · {cost_label}<br>{esc(reason)}<br><small>Entry likelihood: not yet estimated.</small>{target_note(e)}</li>')
     return (f'<div class="plan-option"><label><input type="radio" name="w{n}" value="event"{selected}{disabled} required> '
             f'Enter a tournament</label><select name="e{n}" aria-label="Tournament for week {n}"{disabled}>' + ''.join(options) +
             '</select><small>Choose this activity and a tournament. Request an entry. Your fallback applies if it is not accepted.</small></div>'
@@ -483,6 +486,7 @@ def plan_page(w, q):
     if p is None:
         return 'Planner', ('<p>That period cannot be planned now (only the current four-week period and the next).</p>'
                            '<p><a href="/career">Back to the career</a></p>')
+    from observer_career_context import target_note
     from observer_career_advice import enrich_plan, render_advice
     p = enrich_plan(p, v['golfer'], v.get('readiness', {}).get('training_enabled', True))
     cats = ''.join(f'<option value="{k}">{esc(label)}</option>' for k, label in CATS)
@@ -510,7 +514,7 @@ def plan_page(w, q):
         fallback = (f'<select name="f{n}" aria-label="If the entry is not accepted in week {n}">'
                     + ''.join(f'<option value="train:{k}"{fsel("train:" + k)}>train {esc(label.lower())}</option>' for k, label in CATS)
                     + f'<option value="rest"{fsel("rest")}>rest</option></select>')
-        sel_ev = ('<ul>' + ''.join(f'<li>{esc(e["name"])} ({esc(e["rule"])})</li>' for e in o['selected']) + '</ul>'
+        sel_ev = ('<ul>' + ''.join(f'<li>{esc(e["name"])} ({esc(e["rule"])}){target_note(e)}</li>' for e in o['selected']) + '</ul>'
                   if o['selected'] else '<span class="muted">none</span>')
         inj = f'<p class="banner warn">Injured this week: only rest is possible.</p>' if o['injured_until'] else ''
         rows.append(f'<fieldset class="planner-week"><legend>Week {n}</legend>' + inj + ''.join(opts)
