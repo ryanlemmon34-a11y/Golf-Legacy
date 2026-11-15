@@ -1180,10 +1180,16 @@ class Season:
                 seen = set()
                 vs = venues[ed.event_id]
                 travel = self.cal.spec.travel
+                before = sites
                 sites = [[gid for gid in site if not (busy[gid] & ed.series.day_set) and not (gid in seen or seen.add(gid))
                           and (not travel or self.can_travel(gid, ed.series.day_set,
                                                              (CITY_BY_NAME[vs[min(k, len(vs) - 1)].city].country,)))]
                          for k, site in enumerate(sites)]
+                car = self.career
+                if car is not None and car.status == 'active':
+                    hid = car.golfer_id
+                    if any(hid in x for x in before) and not any(hid in x for x in sites):
+                        self._career_evidence(year, week, clashed=ed.series.series_id)
                 sites = self.pay_at_sites(ed, year, sites, venues)
                 self._default_routes(ed.series, year, sites)
                 commit(ed, sites)
@@ -1240,6 +1246,8 @@ class Season:
             if evs is None:
                 evs = open_to[key] = [ed for ed in regular if self.eligible(g, ed.series, week)]
             if not evs:
+                if g.id == hid:
+                    self._career_entry(car, g, year, week, [], prefs, evs, busy[g.id], self.spendable(g, year))
                 continue
             opts = []
             bar = self.bar(g)
@@ -1269,7 +1277,7 @@ class Season:
                 v = self.event_value(g, ed, week, rng, country[eid], cost, gw, base)
                 opts.append((v, eid))
             if g.id == hid:                                  # the player's entry: that event or none
-                self._career_entry(car, g, year, week, opts, prefs)
+                self._career_entry(car, g, year, week, opts, prefs, evs, days, money)
                 continue
             if not opts:
                 continue
@@ -1289,6 +1297,8 @@ class Season:
         counts = defaultdict(lambda: [0, 0])                 # event_id -> [amateurs, visitors] held
         nxt = {gid: 0 for gid in prefs}
         free = [gid for gid, (want, _) in prefs.items() if want]
+        hid_eid = prefs[hid][0][0] if hid is not None and prefs.get(hid, ((),))[0] else None
+        applied = set()                                      # (career evidence) who asked the player's event
         while free:
             gid = free.pop()
             want = prefs[gid][0]
@@ -1296,6 +1306,8 @@ class Season:
                 continue
             eid = want[nxt[gid]]
             nxt[gid] += 1
+            if eid == hid_eid:
+                applied.add(gid)
             s = by_id[eid].series
             insort(held[eid], (priority(gid, s), gid))
             self._count(counts[eid], gid, s, 1)
@@ -1304,11 +1316,19 @@ class Season:
                 if bumped is not None:
                     free.append(bumped)
         placed = {gid for v in held.values() for _, gid in v}
-        if hid is not None and prefs.get(hid, ((),))[0] and hid not in placed:
-            eid = prefs[hid][0][0]
-            car.note(year, week, 'entry', f'Week {week} of {year}: your entry for {by_id[eid].series.name} was not accepted '
-                     '(the field filled with golfers ahead of you in its entry order); your fallback for the week applies.',
-                     key=('shut', year, week))
+        if hid_eid is not None:
+            s = by_id[hid_eid].series
+            order = sorted(applied, key=lambda x: (priority(x, s), x))   # the event's entry order, as decided now
+            got = hid in placed
+            lineup = self.g[hid].tour.startswith('CO_') and s.tier == 5
+            pos = order.index(hid) + 1
+            code = self.entry_code(got, lineup, pos, cap[hid_eid])
+            self._career_evidence(year, week, event=hid_eid, code=code, position=pos, applicants=len(order),
+                                  capacity=cap[hid_eid], admitted=len(held[hid_eid]))
+            if not got:
+                from .career import ENTRY_TEXT
+                car.note(year, week, 'entry', f'Week {week} of {year}: your entry for {s.name} was not accepted '
+                         f'({ENTRY_TEXT[code]}); your fallback for the week applies.', key=('shut', year, week))
         late_entries = defaultdict(list)                     # took a spare place below their own bar
         for eid, ed in by_id.items():
             s = ed.series
@@ -1345,9 +1365,10 @@ class Season:
                 self.entry_misses[year][gid] += 1           # wanted to play; every field they tried was full
                 self._week_shut.add(gid)
 
-    def _career_entry(self, car, g, year, week, opts, prefs):
+    def _career_entry(self, car, g, year, week, opts, prefs, evs=(), days=frozenset(), money=None):
         """The controlled golfer's entry: exactly the planned event, if it is among the week's options the same
-        checks produced (eligible, no clash with the week's other commitments, affordable); no bar, no alternative."""
+        checks produced (eligible, no clash with the week's other commitments, affordable); no bar, no alternative.
+        When it is not, why -- judged by those same checks, now -- is kept as the week's entry evidence."""
         ch = car.choice(year, week)
         eid = ch.get('event_id') if ch and ch.get('kind') == 'event' else None
         if eid is None:
@@ -1355,10 +1376,53 @@ class Season:
         if any(e == eid for _, e in opts):
             prefs[g.id] = ([eid], [])
             return
-        name = next((e.series.name for e in self.cal.editions(year) if e.event_id == eid), eid)
-        car.note(year, week, 'entry', f'Week {week} of {year}: you could not enter {name} after all (a clash with a '
-                 'selected event that week, or the cost or eligibility changed); your fallback for the week applies.',
-                 key=('noentry', year, week))
+        ed = next((e for e in self.cal.editions(year) if e.event_id == eid), None)
+        name = ed.series.name if ed is not None else eid
+        sel = self._week_entered.get(g.id)
+        if sel is not None and sel[1] == 'selected':
+            code, extra = 'superseded', {'by': sel[0]}       # a rule-selected place this week came first
+        elif ed is None or not any(e.event_id == eid for e in evs):
+            code, extra = 'not_eligible', {}
+        elif days & ed.series.day_set:
+            code, extra = 'clash', {}
+        elif days and self.cal.spec.travel:
+            code, extra = 'clash', {'travel': True}
+        else:
+            code, extra = 'cost', {'money': None if money is None else round(money, 2)}
+        self._career_evidence(year, week, event=eid, code=code, **extra)
+        from .career import ENTRY_TEXT
+        car.note(year, week, 'entry', f'Week {week} of {year}: you could not enter {name} ({ENTRY_TEXT[code]}); your '
+                 'fallback for the week applies.', key=('noentry', year, week))
+
+    @staticmethod
+    def entry_code(got, lineup, position, capacity):
+        """The reason code (career.ENTRY_TEXT) for an entry as the field was decided: accepted; a college golfer's
+        school event (the lineup rotation decides); inside the field's size yet not taken (an amateur or visitor
+        limit); or behind the field's last place in its entry order."""
+        if got:
+            return 'entered'
+        if lineup:
+            return 'school_lineup'
+        return 'quota' if position <= capacity else 'field_full'
+
+    def _career_evidence(self, year, week, **facts):
+        """The controlled golfer's entry evidence for the week, recorded as each decision is made (career.week_entry
+        reads it): what was asked, the outcome and only the facts known at that moment. Nothing else is kept."""
+        car = self.career
+        if car is None or car.status != 'active':
+            return
+        ev = car.__dict__.setdefault('entry_evidence', {}).setdefault((year, week), {})
+        for k, v in facts.items():
+            if k == 'declined':
+                ev.setdefault('declined', [])
+                if v not in ev['declined']:
+                    ev['declined'].append(v)
+            elif k == 'clashed':
+                ev.setdefault('clashed', [])
+                if v not in ev['clashed']:
+                    ev['clashed'].append(v)
+            else:
+                ev[k] = v
 
     def _default_routes(self, s, year, sites):
         """Every selected field explains each entrant: fields whose rule records no routes of its own are
@@ -1452,6 +1516,7 @@ class Season:
             return False
         c = self.career
         if c is not None and c.controls(gid) and not c.accepts(self.year, self.week, s):
+            self._career_evidence(self.year, self.week, declined=s.series_id)
             return False                                     # the player's policy for this period: not taken
         return countries is None or not self.cal.spec.travel or self.can_travel(gid, s.day_set, countries)
 
@@ -1692,7 +1757,11 @@ class Season:
         car = self.career
         if car is not None and ed is not None and car.status == 'active':
             plays = can_play
-            can_play = lambda gid: plays(gid) and not (car.controls(gid) and not car.accepts(year, week, ed.series))
+            def can_play(gid):
+                if car.controls(gid) and not car.accepts(year, week, ed.series):
+                    self._career_evidence(year, week, declined=ed.series.series_id)
+                    return False
+                return plays(gid)
         cities = sorted({v.city for v in self.venues(year)[ed.event_id]}) if ed is not None else []
         money = {}                               # gid -> the money a place was decided on (observation only)
 
@@ -1983,7 +2052,10 @@ class Season:
         stream stays as it was), or for the controlled golfer the player's policy for the period."""
         c = self.career
         if c is not None and c.controls(g.id):
-            return c.accepts(year, week, s)
+            ok = c.accepts(year, week, s)
+            if not ok:
+                self._career_evidence(year, week, declined=s.series_id)
+            return ok
         return keen
 
     def qualifier_field(self, ed, year, week, rng, free):
@@ -3222,6 +3294,8 @@ class Season:
     def record_access(self, year, week):
         """Classify every active golfer's week (see ACCESS): what they played, or why they did not."""
         acc = self.week_access[year]
+        car = self.career
+        hid = car.golfer_id if car is not None and car.status == 'active' else None
         for g in self.active_golfers():
             if g.lifestyle == 'retired':
                 continue
@@ -3255,6 +3329,9 @@ class Season:
                 else:
                     why = {'train': 'chose to train', 'work': 'chose to work'}.get(act, 'chose to rest')
             acc[gid][why] += 1
+            if gid == hid:
+                self._career_evidence(year, week, access=why, first=self._week_first.get(gid),
+                                      entered=list(entered) if entered and why.startswith('played') else None)
             WP.count(self, g, year, week, why)               # the work pathway's evidence (genuine blocks only)
             if why in ('played: alternative', 'shut out: every acceptable field full', 'not selected for the college lineup'):
                 self.access_log[year][gid].append((week, why, self._week_first.get(gid),

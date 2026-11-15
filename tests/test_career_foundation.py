@@ -202,8 +202,8 @@ class Gates(unittest.TestCase):
         s.advance_career('next', op_key='a')
         e1 = first_event(s, 1)
         plan(s, (2028, 1), {1: {'kind': 'event', 'event_id': e1['event_id'], 'fallback': {'kind': 'rest'}}})
-        with mock.patch.object(Season, '_career_entry', lambda self, car, g, y, w, opts, prefs: car.note(
-                y, w, 'entry', 'not entered (test)', key=('noentry', y, w))):
+        with mock.patch.object(Season, '_career_entry', lambda self, car, g, y, w, opts, prefs, *checks: car.note(
+                y, w, 'entry', 'not entered (test)', key=('noentry', y, w))):   # (*checks: eligibility/clash/cost)
             s.advance(1)
         gid = s.season.career.golfer_id
         self.assertEqual(s.season.week_activity[gid], 'rest')        # the player's fallback, not the AI's training

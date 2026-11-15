@@ -37,6 +37,26 @@ CATEGORIES = ('physical', 'long_game', 'short_game', 'putting', 'mental')
 CATEGORY_LABEL = {'physical': 'Physical', 'long_game': 'Long game', 'short_game': 'Short game', 'putting': 'Putting',
                   'mental': 'Mental game'}
 OFFER_KINDS = ('coach_offer', 'caddie_offer', 'job')
+# Why the player's planned entry did or did not stand (Season._career_evidence; career.week_entry). One canonical text
+# per reason; nothing else describes it.
+ENTRY_TEXT = {
+    'entered': 'your entry was accepted',
+    'school_lineup': 'not selected for your school\'s college lineup',
+    'field_full': 'the field filled with golfers ahead of you in its entry order',
+    'quota': 'the places this field keeps for golfers like you (amateurs or visitors) were taken',
+    'not_eligible': 'you are not eligible for it this week',
+    'clash': 'it clashes with an event you are already committed to that week',
+    'cost': 'you cannot pay for the trip',
+    'superseded': 'a rule-selected place you accepted that week came first',
+}
+# The season's week classification (Season.ACCESS) as reason codes
+ACCESS_CODES = {'played: first choice': 'played', 'played: alternative': 'played_alternative',
+                'played: selected field': 'played_selected', 'injured': 'injured',
+                'shut out: every acceptable field full': 'field_full',
+                'not selected for the college lineup': 'school_lineup',
+                'no suitable event scheduled': 'no_event', 'not eligible for the events scheduled': 'not_eligible',
+                'could not afford any event': 'cost', 'declined the events on offer': 'declined',
+                'chose to train': 'train', 'chose to rest': 'rest', 'chose to work': 'work'}
 YEAR_END_KINDS = ('season_review', 'winter_career', 'winter_staff', 'winter_residence', 'choose_newcomer')
 CANDIDATES = 10             # newcomers offered at a switch: a seeded sample of the new junior class, drawn once
 
@@ -164,8 +184,9 @@ class Career:
 
     # ---- the engine's hooks ------------------------------------------------------------------------------------------
     def staff_offer(self, season, kind, person, g, why, when, arrangement=None):
-        """A coach or caddie approaches the controlled golfer: a pending offer, with nothing ended, assigned, charged or
-        reserved. Open until the end of the planning period it was made in."""
+        """A coach or caddie approaches the controlled golfer: a pending offer, with nothing ended, assigned or
+        charged. A coach's offer holds its place in the coach's book until it is answered (staff.offer_reservations).
+        Open until the end of the planning period it was made in."""
         y, w = when
         deadline = (y, min(52, block_start(max(1, w)) + BLOCK)) if block_start(max(1, w)) + BLOCK <= 52 else None
         if kind == 'coach':
@@ -175,7 +196,7 @@ class Career:
             text = (f'Coach {person.name} (reputation {person.reputation:.0f}) offers to coach you for {terms}. '
                     f'Why: {why}.')
             payload = {'staff': person.id, 'name': person.name, 'arrangement': arrangement, 'fee': fee, 'why': why,
-                       'when': [y, w]}
+                       'when': [y, w], 'reserved': True}    # (holds a place in the coach's book: offer_reservations)
             return self.ensure('coach_offer', ('coach', person.id, y), y, w, deadline, payload, text,
                                ('accept', 'decline'))
         text = (f'Caddie {person.name} (reputation {person.reputation:.0f}) offers to carry your bag for '
@@ -857,9 +878,11 @@ def _answer_coach(season, c, d, g, y, w, answer):
         if st.coach(g.id) is coach:
             problem = 'they already coach you'
         elif students >= coach.capacity:
-            problem = 'their book is now full'
+            problem = 'their book is now full' + ('' if p.get('reserved') else
+                                                  ' (an offer made by an earlier build, which held no place for it)')
         elif p['arrangement'] == 'share' and shares >= coach.capacity // 3:
-            problem = 'they have no room left for share-of-winnings players'
+            problem = 'they have no room left for share-of-winnings players' + ('' if p.get('reserved') else
+                                                  ' (an offer made by an earlier build, which held no place for it)')
         elif p['arrangement'] == 'fee' and coach.fee > ST.coach_budget(season, g, y):
             problem = f'their fee (${coach.fee:,.0f} a year) is more than you can now commit to a coach'
     if problem:
@@ -1200,10 +1223,66 @@ def finish_week_feedback(season, year, week, before, event_ids):
            'before': before['before'], 'after': _snapshot(season, g, year), 'events': rows,
            'development': development,
            'development_recorded': bool(season.development and g.ceilings),
-           'injuries': [dict(x) for x in season.injury_episodes(year).get(g.id, []) if x['week'] == week]}
+           'injuries': [dict(x) for x in season.injury_episodes(year).get(g.id, []) if x['week'] == week],
+           'entry': week_entry(season, c, year, week)}
     if not hasattr(c, 'weekly_recaps'):
         c.weekly_recaps = {}
     c.weekly_recaps[(year, week)] = rec
+
+
+def week_entry(season, c, year, week):
+    """The canonical account of the controlled golfer's entry in one week, from evidence recorded when each decision
+    was made (Season._career_evidence) -- never re-judged from today's ranking or state. Keys always present; a fact
+    not recorded is None ('recorded': False for weeks played before this evidence was kept: then only the season's
+    own access log speaks, without positions or cut-offs).
+
+    {'year', 'week', 'recorded': bool,
+     'choice': {'kind', 'event'} | None,           the player's plan for the week
+     'access': str | None, 'access_code': str | None,   the week's classification (Season.ACCESS / ACCESS_CODES)
+     'event': id | None, 'event_label': str | None, the event the player's entry was for
+     'code': str | None, 'text': str | None,       why it stood or not (ENTRY_TEXT)
+     'position': int | None, 'applicants': int | None, 'capacity': int | None, 'admitted': int | None,
+                                                   the player's place in that event's entry order as decided
+     'by': id | None,                              the rule-selected event that came first ('superseded')
+     'entered': {'event', 'how', 'label'} | None,  what they played ('entry' | 'selected')
+     'declined': [series id], 'clashed': [series id]}   rule-selected places not taken by policy / by a clash"""
+    from . import event_labels as EL
+    ev = getattr(c, 'entry_evidence', {}).get((year, week))
+    ch = c.choice(year, week)
+    out = {'year': year, 'week': week, 'recorded': ev is not None,
+           'choice': {'kind': ch['kind'], 'event': ch.get('event_id')} if ch else None,
+           'access': None, 'access_code': None, 'event': None, 'event_label': None, 'code': None, 'text': None,
+           'position': None, 'applicants': None, 'capacity': None, 'admitted': None, 'by': None, 'entered': None,
+           'declined': [], 'clashed': []}
+    if ev is not None:
+        for k in ('event', 'code', 'position', 'applicants', 'capacity', 'admitted', 'by'):
+            out[k] = ev.get(k)
+        out['access'] = ev.get('access')
+        out['declined'] = list(ev.get('declined', []))
+        out['clashed'] = list(ev.get('clashed', []))
+        if ev.get('entered'):
+            eid, how = ev['entered']
+            out['entered'] = {'event': eid, 'how': how, 'label': EL.label(season.cal, _sid(eid))}
+    else:                                              # (an older save: the season's own log, nothing more)
+        gid = c.controlled_at(year, week) or c.golfer_id
+        for wk, why, wanted, played in season.access_log.get(year, {}).get(gid, []):
+            if wk == week:
+                out['access'], out['event'] = why, wanted
+                if played:
+                    out['entered'] = {'event': played, 'how': None, 'label': EL.label(season.cal, _sid(played))}
+    if out['access'] is not None:
+        out['access_code'] = ACCESS_CODES.get(out['access'])
+        if out['code'] is None and out['access_code'] in ('field_full', 'school_lineup'):
+            out['code'] = out['access_code']           # (old saves: the log's own reason)
+    if out['code'] is not None:
+        out['text'] = ENTRY_TEXT.get(out['code'])
+    if out['event'] is not None:
+        out['event_label'] = EL.label(season.cal, _sid(out['event']))
+    return out
+
+
+def _sid(event_id):
+    return event_id.split(':', 1)[1] if ':' in event_id else event_id
 
 
 def period_recaps(c):

@@ -658,7 +658,14 @@ def approach(season, c, g, why, when, rng, students=None, shares=None, arrangeme
     car = getattr(season, 'career', None)
     if car is not None and car.controls(g.id):
         rng.random()                                  # (the draw the AI's answer takes: every stream stays aligned)
-        car.staff_offer(season, 'coach', c, g, why, when, arrangement)   # the player answers: nothing happens yet
+        known = {d['id'] for d in car.pending(('coach_offer',))}
+        d = car.staff_offer(season, 'coach', c, g, why, when, arrangement)   # the player answers: nothing happens yet
+        if d['id'] not in known and st.coach(g.id) is not c and students is not None:
+            # the offer holds its place in the coach's book (and, for a share, in their share quota) until the player
+            # answers, so the rest of this market cannot fill it (offer_reservations: the same places, derived)
+            students[c.id] = students.get(c.id, 0) + 1
+            if arrangement == 'share' and shares is not None:
+                shares[c.id] = shares.get(c.id, 0) + 1
         return False
     cur = st.coach(g.id)
     p, yes, no = golfer_answers(season, st, g, c, when[0], arrangement)
@@ -676,6 +683,27 @@ def approach(season, c, g, why, when, rng, students=None, shares=None, arrangeme
     if arrangement == 'share':
         shares[c.id] = shares.get(c.id, 0) + 1
     return True
+
+
+def offer_reservations(season):
+    """Places in coaches' books held by the controlled golfer's open coach offers: {coach id: (places, of which share
+    places)}. An offer holds a place (and, for a share of winnings, a place in the coach's share quota) from when it
+    is made until the player answers it -- accepted (the place becomes the stint), declined, withdrawn, or replaced
+    by the coach's own later offer -- or the coach stops working; never for a golfer the coach already coaches.
+    Derived from the open decisions, so a save made before reservations holds them as soon as it is read."""
+    car = getattr(season, 'career', None)
+    if car is None or car.status != 'active':
+        return {}
+    st = season.staff
+    cur = st.coach(car.golfer_id)
+    out = {}
+    for d in car.pending(('coach_offer',)):
+        c = st.coaches.get(d['payload']['staff'])
+        if c is None or c.status != 'active' or c is cur:
+            continue
+        n, n_share = out.get(c.id, (0, 0))
+        out[c.id] = (n + 1, n_share + (d['payload'].get('arrangement') == 'share'))
+    return out
 
 
 def started_now(st, kind, gid, when):
@@ -869,6 +897,9 @@ def start_of_season(season, year):
         students[cid] = students.get(cid, 0) + 1
         if st.deal.get(gid) == 'share':
             shares[cid] = shares.get(cid, 0) + 1
+    for cid, (n, n_share) in offer_reservations(season).items():   # places held by the player's open offers
+        students[cid] = students.get(cid, 0) + n
+        shares[cid] = shares.get(cid, 0) + n_share
     coaches = [c for c in st.coaches.values() if c.status == 'active']
     lives = {c.id: season.places.country(c.id, c.country) for c in coaches}   # where they work from
     home = season.home_country
