@@ -812,6 +812,9 @@ def apply(season, cursor, action):
         return _decide(season, c, cursor, action)
     if t == 'end_control':
         return _end_control(season, c, cursor, action)
+    if t in ('set_goal', 'drop_goal'):                 # optional goals: no rule reads them (career_story)
+        from . import career_story as CS
+        return (CS.set_goal if t == 'set_goal' else CS.drop_goal)(season, c, cursor, action)
     raise CareerError(f'Unknown command {t!r}.')
 
 
@@ -1134,7 +1137,15 @@ def view(season, cursor):
             'trophies': _trophies(season, c, g),
             'scouting': _scouting(season, c, g),
             'opportunities': _opportunities(season, c, g, y, w),
+            'goals': _story(season, c, cursor, 'goals'),
+            'timeline': _story(season, c, cursor, 'timeline'),
             'year_end': year_end_view(season, cursor)}
+
+
+def _story(season, c, cursor, what):
+    """The player's goals and the career timeline (golfsim.career_story), from records only."""
+    from . import career_story as CS
+    return CS.goals_view(season, c, cursor) if what == 'goals' else CS.timeline(season, c)
 
 
 def _opportunities(season, c, g, y, w):

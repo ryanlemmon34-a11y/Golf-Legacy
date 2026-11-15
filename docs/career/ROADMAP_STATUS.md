@@ -24,8 +24,8 @@ Status words: **done** (engine and tests on this branch), **partial**, **in prog
 | Factual inbox / calendar / recaps | **partial** | Engine: notices, log, decisions, recaps, planner, `week_entry`. Inbox/calendar presentation: HAL. |
 | Trophies (majors, college, amateur championships) with engraving and multi-win history | **done (engine read model)** | From recorded winners only (`ctx.results` keeps every winner for good). Contract below. |
 | Per-category fallible potential letter grades | **done (engine read model)** | `golfsim/scouting.py`: observations persisted in the career record at control start and each season review; the judge's seeded persistent error; never ceilings or potential. Grades A/B/C/D/F only. |
-| Optional goals | **not implemented** | Player-set, persisted, progress derived from records. Contract below. |
-| Relationships, timeline / living history | **partial** | Stints, staff relationship records, career log and notices exist; a canonical `timeline` read model: **not implemented** (contract below). |
+| Optional goals | **done (engine)** | `set_goal` / `drop_goal` commands (versioned, exactly-once), at most 5 active; kinds win / play_in / world_rank / amateur_rank; status derived from records; read by no rule (tested: world unchanged). `career.view()['goals']`. |
+| Relationships, timeline / living history | **done (engine read model, first version)** | `career.view()['timeline']`: control stints, answered decisions, trophies, wins and top-10s, coach/caddie partnerships, from records only. |
 | Distinctive fictional tournament names | **not implemented** — needs a scoped decision | Renaming series changes names in every world (and engine fingerprint); history must keep the names it was recorded with. Proposal: a new calendar version or display-name table keyed by series id with the old name kept for recorded years. Not started (kept out of the duplicate-label fix). |
 | College qualifier overhaul (4 early-spring qualifiers, 39 each, all US college tours, heats) | **done (engine), calendar v3** | docs/career/COLLEGE_QUALIFIERS.md; `schedule.NEW_WORLD = 'v3'` for the app (HAL: observer_app new-world calendar); engine DEFAULT stays v2; v1/v2 unchanged. |
 | Same-year USA Open place for the college national champion (amateur) | **built, switched off — flagged for scope accounting** | Route `U2C` (v3 only), tested; `college_champion_usa_open=False` until confirmed. |
@@ -106,10 +106,12 @@ load: {fatigue, performance_threshold, train_fatigue_after, rest_fatigue_after, 
 injured_until, recorded_weeks}}`. Grades and levels are the career's recorded observations (scouting), not
 ceilings; fatigue forecasts are career.readiness's (the engine's own formulas).
 
-### Timeline — `career.timeline(season, career)` (proposed)
-`[{date: [year, week], kind, text, refs}]` from stints, decisions, notices, results, trophies, staff stints, moves;
-nothing invented.
+### Timeline — `career.view()['timeline']` (implemented)
+`[{date: [year, week], kind: 'control'|'decision'|'trophy'|'result'|'staff', text, golfer_id}]`, oldest first, from
+records only (golfsim/career_story.py).
 
-### Goals (proposed; persisted)
-Command `{type: "set_goal", goal: {kind, target, by_year}}` (versioned, exactly-once); `career.view()['goals']`
-with progress derived from records. Not built until the timeline exists.
+### Goals — `career.view()['goals']` (implemented)
+Commands: `{schema: 1, type: 'set_goal', goal: {kind: 'win'|'play_in', series_id, by_year} | {kind: 'world_rank'|
+'amateur_rank', top, by_year}, version}` -> `{ok, goal: 'G<n>'}`; `{schema: 1, type: 'drop_goal', goal_id}`.
+View: `[{id, kind, series_id?, label?, top?, by_year, status: 'active'|'achieved'|'missed'|'dropped', achieved:
+[year, week]|null, progress: {position}|null, set: [year, week], golfer_id}]`, newest first. No rule reads goals.

@@ -2005,8 +2005,9 @@ class Season:
     def college_postseason(self, ed, year, free):
         s = ed.series
         sid = s.series_id
-        sp = self.cal.spec
-        if sp.college_qualifiers and sid.startswith('COLLEGE_QUALIFIER_'):
+        cal = getattr(self, 'cal', None)                 # (v1/v2: no qualifiers; test stubs may have no calendar)
+        sp = cal.spec if cal is not None else None
+        if sp is not None and sp.college_qualifiers and sid.startswith('COLLEGE_QUALIFIER_'):
             k = next(i for i, (x, _, _) in enumerate(sp.college_qualifiers, 1) if x == sid)
             done = self.college_qualified(year, k - 1)
             pool = [g for g in self.active_golfers() if g.tour in self.US_COLLEGE and g.id not in done]
@@ -2014,7 +2015,7 @@ class Season:
             rank = sorted(entrants, key=lambda g: (self.am_pos.get(g.id, 99999), self.observed_form(g.id), g.id))
             self.stage_log[(year, sid, 'unavailable')] = sorted(g.id for g in pool if not free(g))
             return self.college_heats(sp, [g.id for g in rank])
-        if sp.college_qualifiers and sid == 'COLLEGE_NATIONAL_CHAMPIONSHIP':
+        if sp is not None and sp.college_qualifiers and sid == 'COLLEGE_NATIONAL_CHAMPIONSHIP':
             got = self.college_qualified(year)
             can = {g.id for g in self.active_golfers() if g.tour in self.US_COLLEGE and free(g)}
             routes = self.entry_routes.setdefault((year, sid), {})
