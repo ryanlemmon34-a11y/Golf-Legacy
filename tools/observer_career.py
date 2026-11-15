@@ -19,6 +19,7 @@ LABEL = dict(CATS)
 
 STYLE = '''<style>
 .career-hub { --career-gold:#b08a3e; }
+.career-summary {display:flex;flex-wrap:wrap;gap:24px;margin:18px 0 8px}.career-summary strong,.career-summary small {display:block}.career-summary strong {font-size:22px}.career-summary small {font-size:11px}.career-calendar {max-height:420px;overflow:auto}.career-calendar li {padding:12px 0;border-bottom:1px solid var(--line)}
 .career-hub h2 { margin:0 0 14px; } .career-hub h3 { margin:0 0 8px; }
 .career-hero { display:flex; justify-content:space-between; align-items:center; gap:28px; padding:26px 30px;
  background:linear-gradient(110deg,var(--soft),var(--panel)); border:1px solid var(--line); border-top:4px solid var(--accent); border-radius:12px; }
@@ -138,22 +139,23 @@ def career_page(w, q):
     latest = recaps[0] if recaps else None
     state = ('Your career' if v['status'] == 'active' else 'Choosing your next golfer' if v['status'] == 'choosing'
              else f'under AI control since {esc(wk(*v["ended"]))}' if v.get('ended') else 'Career history')
+    from observer_career_context import summary as season_summary, panels as context_panels
     from observer_career_yearend import panel as annual_panel, history as stint_history
     annual = annual_panel(w, v)
     hero = (f'<section class="career-hero"><div><div class="eyebrow">{state} · {y} season</div>'
             f'<h2>{esc(g["name"])}</h2><p>{esc(g["country"])} · Age {g["age"]} · {esc(g["tour"])}'
-            f' · {esc(g["status"].title())}</p><a href="/golfer/{g["id"]}">Full player profile ↗</a></div>'
+            f' · {esc(g["status"].title())}</p><a href="/golfer/{g["id"]}">Full player profile ↗</a>{season_summary(v)}</div>'
             f'<div class="career-overall"><span>Overall</span><strong>{g["overall"]:.1f}</strong>'
             '<small>Current ability · 0–100</small></div></section>')
     navigation = ('<div class="career-nav"><a href="#period-review">Period review</a><a href="#career-plan">Next period</a>'
-                  '<a href="#career-attributes">Attributes</a><a href="#career-inbox">Inbox</a></div>')
+                  '<a href="#career-calendar">Calendar &amp; rights</a><a href="#career-attributes">Attributes</a><a href="#career-inbox">Inbox</a></div>')
     inbox = '<section id="career-inbox" class="career-panel">' + decisions_card(w, v) + notices_card(v) + '</section>'
     body = (STYLE + '<div class="career-hub">' + hero + navigation
             + annual + '<div class="career-dashboard"><div class="career-main">' + recap_card(v)
             + '<section id="career-plan" class="career-panel">' + ('<h2>Next season planning</h2><p>Complete the season-transition choices above before making your next weekly plan.</p>' if annual else plan_card(w, v))
             + (advance_card(w, v) if v['status'] == 'active' and not v.get('year_end') else '') + '</section></div>'
             + '<aside class="career-aside">' + readiness_card(v) + support_card(g) + inbox + '</aside></div>'
-            + '<section id="career-attributes" class="career-panel">' + golfer_card(g, latest) + '</section>'
+            + context_panels(v) + '<section id="career-attributes" class="career-panel">' + golfer_card(g, latest) + '</section>'
             + '<details class="career-details"><summary>Career details &amp; hand control back</summary>'
             + f'<p>Started {esc(wk(*v["started"]))}. Current date: {esc(wk(y, week))}.</p>'
             + stint_history(v) + end_card(w, v) + scope_note() + '</details></div>')
@@ -459,10 +461,10 @@ def event_choice(o, cur):
                   'Eligible to request entry' if e['eligible'] and e.get('affordable') else e['why'])
         cost_label = f'Estimated cost {money(e["cost"])}' if e.get('cost') is not None else 'Cost not quoted'
         details.append(f'<li><a href="/event/{quote(e["event_id"])}">{esc(e["name"])}</a><br>'
-                       f'{esc(e["city"])}, {esc(e["country"])} · {esc(e["tour"])} · {cost_label}<br>{esc(reason)}</li>')
+                       f'{esc(e["city"])}, {esc(e["country"])} · {esc(e["tour"])} · {cost_label}<br>{esc(reason)}<br><small>Entry likelihood: not yet estimated.</small></li>')
     return (f'<div class="plan-option"><label><input type="radio" name="w{n}" value="event"{selected}{disabled} required> '
             f'Enter a tournament</label><select name="e{n}" aria-label="Tournament for week {n}"{disabled}>' + ''.join(options) +
-            '</select><small>Request an entry. Your fallback applies if it is not accepted.</small></div>'
+            '</select><small>Choose this activity and a tournament. Request an entry. Your fallback applies if it is not accepted.</small></div>'
             '<details><summary>Event details &amp; eligibility</summary><div class="planner-event-details">' +
             ('<ul>' + ''.join(details) + '</ul>' if details else '<p>No events are listed for this week.</p>') + '</div></details>')
 
@@ -481,6 +483,8 @@ def plan_page(w, q):
     if p is None:
         return 'Planner', ('<p>That period cannot be planned now (only the current four-week period and the next).</p>'
                            '<p><a href="/career">Back to the career</a></p>')
+    from observer_career_advice import enrich_plan, render_advice
+    p = enrich_plan(p, v['golfer'], v.get('readiness', {}).get('training_enabled', True))
     cats = ''.join(f'<option value="{k}">{esc(label)}</option>' for k, label in CATS)
     rows = []
     for o in p['weeks']:
@@ -512,7 +516,7 @@ def plan_page(w, q):
         rows.append(f'<fieldset class="planner-week"><legend>Week {n}</legend>' + inj + ''.join(opts)
                     + '<div class="planner-fallback"><strong>If your event entry is not accepted</strong>' + fallback
                     + '</div><details><summary>Selection-only events</summary>' + sel_ev + '</details></fieldset>')
-    pol = p['policy'] or {}
+    pol = p['policy'] if p['policy'] is not None else {'selected': 'accept', 'qualifying': 'enter'}
     chk = lambda k, val: ' checked' if pol.get(k) == val else ''
     policy = ('<fieldset><legend>Selections and invitations in this period (majors, championships, invitations, '
               'college postseason)</legend>'
@@ -533,7 +537,7 @@ def plan_page(w, q):
             'the rule that keeps you out. An entry is not a place: fields fill in each event\'s entry order, and if yours '
             'is not accepted the week falls back to what you choose here. Events that choose their own fields are covered '
             'by the period\'s policy below.</p>')
-    return f'Plan weeks {w0}–{min(52, w0 + 3)} of {y}', STYLE + '<div class="career-hub"><p class="back"><a href="/career">← Career overview</a></p><div class="planner-intro"><p>Build a period that balances competition, development and recovery.</p></div>' + readiness_card(v) + '<details><summary>How event entry works</summary>' + note + '</details>' + training_categories_help() + form + '</div>'
+    return f'Plan weeks {w0}–{min(52, w0 + 3)} of {y}', STYLE + '<div class="career-hub"><p class="back"><a href="/career">← Career overview</a></p><div class="planner-intro"><p>Build a period that balances competition, development and recovery.</p></div>' + readiness_card(v) + '<details><summary>How event entry works</summary>' + note + '</details>' + training_categories_help() + render_advice(p) + form + '</div>'
 
 
 # ---- reading forms into commands ------------------------------------------------------------------------------------
