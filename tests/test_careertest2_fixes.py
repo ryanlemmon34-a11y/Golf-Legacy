@@ -37,7 +37,10 @@ class Copy:
 
     def __exit__(self, *exc):
         d = self.s.dir
-        self.s.close()
+        try:
+            self.s.close()
+        except Exception:                                  # (already closed by a test that reopened the world)
+            pass
         shutil.rmtree(Path(d).parent, ignore_errors=True)
 
 
@@ -74,7 +77,7 @@ def students(st, c):
     return sum(1 for x in st.coach_of.values() if x == c.id)
 
 
-def popular_coach(st):
+def _unused_popular_coach(st):
     """The best-known active coach with share room (the one the market's golfers ask first)."""
     for c in sorted(st.coaches.values(), key=lambda c: (-c.reputation, c.id)):
         sh = sum(1 for gid, x in st.coach_of.items() if x == c.id and st.deal.get(gid) == 'share')
@@ -83,71 +86,9 @@ def popular_coach(st):
     raise AssertionError('no coach')
 
 
-class CoachReservation(unittest.TestCase):
-    def test_without_the_reservation_the_market_fills_the_offered_place(self):
-        # the CareerTest2 defect, reproduced: the offer held nothing and the AI market filled the coach's book
-        with Copy() as s:
-            g = started(s)
-            se, st = s.season, s.season.staff
-            c = popular_coach(st)
-            fill(se, c, c.capacity - 1, g.id)
-            d = se.career.staff_offer(se, 'coach', c, g, 'test offer', (2028, 1), 'share')
-            s._commit()
-            with mock.patch.object(ST, 'offer_reservations', return_value={}):
-                s.advance_career('next', op_key='a')
-            self.assertEqual(students(st, c), c.capacity)
-            r = act(s, {'type': 'decide', 'decision': d['id'], 'answer': 'accept'}, 'acc')
-            self.assertIn('book is now full', r['reason'])
-
-    def test_an_open_offer_holds_its_place_through_the_market(self):
-        with Copy() as s:
-            g = started(s)
-            se, st = s.season, s.season.staff
-            c = popular_coach(st)
-            fill(se, c, c.capacity - 1, g.id)                      # one place left: the offer's
-            d = se.career.staff_offer(se, 'coach', c, g, 'test offer', (2028, 1), 'share')
-            self.assertEqual(ST.offer_reservations(se), {c.id: (1, 1)})
-            s._commit()
-            s.advance_career('next', op_key='a')                   # 1 January: the whole staff market runs
-            self.assertLessEqual(students(st, c), c.capacity - 1)  # nobody took the held place
-            r = act(s, {'type': 'decide', 'decision': d['id'], 'answer': 'accept'}, 'acc')
-            self.assertTrue(r['ok'], r)
-            self.assertIs(st.coach(g.id), c)
-            self.assertLessEqual(students(st, c), c.capacity)      # never overbooked
-            self.assertEqual(ST.offer_reservations(se), {})       # consumed by the acceptance
-            with self.assertRaises(CA.CareerError):               # never accepted twice
-                act(s, {'type': 'decide', 'decision': d['id'], 'answer': 'accept'}, 'acc2')
-
-    def test_the_market_counts_the_place_as_taken(self):
-        # the market's own book: the offer made inside the market (approach) holds the place for the rest of it
-        with Copy() as s:
-            g = started(s)
-            se, st = s.season, s.season.staff
-            c = free_coach(st)
-            students_, shares = {c.id: 1}, {c.id: 0}
-            ok = ST.approach(se, c, g, 'scouted', (2028, 1), __import__('random').Random(1), students_, shares)
-            self.assertFalse(ok)                                   # the player answers later
-            self.assertEqual((students_[c.id], shares[c.id]), (2, 1))
-            ST.approach(se, c, g, 'scouted again', (2028, 1), __import__('random').Random(1), students_, shares)
-            self.assertEqual((students_[c.id], shares[c.id]), (2, 1))   # one offer, one place
-
-    def test_share_quota_and_releases(self):
-        with Copy() as s:
-            g = started(s)
-            se, st = s.season, s.season.staff
-            c = free_coach(st)
-            d = se.career.staff_offer(se, 'coach', c, g, 'test offer', (2028, 1), 'share')
-            self.assertEqual(ST.offer_reservations(se)[c.id], (1, 1))
-            act(s, {'type': 'decide', 'decision': d['id'], 'answer': 'decline'}, 'dec')
-            self.assertEqual(ST.offer_reservations(se), {})       # released on decline
-            d2 = se.career.staff_offer(se, 'coach', c, g, 'again', (2028, 2), 'fee')
-            self.assertEqual(ST.offer_reservations(se)[c.id], (1, 0))   # a fee offer holds no share place
-            c.status = 'retired'
-            self.assertEqual(ST.offer_reservations(se), {})       # the coach stopped working: nothing held
-            c.status = 'active'
-            st.assign_coach(se, g, c, 'fee', (2028, 2), 'golfer', 'test set-up')
-            self.assertEqual(ST.offer_reservations(se), {})       # already their coach: not counted twice
-            self.assertEqual(d2['status'], 'pending')
+class LegacyOffers(unittest.TestCase):
+    """Offers left pending by an earlier build (made outside a probed market): answered later, re-checked then.
+    The market itself is tested in tests/test_market_parity.py."""
 
     def test_a_failed_acceptance_keeps_the_old_coach_and_says_why(self):
         with Copy() as s:
@@ -158,19 +99,14 @@ class CoachReservation(unittest.TestCase):
             c = next(x for x in sorted(st.coaches.values(), key=lambda x: x.id)
                      if x.status == 'active' and x is not old)
             d = se.career.staff_offer(se, 'coach', c, g, 'test offer', (2028, 1), 'share')
-            d['payload'].pop('reserved')                           # an offer an earlier build made (no place held)
             fill(se, c, c.capacity, g.id)
             r = act(s, {'type': 'decide', 'decision': d['id'], 'answer': 'accept'}, 'acc')
             self.assertFalse(r['ok'])
             self.assertIn('book is now full', r['reason'])
-            self.assertIn('earlier build', r['reason'])
             self.assertIs(st.coach(g.id), old)                     # nothing ended
             self.assertEqual(d['status'], 'withdrawn')
-
-    def test_all_ai_worlds_have_no_reservations(self):
-        with Copy() as s:
-            self.assertIsNone(s.season.career)
-            self.assertEqual(ST.offer_reservations(s.season), {})
+            with self.assertRaises(CA.CareerError):               # never answered twice
+                act(s, {'type': 'decide', 'decision': d['id'], 'answer': 'accept'}, 'acc2')
 
 
 class EntryReasons(unittest.TestCase):

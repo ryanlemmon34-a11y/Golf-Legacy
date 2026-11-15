@@ -656,20 +656,24 @@ def approach(season, c, g, why, when, rng, students=None, shares=None, arrangeme
     if the player said yes."""
     st = season.staff
     car = getattr(season, 'career', None)
-    if car is not None and car.controls(g.id):
-        rng.random()                                  # (the draw the AI's answer takes: every stream stays aligned)
-        known = {d['id'] for d in car.pending(('coach_offer',))}
-        d = car.staff_offer(season, 'coach', c, g, why, when, arrangement)   # the player answers: nothing happens yet
-        if d['id'] not in known and st.coach(g.id) is not c and students is not None:
-            # the offer holds its place in the coach's book (and, for a share, in their share quota) until the player
-            # answers, so the rest of this market cannot fill it (offer_reservations: the same places, derived)
-            students[c.id] = students.get(c.id, 0) + 1
-            if arrangement == 'share' and shares is not None:
-                shares[c.id] = shares.get(c.id, 0) + 1
-        return False
+    mine = car is not None and car.controls(g.id)
     cur = st.coach(g.id)
     p, yes, no = golfer_answers(season, st, g, c, when[0], arrangement)
-    if rng.random() >= p:
+    draw = rng.random()                               # (the answer's draw, taken by the player's answer too)
+    if mine:
+        # the player answers at this very point of the market, as an AI golfer does (market_answer): no place is
+        # held, nothing waits; a fee they cannot commit to is refused by the same rule (p = 0) without asking
+        if p <= 0.0:
+            st.refuse(season, 'coach', c, g, when, 'coach', 'golfer', why, no)
+            return False
+        ans = market_answer(season, car, 'coach', c, g, why, when, arrangement)
+        if ans is None:
+            return False                              # (asked after the market: a pending offer, re-checked later)
+        if ans != 'accept':
+            st.refuse(season, 'coach', c, g, when, 'coach', 'golfer', why, 'declined by the player')
+            return False
+        yes = 'accepted by the player'
+    elif draw >= p:
         st.refuse(season, 'coach', c, g, when, 'coach', 'golfer', why, no)
         return False
     students, shares = ({} if students is None else students), ({} if shares is None else shares)
@@ -685,43 +689,29 @@ def approach(season, c, g, why, when, rng, students=None, shares=None, arrangeme
     return True
 
 
-def offer_reservations(season):
-    """Places in coaches' books held by the controlled golfer's open coach offers: {coach id: (places, of which share
-    places)}. An offer holds a place (and, for a share of winnings, a place in the coach's share quota) from when it
-    is made until the player answers it -- accepted (the place becomes the stint), declined, withdrawn, or replaced
-    by the coach's own later offer -- or the coach stops working; never for a golfer the coach already coaches.
-    Derived from the open decisions, so a save made before reservations holds them as soon as it is read."""
-    car = getattr(season, 'career', None)
-    if car is None or car.status != 'active':
-        return {}
-    st = season.staff
-    cur = st.coach(car.golfer_id)
-    out = {}
-    for d in car.pending(('coach_offer',)):
-        c = st.coaches.get(d['payload']['staff'])
-        if c is None or c.status != 'active' or c is cur:
-            continue
-        n, n_share = out.get(c.id, (0, 0))
-        out[c.id] = (n + 1, n_share + (d['payload'].get('arrangement') == 'share'))
-    return out
+class MarketQuestion(Exception):
+    """Raised in a market probe (Season.market_probe) at the first approach to the controlled golfer that has no
+    answer yet: the market stops there, on a throwaway copy, so the player can answer before the real one runs."""
+
+    def __init__(self, kind, person, g, why, when, arrangement=None):
+        super().__init__(kind, person.id, g.id)
+        self.kind, self.staff_id, self.golfer_id, self.why, self.when = kind, person.id, g.id, why, when
+        self.arrangement = arrangement
 
 
-def caddie_reservations(season):
-    """Caddies held by the controlled golfer's open caddie offers (ids). A caddie who offered to carry the player's
-    bag makes no further offer and is not hired by anyone else until the player answers -- accepted (the stint),
-    declined or withdrawn -- or they stop working; never counted for the golfer's own current caddie. Derived from
-    the open decisions, so a save made before reservations holds them as soon as it is read."""
-    car = getattr(season, 'career', None)
-    if car is None or car.status != 'active':
-        return set()
-    st = season.staff
-    cur = st.caddie(car.golfer_id)
-    out = set()
-    for d in car.pending(('caddie_offer',)):
-        k = st.caddies.get(d['payload']['staff'])
-        if k is not None and k.status == 'active' and k is not cur:
-            out.add(k.id)
-    return out
+def market_answer(season, car, kind, person, g, why, when, arrangement=None):
+    """The player's answer to an approach made in the 1 January staff market: 'accept' / 'decline' as recorded before
+    the market ran (career.market_answers), so it applies at the same point of the market, with the same draw, as
+    an AI golfer's answer would. In a probe, an approach not yet answered stops the market (MarketQuestion). Outside
+    a probe, an approach not answered (e.g. a save from before this rule) becomes an ordinary pending offer, answered
+    later and re-checked then (None)."""
+    ans = car.market_answers.get(when[0], {}).get(f'{kind}:{person.id}') if hasattr(car, 'market_answers') else None
+    if ans is not None:
+        return ans
+    if season.__dict__.get('_market_probe'):
+        raise MarketQuestion(kind, person, g, why, when, arrangement)
+    car.staff_offer(season, kind, person, g, why, when, arrangement)
+    return None
 
 
 def started_now(st, kind, gid, when):
@@ -813,17 +803,28 @@ def golfer_takes_caddie(season, st, g, k, year):
 def caddie_offer(season, k, g, why, when, rng):
     """A caddie offers to carry a golfer's bag and the golfer answers (golfer_takes_caddie): only a yes ends the
     golfer's current caddie's stint (recorded as leaving for the approach) and opens the new one, started by the
-    caddie, with both reasons; a no is recorded with both reasons (on the partnership kept, if any). True if yes;
-    'held' (also true: the caddie makes no further offer) when the offer goes to the player, who answers later."""
+    caddie, with both reasons; a no is recorded with both reasons (on the partnership kept, if any). True if yes.
+    The controlled golfer answers at the same point (market_answer)."""
     st = season.staff
     car = getattr(season, 'career', None)
-    if car is not None and car.controls(g.id):
-        rng.random()                                  # (the draw the AI's answer takes: every stream stays aligned)
-        car.staff_offer(season, 'caddie', k, g, why, when)   # the player answers: nothing happens yet
-        return 'held'                                 # (the caddie is held for the player: caddie_reservations)
+    mine = car is not None and car.controls(g.id)
     cur = st.caddie(g.id)
     p, yes, no = golfer_takes_caddie(season, st, g, k, when[0])
-    if rng.random() >= p:
+    draw = rng.random()                               # (the answer's draw, taken by the player's answer too)
+    if mine:
+        # the player answers at this point of the market (market_answer), as an AI golfer does; a fee they cannot
+        # commit to is refused by the same rule (p = 0) without asking
+        if p <= 0.0:
+            st.refuse(season, 'caddie', k, g, when, 'caddie', 'golfer', why, no)
+            return False
+        ans = market_answer(season, car, 'caddie', k, g, why, when)
+        if ans is None:
+            return False
+        if ans != 'accept':
+            st.refuse(season, 'caddie', k, g, when, 'caddie', 'golfer', why, 'declined by the player')
+            return False
+        yes = 'accepted by the player'
+    elif draw >= p:
         st.refuse(season, 'caddie', k, g, when, 'caddie', 'golfer', why, no)
         return False
     if cur is not None:
@@ -840,7 +841,7 @@ def caddie_approaches(season, year, offered):
     one per pair per winter (`offered`). Returns {caddie id: offers made}."""
     st = season.staff
     when = (year, 1)
-    bags = st._bags() | caddie_reservations(season)  # (a caddie held by the player's open offer is not free)
+    bags = st._bags()
     free = sorted((k for k in st.caddies.values() if k.status == 'active' and k.id not in bags),
                   key=lambda k: (-k.reputation, k.id))
     if not free:
@@ -916,9 +917,6 @@ def start_of_season(season, year):
         students[cid] = students.get(cid, 0) + 1
         if st.deal.get(gid) == 'share':
             shares[cid] = shares.get(cid, 0) + 1
-    for cid, (n, n_share) in offer_reservations(season).items():   # places held by the player's open offers
-        students[cid] = students.get(cid, 0) + n
-        shares[cid] = shares.get(cid, 0) + n_share
     coaches = [c for c in st.coaches.values() if c.status == 'active']
     lives = {c.id: season.places.country(c.id, c.country) for c in coaches}   # where they work from
     home = season.home_country
@@ -1033,7 +1031,7 @@ def start_of_season(season, year):
             st.end_caddie(season, g.id, when, 'no longer on a tour that needs one' if not wants_caddie(g)
                           else 'could no longer afford them', 'golfer')
     caddie_approaches(season, year, offered)          # caddies without a bag make the first move
-    bags = st._bags() | caddie_reservations(season)  # (held for the player's open offers: not hired by others)
+    bags = st._bags()
     free_cads = sorted((k for k in st.caddies.values() if k.status == 'active' and k.id not in bags),
                        key=lambda k: (-k.reputation - rng.gauss(0, 8), k.id))
     turned_down = {}                                  # caddie -> bags they have said no to this winter

@@ -3,49 +3,43 @@
 Engine only. No change to `tools/observer_career.py`, `tools/observer_career_context.py` or
 `golfsim/career_context.py` (HAL's). `career.view()` is not touched (HAL's hook stays free).
 
-## 1. Coach offers hold a place in the coach's book
+## 1. Coach and caddie offers: answered at the same point of the market (supersedes 355555d / 61330b3)
 
-**Defect (CareerTest2):** coach Hunter Long (9894) offered to coach the player's golfer Reed Mann (8291) in 2029 week 1;
-accepting in week 5 was withdrawn, "their book is now full". `staff.approach` queued the player's offer and returned without counting it,
-so the rest of the same 1 January market filled the coach's book (capacity 8; all eight stints began week 1).
+**Defect (CareerTest2):** coach Hunter Long (9894) offered to coach the player's golfer Reed Mann (8291) in 2029
+week 1; accepting in week 5 was withdrawn, "their book is now full": the offer held nothing and the rest of the same
+1 January market filled the coach's book.
 
-**Fix:**
-* `staff.offer_reservations(season) -> {coach id: (places, share places)}`: the places held by the controlled
-  golfer's open coach offers. Derived from the open decisions (so a save is covered as soon as it is read); not held
-  for a coach who has stopped working, nor for the golfer's own current coach (no double count).
-* The market counts them as taken from its start (client total and the one-third share quota), and an offer made
-  inside the market (`approach`) adds its place at once — so neither scouting, established-player approaches nor
-  golfers looking for a coach can take it.
-* Released when the offer is answered (declined, accepted — the place becomes the stint —, withdrawn) or the coach
-  stops working. Open offers are due by the end of their planning period (the game stops for them), so nothing is
-  locked for longer.
-* Acceptance re-checks the real book; a failed acceptance changes nothing (the current coach is kept) and says why.
-  An offer created by an earlier build (no `reserved` flag in its payload) that fails for capacity says so:
-  "their book is now full (an offer made by an earlier build, which held no place for it)". Recorded history
-  (resolved and withdrawn decisions, stints) is never rewritten.
-* All-AI worlds: no career, no reservations, identical (goldens).
+**First fix (355555d, 61330b3), withdrawn after a parity audit:** open offers held a coach place / a caddie until the
+player answered (up to the end of the period). An AI golfer answers an approach on the spot, and its no frees the
+place for the rest of the same market; the player's hold kept a declined place empty for a whole year and let the
+player hold several offers at once -- option value and denied places no AI golfer has. Removed
+(`offer_reservations`, `caddie_reservations`, the `'held'` return, the payload `reserved` flag).
 
-The caddie market had the analogous race; fixed in the follow-on `fix/caddie-offer-reservation` (section 1b).
+**Rule now (equal decision timing):** the 1 January staff market (staff.start_of_season) runs in a fixed order and
+an AI golfer answers each approach on the spot. For the controlled golfer:
 
-## 1b. Caddie offers hold the caddie (follow-on)
+1. Before 1 January runs, the engine runs 1 January on a throwaway copy of the world (`Season.market_probe`); the
+   copy stops at the first approach to the player not yet answered (`staff.MarketQuestion`). The real world has not
+   moved: the cursor stays at 1 January 'start'.
+2. That approach becomes a decision (`coach_offer` / `caddie_offer`, payload `market: <year>`), due at once
+   (deadline = 1 January: the market waits for it; no later deadline is shown). One at a time.
+3. The answer is recorded (`career.market_answers[year]`). When the real market reaches the same approach
+   (`staff.market_answer`) it is applied there, with the same random draw an AI golfer's answer takes: a yes takes
+   the place then; a no leaves it to the next golfer in the same market. The next approach to the player, if any,
+   is found the same way.
+4. A coach approaches only with room (total and share quota, the market's own counts) and nothing is allocated
+   between the approach and the answer, so every market offer is capacity-backed when answered. A fee the golfer
+   cannot commit to is refused by the AI's own rule (chance 0) without asking.
+5. Paired tests (tests/test_market_parity.py): the same world and the same choice, answered by the player and by an
+   AI golfer forced to that choice, give identical worlds -- coach accept/decline in both orders, caddie
+   accept/decline -- and reloading between answers changes nothing.
 
-**Defect:** a caddie without a bag who offered to carry the player's bag went on making offers to other golfers in
-the same market (`caddie_approaches`), and stayed in the pool AI golfers hire from, so they could be taken before
-the player answered; acceptance then failed with "they now carry another bag".
+Offers left pending by an earlier build (made outside a probed market) are still answered later and re-checked
+(an honest "their book is now full" if so; the current coach kept). Recorded history is never rewritten.
+All-AI worlds: unchanged (goldens).
 
-**Fix:**
-* `staff.caddie_reservations(season) -> {caddie id}`: caddies held by the controlled golfer's open caddie offers.
-  Derived from the open decisions (old saves covered when read); not for a caddie who stopped working, nor for the
-  golfer's own current caddie.
-* A caddie whose offer goes to the player makes no further offer that market (`caddie_offer` returns `'held'`), and
-  held caddies are neither free to make offers nor hireable by AI golfers.
-* Released when the offer is answered (accepted: the stint; declined; withdrawn) or the caddie stops working;
-  offers are due by the end of their planning period.
-* Acceptance re-checks (no double bag: a caddie carries one bag); a failed acceptance keeps the current caddie; a
-  successful one ends the old stint and opens the new one in one step. An old offer (no `reserved` flag) that
-  fails because the caddie was taken says so: "they now carry another bag (an offer made by an earlier build, which
-  did not hold them for you)". History is not rewritten.
-* All-AI worlds: no career, nothing held, identical (goldens).
+Still a capability gap, not an advantage: the player never *looks for* a coach or caddie themselves (the AI's own
+search step is skipped for them, its draw still taken). If built, it must use the same search rule.
 
 ## 2. Truthful entry reasons
 
@@ -98,5 +92,5 @@ place in the target event until that event's field is decided (its own `week_ent
 
 * golfsim changed, so the engine fingerprint changes: worlds saved by 5582e27 open browse-only in this build (as
   for every engine change); no migration is enabled. Original saves are never written.
-* Career record: `entry_evidence` is a new optional attribute (absent → `{}`), `reserved` a new optional payload
+* Career record: `entry_evidence` is a new optional attribute (absent → `{}`), `market_answers` / `market_probe` new optional attributes (absent → none), `market` an optional payload
   key; nothing existing is rewritten. Career format unchanged (2).

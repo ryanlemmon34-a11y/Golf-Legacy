@@ -107,6 +107,8 @@ class Career:
         # control stints, oldest first: who the player controlled, from when to when (None: still), and how chosen
         self.stints = [{'golfer_id': golfer_id, 'from': [year, week], 'to': None, 'how': dict(entry)}]
         self.winter = {}                      # year -> the player's year-end answers ('intent', 'career', 'staff', ...)
+        self.market_answers = {}              # year -> {'coach:<id>' | 'caddie:<id>': 'accept' | 'decline'} (staff market)
+        self.market_probe = None              # [year, answers]: the last probe found no unanswered approach
 
     # ---- reading -------------------------------------------------------------------------------------------------
     def controls(self, gid):
@@ -184,9 +186,9 @@ class Career:
 
     # ---- the engine's hooks ------------------------------------------------------------------------------------------
     def staff_offer(self, season, kind, person, g, why, when, arrangement=None):
-        """A coach or caddie approaches the controlled golfer: a pending offer, with nothing ended, assigned or
-        charged. A coach's offer holds its place in the coach's book until it is answered (staff.offer_reservations).
-        Open until the end of the planning period it was made in."""
+        """A coach or caddie approached the controlled golfer outside a probed market (staff.market_answer: e.g. a
+        save from before market answers): a pending offer, with nothing ended, assigned or charged, re-checked when
+        answered. Open until the end of the planning period it was made in."""
         y, w = when
         deadline = (y, min(52, block_start(max(1, w)) + BLOCK)) if block_start(max(1, w)) + BLOCK <= 52 else None
         if kind == 'coach':
@@ -196,13 +198,12 @@ class Career:
             text = (f'Coach {person.name} (reputation {person.reputation:.0f}) offers to coach you for {terms}. '
                     f'Why: {why}.')
             payload = {'staff': person.id, 'name': person.name, 'arrangement': arrangement, 'fee': fee, 'why': why,
-                       'when': [y, w], 'reserved': True}    # (holds a place in the coach's book: offer_reservations)
+                       'when': [y, w]}
             return self.ensure('coach_offer', ('coach', person.id, y), y, w, deadline, payload, text,
                                ('accept', 'decline'))
         text = (f'Caddie {person.name} (reputation {person.reputation:.0f}) offers to carry your bag for '
                 f'${person.weekly_fee:,.0f} a week when you play. Why: {why}.')
-        payload = {'staff': person.id, 'name': person.name, 'weekly_fee': person.weekly_fee, 'why': why, 'when': [y, w],
-                   'reserved': True}                   # (held for the player until answered: caddie_reservations)
+        payload = {'staff': person.id, 'name': person.name, 'weekly_fee': person.weekly_fee, 'why': why, 'when': [y, w]}
         return self.ensure('caddie_offer', ('caddie', person.id, y), y, w, deadline, payload, text, ('accept', 'decline'))
 
     def job_offer(self, year, week, weeks_blocked):
@@ -383,6 +384,9 @@ def gate(season, cursor):
         if c.status == 'choosing':
             d = _newcomer_decision(season, c, y)
             return {'kind': 'decision', 'ids': [d['id']]} if d is not None else None
+        d = market_question(season, c, y)              # the staff market's approaches to the player, one at a time
+        if d is not None:
+            return {'kind': 'decision', 'ids': [d['id']]}
         return None                                    # 1 January runs; what it brings is checked before the week
     if c.status != 'active':
         return None
@@ -438,6 +442,64 @@ def winter_stage(season, c, year):
     return 'engine'
 
 
+def market_question(season, c, y):
+    """The 1 January staff market's next approach to the controlled golfer, as a decision, or None.
+
+    The market (staff.start_of_season) runs in a fixed order and an AI golfer answers each approach on the spot. So
+    that the player answers at the same point, with nothing in the market having moved meanwhile, the whole of
+    1 January is first run on a throwaway copy of the world (Season.market_probe), which stops at the first approach
+    to the player not yet answered; the real 1 January has not run. The decision is due at once (the market waits
+    for it); its answer is applied when the real market reaches the same approach, with the same draw an AI answer
+    takes (staff.market_answer). Approaches therefore come one at a time, every offer is backed by a place the coach
+    has at that moment (a coach approaches only with room, and nothing is allocated before the answer), and no place
+    is ever held while the player decides. Answered offers and the probe that found none are recorded."""
+    if not hasattr(c, 'market_answers'):
+        c.market_answers, c.market_probe = {}, None
+    for d in c.pending(('coach_offer', 'caddie_offer')):
+        if d['payload'].get('market') == y:
+            return d
+    answers = c.market_answers.get(y, {})
+    key = [y, sorted(answers.items())]
+    if c.market_probe == key:
+        return None
+    q = season.market_probe(y)
+    if q is None:
+        c.market_probe = key
+        return None
+    st = season.staff
+    person = st.coaches.get(q.staff_id) if q.kind == 'coach' else st.caddies.get(q.staff_id)
+    g = season.g[c.golfer_id]
+    if q.kind == 'coach':
+        terms = (f'a share of future prize money ({_share_text()})' if q.arrangement == 'share'
+                 else f'a fee of ${person.fee:,.0f} a year')
+        text = (f'1 January {y}: coach {person.name} (reputation {person.reputation:.0f}) offers to coach you for '
+                f'{terms}. Why: {q.why}. The staff market is stopped at this offer: answer now (nothing else in the '
+                'market has happened yet; a no leaves the place to others in this market, as anyone\'s would).')
+        payload = {'staff': person.id, 'name': person.name, 'arrangement': q.arrangement, 'fee': person.fee,
+                   'why': q.why, 'when': [y, 1], 'market': y}
+    else:
+        text = (f'1 January {y}: caddie {person.name} (reputation {person.reputation:.0f}) offers to carry your bag '
+                f'for ${person.weekly_fee:,.0f} a week when you play. Why: {q.why}. The staff market is stopped at this '
+                'offer: answer now (nothing else in the market has happened yet).')
+        payload = {'staff': person.id, 'name': person.name, 'weekly_fee': person.weekly_fee, 'why': q.why,
+                   'when': [y, 1], 'market': y}
+    return c.ensure(f'{q.kind}_offer', ('market', q.kind, person.id, y), y, 1, (y, 1), payload, text,
+                    ('accept', 'decline'))
+
+
+def _answer_market(season, c, d, g, y, w, answer):
+    """A 1 January market offer answered: recorded, applied when the real market reaches it (market_question)."""
+    yr = d['payload']['market']
+    if season.assignments.get(yr) is not None or (y, w) != (yr, 1):
+        raise CareerError('This market offer is no longer open (the market has run).')
+    kind = d['kind'].split('_')[0]
+    c.market_answers.setdefault(yr, {})[f'{kind}:{d["payload"]["staff"]}'] = answer
+    c.resolve(d, 'accepted' if answer == 'accept' else 'declined', y, w,
+              ('accepted' if answer == 'accept' else 'declined') + ': applied as the 1 January market reaches it')
+    c.log.append((y, w, f'{answer}ed {kind} {d["payload"]["name"]} (1 January market)'))
+    return {'ok': True, 'answer': answer}
+
+
 def _year_end_gate(season, c, g, y):
     legacy = [d for d in c.pending() if d['kind'] == 'season_end']
     if legacy:                                         # (a stop recorded by an earlier build: answered as it was)
@@ -447,6 +509,8 @@ def _year_end_gate(season, c, g, y):
     stage = winter_stage(season, c, y)
     ids = []
     if stage == 'season_review':
+        from . import scouting
+        scouting.observe(season, c, g.id, y, 52)        # the season's-end look (once; fallible potential grades)
         choices = [
             {'key': 'keep', 'label': f'Keep playing as {g.name}',
              'facts': {'detail': f'You make {g.name}\'s winter choices next (career path, staff, residence).'}},
@@ -642,6 +706,8 @@ def _answer_year_end(season, c, d, cursor, answer):
             raise CareerError('That golfer is no longer playing: choose another.')
         c.golfer_id = pick
         c.status = 'active'
+        from . import scouting
+        scouting.observe(season, c, pick, y, 1)          # the first look at the new golfer
         c.stints.append({'golfer_id': pick, 'from': [y, 1], 'to': None,
                          'how': {'kind': 'junior', 'class': y, 'candidates': len(d['payload']['candidates']),
                                  'rule': 'chosen by the player from a seeded sample of the season\'s junior class'}})
@@ -709,6 +775,8 @@ def new_career(season, cursor, action):
                  'rule': 'a seeded uniform draw over the season\'s junior class'}
     c = Career(pick, y, 1, entry)
     g = season.g[pick]
+    from . import scouting
+    scouting.observe(season, c, pick, y, 1)              # the first look (fallible potential grades)
     c.note(y, 1, 'start', f'You now control {g.name}, one of the {len(cls)} juniors who entered the world for {y}.')
     season.career = c
     return {'ok': True, 'golfer': pick, 'name': g.name}
@@ -839,6 +907,8 @@ def _decide(season, c, cursor, action):
         return _end_control(season, c, cursor, action)
     if d['kind'] in YEAR_END_KINDS:
         return _answer_year_end(season, c, d, cursor, answer)
+    if d['kind'] in ('coach_offer', 'caddie_offer') and d['payload'].get('market'):
+        return _answer_market(season, c, d, g, y, w, answer)
     if d['kind'] == 'coach_offer':
         return _answer_coach(season, c, d, g, y, w, answer)
     if d['kind'] == 'caddie_offer':
@@ -879,11 +949,9 @@ def _answer_coach(season, c, d, g, y, w, answer):
         if st.coach(g.id) is coach:
             problem = 'they already coach you'
         elif students >= coach.capacity:
-            problem = 'their book is now full' + ('' if p.get('reserved') else
-                                                  ' (an offer made by an earlier build, which held no place for it)')
+            problem = 'their book is now full'
         elif p['arrangement'] == 'share' and shares >= coach.capacity // 3:
-            problem = 'they have no room left for share-of-winnings players' + ('' if p.get('reserved') else
-                                                  ' (an offer made by an earlier build, which held no place for it)')
+            problem = 'they have no room left for share-of-winnings players'
         elif p['arrangement'] == 'fee' and coach.fee > ST.coach_budget(season, g, y):
             problem = f'their fee (${coach.fee:,.0f} a year) is more than you can now commit to a coach'
     if problem:
@@ -914,8 +982,7 @@ def _answer_caddie(season, c, d, g, y, w, answer):
     if k is None or k.status != 'active':
         problem = 'the caddie is no longer working'
     elif k.id in st._bags() and st.caddie(g.id) is not k:
-        problem = 'they now carry another bag' + ('' if p.get('reserved') else
-                                                  ' (an offer made by an earlier build, which did not hold them for you)')
+        problem = 'they now carry another bag'
     elif st.caddie(g.id) is k:
         problem = 'they already carry your bag'
     elif k.weekly_fee * max(1, season.target_events(g)) > ST.caddie_budget(season, g, y):
@@ -1064,7 +1131,21 @@ def view(season, cursor):
             'notices': list(c.notices[-20:]), 'log': list(c.log[-20:]),
             'recaps': period_recaps(c), 'readiness': readiness(season, g, y, w),
             'stints': [stint_view(season, st) for st in getattr(c, 'stints', [])],
+            'trophies': _trophies(season, c, g),
+            'scouting': _scouting(season, c, g),
             'year_end': year_end_view(season, cursor)}
+
+
+def _scouting(season, c, g):
+    """Fallible potential grades for the controlled golfer (golfsim.scouting): from recorded observations only."""
+    from . import scouting
+    return scouting.view(season, c, g.id) if g is not None else None
+
+
+def _trophies(season, c, g):
+    """The controlled golfer's trophies (golfsim.awards): recorded wins only; [] if none."""
+    from . import awards
+    return awards.trophies(season, g.id, c) if g is not None else None
 
 
 def stint_view(season, st):

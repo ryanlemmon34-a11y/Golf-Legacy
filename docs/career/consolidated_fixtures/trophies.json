@@ -1,0 +1,28 @@
+{
+ "note": "illustrative: the 2028 win is injected into a throwaway copy to show the shape",
+ "trophies": [
+  {
+   "event_id": "2028:NATIONAL_AMATEUR_ARGENTINA",
+   "series_id": "NATIONAL_AMATEUR_ARGENTINA",
+   "event_name": "Argentina Amateur Championship",
+   "year": 2028,
+   "winner_id": 1268,
+   "winner_name": "Drew Rogers",
+   "kind": "amateur",
+   "times_won": 1,
+   "during_control": true
+  }
+ ],
+ "engraving_example": [
+  {
+   "year": 2027,
+   "winner_id": 200,
+   "winner_name": "Lucas Cárdenas"
+  },
+  {
+   "year": 2028,
+   "winner_id": 1268,
+   "winner_name": "Drew Rogers"
+  }
+ ]
+}

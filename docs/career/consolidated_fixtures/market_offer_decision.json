@@ -1,0 +1,30 @@
+{
+ "id": "D2",
+ "kind": "coach_offer",
+ "status": "pending",
+ "created": [
+  2028,
+  1
+ ],
+ "deadline": [
+  2028,
+  1
+ ],
+ "payload": {
+  "staff": 637,
+  "name": "Markus Keller",
+  "arrangement": "share",
+  "fee": 66400.0,
+  "why": "test approach",
+  "when": [
+   2028,
+   1
+  ],
+  "market": 2028
+ },
+ "text": "1 January 2028: coach Markus Keller (reputation 93) offers to coach you for a share of future prize money (5% of prize money). Why: test approach. The staff market is stopped at this offer: answer now (nothing else in the market has happened yet; a no leaves the place to others in this market, as anyone's would).",
+ "options": [
+  "accept",
+  "decline"
+ ]
+}

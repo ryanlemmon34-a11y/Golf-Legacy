@@ -1091,6 +1091,20 @@ class Season:
             self._active_n = n
         return self._active
 
+    def market_probe(self, year):
+        """Run 1 January of `year` on a throwaway copy of this season and return the first staff-market approach to
+        the controlled golfer that has no recorded answer (staff.MarketQuestion), or None. This season is untouched
+        (career.market_question)."""
+        import pickle
+        from . import staff as ST
+        probe = pickle.loads(pickle.dumps(self, protocol=pickle.HIGHEST_PROTOCOL))
+        probe._market_probe = True
+        try:
+            probe.start_year(year)
+        except ST.MarketQuestion as q:
+            return q
+        return None
+
     def start_year(self, year):
         """1 January: people refreshed, sponsor contracts, the staff market, playing rights."""
         self._active = None

@@ -1,0 +1,75 @@
+{
+ "as_of": [
+  2028,
+  1
+ ],
+ "source": "coach",
+ "judge": "Po-yu Yang",
+ "categories": [
+  {
+   "category": "physical",
+   "grade": "F",
+   "confidence": "low",
+   "explanation": "Coach Po-yu Yang read (2028, week 1): physical looks about 38; at 18 a golfer typically still gains about 1.8 a year. An estimate, not a certainty.",
+   "history": [
+    {
+     "year": 2028,
+     "week": 1,
+     "grade": "F"
+    }
+   ]
+  },
+  {
+   "category": "long_game",
+   "grade": "F",
+   "confidence": "low",
+   "explanation": "Coach Po-yu Yang read (2028, week 1): long game looks about 26; at 18 a golfer typically still gains about 1.8 a year. An estimate, not a certainty.",
+   "history": [
+    {
+     "year": 2028,
+     "week": 1,
+     "grade": "F"
+    }
+   ]
+  },
+  {
+   "category": "short_game",
+   "grade": "D",
+   "confidence": "low",
+   "explanation": "Coach Po-yu Yang read (2028, week 1): short game looks about 36; at 18 a golfer typically still gains about 1.8 a year. An estimate, not a certainty.",
+   "history": [
+    {
+     "year": 2028,
+     "week": 1,
+     "grade": "D"
+    }
+   ]
+  },
+  {
+   "category": "putting",
+   "grade": "D",
+   "confidence": "low",
+   "explanation": "Coach Po-yu Yang read (2028, week 1): putting looks about 43; at 18 a golfer typically still gains about 1.8 a year. An estimate, not a certainty.",
+   "history": [
+    {
+     "year": 2028,
+     "week": 1,
+     "grade": "D"
+    }
+   ]
+  },
+  {
+   "category": "mental",
+   "grade": "F",
+   "confidence": "low",
+   "explanation": "Coach Po-yu Yang read (2028, week 1): mental looks about 29; at 18 a golfer typically still gains about 1.8 a year. An estimate, not a certainty.",
+   "history": [
+    {
+     "year": 2028,
+     "week": 1,
+     "grade": "F"
+    }
+   ]
+  }
+ ]
+}
