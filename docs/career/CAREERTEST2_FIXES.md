@@ -5,8 +5,8 @@ Engine only. No change to `tools/observer_career.py`, `tools/observer_career_con
 
 ## 1. Coach offers hold a place in the coach's book
 
-**Defect (CareerTest2):** Reed Mann (8291) offered to coach Hunter Long (9894) in 2029 week 1; accepting in week 5
-was withdrawn, "their book is now full". `staff.approach` queued the player's offer and returned without counting it,
+**Defect (CareerTest2):** coach Hunter Long (9894) offered to coach the player's golfer Reed Mann (8291) in 2029 week 1;
+accepting in week 5 was withdrawn, "their book is now full". `staff.approach` queued the player's offer and returned without counting it,
 so the rest of the same 1 January market filled the coach's book (capacity 8; all eight stints began week 1).
 
 **Fix:**
@@ -25,8 +25,27 @@ so the rest of the same 1 January market filled the coach's book (capacity 8; al
   (resolved and withdrawn decisions, stints) is never rewritten.
 * All-AI worlds: no career, no reservations, identical (goldens).
 
-The caddie market has the analogous shape (a free caddie who offered the player can be hired by another golfer in
-the same market before the player answers); not changed here (not in the authorized scope) — flagged.
+The caddie market had the analogous race; fixed in the follow-on `fix/caddie-offer-reservation` (section 1b).
+
+## 1b. Caddie offers hold the caddie (follow-on)
+
+**Defect:** a caddie without a bag who offered to carry the player's bag went on making offers to other golfers in
+the same market (`caddie_approaches`), and stayed in the pool AI golfers hire from, so they could be taken before
+the player answered; acceptance then failed with "they now carry another bag".
+
+**Fix:**
+* `staff.caddie_reservations(season) -> {caddie id}`: caddies held by the controlled golfer's open caddie offers.
+  Derived from the open decisions (old saves covered when read); not for a caddie who stopped working, nor for the
+  golfer's own current caddie.
+* A caddie whose offer goes to the player makes no further offer that market (`caddie_offer` returns `'held'`), and
+  held caddies are neither free to make offers nor hireable by AI golfers.
+* Released when the offer is answered (accepted: the stint; declined; withdrawn) or the caddie stops working;
+  offers are due by the end of their planning period.
+* Acceptance re-checks (no double bag: a caddie carries one bag); a failed acceptance keeps the current caddie; a
+  successful one ends the old stint and opens the new one in one step. An old offer (no `reserved` flag) that
+  fails because the caddie was taken says so: "they now carry another bag (an offer made by an earlier build, which
+  did not hold them for you)". History is not rewritten.
+* All-AI worlds: no career, nothing held, identical (goldens).
 
 ## 2. Truthful entry reasons
 

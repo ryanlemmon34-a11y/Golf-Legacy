@@ -201,7 +201,8 @@ class Career:
                                ('accept', 'decline'))
         text = (f'Caddie {person.name} (reputation {person.reputation:.0f}) offers to carry your bag for '
                 f'${person.weekly_fee:,.0f} a week when you play. Why: {why}.')
-        payload = {'staff': person.id, 'name': person.name, 'weekly_fee': person.weekly_fee, 'why': why, 'when': [y, w]}
+        payload = {'staff': person.id, 'name': person.name, 'weekly_fee': person.weekly_fee, 'why': why, 'when': [y, w],
+                   'reserved': True}                   # (held for the player until answered: caddie_reservations)
         return self.ensure('caddie_offer', ('caddie', person.id, y), y, w, deadline, payload, text, ('accept', 'decline'))
 
     def job_offer(self, year, week, weeks_blocked):
@@ -913,7 +914,8 @@ def _answer_caddie(season, c, d, g, y, w, answer):
     if k is None or k.status != 'active':
         problem = 'the caddie is no longer working'
     elif k.id in st._bags() and st.caddie(g.id) is not k:
-        problem = 'they now carry another bag'
+        problem = 'they now carry another bag' + ('' if p.get('reserved') else
+                                                  ' (an offer made by an earlier build, which did not hold them for you)')
     elif st.caddie(g.id) is k:
         problem = 'they already carry your bag'
     elif k.weekly_fee * max(1, season.target_events(g)) > ST.caddie_budget(season, g, y):

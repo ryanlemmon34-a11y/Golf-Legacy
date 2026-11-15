@@ -706,6 +706,24 @@ def offer_reservations(season):
     return out
 
 
+def caddie_reservations(season):
+    """Caddies held by the controlled golfer's open caddie offers (ids). A caddie who offered to carry the player's
+    bag makes no further offer and is not hired by anyone else until the player answers -- accepted (the stint),
+    declined or withdrawn -- or they stop working; never counted for the golfer's own current caddie. Derived from
+    the open decisions, so a save made before reservations holds them as soon as it is read."""
+    car = getattr(season, 'career', None)
+    if car is None or car.status != 'active':
+        return set()
+    st = season.staff
+    cur = st.caddie(car.golfer_id)
+    out = set()
+    for d in car.pending(('caddie_offer',)):
+        k = st.caddies.get(d['payload']['staff'])
+        if k is not None and k.status == 'active' and k is not cur:
+            out.add(k.id)
+    return out
+
+
 def started_now(st, kind, gid, when):
     """Whether this golfer's current partnership of this kind began in this very market (they are not courted
     again the same winter)."""
@@ -795,13 +813,14 @@ def golfer_takes_caddie(season, st, g, k, year):
 def caddie_offer(season, k, g, why, when, rng):
     """A caddie offers to carry a golfer's bag and the golfer answers (golfer_takes_caddie): only a yes ends the
     golfer's current caddie's stint (recorded as leaving for the approach) and opens the new one, started by the
-    caddie, with both reasons; a no is recorded with both reasons (on the partnership kept, if any). True if yes."""
+    caddie, with both reasons; a no is recorded with both reasons (on the partnership kept, if any). True if yes;
+    'held' (also true: the caddie makes no further offer) when the offer goes to the player, who answers later."""
     st = season.staff
     car = getattr(season, 'career', None)
     if car is not None and car.controls(g.id):
         rng.random()                                  # (the draw the AI's answer takes: every stream stays aligned)
         car.staff_offer(season, 'caddie', k, g, why, when)   # the player answers: nothing happens yet
-        return False
+        return 'held'                                 # (the caddie is held for the player: caddie_reservations)
     cur = st.caddie(g.id)
     p, yes, no = golfer_takes_caddie(season, st, g, k, when[0])
     if rng.random() >= p:
@@ -821,7 +840,7 @@ def caddie_approaches(season, year, offered):
     one per pair per winter (`offered`). Returns {caddie id: offers made}."""
     st = season.staff
     when = (year, 1)
-    bags = st._bags()
+    bags = st._bags() | caddie_reservations(season)  # (a caddie held by the player's open offer is not free)
     free = sorted((k for k in st.caddies.values() if k.status == 'active' and k.id not in bags),
                   key=lambda k: (-k.reputation, k.id))
     if not free:
@@ -1014,7 +1033,7 @@ def start_of_season(season, year):
             st.end_caddie(season, g.id, when, 'no longer on a tour that needs one' if not wants_caddie(g)
                           else 'could no longer afford them', 'golfer')
     caddie_approaches(season, year, offered)          # caddies without a bag make the first move
-    bags = st._bags()
+    bags = st._bags() | caddie_reservations(season)  # (held for the player's open offers: not hired by others)
     free_cads = sorted((k for k in st.caddies.values() if k.status == 'active' and k.id not in bags),
                        key=lambda k: (-k.reputation - rng.gauss(0, 8), k.id))
     turned_down = {}                                  # caddie -> bags they have said no to this winter
