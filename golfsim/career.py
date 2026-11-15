@@ -1051,7 +1051,8 @@ def view(season, cursor):
         if (py, p0) not in c.plans or any(d['kind'] in ('plan', 'replan') for d in c.pending()):
             plan_now = [py, p0]
             break
-    return {'format': c.format, 'id': c.id, 'status': c.status, 'version': c.version, 'started': list(c.started),
+    from .career_context import context
+    return {'context': context(season, g, y, w), 'format': c.format, 'id': c.id, 'status': c.status, 'version': c.version, 'started': list(c.started),
             'ended': list(c.ended) if c.ended else None, 'entry': dict(c.entry), 'cursor': dict(cursor),
             'date': [y, w], 'golfer': golfer, 'blocks': blocks, 'plannable': [list(b) for b in can],
             'plan_next': plan_now,
