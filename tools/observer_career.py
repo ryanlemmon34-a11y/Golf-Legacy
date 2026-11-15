@@ -493,6 +493,7 @@ def plan_page(w, q):
         return 'Planner', ('<p>That period cannot be planned now (only the current four-week period and the next).</p>'
                            '<p><a href="/career">Back to the career</a></p>')
     from observer_career_context import target_note
+    from observer_career_training import panel as training_comparison
     from observer_career_advice import enrich_plan, render_advice
     p = enrich_plan(p, v['golfer'], v.get('readiness', {}).get('training_enabled', True))
     cats = ''.join(f'<option value="{k}">{esc(label)}</option>' for k, label in CATS)
@@ -547,7 +548,7 @@ def plan_page(w, q):
             'the rule that keeps you out. An entry is not a place: fields fill in each event\'s entry order, and if yours '
             'is not accepted the week falls back to what you choose here. Events that choose their own fields are covered '
             'by the period\'s policy below.</p>')
-    return f'Plan weeks {w0}–{min(52, w0 + 3)} of {y}', STYLE + '<div class="career-hub"><p class="back"><a href="/career">← Career overview</a></p><div class="planner-intro"><p>Build a period that balances competition, development and recovery.</p></div>' + readiness_card(v) + '<details><summary>How event entry works</summary>' + note + '</details>' + training_categories_help() + render_advice(p) + form + '</div>'
+    return f'Plan weeks {w0}–{min(52, w0 + 3)} of {y}', STYLE + '<div class="career-hub"><p class="back"><a href="/career">← Career overview</a></p><div class="planner-intro"><p>Build a period that balances competition, development and recovery.</p></div>' + readiness_card(v) + '<details><summary>How event entry works</summary>' + note + '</details>' + training_categories_help() + training_comparison(v) + render_advice(p) + form + '</div>'
 
 
 # ---- reading forms into commands ------------------------------------------------------------------------------------
