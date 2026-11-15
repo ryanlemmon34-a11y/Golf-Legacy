@@ -58,3 +58,18 @@ class CareerContext(unittest.TestCase):
             self.assertIn('name="selected" value="decline" checked',html)
             self.assertIn('name="qualifying" value="skip" checked',html)
             self.assertNotIn('name="selected" value="accept" checked',html)
+
+    def test_entry_evidence_is_visible_without_inventing_cutoff(self):
+        from observer_career_context import entry_note, target_note
+        html = entry_note({'recorded':True,'text':'Field full','event_label':'Test <event>',
+                           'position':145,'applicants':180,'admitted':144,'capacity':144})
+        self.assertIn('145 of 180 applicants',html)
+        self.assertIn('144 admitted',html)
+        self.assertIn('Test &lt;event&gt;',html)
+        old = entry_note({'recorded':False,'text':'School lineup','position':999})
+        self.assertNotIn('999',old)
+        self.assertIn('were not recorded',old)
+        route = target_note({'event_id':'2029:USA_AMATEUR_QUALIFYING',
+                             'target':{'id':'USA_AMATEUR','label':'Open amateur','week':33}})
+        self.assertIn('week 33',route)
+        self.assertIn('not a confirmed',route)
