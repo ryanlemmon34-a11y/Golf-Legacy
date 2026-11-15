@@ -14,12 +14,12 @@ Status words: **done** (engine and tests on this branch), **partial**, **in prog
 | Truthful entry reasons, closeness only from decision-time data | **done** (355555d) | `career.week_entry`, `ENTRY_TEXT`; older weeks `recorded: false`. HAL renders (8d02cb7). |
 | Truthful entry *chances* before deciding | **not implemented** | Only decision-time facts exist. A forward "chance" would be a prediction; proposal: show the entry order rule and last season's recorded cut-off for the same series, labelled as history, never as a promise. Needs Ryan's yes. |
 | Default "yes" acceptance (selected / qualifying) | **partial** | Engine takes whatever policy is posted; the default is the form's (HAL). Engine default when a policy is omitted: not added (would change the command contract) — can add on request. |
-| Visible current qualifications and placement unlocks | **partial** | HAL's `career_context` reads card reasons, winner exemptions, Premier rights. Engine canonical `qualifications` read model: **not implemented** (contract below). |
+| Visible current qualifications and placement unlocks | **done (engine read model, first version)** | `golfsim/opportunities.py`: `career.view()['opportunities']` from the implemented routes (major exemptions with their stated finish, qualifying stages, qualifier targets); status already_qualified / needs_result / awaiting_selection / not_eligible. Tour cards and winner exemptions held: HAL's `career_context`. US college qualifiers plug in when built. |
 | Early invitation notices | **not implemented** | Selection is decided in the event week. Only routes already decided (e.g. a winner's exemption, a card) can be noticed early; anything else would be a prediction. Design needed with HAL. |
 | Usable coach / caddie offers | **done (reworked)** | Market offers answered at the same point of the 1 January market as an AI golfer's (probe on a copy; same draw); the earlier holds were withdrawn after the parity audit. Paired human/AI tests. |
 | Player choosing staff themselves (hire a coach/caddie) | **not implemented** | Today the player only answers offers; the AI "looking for a coach" step is skipped for them. |
 | Thirteen fixed four-week periods; interruptions resume within the period, one recap | **done (verified)** | tests/test_period_cadence.py. |
-| Editable four-week plan accepting coach advice | **done (UI); engine decision-comparison evidence not implemented** | HAL's reviewable advice (c36f17b); the engine plan command needs nothing new. |
+| Editable four-week plan accepting coach advice | **done (UI); engine decision evidence done (`golfsim/decision_support.week_compare`)** | HAL's reviewable advice (c36f17b); the engine plan command needs nothing new. |
 | Season results / season review | **done** | `year_end.review` (YEAR_END.md), weekly recaps with entry evidence. |
 | Factual inbox / calendar / recaps | **partial** | Engine: notices, log, decisions, recaps, planner, `week_entry`. Inbox/calendar presentation: HAL. |
 | Trophies (majors, college, amateur championships) with engraving and multi-win history | **done (engine read model)** | From recorded winners only (`ctx.results` keeps every winner for good). Contract below. |
@@ -87,10 +87,24 @@ error (a seeded, persistent per-coach view; firmer the more seasons watched) —
 category. Never reads ceilings or potential. `grade: null` with an explanation when nothing has been observed yet.
 Grade colours are HAL's.
 
-### Qualifications — `career.qualifications(season, gid, year)` (proposed)
-`[{event_id | series_id, label, route, source: "card" | "winner" | "rights" | "major" | "selected" | "qualifier",
- decided: [year, week], secured: bool}]` from recorded routes only; `secured: false` for a provisional route (e.g.
-a qualifier finish before its target's field is decided).
+### Opportunities — `career.view()['opportunities']` (implemented)
+
+`[{event: {id, series_id, label, week, year}, condition: {kind: 'win'|'finish'|'qualifying_place', text,
+positions: [..]|null, top: n|null, places: n|null, site_places: [..]|null}, target: {id, series_id, label, week,
+year}, route: {code, label, source}, status: 'already_qualified'|'needs_result'|'awaiting_selection'|'not_eligible',
+restrictions: [str], decided: null}]`, for events from the current week to the season's end, sorted by week.
+Only implemented routes (qualification._rules, qualification.stages, event_labels.target); `top` and `positions`
+come from the route's own selector; a qualifier whose places the rule does not state as a number has
+`places: null` and the text "finish in a qualifying place (the field rule)". `already_qualified` only on recorded
+facts (`qualification.secured_places`, `earned_exemptions` as of now). Read only; no random draw.
+
+### Week comparison — `golfsim.decision_support.week_compare(season, career, golfer, year, week)` (implemented)
+
+`{week, year, play: [{event_id, name, eligible, why, cost, tour, selected_field?, opportunities: [...]}],
+train: [{category, grade, confidence, observed_level, weakest_rank, observed_as_of}], rest: {fatigue_after},
+load: {fatigue, performance_threshold, train_fatigue_after, rest_fatigue_after, played_last_4, played_last_8,
+injured_until, recorded_weeks}}`. Grades and levels are the career's recorded observations (scouting), not
+ceilings; fatigue forecasts are career.readiness's (the engine's own formulas).
 
 ### Timeline — `career.timeline(season, career)` (proposed)
 `[{date: [year, week], kind, text, refs}]` from stints, decisions, notices, results, trophies, staff stints, moves;

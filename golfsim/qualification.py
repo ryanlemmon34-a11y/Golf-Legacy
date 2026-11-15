@@ -239,6 +239,7 @@ def lifetime_winners(series_id):
 def top_finishers(series_id, n, year_offset=-1):
     def select(ctx, year):
         return ctx.placed(series_id, year + year_offset, n)
+    select.need = {'kind': 'finish', 'top': n, 'ties': True}
     return select
 
 
@@ -248,6 +249,7 @@ def top_finishers_of(series_ids, n, year_offset=-1):
         for sid in series_ids:
             out += [g for g in ctx.placed(sid, year + year_offset, n) if g not in out]
         return out
+    select.need = {'kind': 'finish', 'top': n, 'ties': True}
     return select
 
 
@@ -255,6 +257,7 @@ def places(series_id, positions, year_offset=-1):
     """Winner (1) and/or runner-up (2) of an event, e.g. an amateur championship final."""
     def select(ctx, year):
         return [gid for gid, pos in ctx.finishers(series_id, year + year_offset) if pos in positions]
+    select.need = {'kind': 'finish', 'positions': tuple(positions)}
     return select
 
 

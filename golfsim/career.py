@@ -1133,7 +1133,14 @@ def view(season, cursor):
             'stints': [stint_view(season, st) for st in getattr(c, 'stints', [])],
             'trophies': _trophies(season, c, g),
             'scouting': _scouting(season, c, g),
+            'opportunities': _opportunities(season, c, g, y, w),
             'year_end': year_end_view(season, cursor)}
+
+
+def _opportunities(season, c, g, y, w):
+    """What upcoming results unlock, by the implemented rules (golfsim.opportunities); None without a golfer."""
+    from . import opportunities
+    return opportunities.opportunities(season, g.id, y, w) if g is not None and g.lifestyle != 'retired' else None
 
 
 def _scouting(season, c, g):

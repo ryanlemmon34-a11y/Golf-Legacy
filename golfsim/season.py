@@ -273,6 +273,7 @@ FULL_STATUS = 125                 # top of last season's Premier money list with
 PREMIER_VISITOR_SHARE = 0.10      # places in a Challenger event Premier members may take ahead of residents
 COURSE_RECORD_ROUNDS = 300       # a new course record is a moment once the layout had this many earlier rounds
 ROTATION_RANK_STARTS = 3          # college/amateur lineups: ranking is worth a head start of this many starts
+MID_AMATEUR_MIN_AGE = 25         # the mid-amateur championships' field: amateurs of this age or older
 AMATEUR_OPEN_EXPANSION = 1.5      # open amateur events can take this many times their usual field
 
 
@@ -1612,7 +1613,7 @@ class Season:
             regions = ELITE_AMATEUR_REGIONS.get(sid)
             pred = (lambda g: free(g) and region_of(g) in regions) if regions else (lambda g: free(g))
             if s.eligibility == 'mid_amateur':
-                pred = lambda g: free(g) and g.age(year) >= 25
+                pred = lambda g: free(g) and g.age(year) >= MID_AMATEUR_MIN_AGE
             return [invite(self.ranked_amateurs(pred), s.field)]
         if s.category == 'national_amateur':
             take = invite(self.ranked_amateurs(lambda g: free(g) and g.country == s.host_country), s.field)
