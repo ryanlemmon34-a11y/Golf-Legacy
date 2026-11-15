@@ -51,21 +51,43 @@ def trophy_case(trophies):
     return '<section id="career-trophies" class="career-panel"><h2>Your trophy case</h2><p class="muted">Earned championships, with each winning year preserved.</p>'+('<div class="trophy-grid">'+''.join(cards)+'</div>' if cards else '<div class="career-empty">No qualifying championship trophies recorded yet.</div>')+'</section>'
 
 
-def scouting_panel(estimates):
+def scouting_panel(estimates, assessment=None):
     cards=[]
     for row in estimates or []:
         grade=row.get('grade')
         fg,bg=GRADE_COLORS.get(grade,('#5c6660','#f0f4ef'))
         letter=grade if grade in GRADE_COLORS else '?'
-        detail=''.join('<p>'+esc(str(row[k]))+'</p>' for k in ('confidence','as_of','explanation') if row.get(k))
+        detail=''
+        if row.get('confidence'):
+            detail+='<p>Confidence: '+esc(str(row['confidence']))+'</p>'
+        if row.get('explanation'):
+            detail+='<p>'+esc(str(row['explanation']))+'</p>'
+        history=row.get('history') or []
+        if history:
+            detail+='<details><summary>Assessment history</summary><ul>'+''.join('<li>'+esc(str(h['year']))+' · week '+esc(str(h['week']))+': '+esc(h['grade'] if h.get('grade') in GRADE_COLORS else 'Not assessed')+'</li>' for h in history)+'</ul></details>'
         cards.append('<article class="scouting-card"><div class="potential-grade" style="color:'+fg+';background:'+bg+'" aria-label="Estimated potential '+esc(letter)+'">'+esc(letter)+'</div><div><h3>'+esc(row['category'])+'</h3><small>'+('Estimated potential' if letter!='?' else 'Not yet assessed')+'</small>'+detail+'</div></article>')
-    return '<section id="career-scouting" class="career-panel"><h2>Scouted potential</h2><p class="muted">An assessment, not a promise. Grades can move up or down as more is learned. A revised estimate does not mean underlying potential changed. Actual ceilings remain hidden.</p>'+('<div class="scouting-grid">'+''.join(cards)+'</div>' if cards else '<p>No category assessments are recorded yet.</p>')+'</section>'
+    metadata=''
+    if assessment:
+        source={'coach':'Coach assessment','self':'Self-assessment'}.get(assessment.get('source'),'Recorded assessment')
+        judge=assessment.get('judge')
+        if isinstance(judge,dict):
+            judge=judge.get('name')
+        when=assessment.get('as_of')
+        if isinstance(when,(list,tuple)) and len(when)==2:
+            when='week '+str(when[1])+' of '+str(when[0])
+        elif isinstance(when,dict):
+            when=('week '+str(when['week'])+' of '+str(when['year'])) if 'week' in when and 'year' in when else None
+        metadata='<p>'+esc(source)+((' · '+esc(str(judge))) if judge else '')+((' · As of '+esc(str(when))) if when else '')+'</p>'
+    return '<section id="career-scouting" class="career-panel"><h2>Scouted potential</h2>'+metadata+'<p class="muted">An assessment, not a promise. Grades can move up or down as more is learned. A revised estimate does not mean underlying potential changed. Actual ceilings remain hidden.</p>'+('<div class="scouting-grid">'+''.join(cards)+'</div>' if cards else '<p>No category assessments are recorded yet.</p>')+'</section>'
 
 
 def panels(view):
     out=''
     if 'trophies' in view:
         out+=trophy_case(view['trophies'])
-    if 'potential_estimates' in view:
+    if 'scouting' in view:
+        assessment=view['scouting']
+        out+=scouting_panel(assessment.get('categories',[]) if assessment else [],assessment)
+    elif 'potential_estimates' in view:
         out+=scouting_panel(view['potential_estimates'])
     return STYLE+out if out else ''

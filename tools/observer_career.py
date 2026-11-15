@@ -359,7 +359,7 @@ def plan_card(w, v):
         y, w0 = b['block']
         rows = [[str(x['week']), esc(x['text']), 'played' if x['played'] else 'planned'] for x in b['weeks']]
         pol = b['policy']
-        out.append(f'<h3>Weeks {w0}–{w0 + len(b["weeks"]) - 1} of {y}</h3>' + table(['Week', 'Plan', ''], rows)
+        out.append(f'<h3>Period {(w0 - 1) // 4 + 1} of 13 · Weeks {w0}–{w0 + 3} of {y}</h3>' + table(['Week', 'Plan', ''], rows)
                    + f'<p class="muted">If selected or invited: {esc(pol["selected"])}. Qualifying: {esc(pol["qualifying"])}.</p>')
     for (py, p0) in v['plannable']:
         out.append(f'<p><a class="button" href="/career/plan?block={py}-{p0}">Plan weeks {p0}–{min(52, p0 + 3)} of {py}</a></p>')

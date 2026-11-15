@@ -33,3 +33,13 @@ class CareerCycle(unittest.TestCase):
         v=self.view();before=copy.deepcopy(v)
         self.assertEqual(panel(v,[]),panel(v,[]))
         self.assertEqual(v,before)
+
+    def test_interruption_keeps_fixed_period_and_partial_review(self):
+        v=self.view();v['date']=[2029,6];v['plannable']=[[2029,5],[2029,9]]
+        v['pending']=[{'kind':'coach_offer'}]
+        r={'start_week':5,'end_week':8,'complete':False,'weeks':[{'week':5,'events':[]}]}
+        html=panel(v,[r])
+        self.assertIn('Period 2 of 13 · weeks 5–8',html)
+        self.assertIn('1 of 4 weeks recorded',html)
+        self.assertIn('continues after the decision',html)
+        self.assertNotIn('weeks 6–9',html)
