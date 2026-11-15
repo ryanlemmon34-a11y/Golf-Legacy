@@ -724,6 +724,8 @@ def market_answer(season, car, kind, person, g, why, when, arrangement=None):
     ans = car.market_answers.get(when[0], {}).get(f'{kind}:{person.id}') if hasattr(car, 'market_answers') else None
     if ans is not None:
         return ans
+    if getattr(car, 'staff_policy', {}).get(f'{kind}_approaches') == 'decline':
+        return 'decline'                              # (the player's standing answer: as if declined on the spot)
     if season.__dict__.get('_market_probe'):
         raise MarketQuestion(kind, person, g, why, when, arrangement)
     car.staff_offer(season, kind, person, g, why, when, arrangement)

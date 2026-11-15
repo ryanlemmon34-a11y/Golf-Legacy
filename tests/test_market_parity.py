@@ -306,7 +306,9 @@ class SeekingStaff(unittest.TestCase):
         b, _, _ = self.play('no')
         self.assertEqual(asked, [])
         self.assertEqual(F.digest(a), F.digest(b))
-        self.assertEqual(CA.view(a.season, a.cursor)['staff_policy'], {'seek_coach': 'no', 'seek_caddie': 'no'})
+        self.assertEqual(CA.view(a.season, a.cursor)['staff_policy'], {'seek_coach': 'no', 'seek_caddie': 'no',
+                                                                       'coach_approaches': 'ask',
+                                                                       'caddie_approaches': 'ask'})
         drop(a), drop(b)
 
     def test_ask_then_yes_is_standing_yes(self):
@@ -329,3 +331,24 @@ class SeekingStaff(unittest.TestCase):
         with self.assertRaises(CA.CareerError):
             act(s, {'type': 'staff_policy', 'policy': {'seek_coach': 'maybe'}}, 'bad')
         drop(s)
+
+
+class StandingDecline(unittest.TestCase):
+    def test_declining_approaches_in_advance_is_answering_no_each_time(self):
+        s0 = world()
+        gid = the_golfer(s0)
+        staffed(s0, gid)
+        ids = [c.id for c in coaches_for(s0, gid)]
+        drop(s0)
+        a, _, _, asked = run_player({('coach', i): 'decline' for i in ids}, ids=ids)
+        b = world()
+        staffed(b, gid)
+        with ExitStack() as stack:
+            for p in injected(ids, gid):
+                stack.enter_context(p)
+            act(b, {'type': 'new_career'}, 'new')
+            act(b, {'type': 'staff_policy', 'policy': {'coach_approaches': 'decline'}}, 'pol')
+            b.advance_career('next', op_key='a')
+            self.assertFalse([d for d in b.season.career.pending() if d['payload'].get('market')])
+        self.assertEqual(F.digest(a), F.digest(b))
+        drop(a), drop(b)

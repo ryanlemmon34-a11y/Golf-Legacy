@@ -9,13 +9,13 @@ gains), and the load: recent weeks played (the career's weekly recaps) and the e
 from __future__ import annotations
 
 
-def week_compare(season, c, g, year, week):
+def week_compare(season, c, g, year, week, opp=None):
     """{week, play: [...], train: [...], rest: {...}, load: {...}} for the controlled golfer's week."""
     from . import career as CA
     from . import opportunities as O
     from . import scouting
     opts = CA.week_options(season, g, year, week)
-    opp = O.opportunities(season, g.id, year, week)
+    opp = O.opportunities(season, g.id, year, week) if opp is None else opp
     by_event = {}
     for o in opp:
         if o['event']['week'] == week:
@@ -50,3 +50,18 @@ def week_compare(season, c, g, year, week):
                      'train_fatigue_after': ready['train_after'], 'rest_fatigue_after': ready['rest_after'],
                      'played_last_4': last(4), 'played_last_8': last(8), 'injured_until': ready['injured_until'],
                      'recorded_weeks': len(recent)}}
+
+
+def block_compare(season, c, g, cursor):
+    """{week: week_compare(...)} for the open weeks of the current four-week period (the planner's weeks), with the
+    opportunities worked out once; {} outside a season's weeks."""
+    from . import career as CA
+    from . import opportunities as O
+    y, w = cursor['year'], cursor['week']
+    if cursor['phase'] == 'end' or g is None or g.lifestyle == 'retired':
+        return {}
+    weeks = CA.open_weeks(cursor, CA.block_start(w))
+    if not weeks:
+        return {}
+    opp = O.opportunities(season, g.id, y, min(weeks))
+    return {str(x): week_compare(season, c, g, y, x, opp) for x in weeks}

@@ -117,3 +117,15 @@ class WeekCompare(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class CommittedHook(unittest.TestCase):
+    def test_the_view_carries_the_periods_comparisons(self):
+        with Copy() as s:
+            g = started(s)
+            se, c = s.season, s.season.career
+            s.advance_career('next', op_key='a')
+            v = CA.view(se, s.cursor)['week_compare']
+            self.assertEqual(list(v), [str(w) for w in CA.open_weeks(s.cursor, 1)])
+            for w, x in v.items():
+                self.assertEqual(x, DS.week_compare(se, c, g, 2028, int(w)))

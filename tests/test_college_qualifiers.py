@@ -36,7 +36,7 @@ def v3_world():
     if 'w' not in _W:
         d = Path(tempfile.mkdtemp(prefix='career_v3_', dir=F.os.environ.get('TMPDIR'))) / 'w'
         s = Session.create(d, seed=11, world=generate_world(year=2027, seed=11, scale=0.05), workers=1, calendar='v3')
-        s.advance(52 + 22)                                             # 2027, then 2028 to week 23
+        s.advance(52 + 25)                                             # 2027, then 2028 through the USA Open
         s.close()
         _W['w'] = d
     return Session.open(_W['w'])
@@ -103,26 +103,35 @@ class Rules(unittest.TestCase):
         self.assertEqual(got2[1][0], 1)                                 # still qualifier 1
         self.assertEqual([g for g, v in got2.items() if v[0] == 2], [7, 8, 9])
 
-    def test_same_year_usa_open_place_is_built_but_off(self):
-        self.assertFalse(SCH.V3.college_champion_usa_open)
-        self.assertNotIn('U2C', [r.code for r in Q.rules_for('v3')['USA_OPEN']])
-        on = Q._rules(replace(SCH.V3, college_champion_usa_open=True))['USA_OPEN']
-        r = next(x for x in on if x.code == 'U2C')
+    def test_same_year_usa_open_place_for_the_amateur_champion(self):
+        self.assertTrue(SCH.V3.college_champion_usa_open)
+        self.assertNotIn('U2C', [r.code for rs in Q.rules_for('v2').values() for r in rs])   # v2 unchanged
+        r = next(x for x in Q.rules_for('v3')['USA_OPEN'] if x.code == 'U2C')
         self.assertTrue(r.amateur_only)
         self.assertEqual(r.source, (('COLLEGE_NATIONAL_CHAMPIONSHIP', 0),))
         self.assertEqual(r.select.need, {'kind': 'finish', 'positions': (1,)})
         cal = WorldCalendar(seed=11, version='v3')
-        self.assertLess(cal.by_id['COLLEGE_NATIONAL_CHAMPIONSHIP'].week, cal.by_id['USA_OPEN_FINAL'].week)
+        by = cal.by_id                                                 # the championship comes before the field
+        self.assertLess(by['COLLEGE_NATIONAL_CHAMPIONSHIP'].week, by['USA_OPEN_FINAL'].week)
+        self.assertLess(by['USA_OPEN_FINAL'].week, by['USA_OPEN'].week)
+        ctx = Q.QualificationContext(version='v3')
+        ctx.people = {5: Q.Person(5, 'Champion', 'amateur', 21), 6: Q.Person(6, 'Second', 'amateur', 21)}
+        ctx.add_result('COLLEGE_NATIONAL_CHAMPIONSHIP', 2028, [(5, 1), (6, 2)])
+        ctx.add_result('INTL_UNIVERSITY_CHAMPIONSHIP', 2028, [(6, 1)])
+        self.assertEqual(r.select(ctx, 2028), [5])                     # the champion only; not the world university's
+        self.assertTrue(Q._eligible(ctx, 5, r, 2028))
+        ctx.people[5].status = 'pro'                                   # turned professional: no place
+        self.assertFalse(Q._eligible(ctx, 5, r, 2028))
+        self.assertEqual(r.select(ctx, 2027), [])                       # no championship played: nobody invited
 
-
-V3_2028_W23 = '249f876d8ce7a15bdc828919bdfdbed8f287d657977a3b3665d5c68d53b44cc6'   # v3 golden (all AI)
+V3_2028_W26 = '34e21453635b803a896d5e221fd3298a4b35470707289504a2b07b5c45565e5c'   # v3 golden (all AI), after the USA Open
 
 
 class Season2028(unittest.TestCase):
     def test_v3_golden(self):
-        """An all-AI v3 world is reproducible: its golden digest after a season and 22 weeks."""
+        """An all-AI v3 world is reproducible: its golden digest after a season and 25 weeks."""
         s = v3_world()
-        self.assertEqual(F.digest(s), V3_2028_W23)
+        self.assertEqual(F.digest(s), V3_2028_W26)
         self.assertEqual(s.season.cal.version, 'v3')
         s.close()
 
@@ -163,6 +172,43 @@ class Season2028(unittest.TestCase):
             self.assertRegex(routes[gid], r'^QUALIFIER [1-4], HEAT \d+ \(T?\d+\)$')
         self.assertIn(f'{y}:SMALL_COLLEGE_CHAMPIONSHIP', se.results)    # the small-college event is still played
         s.close()
+
+    def test_the_champion_in_the_same_seasons_usa_open(self):
+        s = v3_world()
+        se = s.season
+        champ = se.ctx.winner('COLLEGE_NATIONAL_CHAMPIONSHIP', 2028)
+        self.assertIsNotNone(champ)
+        f = se.stage_log[(2028, 'USA_OPEN', 'field')]
+        entry = next((e for e in f.entries if e.golfer_id == champ), None)
+        g = se.g[champ]
+        if g.status == 'amateur' and g.lifestyle != 'retired':
+            self.assertIsNotNone(entry)                                # invited (unless already in by another route)
+            self.assertTrue(entry.primary == 'U2C' or 'U2C' in entry.sources)
+        else:
+            self.assertTrue(entry is None or entry.primary != 'U2C')
+        s.close()
+
+    def test_fictional_names_for_new_worlds_only(self):
+        import re
+        from unittest import mock
+        with mock.patch.dict(SCH.SPECS, {'v3n': replace(SCH.V3, version='v3n', fictional_names=False)}):
+            v3n = WorldCalendar(seed=11, version='v3n')                  # v3 without the names
+        v2, v3 = WorldCalendar(seed=11, version='v2'), WorldCalendar(seed=11, version='v3')
+        self.assertTrue(any(re.search(r'Event \d+', x.name) for x in v2.series))   # v2 keeps its names
+        self.assertFalse(any(re.search(r'Event \d+', x.name) for x in v3.series))
+        self.assertEqual([x.series_id for x in v3n.series], [x.series_id for x in v3.series])
+        for x, o in zip(v3.series, v3n.series):                         # only names change
+            self.assertEqual((x.week, x.tour, x.cities, x.field, x.tier, x.days), (o.week, o.tour, o.cities,
+                                                                                  o.field, o.tier, o.days))
+            if not re.search(r'Event \d+', o.name):
+                self.assertEqual(x.name, o.name)                         # Premier events and anchors keep theirs
+        renamed = [x.name for x, o in zip(v3.series, v3n.series) if re.search(r'Event \d+', o.name)]
+        self.assertTrue(renamed)
+        self.assertEqual(len(renamed), len(set(renamed)))               # unique
+        self.assertEqual([x.name for x in WorldCalendar(seed=11, version='v3').series],
+                         [x.name for x in v3.series])                    # stable (rebuilt identically on loading)
+        for bad in ('PGA', 'Augusta', 'Masters Tournament', 'NCAA', 'USGA', 'R&A', 'Rolex', 'Nike'):
+            self.assertFalse(any(bad in x for x in renamed))
 
     def test_opportunities_show_the_qualifiers(self):
         s = v3_world()

@@ -66,8 +66,10 @@ class Spec:
     college_qualifier_places: int = 39
     college_qualifier_max_heats: int = 10
     # the season's college national champion, if still an amateur, in the same season's USA Open (USGA 2026);
-    # built and tested, off until confirmed in the final scope
+    # v3 (confirmed in the final scope 2026-11-15)
     college_champion_usa_open: bool = False
+    # v3: distinctive fictional names for the ordinary numbered events (golfsim/event_names.py; new worlds only)
+    fictional_names: bool = False
 
     @property
     def major_weeks(self):
@@ -204,6 +206,7 @@ V2 = Spec(
 V3 = replace(
     V2, version='v3', label='Reference calendar with US college qualifiers (majors weeks 15, 20, 25, 30)',
     anchors={k: v for k, v in V2.anchors.items() if k != 'COLLEGE_REGIONAL'},
+    college_champion_usa_open=True, fictional_names=True,
     college_qualifiers=(('COLLEGE_QUALIFIER_1', 10, 'qualifier 1, week 10'),
                         ('COLLEGE_QUALIFIER_2', 11, 'qualifier 2, week 11'),
                         ('COLLEGE_QUALIFIER_3', 12, 'qualifier 3, week 12'),

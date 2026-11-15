@@ -74,6 +74,32 @@ class Server:
         return self.app.job()
 
 
+def answer_market(t, srv, answer='decline'):
+    """Answer the 1 January staff market's questions one at a time, through the page's own forms (the market stops
+    before it runs for each approach to the player: career.market_question). Returns how many were answered."""
+    n = 0
+    for _ in range(80):                                    # (a sought-after golfer can be approached many times)
+        car = srv.session().season.career
+        ds = [d for d in car.pending() if d['payload'].get('market')]
+        if not ds:
+            return n
+        d = ds[0]
+        want = answer if answer in d['options'] else d['options'][-1]
+        for segment in srv.get('/career').split('<form ')[1:]:
+            values = dict(re.findall(r'<input type="hidden" name="(\w+)" value="([^"]*)">',
+                                     segment.split('</form>')[0]))
+            if values.get('decision') == d['id'] and values.get('answer') == want:
+                t.assertEqual(banners(srv.post('/career/decide', values))[0][0], 'ok')
+                break
+        else:
+            t.fail(f'no {want} form for market decision {d["id"]}')
+        n += 1
+        f = fields(srv.get('/career'), '/career/advance')
+        srv.post('/career/advance', dict(f, mode='next'))
+        t.assertEqual(srv.job()['state'], 'done')
+    t.fail('the market kept asking')
+
+
 def start_and_reach_the_plan(t, srv):
     p = srv.get('/career')
     t.assertIn('Start the career', p)
@@ -85,6 +111,8 @@ def start_and_reach_the_plan(t, srv):
     t.assertEqual(j['state'], 'done')
     t.assertIn('0 weeks played', j['message'])
     t.assertIn('decision', j['message'])
+    answer_market(t, srv)                                  # (1 January's market questions first, if any)
+    t.assertTrue(srv.session().season.career.pending(('plan',)))
     return srv.get('/career/plan?block=2028-1')
 
 

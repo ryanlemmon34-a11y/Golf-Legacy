@@ -501,6 +501,11 @@ class WorldCalendar:
         self.series = []
         self._tour_weeks = defaultdict(Counter)        # tour -> week -> events
         self._build()
+        if self.spec.fictional_names:                  # v3: names for the ordinary numbered events (nothing else)
+            from dataclasses import replace as _rp
+            from .event_names import fictional_names
+            names = fictional_names(self.series, seed)
+            self.series = [_rp(s, name=names[s.series_id]) if s.series_id in names else s for s in self.series]
         self.by_id = {s.series_id: s for s in self.series}
         if len(self.by_id) != len(self.series):
             raise AssertionError('duplicate series id')

@@ -823,9 +823,12 @@ def apply(season, cursor, action):
         return _end_control(season, c, cursor, action)
     if t == 'staff_policy':                            # look for a coach / caddie in the 1 January market
         pol = action.get('policy') or {}
-        bad = {k: v for k, v in pol.items() if k not in ('seek_coach', 'seek_caddie') or v not in ('yes', 'no', 'ask')}
+        ok = {'seek_coach': ('yes', 'no', 'ask'), 'seek_caddie': ('yes', 'no', 'ask'),
+              'coach_approaches': ('ask', 'decline'), 'caddie_approaches': ('ask', 'decline')}
+        bad = {k: v for k, v in pol.items() if v not in ok.get(k, ())}
         if bad or not pol:
-            raise CareerError("Set seek_coach / seek_caddie to 'yes', 'no' or 'ask'.")
+            raise CareerError("Set seek_coach / seek_caddie to 'yes', 'no' or 'ask', and coach_approaches / "
+                              "caddie_approaches to 'ask' or 'decline'.")
         if not hasattr(c, 'staff_policy'):
             c.staff_policy = {}
         c.staff_policy.update(pol)
@@ -1165,11 +1168,19 @@ def view(season, cursor):
             'scouting': _scouting(season, c, g),
             'opportunities': _opportunities(season, c, g, y, w),
             'goals': _story(season, c, cursor, 'goals'),
-            'staff_policy': dict({'seek_coach': 'no', 'seek_caddie': 'no'}, **getattr(c, 'staff_policy', {})),
+            'staff_policy': dict({'seek_coach': 'no', 'seek_caddie': 'no', 'coach_approaches': 'ask',
+                                  'caddie_approaches': 'ask'}, **getattr(c, 'staff_policy', {})),
             'money': _money(season, g, y),
+            'week_compare': _compare(season, c, g, cursor),
             'seasons_summary': _seasons(season, c),
             'timeline': _story(season, c, cursor, 'timeline'),
             'year_end': year_end_view(season, cursor)}
+
+
+def _compare(season, c, g, cursor):
+    """Play / train / rest evidence for each open week of the current period (golfsim.decision_support)."""
+    from . import decision_support
+    return decision_support.block_compare(season, c, g, cursor) if c.status == 'active' else {}
 
 
 def _money(season, g, y):
