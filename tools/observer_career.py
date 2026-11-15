@@ -104,6 +104,8 @@ STYLE = '''<style>
 @media(max-width:950px){ .career-dashboard { grid-template-columns:1fr; } .career-aside { display:grid; grid-template-columns:1fr 1fr; gap:18px; } .career-aside #career-inbox { grid-column:1 / -1; } }
 @media(max-width:650px){ .career-hero { padding:20px; align-items:flex-start; } .career-hero h2 { font-size:24px; } .career-overall { min-width:95px; padding-left:12px; } .career-overall strong { font-size:32px; } .career-overall small { display:none; } .career-panel { padding:16px; } .career-ratings,.planner-grid,.planner-policies,.career-aside { grid-template-columns:1fr; } .career-aside #career-inbox { grid-column:auto; } .planner-intro { display:block; } }
 </style>'''
+from observer_career_color import STYLE as COLOR_STYLE
+STYLE += COLOR_STYLE
 
 def money(x):
     return f'${x:,.0f}' if x is not None else '—'
@@ -191,7 +193,8 @@ def readiness_card(v):
     pct = max(0, min(100, f * 100))
     label = r.get('label', 'Fresh' if pct <= 20 else 'Fatigue is affecting play')
     detail = r.get('detail', 'Fatigue above 20% reduces playing performance. Rest recovers more fatigue than practice.')
-    out = ('<section class="career-panel readiness"><div class="eyebrow">Before you plan</div>'
+    state_class = ' readiness-caution' if pct > 20 or g['injured_until'] else ''
+    out = (f'<section class="career-panel readiness{state_class}"><div class="eyebrow">Before you plan</div>'
            f'<h2>{esc(label)}</h2><div class="fatigue-number">{pct:.1f}<span>% fatigue</span></div>'
            f'<meter min="0" max="100" value="{pct}" aria-label="Fatigue: {pct:.1f} percent"></meter>'
            '<div class="meter-labels"><span>Fresh</span><span>Exhausted</span></div>'
@@ -274,7 +277,8 @@ def render_recap(r, latest=False):
         for e in w.get('events', []):
             pos = e.get('position')
             place = (('T' if e.get('tied') else '') + ('1st' if pos == 1 else str(pos))) if pos is not None else e.get('finish_label', 'Unplaced')
-            out += f'<div class="result-row"><strong class="result-place">{esc(place)}</strong><div><a href="/event/{quote(str(e["id"]))}">{esc(e["name"])}</a>'
+            result_class = ' result-win' if pos == 1 else ' result-top10' if pos is not None and pos <= 10 else ''
+            out += f'<div class="result-row{result_class}"><strong class="result-place">{esc(place)}</strong><div><a href="/event/{quote(str(e["id"]))}">{esc(e["name"])}</a>'
             rounds = e.get('rounds') or []
             out += '<p class="muted">' + (f'Rounds: {esc(" · ".join(map(str, rounds)))}' if rounds else 'Round scores not recorded')
             if e.get('prize') is not None:
