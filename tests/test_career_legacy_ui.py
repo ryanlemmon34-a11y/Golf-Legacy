@@ -44,3 +44,14 @@ class LegacyPresentation(unittest.TestCase):
         before=copy.deepcopy(v)
         self.assertEqual(panels(v),panels(v))
         self.assertEqual(v,before)
+
+    def test_backend_scouting_contract_and_revision_history(self):
+        html=panels({'scouting':{'source':'coach','judge':'Casey Coach','as_of':[2031,1],
+            'categories':[{'category':'Putting','grade':'B','confidence':'medium','explanation':'Observed rounds',
+                           'history':[{'year':2030,'week':1,'grade':'C'},{'year':2031,'week':1,'grade':'B'}]}]}})
+        self.assertIn('Coach assessment',html)
+        self.assertIn('Casey Coach',html)
+        self.assertIn('week 1 of 2031',html)
+        self.assertIn('Confidence: medium',html)
+        self.assertIn('2030 · week 1: C',html)
+        self.assertIn('No category assessments',panels({'scouting':None}))

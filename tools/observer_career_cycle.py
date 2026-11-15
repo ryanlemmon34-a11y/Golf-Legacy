@@ -23,9 +23,15 @@ def panel(v,recaps):
             past+='Best finish: '+('T' if best.get('tied') else '')+str(best['position'])+' in '+esc(best['name'])+'.'
         else:
             past+='Review training, recovery and any competition below.'
+        if not r.get('complete'):
+            past+=' In progress: '+str(len({w.get("week") for w in weeks if w.get("week") is not None}))+' of 4 weeks recorded; this period continues after the decision.'
         past+='</p><a href="#period-review">See what changed →</a>'
     pending=v.get('pending',[])
     middle='<h3>'+str(len(pending))+' decision'+('s' if len(pending)!=1 else '')+' awaiting you</h3>' if pending else '<h3>Choose your next focus</h3>'
+    date=v.get('date') or (v.get('plannable') or [None])[0]
+    if date:
+        first=1+4*((date[1]-1)//4)
+        middle='<span class="status-pill">Period '+str((first-1)//4+1)+' of 13 · weeks '+str(first)+'–'+str(first+3)+'</span>'+middle
     g=v['golfer'];fatigue=g.get('fatigue',0)
     if g.get('injured_until'):
         middle+='<p>Recovery comes first while the recorded injury keeps you out.</p>'
