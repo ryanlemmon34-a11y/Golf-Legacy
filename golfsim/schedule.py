@@ -29,7 +29,7 @@ scheme onto the other so a manifest or a comparison can line them up.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 LEGACY = 'v1'                  # worlds saved before calendar versions
 DEFAULT = 'v2'                 # new worlds
@@ -57,6 +57,16 @@ class Spec:
     snapshots: bool = False              # cut-off rules read their own immutable snapshot (never a later one)
     amateur_award: tuple = ()            # (week after which the season's leading amateur is named, routes)
     rules_note: str = ''
+    # v3: the US college championship's qualifying (docs/career/COLLEGE_QUALIFIERS.md): ((series id, week, label),
+    # ...) sequential qualifiers open to every US college golfer (D1 and small college) not yet qualified, in
+    # heats of at most college_heat_size, each awarding college_qualifier_places places; no regionals
+    college_qualifiers: tuple = ()
+    college_heat_size: int = 156
+    college_qualifier_places: int = 39
+    college_qualifier_max_heats: int = 10
+    # the season's college national champion, if still an amateur, in the same season's USA Open (USGA 2026);
+    # built and tested, off until confirmed in the final scope
+    college_champion_usa_open: bool = False
 
     @property
     def major_weeks(self):
@@ -73,7 +83,7 @@ class Spec:
             return self.anchors[sid]
         if sid in self.qschool:
             return self.qschool[sid]
-        for sid_, wk, _ in self.usa_local + self.britannia_regional:
+        for sid_, wk, _ in self.usa_local + self.britannia_regional + self.college_qualifiers:
             if sid_ == sid:
                 return wk
         return {'USA_OPEN_FINAL_INTL': self.usa_final_intl, 'USA_OPEN_FINAL': self.usa_final,
@@ -187,7 +197,23 @@ V2 = Spec(
                 'Britannia Opens.'),
 )
 
-SPECS = {'v1': V1, 'v2': V2}
+# ---------------------------------------------------------------------------------------------
+# v3: v2 with the US college championship's four early-spring qualifiers (no regionals)
+# ---------------------------------------------------------------------------------------------
+V3 = replace(
+    V2, version='v3', label='Reference calendar with US college qualifiers (majors weeks 15, 20, 25, 30)',
+    anchors={k: v for k, v in V2.anchors.items() if k != 'COLLEGE_REGIONAL'},
+    college_qualifiers=(('COLLEGE_QUALIFIER_1', 10, 'qualifier 1, week 10'),
+                        ('COLLEGE_QUALIFIER_2', 11, 'qualifier 2, week 11'),
+                        ('COLLEGE_QUALIFIER_3', 12, 'qualifier 3, week 12'),
+                        ('COLLEGE_QUALIFIER_4', 13, 'qualifier 4, week 13')),
+    rules_note=V2.rules_note + (' The College National Championship (week 22) is reached through four sequential '
+                                'qualifiers (weeks 10-13) open to every US college golfer, D1 and small college, '
+                                'whatever their nationality, in heats of at most 156; each qualifier awards 39 places '
+                                'shared among its heats; a qualified golfer does not enter the later ones. No '
+                                'regionals. The Small College and World University Championships are unchanged.'))
+
+SPECS = {'v1': V1, 'v2': V2, 'v3': V3}
 # The qualifying waves were named by week in v1, by wave in v2: one identity map for both
 ALIASES = {'USA_OPEN_LOCAL_W19': 'USA_OPEN_LOCAL_1', 'USA_OPEN_LOCAL_W20': 'USA_OPEN_LOCAL_2',
            'USA_OPEN_LOCAL_W21': 'USA_OPEN_LOCAL_3', 'BRITANNIA_REGIONAL_W26': 'BRITANNIA_REGIONAL_1',

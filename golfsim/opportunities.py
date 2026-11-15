@@ -164,6 +164,25 @@ def opportunities(season, gid, year, from_week):
                             'route': {'code': f'STAGE_{final}', 'label': f'{EL.label(season.cal, final)} stage',
                                       'source': 'qualification.stages'},
                             'status': status(sid, None, final, year), 'restrictions': [], 'decided': None})
+    sp = season.cal.spec
+    for sid, _, label in sp.college_qualifiers:                     # v3: the college championship's qualifiers
+        if sid in upcoming:
+            done = season.college_qualified(year)
+            st = ('already_qualified' if gid in done else
+                  'not_eligible' if g.tour not in season.US_COLLEGE or g.lifestyle == 'retired' else 'needs_result')
+            out.append({'event': _ev(season, sid, year),
+                        'condition': {'kind': 'qualifying_place',
+                                      'text': f'finish in your heat\'s share of the qualifier\'s '
+                                              f'{sp.college_qualifier_places} places (heats of at most '
+                                              f'{sp.college_heat_size}, places in proportion to heat size)',
+                                      'positions': None, 'top': None, 'places': sp.college_qualifier_places,
+                                      'site_places': None},
+                        'target': _ev(season, 'COLLEGE_NATIONAL_CHAMPIONSHIP', year),
+                        'route': {'code': 'COLLEGE_QUALIFYING', 'label': 'College championship qualifying',
+                                  'source': 'season.college_qualified'},
+                        'status': st, 'restrictions': ['US college golfers (any nationality)',
+                                                       'not already qualified this season'],
+                        'decided': None})
     seen = {(o['event']['series_id'], o['target']['series_id']) for o in out}
     for sid in sorted(upcoming):
         t = EL.target(season.cal, sid)

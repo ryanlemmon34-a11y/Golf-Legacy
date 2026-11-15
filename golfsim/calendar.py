@@ -434,9 +434,16 @@ def _anchor_specs(spec=SCH.V1):
         yield (f'CONFERENCE_CHAMPIONSHIP_{i + 1}', f'Conference Championship {i + 1}', 'CO_US_D1', 5, 'college',
                'college_postseason', 54, 60, A['CONFERENCE_CHAMPIONSHIP'], 'college', 'USA', None, 'rotating', 'Fri-Sun',
                False, 40, 1, 0)
-    for i in range(4):
-        yield (f'COLLEGE_REGIONAL_{i + 1}', f'College Regional {i + 1}', 'CO_US_D1', 5, 'college', 'college_postseason',
-               54, 75, A['COLLEGE_REGIONAL'], 'college', 'USA', None, 'rotating', 'Mon-Wed', False, 48, 1, 0)
+    if spec.college_qualifiers:                   # v3: four sequential qualifiers in heats (sites), no regionals
+        for sid, wk, label in spec.college_qualifiers:
+            yield (sid, f'College Championship Qualifier ({label})', 'CO_US_D1', 5, 'college', 'college_postseason',
+                   54, spec.college_heat_size, wk, 'college', 'USA', None, 'rotating', 'Mon-Wed', False, 44,
+                   spec.college_qualifier_max_heats, 0)
+    else:
+        for i in range(4):
+            yield (f'COLLEGE_REGIONAL_{i + 1}', f'College Regional {i + 1}', 'CO_US_D1', 5, 'college',
+                   'college_postseason', 54, 75, A['COLLEGE_REGIONAL'], 'college', 'USA', None, 'rotating', 'Mon-Wed',
+                   False, 48, 1, 0)
     yield ('COLLEGE_NATIONAL_CHAMPIONSHIP', 'College National Championship', 'CO_US_D1', 5, 'college',
            'college_postseason', 72, 156, A['COLLEGE_NATIONAL_CHAMPIONSHIP'], 'college', 'USA', ('Scottsdale, Arizona', 'Fort Worth, Texas',
                                                                  'Atlanta, Georgia', 'San Diego, California'),

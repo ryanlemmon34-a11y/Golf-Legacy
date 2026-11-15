@@ -506,6 +506,11 @@ def _rules(sp):
         )
     finals = tuple(sid for sid in ('USA_OPEN_FINAL_INTL', 'USA_OPEN_FINAL'))
     usa = (
+        *((Route('U2C', 'College national champion (this season)', 'NCAA individual champion (same season, if '
+                 'still an amateur; USGA 2026 exemption list)', places('COLLEGE_NATIONAL_CHAMPIONSHIP', (1,),
+                                                                     year_offset=0),
+                 amateur_only=True, source=(('COLLEGE_NATIONAL_CHAMPIONSHIP', 0),)),)
+          if getattr(sp, 'college_champion_usa_open', False) else ()),
         Route('U1', 'USA Open champions, last 10 years', 'US Open champions (10 years)', winners_of(('USA_OPEN',), 10, False),
               source=(('wins', ('USA_OPEN',), 10),)),
         *usa_amateurs,

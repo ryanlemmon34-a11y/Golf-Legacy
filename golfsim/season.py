@@ -1949,9 +1949,89 @@ class Season:
         self.entry_routes[(year, s.series_id)] = routes
         return [list(routes)]
 
+    # ---- v3: the college championship's qualifiers (docs/career/COLLEGE_QUALIFIERS.md) -----------------------
+    US_COLLEGE = ('CO_US_D1', 'CO_US_SMALL')
+
+    def college_heats(self, sp, entrants):
+        """Deal ranked entrants into heats (sites) of at most the heat size: H = ceil(n / size) heats (at most the
+        series' sites; with more entrants every heat grows -- nobody is left out), dealt serpentine by rank so every
+        heat has the same spread of strength."""
+        n = len(entrants)
+        if not n:
+            return []
+        h = min(sp.college_qualifier_max_heats, max(1, -(-n // sp.college_heat_size)))
+        heats = [[] for _ in range(h)]
+        for i, gid in enumerate(entrants):
+            r, k = divmod(i, h)
+            heats[k if r % 2 == 0 else h - 1 - k].append(gid)
+        return heats
+
+    @staticmethod
+    def heat_places(sizes, places):
+        """The qualifier's places shared among its heats in proportion to their fields (largest remainder; equal
+        remainders to the earlier heat)."""
+        total = sum(sizes)
+        if not total:
+            return [0] * len(sizes)
+        quota = [places * n / total for n in sizes]
+        out = [int(q) for q in quota]
+        for k in sorted(range(len(sizes)), key=lambda k: (-(quota[k] - out[k]), k))[:places - sum(out)]:
+            out[k] += 1
+        return out
+
+    def college_qualified(self, year, upto=None):
+        """{gid: (qualifier number, heat number, finish label)} of the golfers qualified for this season's college
+        championship by the qualifiers played (through qualifier `upto`), in order. Each heat's places go to its
+        best finishers: a tie at the last place is settled by countback (the final round, then the round before),
+        then by id; withdrawals and disqualifications never qualify; places a heat cannot fill lapse."""
+        sp = self.cal.spec
+        out = {}
+        for k, (sid, _, _) in enumerate(sp.college_qualifiers, 1):
+            if upto is not None and k > upto:
+                break
+            res = self.results.get(f'{year}:{sid}')
+            if res is None:
+                continue
+            sizes = [len(site) for site in res.finish]
+            for h, (site, n) in enumerate(zip(res.finish, self.heat_places(sizes, sp.college_qualifier_places)), 1):
+                rounds = res.scores[h - 1] if h - 1 < len(res.scores) else {}
+                done = [(gid, pos, tot) for gid, pos, tot in site if pos is not None and gid not in out]
+                key = lambda r: (r[1], tuple(reversed(rounds.get(r[0], ()))), r[0])   # countback: last round first
+                for gid, pos, _ in sorted(done, key=key)[:n]:
+                    tied = sum(1 for _, p, _ in site if p == pos) > 1
+                    out[gid] = (k, h, f'{"T" if tied else ""}{pos}')
+        return out
+
     def college_postseason(self, ed, year, free):
         s = ed.series
         sid = s.series_id
+        sp = self.cal.spec
+        if sp.college_qualifiers and sid.startswith('COLLEGE_QUALIFIER_'):
+            k = next(i for i, (x, _, _) in enumerate(sp.college_qualifiers, 1) if x == sid)
+            done = self.college_qualified(year, k - 1)
+            pool = [g for g in self.active_golfers() if g.tour in self.US_COLLEGE and g.id not in done]
+            entrants = [g for g in pool if free(g)]
+            rank = sorted(entrants, key=lambda g: (self.am_pos.get(g.id, 99999), self.observed_form(g.id), g.id))
+            self.stage_log[(year, sid, 'unavailable')] = sorted(g.id for g in pool if not free(g))
+            return self.college_heats(sp, [g.id for g in rank])
+        if sp.college_qualifiers and sid == 'COLLEGE_NATIONAL_CHAMPIONSHIP':
+            got = self.college_qualified(year)
+            can = {g.id for g in self.active_golfers() if g.tour in self.US_COLLEGE and free(g)}
+            routes = self.entry_routes.setdefault((year, sid), {})
+            done = self.nationals_withdrawn.get(year, {})
+            ids = []
+            for gid, (k, h, fin) in got.items():
+                if gid in can:
+                    ids.append(gid)
+                    routes[gid] = f'QUALIFIER {k}, HEAT {h} ({fin})'
+                elif gid not in done:
+                    g = self.g.get(gid)
+                    why = ('injured' if gid in self.injured else 'retired' if g is None or g.lifestyle == 'retired'
+                           else 'no longer a US college golfer' if g.tour not in self.US_COLLEGE
+                           else 'could not play that week')
+                    self.nationals_withdrawn[year][gid] = why
+                    self.log(gid, year, ed.week, f'Withdrew from the {s.name} ({why}); qualified in qualifier {k}')
+            return [ids[:s.field]]
         d1 = [g for g in self.active_golfers() if g.tour == 'CO_US_D1' and free(g)]
         rank = lambda gs: sorted(gs, key=lambda g: (self.am_pos.get(g.id, 99999), self.observed_form(g.id), g.id))
         if sid.startswith('CONFERENCE_CHAMPIONSHIP_'):

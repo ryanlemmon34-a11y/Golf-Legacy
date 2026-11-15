@@ -92,7 +92,8 @@ def target(cal, series_id):
             t = chain[chain.index(series_id) + 1]
         else:
             s = by.get(series_id)
-            if s is not None and s.category == 'college_postseason' and 'REGIONAL' in series_id:
+            if s is not None and s.category == 'college_postseason' and ('REGIONAL' in series_id
+                                                                         or 'QUALIFIER' in series_id):
                 t = next((x for x in by if x.startswith('COLLEGE_NATIONAL')), None)
     if t is None or t not in by:
         return None
