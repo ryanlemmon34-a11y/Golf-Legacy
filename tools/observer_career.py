@@ -141,6 +141,8 @@ def career_page(w, q):
     latest = recaps[0] if recaps else None
     state = ('Your career' if v['status'] == 'active' else 'Choosing your next golfer' if v['status'] == 'choosing'
              else f'under AI control since {esc(wk(*v["ended"]))}' if v.get('ended') else 'Career history')
+    from observer_career_cycle import panel as cycle_panel
+    from observer_career_legacy import panels as legacy_panels
     from observer_career_context import summary as season_summary, panels as context_panels
     from observer_career_yearend import panel as annual_panel, history as stint_history
     annual = annual_panel(w, v)
@@ -153,11 +155,11 @@ def career_page(w, q):
                   '<a href="#career-calendar">Calendar &amp; rights</a><a href="#career-attributes">Attributes</a><a href="#career-inbox">Inbox</a></div>')
     inbox = '<section id="career-inbox" class="career-panel">' + decisions_card(w, v) + notices_card(v) + '</section>'
     body = (STYLE + '<div class="career-hub">' + hero + navigation
-            + annual + '<div class="career-dashboard"><div class="career-main">' + recap_card(v)
+            + annual + cycle_panel(v, recaps) + '<div class="career-dashboard"><div class="career-main">' + recap_card(v)
             + '<section id="career-plan" class="career-panel">' + ('<h2>Next season planning</h2><p>Complete the season-transition choices above before making your next weekly plan.</p>' if annual else plan_card(w, v))
             + (advance_card(w, v) if v['status'] == 'active' and not v.get('year_end') else '') + '</section></div>'
             + '<aside class="career-aside">' + readiness_card(v) + support_card(g) + inbox + '</aside></div>'
-            + context_panels(v) + '<section id="career-attributes" class="career-panel">' + golfer_card(g, latest) + '</section>'
+            + context_panels(v) + legacy_panels(v) + '<section id="career-attributes" class="career-panel">' + golfer_card(g, latest) + '</section>'
             + '<details class="career-details"><summary>Career details &amp; hand control back</summary>'
             + f'<p>Started {esc(wk(*v["started"]))}. Current date: {esc(wk(y, week))}.</p>'
             + stint_history(v) + end_card(w, v) + scope_note() + '</details></div>')
