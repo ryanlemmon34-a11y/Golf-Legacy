@@ -8,7 +8,7 @@ Compatibility (shown for every world, decided before anything is opened). Only w
 saved can be continued (owner's decision, 31 October 2026: no compatibility with older worlds, no migrations):
 - the save format and schema must be this version's (golf-legacy-session/1, schema 1);
 - the engine that saved it (a fingerprint of the simulation code, golfsim/savegame.engine_id) must be this one;
-- it must play the reference calendar (v2); the classic calendar (v1) is not offered for new worlds.
+- it must play the reference calendars (v2/v3); the classic calendar (v1) is not offered for new worlds.
 Anything else is an unsupported save, said so with its reasons (`unsupported`): its published history can
 still be browsed read-only and the folder copied, but it is never continued and never changed or deleted.
 Copies made by earlier builds to continue another engine's world (ENGINE_ACCEPTED.json) are treated the same
@@ -163,7 +163,7 @@ def unsupported(info):
         out.append(f'an older save format ({info.get("format")}, schema {info.get("schema")})')
     if not info.get('same_engine'):
         out.append(f'saved by an earlier engine (commit {(info.get("commit") or "unknown")[:10]})')
-    if info.get('calendar') not in (None, 'v2'):
+    if info.get('calendar') not in (None, 'v2', 'v3'):
         out.append(f'the classic calendar ({info.get("calendar")})')
     return out
 

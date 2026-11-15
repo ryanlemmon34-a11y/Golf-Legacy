@@ -26,7 +26,7 @@ import observer_app as OA                                              # noqa: E
 from golfsim import career as CA                                       # noqa: E402
 from golfsim.session import Session                                    # noqa: E402
 
-POST_ROUTES = {'/career/start', '/career/plan', '/career/decide', '/career/end', '/career/advance', '/career/new'}
+POST_ROUTES = {'/career/start', '/career/plan', '/career/decide', '/career/end', '/career/advance', '/career/new', '/career/set_goal', '/career/drop_goal', '/career/staff_policy'}
 
 
 def fields(page, action):
