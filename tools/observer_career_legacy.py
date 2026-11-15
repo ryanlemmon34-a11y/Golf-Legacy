@@ -78,7 +78,7 @@ def scouting_panel(estimates, assessment=None):
         elif isinstance(when,dict):
             when=('week '+str(when['week'])+' of '+str(when['year'])) if 'week' in when and 'year' in when else None
         metadata='<p>'+esc(source)+((' · '+esc(str(judge))) if judge else '')+((' · As of '+esc(str(when))) if when else '')+'</p>'
-    return '<section id="career-scouting" class="career-panel"><h2>Scouted potential</h2>'+metadata+'<p class="muted">An assessment, not a promise. Grades can move up or down as more is learned. A revised estimate does not mean underlying potential changed. Actual ceilings remain hidden.</p>'+('<div class="scouting-grid">'+''.join(cards)+'</div>' if cards else '<p>No category assessments are recorded yet.</p>')+'</section>'
+    return '<section id="career-scouting" class="career-panel"><h2>Scouted potential</h2>'+metadata+'<p class="muted">An assessment, not a promise. Grades can move up or down as more is learned. A revised estimate does not mean underlying potential changed. Underlying limits are not revealed.</p>'+('<div class="scouting-grid">'+''.join(cards)+'</div>' if cards else '<p>No category assessments are recorded yet.</p>')+'</section>'
 
 
 def panels(view):

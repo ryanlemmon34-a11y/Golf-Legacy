@@ -32,6 +32,7 @@ import observer_career as OCAR                                       # noqa: E40
 import observer_jobs as J                                            # noqa: E402
 import observer_worlds as WL                                         # noqa: E402
 from observer import esc                                             # noqa: E402
+from golfsim import schedule as SCHEDULE
 
 DEFAULT_LIBRARY = ROOT / 'worlds'
 
@@ -267,6 +268,23 @@ class App:
         elif kind == 'decide':
             body = {'schema': CA.SCHEMA, 'type': 'decide', 'decision': O.one(form, 'decision'),
                     'answer': O.one(form, 'answer'), 'version': version}
+        elif kind in ('set_goal','drop_goal','staff_policy'):
+            try:
+                body = {'schema': CA.SCHEMA, 'type': kind, 'version': version}
+                if kind == 'set_goal':
+                    goal_kind=O.one(form,'kind')
+                    goal={'kind':goal_kind,'by_year':int(O.one(form,'by_year'))}
+                    if goal_kind in ('win','play_in'):
+                        goal['series_id']=O.one(form,'series_id')
+                    else:
+                        goal['top']=int(O.one(form,'top'))
+                    body['goal']=goal
+                elif kind == 'drop_goal':
+                    body['goal_id']=O.one(form,'goal_id')
+                else:
+                    body['policy']={k:O.one(form,k) for k in ('seek_coach','seek_caddie')}
+            except (ValueError,TypeError):
+                return ('err','Check the goal year and ranking fields. Nothing was changed.'), '/career'
         elif kind == 'end':
             if O.one(form, 'confirm') != 'yes':
                 return ('warn', 'Tick the box to confirm that the AI decides for this golfer from now on: nothing was '
@@ -299,6 +317,8 @@ class App:
         elif kind == 'decide':
             text = {'accept': 'Accepted.', 'decline': 'Declined.', 'return_to_ai': 'The golfer is back under AI control.'}.get(
                 res.get('answer'), 'Done.')
+        elif kind in ('set_goal','drop_goal','staff_policy'):
+            text = {'set_goal':'Goal saved.','drop_goal':'Goal dropped.','staff_policy':'Staff search preferences saved.'}[kind]
         else:
             text = 'The golfer is back under AI control; the AI plans the rest of this period and everything after it.'
         return ('ok', text), '/career'
@@ -394,8 +414,8 @@ class App:
             from golfsim.session import Session
             job.update(phase='generating the world and its population')
             s = Session.create(d, seed=seed, workers=self.workers, world=generate_world(year=start, seed=seed),
-                               calendar='v2')
-            WL.record_creation(d, seed, start, 'v2')
+                               calendar=SCHEDULE.NEW_WORLD)
+            WL.record_creation(d, seed, start, SCHEDULE.NEW_WORLD)
             J.log(d, f'created for a new career with seed {seed}, starting in {start}')
             job.update(phase='playing the first season under AI', total=52)
             J.ensure_pool(s.season)
@@ -424,9 +444,10 @@ class App:
             start = int(O.one(form, 'start_year') or 2027)
             if not 1900 <= start <= 2200:
                 raise ValueError('The starting year must be from 1900 to 2200.')
-            calendar = O.one(form, 'calendar') or 'v2'
-            if calendar != 'v2':                              # (the classic calendar is not offered for new worlds)
-                raise ValueError('New worlds play the reference calendar (v2).')
+            from golfsim.schedule import NEW_WORLD
+            calendar = O.one(form, 'calendar') or NEW_WORLD
+            if calendar != NEW_WORLD:                              # (the classic calendar is not offered for new worlds)
+                raise ValueError('New worlds play the current career calendar (v3).')
         except (ValueError, FileExistsError) as e:
             return ('err', esc(e))
 
@@ -696,7 +717,7 @@ class App:
                    'same golfers and, shot for shot, the same history (that is what makes a problem report replayable). '
                    'A new seed is suggested each time; type an earlier world’s seed (shown in the library) to make that '
                    'world again. The whole world is generated: every nation, golfer, coach and caddie. Every new world '
-                   'plays the reference calendar (majors in weeks 15, 20, 25 and 30).</p>')
+                   'plays the current career calendar with sequential US college qualifiers (majors in weeks 15, 20, 25 and 30).</p>')
         out.append('<h2>Start a new career</h2><form method="post" action="/career/new" class="filters">'
                    '<label>Name<input name="name" required placeholder="my career"></label>'
                    '<label>Starting year<input name="start_year" type="number" min="1900" max="2200" value="2027"></label>'
@@ -862,7 +883,7 @@ def make_handler(app):
                         notice = ('warn', 'Nothing to stop: the operation had already finished.')
                 elif u.path == '/worlds/create':
                     notice, to = app.create(form), '/'
-                elif u.path in ('/career/start', '/career/plan', '/career/decide', '/career/end'):
+                elif u.path in ('/career/start', '/career/plan', '/career/decide', '/career/end', '/career/set_goal', '/career/drop_goal', '/career/staff_policy'):
                     notice, to = app.renderer.call(app.career_command, form, u.path.rsplit('/', 1)[1])
                 elif u.path == '/career/advance':
                     notice, to = app.renderer.call(app.career_advance, form), '/career'

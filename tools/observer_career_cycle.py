@@ -32,6 +32,11 @@ def panel(v,recaps):
     if date:
         first=1+4*((date[1]-1)//4)
         middle='<span class="status-pill">Period '+str((first-1)//4+1)+' of 13 · weeks '+str(first)+'–'+str(first+3)+'</span>'+middle
+    active_goals=[g for g in v.get('goals',[]) if g.get('status')=='active' and g.get('golfer_id',v['golfer'].get('id'))==v['golfer'].get('id')]
+    if active_goals:
+        goal=active_goals[0]
+        title=goal.get('label') or (goal['kind'].replace('_',' ')+' top '+str(goal.get('top')))
+        middle+='<p>Your target: '+esc(str(title))+' by '+str(goal['by_year'])+'.</p><a href="#career-goals">Review your goals →</a>'
     g=v['golfer'];fatigue=g.get('fatigue',0)
     if g.get('injured_until'):
         middle+='<p>Recovery comes first while the recorded injury keeps you out.</p>'
