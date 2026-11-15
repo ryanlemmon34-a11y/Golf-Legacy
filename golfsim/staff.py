@@ -694,9 +694,25 @@ class MarketQuestion(Exception):
     answer yet: the market stops there, on a throwaway copy, so the player can answer before the real one runs."""
 
     def __init__(self, kind, person, g, why, when, arrangement=None):
-        super().__init__(kind, person.id, g.id)
-        self.kind, self.staff_id, self.golfer_id, self.why, self.when = kind, person.id, g.id, why, when
+        pid = person.id if person is not None else None
+        super().__init__(kind, pid, g.id)
+        self.kind, self.staff_id, self.golfer_id, self.why, self.when = kind, pid, g.id, why, when
         self.arrangement = arrangement
+
+
+def market_choice(season, car, kind, g, when, why=''):
+    """The player's own market choice ('seek_coach' / 'seek_caddie': 'yes' | 'no'), applied where an AI golfer's
+    decision to look is taken: the career's standing choice (career.staff_policy: 'yes' / 'no' / 'ask'; 'no' by
+    default, as before this choice existed), or with 'ask' the answer given when the market stopped for it."""
+    ans = car.market_answers.get(when[0], {}).get(kind) if hasattr(car, 'market_answers') else None
+    if ans is not None:
+        return ans
+    standing = getattr(car, 'staff_policy', {}).get(kind, 'no')   # the player's standing choice ('no' by default)
+    if standing in ('yes', 'no'):
+        return standing
+    if season.__dict__.get('_market_probe'):                   # 'ask': the market stops for the answer
+        raise MarketQuestion(kind, None, g, why, when)
+    return 'no'
 
 
 def market_answer(season, car, kind, person, g, why, when, arrangement=None):
@@ -984,9 +1000,10 @@ def start_of_season(season, year):
         if g.lifestyle == 'part_time':
             p_want *= 0.5                             # a full-time job leaves little time for individual coaching
         if car is not None and car.controls(g.id):
-            rng.random()                              # (the AI's draw) -- looking for a coach is the player's choice,
-            continue                                  # not offered in this build (offers to them are decisions)
-        if rng.random() > p_want:
+            rng.random()                              # (the AI's draw: the player decides whether to look instead)
+            if market_choice(season, car, 'seek_coach', g, when) != 'yes':
+                continue                              # looking, the same search and the same coaches' answers follow
+        elif rng.random() > p_want:
             continue
         budget = coach_budget(season, g, year)
         if budget < 2500:
@@ -1036,8 +1053,8 @@ def start_of_season(season, year):
                        key=lambda k: (-k.reputation - rng.gauss(0, 8), k.id))
     turned_down = {}                                  # caddie -> bags they have said no to this winter
     for g in sorted((g for g in active if wants_caddie(g) and g.id not in st.caddie_of), key=priority):
-        if car is not None and car.controls(g.id):
-            continue                                  # hiring a caddie: the player's choice, not offered in this build
+        if car is not None and car.controls(g.id) and market_choice(season, car, 'seek_caddie', g, when) != 'yes':
+            continue                                  # the player's choice; looking: the same search as anyone's
         budget = caddie_budget(season, g, year)
         events = max(1, season.target_events(g))
         level = results_level(season, g, year)

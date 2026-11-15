@@ -455,7 +455,7 @@ def market_question(season, c, y):
     is ever held while the player decides. Answered offers and the probe that found none are recorded."""
     if not hasattr(c, 'market_answers'):
         c.market_answers, c.market_probe = {}, None
-    for d in c.pending(('coach_offer', 'caddie_offer')):
+    for d in c.pending(('coach_offer', 'caddie_offer', 'market_choice')):
         if d['payload'].get('market') == y:
             return d
     answers = c.market_answers.get(y, {})
@@ -467,8 +467,17 @@ def market_question(season, c, y):
         c.market_probe = key
         return None
     st = season.staff
-    person = st.coaches.get(q.staff_id) if q.kind == 'coach' else st.caddies.get(q.staff_id)
     g = season.g[c.golfer_id]
+    if q.kind in ('seek_coach', 'seek_caddie'):
+        what = 'coach' if q.kind == 'seek_coach' else 'caddie'
+        from . import staff as ST
+        budget = (ST.coach_budget if what == 'coach' else ST.caddie_budget)(season, g, y)
+        text = (f'1 January {y}: you have no {what}. Look for one in this staff market? You would ask the '
+                f'{what}s you could afford (up to about ${budget:,.0f} a year for golf staff), best first, and each '
+                f'answers for their own reasons, as for any golfer. The market is stopped here: answer now.')
+        return c.ensure('market_choice', ('market', q.kind, y), y, 1, (y, 1),
+                        {'choice': q.kind, 'market': y, 'budget': round(budget, 2)}, text, ('yes', 'no'))
+    person = st.coaches.get(q.staff_id) if q.kind == 'coach' else st.caddies.get(q.staff_id)
     if q.kind == 'coach':
         terms = (f'a share of future prize money ({_share_text()})' if q.arrangement == 'share'
                  else f'a fee of ${person.fee:,.0f} a year')
@@ -812,6 +821,16 @@ def apply(season, cursor, action):
         return _decide(season, c, cursor, action)
     if t == 'end_control':
         return _end_control(season, c, cursor, action)
+    if t == 'staff_policy':                            # look for a coach / caddie in the 1 January market
+        pol = action.get('policy') or {}
+        bad = {k: v for k, v in pol.items() if k not in ('seek_coach', 'seek_caddie') or v not in ('yes', 'no', 'ask')}
+        if bad or not pol:
+            raise CareerError("Set seek_coach / seek_caddie to 'yes', 'no' or 'ask'.")
+        if not hasattr(c, 'staff_policy'):
+            c.staff_policy = {}
+        c.staff_policy.update(pol)
+        c._bump()
+        return {'ok': True, 'staff_policy': dict(c.staff_policy)}
     if t in ('set_goal', 'drop_goal'):                 # optional goals: no rule reads them (career_story)
         from . import career_story as CS
         return (CS.set_goal if t == 'set_goal' else CS.drop_goal)(season, c, cursor, action)
@@ -912,6 +931,14 @@ def _decide(season, c, cursor, action):
         return _answer_year_end(season, c, d, cursor, answer)
     if d['kind'] in ('coach_offer', 'caddie_offer') and d['payload'].get('market'):
         return _answer_market(season, c, d, g, y, w, answer)
+    if d['kind'] == 'market_choice':
+        yr = d['payload']['market']
+        if season.assignments.get(yr) is not None or (y, w) != (yr, 1):
+            raise CareerError('This choice is no longer open (the market has run).')
+        c.market_answers.setdefault(yr, {})[d['payload']['choice']] = answer
+        c.resolve(d, 'resolved', y, w, answer)
+        c.log.append((y, w, f'{d["payload"]["choice"].replace("_", " ")}: {answer}'))
+        return {'ok': True, 'answer': answer}
     if d['kind'] == 'coach_offer':
         return _answer_coach(season, c, d, g, y, w, answer)
     if d['kind'] == 'caddie_offer':
@@ -1138,6 +1165,7 @@ def view(season, cursor):
             'scouting': _scouting(season, c, g),
             'opportunities': _opportunities(season, c, g, y, w),
             'goals': _story(season, c, cursor, 'goals'),
+            'staff_policy': dict({'seek_coach': 'no', 'seek_caddie': 'no'}, **getattr(c, 'staff_policy', {})),
             'timeline': _story(season, c, cursor, 'timeline'),
             'year_end': year_end_view(season, cursor)}
 

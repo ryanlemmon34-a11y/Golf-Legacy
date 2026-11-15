@@ -277,3 +277,55 @@ class MarketQuestions(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class SeekingStaff(unittest.TestCase):
+    """The player may look for a coach (or caddie) in the 1 January market by the same search an AI golfer uses:
+    a standing choice (career.staff_policy, 'no' by default -- the earlier behaviour) or 'ask' (the market stops)."""
+
+    def play(self, policy, answer=None):
+        s = world()
+        act(s, {'type': 'new_career'}, 'new')
+        gid = s.season.career.golfer_id
+        if policy is not None:
+            act(s, {'type': 'staff_policy', 'policy': {'seek_coach': policy}}, 'pol')
+        asked = []
+        for n in range(4):
+            s.advance_career('next', op_key=f'a{n}')
+            ds = [d for d in s.season.career.pending() if d['payload'].get('market')]
+            if s.cursor['phase'] != 'start' or not ds:
+                break
+            d = ds[0]
+            asked.append(d['kind'])
+            act(s, {'type': 'decide', 'decision': d['id'], 'answer': answer if d['kind'] == 'market_choice'
+                    else 'decline'}, f'm{n}')
+        return s, gid, asked
+
+    def test_default_no_is_the_earlier_behaviour(self):
+        a, gid, asked = self.play(None)
+        b, _, _ = self.play('no')
+        self.assertEqual(asked, [])
+        self.assertEqual(F.digest(a), F.digest(b))
+        self.assertEqual(CA.view(a.season, a.cursor)['staff_policy'], {'seek_coach': 'no', 'seek_caddie': 'no'})
+        drop(a), drop(b)
+
+    def test_ask_then_yes_is_standing_yes(self):
+        with mock.patch.object(ST, 'coach_budget', return_value=1e6):   # (both worlds: coaches they can afford)
+            a, gid, asked = self.play('ask', 'yes')
+            b, _, _ = self.play('yes')
+            c, _, _ = self.play('no')
+        self.assertIn('market_choice', asked)
+        self.assertEqual(F.digest(a), F.digest(b))                     # asking changes nothing but the timing
+        st = a.season.staff
+        asked_coaches = [p for p in st.rel.pairs if p[0] == 'coach' and p[2] == gid]
+        self.assertTrue(asked_coaches)                                  # the search ran: coaches were asked
+        self.assertFalse([p for p in c.season.staff.rel.pairs if p[0] == 'coach' and p[2] == gid])   # 'no': nobody
+        self.assertNotEqual(F.digest(a), F.digest(c))
+        drop(a), drop(b), drop(c)
+
+    def test_bad_policy_refused(self):
+        s = world()
+        act(s, {'type': 'new_career'}, 'new')
+        with self.assertRaises(CA.CareerError):
+            act(s, {'type': 'staff_policy', 'policy': {'seek_coach': 'maybe'}}, 'bad')
+        drop(s)
