@@ -21,6 +21,8 @@ def context(season, g, year, week):
                 continue
             row = dict(row, week=w, purse=ed.series.purse)
             row['status'] = (row.get('why') or 'Eligible to request entry; place not guaranteed') if 'eligible' in row else row['rule']
+            if options['injured_until']:
+                row['status'] = 'Unavailable during the recorded injury window'
             upcoming.append(row)
     return {'summary': summary, 'qualifications': qualifications, 'upcoming': upcoming,
             'through_week': min(52, week + 11)}
