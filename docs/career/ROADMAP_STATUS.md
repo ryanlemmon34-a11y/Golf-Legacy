@@ -27,8 +27,8 @@ Status words: **done** (engine and tests on this branch), **partial**, **in prog
 | Optional goals | **not implemented** | Player-set, persisted, progress derived from records. Contract below. |
 | Relationships, timeline / living history | **partial** | Stints, staff relationship records, career log and notices exist; a canonical `timeline` read model: **not implemented** (contract below). |
 | Distinctive fictional tournament names | **not implemented** — needs a scoped decision | Renaming series changes names in every world (and engine fingerprint); history must keep the names it was recorded with. Proposal: a new calendar version or display-name table keyed by series id with the old name kept for recorded years. Not started (kept out of the duplicate-label fix). |
-| College qualifier overhaul (4 early-spring qualifiers, 39 each, all US college tours, heats) | **not implemented** (design ready) | `QUALIFIER_DESIGN` (fair heats, ~720 entrants, 5 heats 8/8/8/8/7). New calendar version v3 only; v1/v2 unchanged. |
-| Same-year USA Open place for the college national champion (amateur) | **not implemented — flagged for scope accounting** | Authorized earlier by HAL; v3 only; to be confirmed in the final scope before enabling. |
+| College qualifier overhaul (4 early-spring qualifiers, 39 each, all US college tours, heats) | **done (engine), calendar v3** | docs/career/COLLEGE_QUALIFIERS.md; `schedule.NEW_WORLD = 'v3'` for the app (HAL: observer_app new-world calendar); engine DEFAULT stays v2; v1/v2 unchanged. |
+| Same-year USA Open place for the college national champion (amateur) | **built, switched off — flagged for scope accounting** | Route `U2C` (v3 only), tested; `college_champion_usa_open=False` until confirmed. |
 | Finance trace | **partial** | Ledgers and money evidence exist per season (pruned after a season, archived); no career-facing trace read model. |
 | Sponsor / backer explanations | **partial** | Backer reviews and sponsor offers are recorded with reasons in the AI; career-facing explanations not built. |
 | Annual tracking | **partial** | Year-end review per season; stints; multi-season summary read model not built. |

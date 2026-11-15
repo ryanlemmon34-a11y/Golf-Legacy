@@ -115,7 +115,20 @@ class Rules(unittest.TestCase):
         self.assertLess(cal.by_id['COLLEGE_NATIONAL_CHAMPIONSHIP'].week, cal.by_id['USA_OPEN_FINAL'].week)
 
 
+V3_2028_W23 = '249f876d8ce7a15bdc828919bdfdbed8f287d657977a3b3665d5c68d53b44cc6'   # v3 golden (all AI)
+
+
 class Season2028(unittest.TestCase):
+    def test_v3_golden(self):
+        """An all-AI v3 world is reproducible: its golden digest after a season and 22 weeks."""
+        s = v3_world()
+        self.assertEqual(F.digest(s), V3_2028_W23)
+        self.assertEqual(s.season.cal.version, 'v3')
+        s.close()
+
+    def test_new_worlds_get_v3_engine_default_unchanged(self):
+        self.assertEqual((SCH.NEW_WORLD, SCH.DEFAULT), ('v3', 'v2'))
+
     def test_a_v3_season(self):
         s = v3_world()
         se = s.season

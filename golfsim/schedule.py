@@ -32,7 +32,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field, replace
 
 LEGACY = 'v1'                  # worlds saved before calendar versions
-DEFAULT = 'v2'                 # new worlds
+DEFAULT = 'v2'                 # a world created without naming a calendar (the engine's API and its tests: unchanged)
+NEW_WORLD = 'v3'               # the calendar the app offers for a new world (US college qualifiers; authorized)
 
 
 @dataclass(frozen=True)
