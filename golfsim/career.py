@@ -409,6 +409,7 @@ def gate(season, cursor):
             scouting.observe(season, c, g.id, y, w, why)   # (records only; its own seeded draws)
         if w == block_start(w):
             secured_notices(season, c, g, y, w)        # (newly held places, noted once, before the period is planned)
+        invitation_decisions(season, c, g, y, w)       # v4: invitations received, each answered by its deadline
         if c.plan_for(y, w) is None:
             w0 = block_start(w)
             c.ensure('plan', ('plan', y, w0), y, w, (y, w0),
@@ -434,6 +435,58 @@ def gate(season, cursor):
 
 def _status_of(g):
     return {'status': g.status, 'tour': g.tour, 'lifestyle': g.lifestyle}
+
+
+def invitation_decisions(season, c, g, y, w):
+    """v4 (golfsim/invitations.py): one decision per invitation or alternate's place offered to the controlled golfer,
+    due by the response deadline; the offers sent the same week share a group. Under the explicit 'auto' setting, no
+    decision: the deadline applies the same rule an AI golfer answers by (noted once)."""
+    from . import invitations as INV
+    from .geography import CITY_BY_NAME
+    if not getattr(season.cal.spec, 'advance_invitations', False):
+        return
+    for rec in sorted(INV.ledger(season).values(), key=lambda r: (r['deadline'], r['series_id'])):
+        e = next((x for x in rec['entries'] if x['golfer_id'] == g.id), None)
+        if e is None or e['status'] != 'offered' or tuple(rec['deadline']) < (y, w):
+            continue
+        if rec['event_id'] in getattr(c, 'invitation_answers', {}):
+            continue                                   # answered: applied at the deadline
+        city = INV._city(season, rec)
+        when = date_text(rec['year'], rec['week'])
+        if getattr(c, 'invitation_policy', 'ask') == 'auto':
+            c.note(y, w, 'invitation', f'{rec["name"]} ({when}, {city}): '
+                   + ('invited' if e['role'] == 'invited' else f'alternate number {e["order"]}')
+                   + f'. Your setting answers by the rule on {date_text(*rec["deadline"])}.',
+                   key=('invitation_auto', rec['event_id']))
+            continue
+        cost = INV.cost_estimate(season, g, rec)
+        clash = INV.conflicts(season, g.id, rec)
+        plan = c.choice(rec['year'], rec['week']) if hasattr(c, 'choice') else None
+        if plan and plan.get('kind') == 'event' and plan.get('event_id') != rec['event_id']:
+            clash.append({'kind': 'plan', 'event_id': plan['event_id'], 'name': plan['event_id'],
+                          'text': f'Your plan for that week enters {plan["event_id"]}; an accepted invitation '
+                                  'comes first (fields chosen by the event are set before entries).'})
+        from . import opportunities as O
+        for (sid, yy), _rows in O.held_places(season, g.id, y, w).items():
+            ss = season.cal.by_id.get(sid)
+            ed = next((x for x in season.cal.editions(yy) if x.series.series_id == sid), None) if ss else None
+            if ed is not None and (ed.year, ed.week) == (rec['year'], rec['week']):
+                clash.append({'kind': 'earned', 'event_id': ed.event_id, 'name': ss.name,
+                              'text': f'You hold an earned place in {ss.name} that week (fields of majors and '
+                                      'championships are set first).'})
+        role = ('You are invited' if e['role'] == 'invited'
+                else f'You are alternate number {e["order"]}: stand by to take a place if one comes free')
+        text = (f'{rec["name"]}, {when} (days {", ".join(str(d) for d in rec["days"])}), {city}, '
+                f'{CITY_BY_NAME[city].country}. {role}. The trip costs about ${cost:,.0f} now (checked again that '
+                f'week; nothing is spent unless you play). Answer by {date_text(*rec["deadline"])}.'
+                + (' Clashes: ' + ' '.join(x['text'] for x in clash) if clash else ''))
+        c.ensure('invitation', ('invitation', rec['event_id']), y, w, tuple(rec['deadline']),
+                 {'event_id': rec['event_id'], 'series_id': rec['series_id'], 'name': rec['name'],
+                  'golfer_id': g.id, 'route': 'invitation', 'role': e['role'], 'order': e['order'],
+                  'field': rec['field'], 'event_week': [rec['year'], rec['week']], 'days': list(rec['days']),
+                  'city': city, 'country': CITY_BY_NAME[city].country, 'cost_estimate': cost,
+                  'deadline': list(rec['deadline']), 'conflicts': clash, 'group': list(rec['offer_at'])},
+                 text, ('accept', 'decline') if e['role'] == 'invited' else ('standby', 'decline'))
 
 
 def record_status(season, c, g, date):
@@ -884,6 +937,14 @@ def apply(season, cursor, action):
         c.staff_policy.update(pol)
         c._bump()
         return {'ok': True, 'staff_policy': dict(c.staff_policy)}
+    if t == 'invitation_policy':                       # v4: answer invitations myself ('ask') or by the rule ('auto')
+        v = action.get('value')
+        if v not in ('ask', 'auto'):
+            raise CareerError("Set invitation_policy to 'ask' (answer each invitation) or 'auto' (accept when "
+                              "eligible, fit, affordable and free of a clash; otherwise decline).")
+        c.invitation_policy = v
+        c._bump()
+        return {'ok': True, 'invitation_policy': v}
     if t in ('set_goal', 'drop_goal'):                 # optional goals: no rule reads them (career_story)
         from . import career_story as CS
         return (CS.set_goal if t == 'set_goal' else CS.drop_goal)(season, c, cursor, action)
@@ -996,6 +1057,18 @@ def _decide(season, c, cursor, action):
         return _answer_coach(season, c, d, g, y, w, answer)
     if d['kind'] == 'caddie_offer':
         return _answer_caddie(season, c, d, g, y, w, answer)
+    if d['kind'] == 'invitation':
+        from . import invitations as INV
+        p = d['payload']
+        rec = INV.ledger(season).get(p['event_id'])
+        e = None if rec is None else next((x for x in rec['entries'] if x['golfer_id'] == p['golfer_id']), None)
+        if e is None or e['status'] != 'offered' or (y, w) > tuple(p['deadline']):
+            c.resolve(d, 'withdrawn', y, w, 'no longer open: the answers have been applied')
+            return {'ok': False, 'reason': d['resolved']['text']}
+        c.__dict__.setdefault('invitation_answers', {})[p['event_id']] = answer
+        c.resolve(d, 'resolved', y, w, answer)
+        c.log.append((y, w, f'{p["name"]}: {answer}'))
+        return {'ok': True, 'answer': answer}
     if d['kind'] == 'job':
         from . import work_pathway as WP
         if answer == 'accept':
@@ -1221,6 +1294,8 @@ def view(season, cursor):
             'goals': _story(season, c, cursor, 'goals'),
             'staff_policy': dict({'seek_coach': 'no', 'seek_caddie': 'no', 'coach_approaches': 'ask',
                                   'caddie_approaches': 'ask'}, **getattr(c, 'staff_policy', {})),
+            'invitation_policy': getattr(c, 'invitation_policy', 'ask'),
+            'entries': _entries(season, c, g),
             'money': _money(season, g, y),
             'week_compare': compare,
             'advice': _advice(season, c, g, cursor, compare),
@@ -1233,6 +1308,34 @@ def _compare(season, c, g, cursor):
     """Play / train / rest evidence for each open week of the current period (golfsim.decision_support)."""
     from . import decision_support
     return decision_support.block_compare(season, c, g, cursor) if c.status == 'active' else {}
+
+
+def _entries(season, c, g):
+    """v4: this golfer's advance invitations (golfsim/invitations.py), oldest event first, from the recorded offers
+    and answers: [{event_id, name, route, role, order, status, status_text, event_week, offer_at, deadline,
+    cost_estimate, reason, history}]. Empty where the calendar sends none."""
+    from . import invitations as INV
+    if g is None or not getattr(season.cal.spec, 'advance_invitations', False):
+        return []
+    out = []
+    for rec in sorted(INV.ledger(season).values(), key=lambda r: (r['year'], r['week'], r['series_id'])):
+        e = next((x for x in rec['entries'] if x['golfer_id'] == g.id), None)
+        if e is None:
+            continue
+        st = e['status']
+        if st == 'entered' and e.get('late'):
+            st_text = 'entered as a late replacement'
+        else:
+            st_text = INV.STATUS_TEXT.get(st, st)
+        out.append({'event_id': rec['event_id'], 'name': rec['name'], 'route': 'invitation', 'role': e['role'],
+                    'order': e['order'], 'status': st, 'status_text': st_text,
+                    'event_week': [rec['year'], rec['week']], 'offer_at': list(rec['offer_at']),
+                    'deadline': list(rec['deadline']),
+                    'cost_estimate': INV.cost_estimate(season, g, rec) if st in ('offered', 'accepted', 'promoted',
+                                                                                 'standby') else None,
+                    'reason': e.get('reason'),
+                    'history': [x for x in rec['log'] if x['golfer_id'] == g.id]})
+    return out
 
 
 def _advice(season, c, g, cursor, compare):

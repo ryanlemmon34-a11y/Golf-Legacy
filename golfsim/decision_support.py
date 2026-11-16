@@ -30,13 +30,14 @@ def week_compare(season, c, g, year, week, opp=None):
                      'opportunities': by_event.get(row['event_id'], []),
                      'last_edition': O.field_history(season, row['event_id'].split(':', 1)[1], year),
                      'course_fit': _course_fit(season, g, row['event_id']),
-                     'entry_outlook': EO.outlook(season, g, year, week, row, held, inj)})
+                     'entry_outlook': EO.outlook(season, g, year, week, row, held, inj), 'route': 'entry'})
     for row in opts['selected']:
         play.append({'event_id': row['event_id'], 'name': row.get('name'), 'eligible': None,
                      'why': row.get('rule'), 'cost': None, 'tour': row.get('tour'), 'selected_field': True,
                      'opportunities': by_event.get(row['event_id'], []),
                      'course_fit': _course_fit(season, g, row['event_id']),
-                     'entry_outlook': EO.outlook(season, g, year, week, row, held, inj)})
+                     'entry_outlook': EO.outlook(season, g, year, week, row, held, inj),
+                     'route': EO.route(season, row)})
     sc = scouting.view(season, c, g.id)
     obs = getattr(c, 'observations', {}).get(g.id, [])
     levels = obs[-1]['levels'] if obs else {}

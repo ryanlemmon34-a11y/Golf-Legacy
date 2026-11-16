@@ -16,7 +16,8 @@ rules give (opportunities.held_places); admission is only ever reported after th
 from __future__ import annotations
 
 STATUSES = ('injured', 'not_eligible', 'cannot_afford', 'holds_place', 'assured_by_rules', 'unless_qualified_earlier',
-            'rule_selected', 'quota_limited',
+            'invitations_later', 'invited', 'accepted', 'alternate_standby', 'declined', 'not_invited', 'expired',
+            'withdrawn', 'alternate_unused', 'rule_selected', 'quota_limited',
             'open_last_time', 'near_capacity_last_time', 'ahead_of_last_cutoff', 'at_last_cutoff',
             'behind_last_cutoff', 'unknown')
 NEAR = 0.8                 # requests at or above this share of the places: 'near capacity' though the field did not fill
@@ -28,6 +29,15 @@ LABELS = {
     'holds_place': 'You hold a place under the event\'s rules',
     'assured_by_rules': 'The rules enter you',
     'unless_qualified_earlier': 'Entered unless you qualify earlier',
+    'invitations_later': 'Invitations not yet sent',
+    'invited': 'Invited: your answer is due',
+    'accepted': 'Invitation accepted',
+    'alternate_standby': 'Alternate on stand-by',
+    'declined': 'Invitation declined',
+    'not_invited': 'Not among those invited',
+    'expired': 'Invitation expired',
+    'withdrawn': 'Withdrawn from the field',
+    'alternate_unused': 'Alternate: no place came free',
     'rule_selected': 'The event selects its own field',
     'quota_limited': 'Limited places for golfers like you',
     'open_last_time': 'Places were left last edition',
@@ -59,6 +69,9 @@ def outlook(season, g, year, week, row, held=None, injured=None):
         cq = college_qualifier(season, g, sid, year, week)
         if cq is not None:
             return cq
+        iv = invitation(season, g, row['event_id'], s)
+        if iv is not None:
+            return iv
         held = O.held_places(season, g.id, year, week) if held is None else held
         mine = held.get((sid, year))
         if mine:
@@ -147,3 +160,67 @@ def college_qualifier(season, g, sid, year, week):
                     uncertainty=caveat)
     return _out('assured_by_rules', 'Every US college golfer not yet qualified is entered, and you have not qualified '
                 'in the qualifiers played so far.', uncertainty=caveat)
+
+
+def invitation(season, g, event_id, s):
+    """v4 invitation fields (golfsim/invitations.py): where this golfer stands, from the recorded offers and answers
+    only. None when the field is not an advance invitation (earlier calendars, qualifiers, earned places)."""
+    from . import invitations as INV
+    if s is None or not INV.applies(season, s):
+        return None
+    rec = INV.ledger(season).get(event_id)
+    ed = next((e for e in season.cal.editions(int(event_id.split(':', 1)[0])) if e.event_id == event_id), None)
+    if rec is None:
+        if ed is None:
+            return None
+        o = INV.offer_week(season, ed)
+        if tuple(o) < (season.year, getattr(season, 'week', 1)):
+            return None                                 # (sent before this world began: selected in the event week)
+        return _out('invitations_later', f'Invitations go out in week {o[1]} of {o[0]}, by amateur ranking'
+                    + (' (host country first, then its region)' if s.category == 'national_amateur' else '')
+                    + '; no forecast of the selection is made.',
+                    uncertainty='The selection is made from the rankings as they stand then.')
+    e = next((x for x in rec['entries'] if x['golfer_id'] == g.id), None)
+    sent = f'week {rec["offer_at"][1]} of {rec["offer_at"][0]}'
+    due = f'week {rec["deadline"][1]} of {rec["deadline"][0]}'
+    if e is None:
+        return _out('not_invited', f'The selection made in {sent} ({rec["field"]} invited and the alternates, by '
+                    'amateur ranking) did not include you.', uncertainty=None)
+    st = e['status']
+    alt = e['role'] == 'alternate'
+    check = 'Every entrant is checked again in the event week (eligible, fit, free those days, able to pay).'
+    if st == 'offered':
+        return _out('invited', (f'Alternate number {e["order"]}' if alt else 'Invited')
+                    + f' in {sent}; answer by {due}.', uncertainty=check)
+    if st in ('accepted', 'promoted', 'entered'):
+        how = ' (promoted from the alternates)' if st == 'promoted' or e.get('status_before') == 'promoted' else ''
+        return _out('accepted', f'Accepted{how}: your place in the field.', uncertainty=check)
+    if st == 'standby':
+        return _out('alternate_standby', f'Alternate number {e["order"]}, on stand-by: a place goes to you only if '
+                    'one comes free and you pass the event-week checks.', uncertainty=check)
+    if st == 'declined':
+        return _out('declined', 'Declined' + (f': {e["reason"]}' if e.get('reason') else '') + '.', uncertainty=None)
+    if st == 'expired':
+        return _out('expired', 'Expired' + (f': {e["reason"]}' if e.get('reason') else '') + '.', uncertainty=None)
+    if st == 'withdrawn':
+        return _out('withdrawn', f'Withdrawn in the event week: {e.get("reason")}.', uncertainty=None)
+    return _out('alternate_unused', 'Alternate: no place came free' + (f' ({e["reason"]})' if e.get('reason') else '')
+                + '.', uncertainty=None)
+
+
+def route(season, row):
+    """How a planner row's place is reached: 'entry' (an ordinary entry request), 'invitation' (v4 advance
+    invitation), 'qualifier' (the entrant decides to try), 'earned' (a field chosen by the event's rules from
+    results, exemptions or standings)."""
+    from . import invitations as INV
+    from .career import entrant_decides
+    if 'rule' not in row and not row.get('selected_field'):
+        return 'entry'
+    s = season.cal.by_id.get(row['event_id'].split(':', 1)[1])
+    if s is None:
+        return 'earned'
+    if INV.applies(season, s):
+        return 'invitation'
+    if entrant_decides(s):
+        return 'qualifier'
+    return 'earned'

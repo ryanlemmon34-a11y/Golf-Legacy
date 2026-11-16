@@ -33,7 +33,7 @@ from dataclasses import dataclass, field, replace
 
 LEGACY = 'v1'                  # worlds saved before calendar versions
 DEFAULT = 'v2'                 # a world created without naming a calendar (the engine's API and its tests: unchanged)
-NEW_WORLD = 'v3'               # the calendar the app offers for a new world (US college qualifiers; authorized)
+NEW_WORLD = 'v4'               # the calendar the app offers for a new world (v3 + advance invitations; authorized)
 
 
 @dataclass(frozen=True)
@@ -72,6 +72,9 @@ class Spec:
     fictional_names: bool = False
     # v3: course fit and recorded familiarity as a small part of an event's appeal (golfsim/course_fit.py)
     course_fit: bool = False
+    # v4: invitation fields (national / elite amateur championships) offered in advance with deadlines and alternates
+    # (golfsim/invitations.py)
+    advance_invitations: bool = False
 
     @property
     def major_weeks(self):
@@ -219,7 +222,20 @@ V3 = replace(
                                 'shared among its heats; a qualified golfer does not enter the later ones. No '
                                 'regionals. The Small College and World University Championships are unchanged.'))
 
-SPECS = {'v1': V1, 'v2': V2, 'v3': V3}
+# ---------------------------------------------------------------------------------------------
+# v4: v3 with invitations sent in advance (offer, response deadline, alternates, event-week checks)
+# ---------------------------------------------------------------------------------------------
+V4 = replace(
+    V3, version='v4', label='Reference calendar with US college qualifiers and advance invitations '
+                            '(majors weeks 15, 20, 25, 30)',
+    advance_invitations=True,
+    rules_note=V3.rules_note + (' Invitation fields (national amateur championships and the elite amateur '
+                                'championships chosen by ranking) are offered in advance: national championships 4 '
+                                'weeks before, elite championships 6 weeks before, with a two-week answer deadline, '
+                                'alternates on stand-by and a final check of every entrant in the event week; '
+                                'qualifiers and earned places are unchanged.'))
+
+SPECS = {'v1': V1, 'v2': V2, 'v3': V3, 'v4': V4}
 # The qualifying waves were named by week in v1, by wave in v2: one identity map for both
 ALIASES = {'USA_OPEN_LOCAL_W19': 'USA_OPEN_LOCAL_1', 'USA_OPEN_LOCAL_W20': 'USA_OPEN_LOCAL_2',
            'USA_OPEN_LOCAL_W21': 'USA_OPEN_LOCAL_3', 'BRITANNIA_REGIONAL_W26': 'BRITANNIA_REGIONAL_1',

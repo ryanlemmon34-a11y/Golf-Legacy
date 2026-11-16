@@ -139,7 +139,7 @@ def advise(season, c, g, cursor, compare):
     def committed_rows(wc):
         sel = [r for r in wc['play'] if r.get('selected_field')]
         st = lambda r: (r.get('entry_outlook') or {}).get('status')
-        held = [r for r in sel if st(r) in ('holds_place', 'assured_by_rules')]
+        held = [r for r in sel if st(r) in ('holds_place', 'assured_by_rules', 'accepted')]
         unless = [r for r in sel if st(r) == 'unless_qualified_earlier']   # entered unless qualified before it
         trying = [r for r in sel if r in quals] if policy['qualifying'] == 'enter' else []
         return sel, st, held, unless, trying
@@ -160,7 +160,8 @@ def advise(season, c, g, cursor, compare):
         near = sorted(x for x in committed_weeks if abs(x - w) < WINDOW and x != w)
         sel, st, held, unless, trying = committed_rows(wc)
         maybe = [r for r in sel if r not in held and r not in trying and r not in unless
-                 and st(r) not in ('not_eligible', 'injured')
+                 and st(r) not in ('not_eligible', 'injured', 'declined', 'not_invited', 'expired', 'withdrawn',
+                                   'alternate_unused', 'invitations_later')
                  and not (series(r) is not None and CA.entrant_decides(series(r)))]
         cands = []
         for row in wc['play']:
@@ -186,10 +187,11 @@ def advise(season, c, g, cursor, compare):
             rec = dict(train_choice)
             name = lambda rows: ', '.join(r.get('name') or r['event_id'] for r in rows)
             parts = []                                        # one explanation per kind of place, never merged
-            mine = [r for r in held if st(r) == 'holds_place']
+            mine = [r for r in held if st(r) in ('holds_place', 'accepted')]
             given = [r for r in held if st(r) == 'assured_by_rules']
             if mine:
-                parts.append(f'{name(mine)}: you hold a place and the suggested policy accepts it')
+                parts.append(f'{name(mine)}: you hold a place' + ('' if all(st(r) == 'accepted' for r in mine)
+                                                                   else ' and the suggested policy accepts it'))
             if given:
                 parts.append(f'{name(given)}: the rules enter you and the suggested policy accepts it')
             if trying:

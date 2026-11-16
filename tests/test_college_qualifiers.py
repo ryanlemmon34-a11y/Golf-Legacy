@@ -137,8 +137,11 @@ class Season2028(unittest.TestCase):
         self.assertEqual(s.season.cal.version, 'v3')
         s.close()
 
-    def test_new_worlds_get_v3_engine_default_unchanged(self):
-        self.assertEqual((SCH.NEW_WORLD, SCH.DEFAULT), ('v3', 'v2'))
+    def test_new_worlds_get_v4_engine_default_unchanged(self):
+        # v4 (2026-11-16) = v3 + advance invitations (docs/career/ADVANCE_INVITATIONS.md): the college qualifiers are
+        # v3's and unchanged there
+        self.assertEqual((SCH.NEW_WORLD, SCH.DEFAULT), ('v4', 'v2'))
+        self.assertEqual(SCH.V4.college_qualifiers, SCH.V3.college_qualifiers)
 
     def test_a_v3_season(self):
         s = v3_world()

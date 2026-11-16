@@ -45,6 +45,7 @@ from . import residence as RES
 from . import familiarity as FAM
 from . import course_fit as CF
 from . import home_clubs as HC
+from . import invitations as INV
 from .calendar import LOCAL_CIRCUITS, TOUR_BY_KEY, _in_window
 from . import schedule as SCH
 from . import upsets as UP
@@ -1114,6 +1115,7 @@ class Season:
         """1 January: people refreshed, sponsor contracts, the staff market, playing rights."""
         self._active = None
         self.year = year
+        INV.prune(self, year)
         if year == self.first_year:                          # the world's own golfers, as the records begin
             for g in self.world.golfers:
                 if g.lifestyle != 'retired' and not any(g.id in c for c in self.creations.values()):
@@ -1189,6 +1191,7 @@ class Season:
                     self._week_entered.setdefault(gid, (ed.event_id, how))
                     self.reserve(self.g[gid], ed.series, city)
 
+        INV.step(self, year, week)                           # v4: invitations sent / answered this week
         special = [e for e in eds if self.is_special(e.series)]
         regular = [e for e in eds if not self.is_special(e.series)]
         for ed in sorted(special, key=lambda e: (e.series.tier, e.series.series_id)):
@@ -1608,6 +1611,8 @@ class Season:
         the next alternate, takes the place."""
         s = ed.series
         sid = s.series_id
+        if INV.applies(self, s) and not INV.late_editions(self, ed):
+            return [INV.event_field(self, ed, year, week, busy)]   # v4: offered in advance, checked again now
         cities = {v.city for v in self.venues(year)[ed.event_id]}
         # a golfer who can pay for at least one of the event's sites; the site they are given is checked
         # again before the field is fixed (pay_at_sites)
@@ -2416,6 +2421,7 @@ class Season:
         D.restore_self_views(state.pop('_self_view', None))  # (derived values: saved only to spare re-deriving)
         state.setdefault('new_pros_added', {})              # saves from before new professionals arrived
         state.setdefault('field_cutoffs', {})                # saves from before field history: none recorded
+        state.setdefault('invitations', {})                  # saves from before advance invitations: none sent
         state.setdefault('familiar_base', defaultdict(Counter))  # saves from before the regional baseline: none
         state.setdefault('familiar_base_on', True)
         state.setdefault('home_clubs', {})                   # saves from before home clubs: given at the next winter
