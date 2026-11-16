@@ -91,6 +91,38 @@ def _person_ok(season, g, route, target_year):
     return True
 
 
+def field_history(season, series_id, year):
+    """How this series' field closed at its last recorded edition before `year` (Season.note_cutoff), labelled as
+    history -- never a chance or a promise for this edition: {year, capacity, asked, admitted, full, late_fills,
+    closed_at} or None (no edition recorded: a new series, an older save, or more than a season ago)."""
+    for y in (year - 1,):
+        rec = season.__dict__.get('field_cutoffs', {}).get(y, {}).get(series_id)
+        if rec is not None:
+            return {'year': y, 'capacity': rec['capacity'], 'asked': rec['asked'], 'admitted': rec['admitted'],
+                    'full': rec['full'], 'late_fills': rec['late_fills'],
+                    'closed_at': season.entry_class_label(rec['last_class']) if rec['full'] else None,
+                    'note': f'History: the {y} edition. A record of what happened then, not a forecast.'}
+    return None
+
+
+def held_places(season, gid, year, week):
+    """{(target series, target year): [{code, label, amateur_only}]} of the places this golfer holds now on recorded facts:
+    major exemptions and earned qualifying places (qualification), and a college championship place earned in a
+    qualifier (calendar v3)."""
+    out = {}
+    routes = {r.code: r for rs in Q.rules_for(season.ctx.version).values() for r in rs}
+    for key, codes in _held(season, gid, year, week).items():
+        out[key] = [{'code': c, 'label': routes[c].label if c in routes else c,
+                     'amateur_only': bool(routes[c].amateur_only) if c in routes else False} for c in codes]
+    if season.cal.spec.college_qualifiers:
+        got = season.college_qualified(year).get(gid)
+        if got is not None:
+            out[('COLLEGE_NATIONAL_CHAMPIONSHIP', year)] = [
+                {'code': 'COLLEGE_QUALIFYING', 'amateur_only': False,
+                 'label': f'college championship qualifier {got[0]}, heat {got[1]} ({got[2]})'}]
+    return out
+
+
 def _held(season, gid, year, week):
     """{(major, target year): [route codes]} of places this golfer already holds on recorded facts."""
     ctx = season.ctx

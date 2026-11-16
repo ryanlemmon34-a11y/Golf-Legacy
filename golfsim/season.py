@@ -500,6 +500,7 @@ class Season:
         self.upset_estimates = True
         self._upset_facts = {}                               # event id -> {gid: (status, age, world, amateur rank)}
         self.entry_misses = defaultdict(Counter)             # year -> gid -> weeks shut out of full fields
+        self.field_cutoffs = {}                              # year -> series id -> how its field closed (history)
         self.entry_wants = defaultdict(Counter)              # year -> gid -> weeks they wanted to play
         self.season_rounds = defaultdict(Counter)            # year -> gid -> competitive rounds played
         # assumed competitive experience from before a golfer entered the world (gid -> (year, rounds)):
@@ -1314,6 +1315,7 @@ class Season:
         free = [gid for gid, (want, _) in prefs.items() if want]
         hid_eid = prefs[hid][0][0] if hid is not None and prefs.get(hid, ((),))[0] else None
         applied = set()                                      # (career evidence) who asked the player's event
+        asked = Counter()                                    # event_id -> golfers who asked it (field history)
         while free:
             gid = free.pop()
             want = prefs[gid][0]
@@ -1321,6 +1323,7 @@ class Season:
                 continue
             eid = want[nxt[gid]]
             nxt[gid] += 1
+            asked[eid] += 1
             if eid == hid_eid:
                 applied.add(gid)
             s = by_id[eid].series
@@ -1365,6 +1368,7 @@ class Season:
                 commit(ed, [ids], 'entry')
                 late = set(late_entries.get(eid, ()))
                 self.event_routes[year][eid] = {gid: self.entry_route(self.g[gid], s, gid in late) for gid in ids}
+            self.note_cutoff(year, ed, cap[eid], asked[eid], held[eid], late_entries.get(eid, ()))
         stats = self.entry_stats[year]
         for gid, (want, _) in prefs.items():
             if not want:
@@ -1408,6 +1412,29 @@ class Season:
         from .career import ENTRY_TEXT
         car.note(year, week, 'entry', f'Week {week} of {year}: you could not enter {name} ({ENTRY_TEXT[code]}); your '
                  'fallback for the week applies.', key=('noentry', year, week))
+
+    # The class at which an ordinary field closed (Season.priority's first element), in words
+    ENTRY_CLASSES = {1: "a winner's exemption", 10: 'members of the event\'s own tour (or its home amateurs)',
+                     11: 'home players at their national open', 12: 'players from a higher tour',
+                     13: 'players from another tour of the same level', 14: 'players from a lower tour',
+                     19: 'amateurs in a professional event'}
+
+    def entry_class_label(self, cls):
+        if cls in self.ENTRY_CLASSES:
+            return self.ENTRY_CLASSES[cls]
+        if isinstance(cls, int) and cls < 10:
+            return f'Premier playing rights: {RIGHTS[cls // 2]}' + ('' if cls % 2 == 0 else ' (another circuit)')
+        return None
+
+    def note_cutoff(self, year, ed, capacity, asked, held, late):
+        """Field history (observation only; nothing reads it back for selection): how an ordinary event's field
+        closed this edition -- how many asked, its size, how many were taken, and the entry class of the last
+        golfer taken ahead of the late fills. Kept for this season and the last (prune_history)."""
+        taken = [p for p, gid in held if gid not in late]
+        last = taken[-1][0] if taken else None
+        self.field_cutoffs.setdefault(year, {})[ed.series.series_id] = {
+            'capacity': capacity, 'asked': asked, 'admitted': len(held), 'late_fills': len(late),
+            'full': len(held) >= capacity, 'last_class': last if last is None or isinstance(last, int) else None}
 
     @staticmethod
     def entry_code(got, lineup, position, capacity):
@@ -2385,6 +2412,7 @@ class Season:
     def __setstate__(self, state):
         D.restore_self_views(state.pop('_self_view', None))  # (derived values: saved only to spare re-deriving)
         state.setdefault('new_pros_added', {})              # saves from before new professionals arrived
+        state.setdefault('field_cutoffs', {})                # saves from before field history: none recorded
         state.setdefault('familiar_base', defaultdict(Counter))  # saves from before the regional baseline: none
         state.setdefault('familiar_base_on', True)
         state.setdefault('home_clubs', {})                   # saves from before home clubs: given at the next winter
@@ -2846,6 +2874,8 @@ class Season:
         old = lambda y: y < year - 1
         for gid in [gid for gid, (y, _) in self.prior_rounds.items() if y < year]:
             del self.prior_rounds[gid]                       # their first season is over
+        for y in [y for y in self.field_cutoffs if old(y)]:
+            del self.field_cutoffs[y]
         for d in (self.earnings, self.level_earnings, self.played, self.open_am_starts, self.pstats, self.ledgers, self.season_rounds, self.entry_wants,
                   self.entry_misses, self.entry_stats, self.declined, self.nationals_withdrawn, self.school_trips, self.club_trips,
                   self.backer_flows, self.move_log, self.move_blocked, self.familiar_base, self.activity_counts,

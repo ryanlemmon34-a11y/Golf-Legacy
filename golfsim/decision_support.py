@@ -24,7 +24,8 @@ def week_compare(season, c, g, year, week, opp=None):
     for row in opts['events']:
         play.append({'event_id': row['event_id'], 'name': row.get('name'), 'eligible': row.get('eligible'),
                      'why': row.get('why'), 'cost': row.get('cost'), 'tour': row.get('tour'),
-                     'opportunities': by_event.get(row['event_id'], [])})
+                     'opportunities': by_event.get(row['event_id'], []),
+                     'last_edition': O.field_history(season, row['event_id'].split(':', 1)[1], year)})
     for row in opts['selected']:
         play.append({'event_id': row['event_id'], 'name': row.get('name'), 'eligible': None,
                      'why': row.get('rule'), 'cost': None, 'tour': row.get('tour'), 'selected_field': True,

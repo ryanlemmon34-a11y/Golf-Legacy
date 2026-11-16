@@ -398,6 +398,8 @@ def gate(season, cursor):
                      ('return_to_ai',))
         return {'kind': 'decision', 'ids': [d['id']]}
     if ph == 'week':
+        if w == block_start(w):
+            secured_notices(season, c, g, y, w)        # (newly held places, noted once, before the period is planned)
         if c.plan_for(y, w) is None:
             w0 = block_start(w)
             c.ensure('plan', ('plan', y, w0), y, w, (y, w0),
@@ -440,6 +442,25 @@ def winter_stage(season, c, year):
     if done == 2:
         return 'winter_residence'
     return 'engine'
+
+
+def secured_notices(season, c, g, y, w):
+    """At a period's start: a notice for each place the golfer now holds on recorded facts that was not noticed
+    before (opportunities.held_places) -- a decided place, with its route; never a place still to be decided.
+    Exactly once: what was noticed is kept (career.secured_seen), across reloads and interruptions."""
+    from . import opportunities as O
+    from . import event_labels as EL
+    seen = c.__dict__.setdefault('secured_seen', [])
+    for (target, ty), routes in sorted(O.held_places(season, g.id, y, w).items(), key=lambda kv: (kv[0][1], kv[0][0])):
+        key = [g.id, target, ty]
+        if key in seen:
+            continue
+        seen.append(key)
+        cond = (' (amateurs only: the place lapses on turning professional)'
+                if all(r['amateur_only'] for r in routes) else '')
+        c.note(y, w, 'secured', f'{date_text(y, w)}: you hold a place in the {EL.label(season.cal, target)} {ty} '
+                                f'-- {"; ".join(r["label"] for r in routes)}{cond}. A recorded place, not an estimate.',
+               key=('secured', g.id, target, ty))
 
 
 def market_question(season, c, y):
