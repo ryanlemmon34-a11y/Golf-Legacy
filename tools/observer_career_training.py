@@ -1,3 +1,4 @@
+from observer_career_estimates import growth
 """Read-only practice comparisons from visible skills and recorded outcomes, never true ceilings."""
 from observer import esc
 from observer_career_advice import GROUPS
@@ -36,6 +37,7 @@ def panel(v):
         grade=r.get('grade');fg,bg=GRADE_COLORS.get(grade,('#5c6660','#f0f4ef'))
         potential=(f'<span class="training-estimate" style="color:{fg};background:{bg}">Estimated potential {esc(grade)}</span>' if grade in GRADE_COLORS else '<span class="muted">Potential not assessed</span>')
         facts=''
+        facts+=growth(r)
         if r.get('confidence'):
             facts+='<p>Confidence: '+esc(str(r['confidence']))+'</p>'
         if r.get('explanation'):
@@ -48,4 +50,4 @@ def panel(v):
         else:
             facts+='<p>No recent recorded practice outcome for this focus.</p>'
         rows.append(f'<article><h3>{LABELS[k]}</h3><div class="training-current">{means[k]:.1f}</div><small>Current training-group average</small><p>{potential}</p>'+facts+'</article>')
-    return (STYLE+'<section class="career-panel"><div class="eyebrow">Make the practice choice informed</div><h2>What should I work on?</h2><p>'+esc(recent_text)+'</p><p>Current relative strength: <strong>'+LABELS[strongest]+'</strong>. Lowest current group: <strong>'+LABELS[weakest]+'</strong>. A weaker group is not automatically the best investment.</p><div class="training-compare">'+''.join(rows)+'</div><p class="muted">Potential grades describe a fallible future-level assessment, not exact remaining growth. Recent improvement is evidence, not a promised gain. We do not reveal underlying limits or manufacture a headroom estimate.</p><details><summary>Competition, practice or recovery?</summary><ul><li>Compete for recorded results, earnings and event-specific opportunities, with entry uncertainty, travel costs and fatigue.</li><li>Practice one focus and review its actual effect afterward. Giving up an event buys practice time, not guaranteed improvement.</li><li>Rest to reduce fatigue faster, especially above the 20% performance threshold. No direct skill training is performed.</li></ul></details></section>')
+    return (STYLE+'<section class="career-panel"><div class="eyebrow">Make the practice choice informed</div><h2>What should I work on?</h2><p>'+esc(recent_text)+'</p><p>Current relative strength: <strong>'+LABELS[strongest]+'</strong>. Lowest current group: <strong>'+LABELS[weakest]+'</strong>. A weaker group is not automatically the best investment.</p><div class="training-compare">'+''.join(rows)+'</div><p class="muted">Potential grades describe a fallible future-level assessment, not exact remaining growth. Recent improvement is evidence, not a promised gain. Growth-room assessments use recorded observations and remain uncertain; underlying limits are not revealed.</p><details><summary>Competition, practice or recovery?</summary><ul><li>Compete for recorded results, earnings and event-specific opportunities, with entry uncertainty, travel costs and fatigue.</li><li>Practice one focus and review its actual effect afterward. Giving up an event buys practice time, not guaranteed improvement.</li><li>Rest to reduce fatigue faster, especially above the 20% performance threshold. No direct skill training is performed.</li></ul></details></section>')
