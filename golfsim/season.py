@@ -1432,7 +1432,7 @@ class Season:
         golfer taken ahead of the late fills. Kept for this season and the last (prune_history)."""
         taken = [p for p, gid in held if gid not in late]
         last = taken[-1][0] if taken else None
-        self.field_cutoffs.setdefault(year, {})[ed.series.series_id] = {
+        self.__dict__.setdefault('field_cutoffs', {}).setdefault(year, {})[ed.series.series_id] = {
             'capacity': capacity, 'asked': asked, 'admitted': len(held), 'late_fills': len(late),
             'full': len(held) >= capacity, 'last_class': last if last is None or isinstance(last, int) else None}
 
