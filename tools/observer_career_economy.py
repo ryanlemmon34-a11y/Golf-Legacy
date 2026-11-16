@@ -1,5 +1,6 @@
 """Read-only presentation of the committed career financial and weekly evidence."""
 from html import escape as esc
+from observer_career_estimates import entry as entry_panel
 from observer_course_context import panel as course_panel
 
 def dollars(x):
@@ -47,6 +48,7 @@ def comparison(v,week):
     for e in r['play']:
         state='Selection required' if e.get('selected_field') else ('Eligible to attempt entry' if e['eligible'] else 'Not eligible')
         out+='<p><strong>'+esc(e['name'])+'</strong>: '+state+'; cost '+dollars(e.get('cost'))+'. '+esc(e.get('why') or '')+'</p>'
+        out+=entry_panel(e.get('entry_outlook'))
         out+=course_panel(e.get('course_fit'))
         history=e.get('last_edition')
         if history:

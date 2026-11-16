@@ -1,3 +1,4 @@
+from observer_career_estimates import growth
 """Presentation-only trophies and fallible scouting estimates supplied by committed read models.
 No awards, potential grades or simulation decisions are inferred here.
 """
@@ -58,6 +59,7 @@ def scouting_panel(estimates, assessment=None):
         fg,bg=GRADE_COLORS.get(grade,('#5c6660','#f0f4ef'))
         letter=grade if grade in GRADE_COLORS else '?'
         detail=''
+        detail+=growth(row)
         if row.get('confidence'):
             detail+='<p>Confidence: '+esc(str(row['confidence']))+'</p>'
         if row.get('explanation'):

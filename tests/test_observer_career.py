@@ -31,7 +31,10 @@ POST_ROUTES = {'/career/start', '/career/plan', '/career/decide', '/career/end',
 
 def fields(page, action):
     """The hidden fields of the first form on `page` that posts to `action`."""
-    seg = page.split(f'action="{action}"')[1].split('</form>')[0]
+    match = re.search(r'<form\b[^>]*\baction="' + re.escape(action) + r'"[^>]*>(.*?)</form>', page, re.S)
+    if match is None:
+        raise AssertionError(f"No form posts to {action}")
+    seg = match.group(1)
     return dict(re.findall(r'<input type="hidden" name="(\w+)" value="([^"]*)">', seg))
 
 
