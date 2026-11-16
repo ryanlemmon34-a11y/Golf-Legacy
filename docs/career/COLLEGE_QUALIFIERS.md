@@ -48,8 +48,8 @@ Nobody is excluded by ranking: every entrant gets a heat.
 
 * Next season's Tour Masters for the college national champion (route M16, amateurs) -- as v2.
 * The same season's USA Open for the college national champion if still an amateur (route `U2C`, after the USGA's 2026
-  exemption list): **built and tested, switched off** (`college_champion_usa_open = False`) until confirmed in the
-  final scope. The championship (week 22) is decided before the USA Open's field (final qualifying week 24, the Open
+  exemption list): **on in calendar v3** (`college_champion_usa_open = True`, enabled 2026-11-15 on the final-scope
+  confirmation; the spec field defaults to False, so v1/v2 have no such route). The championship (week 22) is decided before the USA Open's field (final qualifying week 24, the Open
   week 25), and a golfer's status changes only in the winter.
 
 ## Read models
@@ -63,4 +63,5 @@ Nobody is excluded by ranking: every entrant gets a heat.
 `tests/test_college_qualifiers.py`: v1/v2 unchanged; v3 calendar valid; heats, place shares, ties by countback,
 withdrawals, short heats, no re-entry; a v3 season played through week 23 (unique qualification, US college tours
 only, nationality-independent, championship field = qualified minus withdrawals, recorded routes, small-college
-championship still played); the v3 golden digest; the USA Open route built but off.
+championship still played); the v3 golden digest (re-baselined for course fit, docs/career/COURSE_FIT.md); the USA Open route on in v3 (timing,
+amateur status, no invented place) and absent from v2.

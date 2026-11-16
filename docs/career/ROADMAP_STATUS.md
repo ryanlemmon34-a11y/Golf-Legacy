@@ -1,8 +1,10 @@
-# Career roadmap: implementation status, dependencies and engine contracts (2026-11-15)
+# Career roadmap: implementation status, dependencies and engine contracts (updated 2026-11-16)
 
-Branch `integration/consolidated-career-update` (from `integration/caddie-ui-verify` 89a6d96, plus HAL's bd87022 →
-bc753ef and 4bbcb2e → 747fbf7). **Not a complete build; not ready for Ryan's test.** HAL owns UI; Claude owns
-engine, persisted decisions and evidence, and the read models below.
+Verified baseline `wip/consolidated-career-update` @ 8580171 (full per-module regression, docs below). Bounded
+completion on `feature/career-completion` (from 8580171): course fit on selected rows, living history, period
+scouting with growth room, entry outlook, coach's advice. **Not ready for Ryan's test until the combined regression
+and HAL's UI wiring are verified.** HAL owns UI; Claude owns engine, persisted decisions and evidence, and the read
+models below.
 
 Status words: **done** (engine and tests on this branch), **partial**, **in progress** (this checkpoint),
 **not implemented**, **blocked** (needs a decision or input), **deferred** (long-term, not to be raced).
@@ -12,20 +14,21 @@ Status words: **done** (engine and tests on this branch), **partial**, **in prog
 | item | engine status | notes / owner |
 |---|---|---|
 | Truthful entry reasons, closeness only from decision-time data | **done** (355555d) | `career.week_entry`, `ENTRY_TEXT`; older weeks `recorded: false`. HAL renders (8d02cb7). |
-| Truthful entry *chances* before deciding (forward-entry expectations) | **done as history (no chances)** | Every ordinary field's close is recorded per edition (`Season.field_cutoffs`, observation only: asked, field size, admitted, late fills, the entry class it closed at). `opportunities.field_history(season, series, year)` and `week_compare` play rows' `last_edition` show the previous edition, labelled as history -- never a probability or a promise. Older saves and first seasons: null. Rule-selected fields: no forward statement. |
+| Truthful entry *chances* before deciding (forward-entry expectations) | **done: history plus qualitative outlook (no chances)** (feature/career-completion) | `week_compare` play rows' `entry_outlook` (docs/career/ENTRY_OUTLOOK.md): the golfer's entry class now against how the field closed last edition; `unknown` with the reason when unsupported; measured calibration in the doc, never shown as numbers. |
 | Default "yes" acceptance (selected / qualifying) | **partial** | Engine takes whatever policy is posted; the default is the form's (HAL). Engine default when a policy is omitted: not added (would change the command contract) — can add on request. |
 | Visible current qualifications and placement unlocks | **done (engine read model, first version)** | `golfsim/opportunities.py`: `career.view()['opportunities']` from the implemented routes (major exemptions with their stated finish, qualifying stages, qualifier targets); status already_qualified / needs_result / awaiting_selection / not_eligible. Tour cards and winner exemptions held: HAL's `career_context`. US college qualifiers plug in when built. |
 | Early invitation notices | **done (decided places only)** | At each period start a notice (`kind: 'secured'`) for each place now held on recorded facts and not noticed before (`opportunities.held_places`: major exemptions, earned qualifying places, a v3 college championship place), with its route; exactly once (`career.secured_seen`) across reloads and interruptions. Nothing is announced about places not yet decided. |
 | Usable coach / caddie offers | **done (reworked)** | Market offers answered at the same point of the 1 January market as an AI golfer's (probe on a copy; same draw); the earlier holds were withdrawn after the parity audit. Paired human/AI tests. |
 | Player choosing staff themselves (hire a coach/caddie) | **done (engine)** | `staff_policy` command: seek_coach / seek_caddie = 'no' (default, earlier behaviour) / 'yes' / 'ask'; coach_approaches / caddie_approaches = 'ask' (default) / 'decline' (every market approach answered no, as on the spot) (the 1 January market stops with a `market_choice` decision, yes/no). Looking runs the AI's own search: same ranking, same coaches' and caddies' answers. `career.view()['staff_policy']`. |
 | Thirteen fixed four-week periods; interruptions resume within the period, one recap | **done (verified)** | tests/test_period_cadence.py. |
-| Editable four-week plan accepting coach advice | **done (UI); engine decision evidence done (`golfsim/decision_support.week_compare`; committed hook `career.view()['week_compare']` = {week: comparison} for the current period's open weeks)** | HAL's reviewable advice (c36f17b); the engine plan command needs nothing new. |
+| Editable four-week plan accepting coach advice | **done (engine advice: feature/career-completion; UI wiring: HAL)** | `career.view()['advice']` (docs/career/COACH_ADVICE.md): play / train / rest per open week from stakes, pathway, entry outlook, course fit, cost, load, fatigue formulas, visible weakness, perceived growth room and coach speciality, by fixed rules; read only; the suggestion is a valid plan. Replaces HAL's interim helper's rules once wired. |
 | Season results / season review | **done** | `year_end.review` (YEAR_END.md), weekly recaps with entry evidence. |
 | Factual inbox / calendar / recaps | **partial** | Engine: notices, log, decisions, recaps, planner, `week_entry`. Inbox/calendar presentation: HAL. |
 | Trophies (majors, college, amateur championships) with engraving and multi-win history | **done (engine read model)** | From recorded winners only (`ctx.results` keeps every winner for good). Contract below. |
-| Per-category fallible potential letter grades | **done (engine read model)** | `golfsim/scouting.py`: observations persisted in the career record at control start and each season review; the judge's seeded persistent error; never ceilings or potential. Grades A/B/C/D/F only. |
+| Per-category fallible potential letter grades | **done (engine read model; period cadence and growth room: feature/career-completion)** | `golfsim/scouting.py`: looks at control start, each period start, the first week after a coach change and the season's end (the career's gate only); level read over 12 weeks of looks, trend over at least 26 weeks; the judge's seeded persistent error; never ceilings or potential. Grades A/B/C/D/F only; `growth_room` qualitative with uncertainty and basis; `unknown` without evidence. |
 | Optional goals | **done (engine)** | `set_goal` / `drop_goal` commands (versioned, exactly-once), at most 5 active; kinds win / play_in / world_rank / amateur_rank; status derived from records; read by no rule (tested: world unchanged). `career.view()['goals']`. |
-| Relationships, timeline / living history | **done (engine read model, first version)** | `career.view()['timeline']`: control stints, answered decisions, trophies, wins and top-10s, coach/caddie partnerships, from records only. |
+| Relationships, timeline / living history | **done (engine read model; tour and injury history: feature/career-completion)** | `career.view()['timeline']`: control stints, answered decisions, trophies, wins and top-10s, coach/caddie partnerships, tour / status transitions (`career.status_log`, logged once when first seen under control; nothing earlier inferred), injury onsets (from the weekly recaps' onset episodes, once each), from records only. |
+| Course fit and recorded familiarity in event choice | **done (v3; owner-authorized 2026-11-15)** | docs/career/COURSE_FIT.md; selected rows too (feature/career-completion). |
 | Distinctive fictional tournament names | **done (v3 new worlds)** | golfsim/event_names.py: the ordinary numbered events get place names (town + optional course feature + kind suffix), deterministic, unique, no real brands, places tied to famous real events avoided; ids, weeks, venues, Premier/anchor names unchanged; v1/v2 unchanged. |
 | College qualifier overhaul (4 early-spring qualifiers, 39 each, all US college tours, heats) | **done (engine), calendar v3** | docs/career/COLLEGE_QUALIFIERS.md; `schedule.NEW_WORLD = 'v3'` for the app (HAL: observer_app new-world calendar); engine DEFAULT stays v2; v1/v2 unchanged. |
 | Same-year USA Open place for the college national champion (amateur) | **done (v3), enabled 2026-11-15 on HAL's final-scope confirmation** | Route `U2C`: championship (week 22) before final qualifying (24) and the Open (25); amateurs only; tests for timing, status, no invented place, the World University champion not included. |
@@ -38,18 +41,14 @@ Status words: **done** (engine and tests on this branch), **partial**, **in prog
 | Commercial: Steam, Birth (origin) mode, mods | **deferred (long term)** | Not part of this update. |
 | Automatic world prologue | **not approved** | Not built. |
 
-## Dependency plan (engine)
+## Dependency plan (engine) — as built
 
-1. Consolidate (this branch) — HAL's follow-ups on top of the engine fixes; focused tests.
-2. **Trophies read model** (no new world state; recorded winners only). → HAL's trophy cabinet.
-3. **Potential estimates**: persisted yearly observations in the career record + seeded per-coach view; read model.
-   Depends on nothing else; must not touch world RNG streams.
-4. **Qualifications read model** (canonical, from recorded routes) → early notices only for routes already decided.
-5. **Timeline read model** (stints, results, trophies, staff, moves, decisions) → goals (persisted, versioned
-   command) build on it.
-6. College qualifier overhaul (calendar v3) — independent of 2-5; largest; needs the v3 default and golden
-   re-baseline sign-off already given; same-year USA Open place confirmed in scope first.
-7. Later: player staff hiring, finance trace, sponsor explanations, annual tracking, fictional names (decision).
+All seven original steps are built: consolidation; trophies; potential estimates; qualifications read model and early
+notices; timeline and goals; the college qualifier overhaul (v3, U2C on); staff hiring, finance trace, sponsor
+explanations, annual tracking and fictional names. The bounded completion (feature/career-completion) was built in
+this order: course fit on selected rows (needs course fit); living history (needs the timeline); period scouting and
+growth room (needs scouting); entry outlook (needs field history); coach's advice (needs all of these). Open: HAL's UI
+wiring of the new keys; the combined regression; the encyclopedia (deferred); commercial items (deferred).
 
 ## Engine contracts (agreed shapes, engine side)
 
@@ -73,19 +72,27 @@ Ties are decided by the event's own playoff (one winner per edition); multi-site
 
 ### Potential estimates — `career.view()['scouting']` (implemented)
 
-`as_of` is a list `[year, week]` (not an object); `grade` is one of `A`, `B`, `C`, `D`, `F` (no `E`) or `null`;
-`history` is a list of `{year, week, grade}`.
+`as_of` is a list `[year, week]` (not an object); `grade` is one of `A`, `B`, `C`, `D`, `F` (no `E`) or `null`.
 
 ```
-scouting: { as_of: [year, week] | null, source: "coach" | "self",
+scouting: { as_of: [year, week] | null, source: "coach" | "self" | null, judge: name | null,
             categories: [ {category: "putting", grade: "A".."F" | null, confidence: "low" | "medium" | "high" | null,
-                           explanation: str | null, history: [{year, grade}]} ] }
+                           growth_room: {label: "little"|"some"|"considerable"|"unknown",
+                                         uncertainty: "narrow"|"moderate"|"wide"|null,
+                                         basis: ["age_curve", "observed_trend"?, "coach_read"|"self_read"], explanation},
+                           evidence: {observations, looks_in_read, span_weeks, trend_available, trend_weeks},
+                           explanation: str | null, history: [{year, week, grade, reason}]} ] }
 ```
-Grade from a projected category level: the observed level (seen with error) + the typical growth for the age +
-the observed recent improvement (from the persisted yearly observations), through the judging coach's scouting
-error (a seeded, persistent per-coach view; firmer the more seasons watched) — the staff scouting model, per
-category. Never reads ceilings or potential. `grade: null` with an explanation when nothing has been observed yet.
-Grade colours are HAL's.
+Looks (`reason`): `start` (control starts), `period` (each period start), `coach_change` (the first week after the
+coach changed), `season_end`; written by the career's gate as the world advances, never by a read, each with its own
+seeded observation error. The level read is the mean of the looks of the last 12 weeks; the observed trend needs at
+least 26 weeks of looks (the look nearest a season back, annualised). Grade from the projected category level: the
+level read + the typical growth for the age + the observed trend, through the judge's scouting error (a seeded,
+persistent per-judge view; firmer the more seasons watched). `growth_room` is that projected gain in words (little up
+to 1.5, some up to 5, considerable above), with uncertainty from the judge's remaining error (one step wider without
+a trend) -- never a ceiling and never a grade minus a level. Never reads ceilings or potential. `grade: null` and
+`growth_room.label: 'unknown'` when nothing has been observed (or a read from an older build lacks it). Grade colours
+are HAL's.
 
 ### Opportunities — `career.view()['opportunities']` (implemented)
 
@@ -100,15 +107,21 @@ facts (`qualification.secured_places`, `earned_exemptions` as of now). Read only
 
 ### Week comparison — `golfsim.decision_support.week_compare(season, career, golfer, year, week)` (implemented)
 
-`{week, year, play: [{event_id, name, eligible, why, cost, tour, selected_field?, opportunities: [...]}],
+`{week, year, play: [{event_id, name, eligible, why, cost, tour, selected_field?, opportunities: [...], last_edition
+(ordinary rows), course_fit (COURSE_FIT.md; selected rows too), entry_outlook (ENTRY_OUTLOOK.md)}],
 train: [{category, grade, confidence, observed_level, weakest_rank, observed_as_of}], rest: {fatigue_after},
 load: {fatigue, performance_threshold, train_fatigue_after, rest_fatigue_after, played_last_4, played_last_8,
 injured_until, recorded_weeks}}`. Grades and levels are the career's recorded observations (scouting), not
 ceilings; fatigue forecasts are career.readiness's (the engine's own formulas).
 
 ### Timeline — `career.view()['timeline']` (implemented)
-`[{date: [year, week], kind: 'control'|'decision'|'trophy'|'result'|'staff', text, golfer_id}]`, oldest first, from
-records only (golfsim/career_story.py).
+`[{date: [year, week], kind: 'control'|'decision'|'trophy'|'result'|'staff'|'tour'|'injury', text, golfer_id}]`,
+oldest first, from records only (golfsim/career_story.py). `tour`: a status / tour / lifestyle change from
+`career.status_log`, dated when the career's gate first saw it (week 53 = the winter); the first sight of a golfer is
+a baseline, never a transition. `injury`: one per onset episode kept in the weekly recaps.
+
+### Coach's advice — `career.view()['advice']` (implemented)
+See docs/career/COACH_ADVICE.md for the contract and rules; `null` outside an active career's open weeks.
 
 ### Goals — `career.view()['goals']` (implemented)
 Commands: `{schema: 1, type: 'set_goal', goal: {kind: 'win'|'play_in', series_id, by_year} | {kind: 'world_rank'|
