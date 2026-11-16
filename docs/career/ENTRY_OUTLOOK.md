@@ -50,7 +50,8 @@ probability.
 
 ## Calibration and limits
 
-These figures are measured, not shown in the game.
+These figures are measured for audit, not shown in the game. They come from one seed and a small world, and they vary
+too widely between seasons to be presented as probabilities, so numeric entry chances stay absent.
 
 Setup:
 * World: calendar v3, seed 11, scale 0.05, all AI.

@@ -87,11 +87,14 @@ Looks (`reason`): `start` (control starts), `period` (each period start), `coach
 coach changed), `season_end`; written by the career's gate as the world advances, never by a read, each with its own
 seeded observation error. The level read is the mean of the looks of the last 12 weeks; the observed trend needs at
 least 26 weeks of looks (the look nearest a season back, annualised). Grade from the projected category level: the
-level read + the typical growth for the age + the observed trend, through the judge's scouting error (a seeded,
+level read + the development still typical for the age (the youth part of the public age curve only: nothing from 27
+on; old-age decline is never counted as room) + the observed trend (before 27: faster or slower than typical; from 27:
+only improvement actually seen), through the judge's scouting error (a seeded,
 persistent per-judge view; firmer the more seasons watched). `growth_room` is that projected gain in words (little up
 to 1.5, some up to 5, considerable above), with uncertainty from the judge's remaining error (one step wider without
 a trend) -- never a ceiling and never a grade minus a level. Never reads ceilings or potential. `grade: null` and
-`growth_room.label: 'unknown'` when nothing has been observed (or a read from an older build lacks it). Grade colours
+`growth_room.label: 'unknown'` when nothing has been observed (or a read from an older build lacks it). The read's
+explanation states the age curve's sign ("typically still gains", "at their peak", "typically loses"). Grade colours
 are HAL's.
 
 ### Opportunities — `career.view()['opportunities']` (implemented)

@@ -205,5 +205,32 @@ class ReviewFixes(unittest.TestCase):
             self.assertEqual(x['recommended']['kind'], 'event')
 
 
+class LoadWindow(unittest.TestCase):
+    """At most MAX_RECENT tournaments in any WINDOW (4) consecutive weeks, recorded and suggested together: the week
+    itself and the three before it (HAL's audit of b7fb0ee: the count had looked four weeks back)."""
+
+    synthetic = Advice.synthetic
+
+    def test_boundary(self):
+        with Copy() as s:
+            g = at_first_period(s)
+            from golfsim.calendar import TOUR_BY_KEY
+            own = TOUR_BY_KEY[g.tour].name
+            rows = {w: [event_row(f'2028:B{w}', own, stakes=1)] for w in range(1, 5)}
+            _, _, w0 = self.synthetic(s, rows)
+            a, _, _ = self.synthetic(s, rows, recaps=(w0 - 3, w0 - 2))       # two in the three weeks before: no
+            self.assertNotEqual(a['weeks'][str(w0)]['recommended']['kind'], 'event')
+            a, _, _ = self.synthetic(s, rows, recaps=(w0 - 4, w0 - 3))       # one of them four weeks back: yes
+            self.assertEqual(a['weeks'][str(w0)]['recommended']['kind'], 'event')
+            for recaps in ((), (w0 - 1,), (w0 - 3, w0 - 2), (w0 - 4, w0 - 3), (w0 - 2,)):
+                a, _, _ = self.synthetic(s, rows, recaps=recaps)
+                played = set(recaps) | {int(w) for w, x in a['weeks'].items() if x['recommended']['kind'] == 'event'}
+                for start in range(w0 - 6, w0 + 4):
+                    self.assertLessEqual(sum(1 for x in played if start <= x < start + AD.WINDOW), AD.MAX_RECENT,
+                                         (recaps, sorted(played)))
+                self.assertTrue(all('four consecutive weeks' in r['text'] for x in a['weeks'].values()
+                                    for r in x['reasons'] if r['code'] == 'load'))
+
+
 if __name__ == '__main__':
     unittest.main()

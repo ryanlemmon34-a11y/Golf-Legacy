@@ -16,7 +16,8 @@ plan), and the same evidence and rules apply to every golfer. No random draw, no
 from __future__ import annotations
 
 FATIGUE_LIMIT = 0.2               # the engine's season-fatigue performance threshold (career.readiness)
-MAX_RECENT = 2                    # tournaments in any four-week stretch the advice suggests at most
+MAX_RECENT = 2                    # tournaments in any four consecutive weeks the advice suggests at most
+WINDOW = 4                        # (the week itself and the three before it)
 PLAY_BAR = 2.0                    # an event's advice score needed to suggest playing it
 
 OUTLOOK_POINTS = {'open_last_time': 2.0, 'ahead_of_last_cutoff': 2.0, 'near_capacity_last_time': 1.0,
@@ -137,7 +138,7 @@ def advise(season, c, g, cursor, compare):
     for w in weeks:
         wc = compare[str(w)]
         inj = wc['load'].get('injured_until')
-        plays_4 = sum(1 for x in recent + planned_play if w - 4 <= x < w)
+        plays_4 = sum(1 for x in recent + planned_play if w - (WINDOW - 1) <= x < w)   # the three weeks before
         sel = [r for r in wc['play'] if r.get('selected_field')]
         held = [r for r in sel if (r.get('entry_outlook') or {}).get('status') == 'holds_place']
         trying = [r for r in sel if r in quals] if policy['qualifying'] == 'enter' else []
@@ -176,15 +177,16 @@ def advise(season, c, g, cursor, compare):
                                      f'performance suffers; rest brings it to about {rest_after:.0%}.')]
         elif best and best[0] >= PLAY_BAR and plays_4 < MAX_RECENT:   # (a long shot only with enough else for it)
             rec = {'kind': 'event', 'event_id': best[1], 'fallback': dict(train_choice)}
-            reasons = best[3] + [_r('load', f'{plays_4} tournament(s) recorded or suggested in the four weeks before '
-                                            f'(at most {MAX_RECENT} in any four).')]
+            reasons = best[3] + [_r('load', f'{plays_4} tournament(s) recorded or suggested in the three weeks before: '
+                                            f'at most {MAX_RECENT} in any four consecutive weeks.')]
             if (best[2].get('entry_outlook') or {}).get('status') == 'behind_last_cutoff':
                 reasons = [r for r in best[4] if r['code'] == 'long_shot'] + reasons
         elif training and cat:
             rec = dict(train_choice)
             reasons = list(cat_reasons)
             if best and plays_4 >= MAX_RECENT:
-                reasons.append(_r('load', f'{plays_4} tournaments in the four weeks before: a development week instead.'))
+                reasons.append(_r('load', f'{plays_4} tournaments in the three weeks before (at most {MAX_RECENT} in '
+                                          f'any four consecutive weeks): a development week instead.'))
             elif not best or best[0] < PLAY_BAR:
                 reasons.append(_r('no_strong_event', 'No event this week stands out on stakes, pathway and entry '
                                                      'outlook.'))
@@ -200,7 +202,8 @@ def advise(season, c, g, cursor, compare):
         if best and rec.get('kind') != 'event' and not inj:
             alts.append({'choice': {'kind': 'event', 'event_id': best[1], 'fallback': dict(train_choice)},
                          'name': best[2].get('name'), 'for': best[3], 'against': best[4] + (
-                             [_r('load', f'{plays_4} tournament(s) in the four weeks before.')] if plays_4 else [])})
+                             [_r('load', f'{plays_4} tournament(s) in the three weeks before; at most {MAX_RECENT} in '
+                                         f'any four consecutive weeks.')] if plays_4 else [])})
         if rec.get('kind') != 'train' and training and cat and not inj:
             alts.append({'choice': dict(train_choice), 'for': cat_reasons,
                          'against': [_r('no_results', 'No prize money, ranking points or qualifying results.'),

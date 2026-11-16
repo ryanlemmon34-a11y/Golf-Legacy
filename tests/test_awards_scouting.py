@@ -277,5 +277,115 @@ class AssessmentParity(unittest.TestCase):
             self.assertEqual(strip(third.observations[g.id]), strip(c.observations[g.id]))
 
 
+class AgeCurve(unittest.TestCase):
+    """HAL's audit of b7fb0ee: growth room counts only the youth part of the public age curve -- never old-age decline
+    as upside. Ages 18/27/34/50/60; flat, declining and improving observed trends; self and coach judges; the
+    advice's training table reads the same room."""
+
+    def read(self, se, g, age, change, coach=None):
+        from unittest import mock
+        car = CA.Career(g.id, 2028, 1, {'rule': 'test'})
+        g.born = 2028 - age
+        base = dict(g.attrs)
+        try:
+            with mock.patch.object(scouting, 'OBSERVE_SD', 0.0):           # (test: exact looks)
+                scouting.observe(se, car, g.id, 2028, 1, 'period')
+                for k in g.attrs:
+                    g.attrs[k] = max(1.0, min(99.0, base[k] + change))
+                scouting.observe(se, car, g.id, 2029, 1, 'period')         # 52 weeks later
+        finally:
+            g.attrs.clear()
+            g.attrs.update(base)
+        return car, car.observations[g.id][-1]['estimates']
+
+    def test_youth_only_and_trends(self):
+        with Copy() as s:
+            g0 = started(s)
+            se = s.season
+            g = next(x for x in se.active_golfers() if x.id != g0.id and x.lifestyle != 'retired'
+                     and se.staff.coach(x.id) is None)
+            born = g.born
+            try:
+                for age in (18, 27, 34, 50, 60):
+                    youth = scouting.youth_remaining(age + 1)                # (read at the second look, a year on)
+                    typical = scouting.typical_change(age + 1)
+                    for change in (0.0, -3.0, 3.0):
+                        _, est = self.read(se, g, age, change)
+                        for cat, e in est.items():
+                            self.assertAlmostEqual(e['youth'], round(youth, 2), places=2)
+                            self.assertAlmostEqual(e['gain'], e['youth'] + e['trend_part'] + e['judge_part'],
+                                                   delta=0.02)
+                            if age + 1 >= 27:
+                                self.assertEqual(e['youth'], 0.0)
+                                # past the developing years: only improvement actually seen adds room
+                                want = max(0.0, e['recent'])
+                                self.assertAlmostEqual(e['trend_part'], round(want, 2), delta=0.06)
+                                if change <= 0:
+                                    self.assertEqual(e['trend_part'], 0.0)
+                                    self.assertLessEqual(e['gain'], e['judge_part'] + 1e-9)
+                            else:
+                                self.assertAlmostEqual(e['trend_part'], round(1.5 * (e['recent'] - typical), 2),
+                                                       delta=0.2)
+                    # the words follow the curve's sign
+                    v = scouting.view(se, self.read(se, g, age, 0.0)[0], g.id)
+                    text = v['categories'][0]['explanation']
+                    if age + 1 < 27:
+                        self.assertIn('typically still gains', text)
+                    elif age + 1 > 34:
+                        self.assertIn('typically loses', text)
+                        self.assertNotIn('gains about -', text)
+                    self.assertNotIn('about -', text)
+            finally:
+                g.born = born
+
+    def test_old_golfer_has_no_curve_upside_self_and_coach(self):
+        from test_careertest2_fixes import free_coach
+        with Copy() as s:
+            g0 = started(s)
+            se = s.season
+            g = next(x for x in se.active_golfers() if x.id != g0.id and x.lifestyle != 'retired'
+                     and se.staff.coach(x.id) is None)
+            born = g.born
+            try:
+                for coached in (False, True):
+                    if coached:
+                        se.staff.assign_coach(se, g, free_coach(se.staff), 'fee', (2027, 52), 'golfer', 'test set-up')
+                    for age in (50, 60):
+                        car, est = self.read(se, g, age, 0.0)
+                        v = scouting.view(se, car, g.id)
+                        self.assertEqual(v['source'], 'coach' if coached else 'self')
+                        for x in v['categories']:
+                            e = est[x['category']]
+                            self.assertEqual((e['youth'], e['trend_part']), (0.0, 0.0))
+                            self.assertEqual(x['growth_room']['label'],
+                                             next(n for n, bar in scouting.ROOM if e['judge_part'] <= bar))
+                            self.assertIn('past the developing years', x['growth_room']['explanation'])
+            finally:
+                g.born = born
+
+    def test_advice_reads_the_corrected_room(self):
+        from golfsim import career_advice as AD
+        with Copy() as s:
+            g = started(s)
+            se, c = s.season, s.season.career
+            s.advance_career('next', op_key='a')
+            for d in c.pending(CA.OFFER_KINDS):
+                from test_careertest2_fixes import act
+                act(s, {'type': 'decide', 'decision': d['id'], 'answer': 'decline'}, f'o{d["id"]}')
+            born = g.born
+            try:
+                g.born = 2028 - 55
+                c.observations = {}
+                scouting.observe(se, c, g.id, 2028, s.cursor['week'], 'period')
+                v = CA.view(se, s.cursor)
+                rooms = {x['category']: x['growth_room']['label'] for x in v['scouting']['categories']}
+                for row in v['advice']['training_table']:
+                    self.assertEqual(row['growth_room'], rooms[row['category']])
+                est = c.observations[g.id][-1]['estimates']
+                self.assertTrue(all(e['youth'] == 0.0 for e in est.values()))
+            finally:
+                g.born = born
+
+
 if __name__ == '__main__':
     unittest.main()

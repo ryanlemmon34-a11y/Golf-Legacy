@@ -17,7 +17,7 @@ The advice uses only what the planner already shows (`week_compare`) and the sco
 | Pathway | the event's tour is the golfer's own tour | +1.5 |
 | Course fit and familiarity | `course_fit.points` | +0.5 × points |
 | Cost | cost compared with the money available for golf | −1 if it is more than half; never suggested if it can't be paid |
-| Load | tournaments recorded or suggested in the 4 weeks before, plus held places and qualifying the suggested policy enters | at most 2 in any 4-week stretch |
+| Load | tournaments recorded or suggested, plus held places and qualifying the suggested policy enters | at most 2 in any 4 consecutive weeks: a week is suggested only if the three weeks before hold fewer than 2 |
 | Held places / qualifying | rule-selected rows: `entry_outlook.status == 'holds_place'`; qualifying by the engine's own test (`career.entrant_decides`), entered (`qualifying: 'enter'`) only when a result there can still earn a place | that week's competition comes first and counts in the load (code `committed`); the plan entry is training, or rest |
 | Possible selections | other rule-selected rows | said (code `possible_selection`), not counted: selection isn't known in advance, so the real load can be higher |
 | Fatigue | `career.readiness` and the engine's rest and training formulas | rest when fatigue is above the 20 % threshold |
@@ -57,12 +57,14 @@ Reason codes:
 
 ## Tests
 
-`tests/test_career_advice.py` (5 tests; the last two from HAL's review of 6d0d31e):
+`tests/test_career_advice.py` (6 tests; two from HAL's review of 6d0d31e, one from the audit of b7fb0ee):
 * Read only and deterministic: the world digest is unchanged, and the suggested plan is accepted by the engine's own
   validation.
 * The rules: stakes and own tour preferred; the load cap; nothing suggested behind the cut-off or when unaffordable;
   rest when tired or injured; recorded play counts toward the load.
 * The training pick uses weakness, growth room and coach speciality.
+* The load window's boundary: two tournaments in the three weeks before block a suggestion; one of them four weeks
+  back does not; every 4-week window holds at most 2 (`LoadWindow`, from HAL's audit of b7fb0ee).
 * A long shot (behind the cut-off) is suggested only when everything else outweighs it, with `long_shot` first.
 * A held place takes a load slot. Qualifying is recognised by the engine's test, so rule text saying "qualifying"
   doesn't make an event qualifying. Possible selections are stated but not counted.

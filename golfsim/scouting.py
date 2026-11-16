@@ -7,7 +7,9 @@ Built like a coach's scouting of a young player (staff.scouting_estimate), per c
   at the start of each four-week period, the first week after a change of coach, and at each season's end
   (`observe`, called by the career's gate as the world advances, never by a page view), and keeps them
   (career.observations); the level read is the mean of the looks of the last WINDOW weeks;
-* the growth typical for the golfer's age (the population's public aging curve);
+* the development still typical for the golfer's age: the youth part of the population's public aging curve only
+  (`youth_remaining`: nothing from the prime age, 27, on; old-age decline is never counted as room to grow), and the
+  typical change a year (`typical_change`: positive while young, zero in the prime, negative in decline);
 * the improvement actually observed over at least TREND_MIN weeks (the look nearest a season back, annualised),
   against that typical growth -- none until such a span has been watched (and the read says so);
 * through the judge's error: a persistent, seeded view per judge, golfer and category (a coach does not re-roll their
@@ -31,6 +33,21 @@ GRADES = (('A', 73.0), ('B', 65.0), ('C', 56.0), ('D', 48.0), ('F', float('-inf'
 OBSERVE_SD = 2.0                  # how far an observed category level can be from the true one
 WINDOW = 12                       # weeks of looks averaged into the level read
 TREND_MIN, TREND_MAX = 26, 104    # weeks: the span an observed trend needs (and the longest one used)
+PRIME = 27.0                      # the public aging curve's prime age (population.age_deficit)
+
+
+def youth_remaining(age):
+    """Development still typical before the prime at this age (category points): the youth part of the public aging
+    curve only. 0 from the prime on -- the curve's old-age decline is a loss to come, never room to grow."""
+    young = max(0.0, PRIME - age)
+    return 0.36 * young ** 1.55
+
+
+def typical_change(age):
+    """The typical change in a year at this age on the public aging curve: + while developing, 0 in the prime,
+    - in decline."""
+    from .population import age_deficit
+    return age_deficit(age, PRIME) - age_deficit(age + 1, PRIME)
 REASONS = ('start', 'period', 'coach_change', 'season_end')
 CATS = tuple(CATEGORIES)
 
@@ -105,14 +122,14 @@ def _seen(rows, upto):
 
 def _estimate(season, c, gid, rows):
     """The read at the last observation in `rows` (chronological, all earlier looks of this golfer)."""
-    from .population import age_deficit
     from .staff import firming
     from .development import judgement
     i = len(rows) - 1
     o = rows[i]
     g = season.g[gid]
     age, year = o['age'], o['year']
-    typical = age_deficit(age, 27.0) - age_deficit(age + 1, 27.0)
+    typical = typical_change(age)
+    youth = youth_remaining(age)
     seen, n_near = _seen(rows, i)
     back = [j for j in range(i) if TREND_MIN <= _abs(o) - _abs(rows[j]) <= TREND_MAX]
     j = min(back, key=lambda k: (abs(_abs(o) - _abs(rows[k]) - 52), -k)) if back else None
@@ -136,15 +153,18 @@ def _estimate(season, c, gid, rows):
     for cat in CATS:
         if j is not None:
             recent = (seen[cat] - then[cat]) * 52 / gap
-            trend = 1.5 * (recent - typical)
+            # developing (before the prime): faster or slower than typical moves the remaining development; from the
+            # prime on, only improvement actually seen counts (a year of it), never holding up better than decline
+            trend = 1.5 * (recent - typical) if youth > 0 else max(0.0, recent)
         else:
             recent, trend = None, 0.0
         view = random.Random(f'{season.seed}:catview:{judge}:{gid}:{cat}').gauss(0, sd)
-        gain = age_deficit(age, 27.0) + trend + firm * view
+        gain = youth + trend + firm * view
         projected = seen[cat] + gain
         confidence = ('high' if span >= 104 and spread <= 6 else 'medium' if recent is not None else 'low')
         out[cat] = {'grade': grade(projected), 'confidence': confidence, 'seen': round(seen[cat], 1),
                     'recent': None if recent is None else round(recent, 1), 'typical': round(typical, 1),
+                    'youth': round(youth, 2), 'trend_part': round(trend, 2), 'judge_part': round(firm * view, 2),
                     'gain': round(gain, 2), 'spread': round(spread, 2), 'looks': n_near,
                     'trend_weeks': gap if j is not None else None}
     return out
@@ -155,8 +175,8 @@ ROOM = (('little', 1.5), ('some', 5.0), ('considerable', float('inf')))
 
 def growth_room(e, source):
     """The judge's qualitative growth-room estimate for one category from its read `e`: their projected gain (the
-    age curve, the observed trend if any, their own persistent error), never a ceiling and never a grade minus a
-    level. Uncertainty from the judge's remaining error, one step wider without an observed trend."""
+    youth part of the age curve, the observed trend if any, their own persistent error), never a ceiling, never a grade
+    minus a level and never old-age decline counted as room. Uncertainty from the judge's remaining error, one step wider without an observed trend."""
     gain = e.get('gain')
     if gain is None:                                  # (a read from before this was kept)
         return {'label': 'unknown', 'uncertainty': None, 'basis': [],
@@ -171,8 +191,19 @@ def growth_room(e, source):
     trend = (f'what they have seen over {e["trend_weeks"]} weeks' if e['recent'] is not None
              else 'no observed trend yet (needs at least 26 weeks of looks)')
     return {'label': label, 'uncertainty': steps[k], 'basis': basis,
-            'explanation': f'{who} see {label} room to grow here, judged from age and {trend}. An opinion with '
+            'explanation': f'{who} see {label} room to grow here, judged from age ('
+                           + ('still developing' if e.get('youth', 0) > 0 else 'past the developing years')
+                           + f') and {trend}. An opinion with '
                            f'{steps[k]} uncertainty, not a limit.'}
+
+
+def age_text(age, typical):
+    """The age curve in words for a read (typical: the typical change a year at that age)."""
+    if typical > 0.05:
+        return f'at {age} a golfer typically still gains about {typical:.1f} a year.'
+    if typical < -0.05:
+        return f'at {age} a golfer typically loses about {-typical:.1f} a year.'
+    return f'at {age} a golfer is typically at their peak, neither gaining nor losing with age.'
 
 
 def view(season, c, gid):
@@ -203,8 +234,8 @@ def view(season, c, gid):
                                   'span_weeks': _abs(o) - _abs(rows[0]), 'trend_available': e['recent'] is not None,
                                   'trend_weeks': e.get('trend_weeks')},
                      'explanation': (f'{who} read ({o["year"]}, week {o["week"]}): {cat.replace("_", " ")} looks about '
-                                     f'{e["seen"]:.0f}{trend}; at {o["age"]} a golfer typically still gains about '
-                                     f'{e["typical"]:.1f} a year. An estimate, not a certainty.'),
+                                     f'{e["seen"]:.0f}{trend}; {age_text(o["age"], e["typical"])} An estimate, not a '
+                                     f'certainty.'),
                      'history': [{'year': r['year'], 'week': r['week'], 'grade': r['estimates'][cat]['grade'],
                                   'reason': r.get('reason')} for r in rows]})
     return {'as_of': [o['year'], o['week']], 'source': 'coach' if o['coach'] is not None else 'self',
