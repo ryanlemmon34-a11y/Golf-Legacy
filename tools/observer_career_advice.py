@@ -84,15 +84,57 @@ def enrich_plan(plan, golfer, training_enabled=True):
     return p
 
 
+def committed_plan(plan, view):
+    """Attach only the committed recommendation for this exact period; never recompute advice."""
+    p=copy.deepcopy(plan)
+    p['advice']=None
+    a=view.get('advice')
+    if not a or list(a.get('block',[])) != list(p.get('block',[])):
+        return p
+    open_weeks={w['week'] for w in p['weeks']}
+    rows=[]
+    for key,r in sorted(a.get('weeks',{}).items(),key=lambda item:int(item[0])):
+        week=int(key)
+        if week not in open_weeks:
+            continue
+        rows.append({'week':week,'choice':copy.deepcopy(r['recommended']),
+                     'reason':' '.join(x['text'] for x in r.get('reasons',[])),
+                     'alternatives':copy.deepcopy(r.get('alternatives',[]))})
+    if not rows or {r['week'] for r in rows} != open_weeks:
+        return p
+    p['advice']={'coach':a.get('judge') or 'Your own assessment','source':a.get('source','self'),
+                 'weeks':rows,'policy':copy.deepcopy(a['policy']),'note':a.get('note',''),
+                 'training_table':copy.deepcopy(a.get('training_table',[]))}
+    return p
+
+
+def advice_details(a):
+    esc=html.escape
+    out=[]
+    for r in a['weeks']:
+        alternatives=[]
+        for alt in r.get('alternatives',[]):
+            choice=alt.get('choice',{})
+            name=alt.get('name') or (choice.get('category') or choice.get('kind','Alternative')).replace('_',' ').title()
+            pro=''.join('<li>'+esc(x['text'])+'</li>' for x in alt.get('for',[]))
+            con=''.join('<li>'+esc(x['text'])+'</li>' for x in alt.get('against',[]))
+            alternatives.append('<article><strong>'+esc(name)+'</strong>'+('<p>Reasons for</p><ul>'+pro+'</ul>' if pro else '')+('<p>Tradeoffs</p><ul>'+con+'</ul>' if con else '')+'</article>')
+        out.append('<li><strong>Week '+str(r['week'])+':</strong> '+esc(r['reason'])+
+                   ('<details><summary>Compare alternatives</summary>'+''.join(alternatives)+'</details>' if alternatives else '')+'</li>')
+    return ''.join(out)
+
+
 def render_advice(plan):
     a = plan.get('advice')
     if not a:
-        return '<p class="muted">Coach advice is unavailable: a private coach, visible ratings and an open planning period are required.</p>'
+        return '<p class="muted">No committed recommendation is available for this planning period. Choose your activities below.</p>'
     esc = html.escape
     payload = json.dumps(a, separators=(',', ':')).replace('<', '\\u003c').replace('&', '\\u0026')
-    items = ''.join(f'<li><strong>Week {r["week"]}:</strong> {esc(r["reason"])}</li>' for r in a['weeks'])
-    return (f'<section class="career-panel coach-advice"><h3>{esc(a["coach"])}’s suggested period</h3><ul>{items}</ul>'
-            f'<p class="muted">{esc(a["note"])}</p><button type="button" id="accept-coach-advice">Accept coach advice</button>'
+    items = advice_details(a)
+    title = esc(a["coach"])+"’s suggested period" if a.get("source","coach")=="coach" else "Your planning assessment"
+    button = "Accept coach advice" if a.get("source","coach")=="coach" else "Apply suggested plan"
+    return (f'<section class="career-panel coach-advice"><h3>{title}</h3><ul>{items}</ul>'
+            f'<p class="muted">{esc(a["note"])}</p><button type="button" id="accept-coach-advice">{button}</button>'
             '<p id="coach-advice-status" role="status" aria-live="polite"></p></section>'
             '<script>(function(){const advice=' + payload + ';'
             'document.getElementById("accept-coach-advice").addEventListener("click",function(){'
@@ -103,6 +145,7 @@ def render_advice(plan):
             'if(c.kind==="event"){updates.push(["e"+n,c.event_id]);updates.push(["f"+n,c.fallback.kind==="train"?"train:"+c.fallback.category:"rest"]);}'
             'for(const [name,val] of updates){const select=form.elements.namedItem(name);if(!select||select.disabled||!Array.from(select.options).some(o=>o.value===val))return;}'
             'changes.push([r,updates]);}'
+            'for(const [name,val] of Object.entries(advice.policy)){if(!radio(name,val))return;}'
             'for(const [r,updates] of changes){r.checked=true;for(const [name,val] of updates)form.elements.namedItem(name).value=val;}'
             'for(const [name,val] of Object.entries(advice.policy)){const r=radio(name,val);if(r)r.checked=true;}'
             'document.getElementById("coach-advice-status").textContent="Advice applied to the form. Review it, then Save the plan. Nothing has been saved yet.";'
