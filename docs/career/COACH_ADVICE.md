@@ -60,7 +60,7 @@ Reason codes:
 `tests/test_career_advice.py` (6 tests; two from HAL's review of 6d0d31e, one from the audit of b7fb0ee):
 * Read only and deterministic: the world digest is unchanged, and the suggested plan is accepted by the engine's own
   validation.
-* The rules: stakes and own tour preferred; the load cap; nothing suggested behind the cut-off or when unaffordable;
+* The rules: stakes and own tour preferred; the load cap; a weak event behind the cut-off not suggested (score below the bar); nothing unaffordable suggested;
   rest when tired or injured; recorded play counts toward the load.
 * The training pick uses weakness, growth room and coach speciality.
 * The load window's boundary: two tournaments in the three weeks before block a suggestion; one of them four weeks
