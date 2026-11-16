@@ -1205,6 +1205,7 @@ def view(season, cursor):
             plan_now = [py, p0]
             break
     from .career_context import context
+    compare = _compare(season, c, g, cursor)
     return {'context': context(season, g, y, w), 'format': c.format, 'id': c.id, 'status': c.status, 'version': c.version, 'started': list(c.started),
             'ended': list(c.ended) if c.ended else None, 'entry': dict(c.entry), 'cursor': dict(cursor),
             'date': [y, w], 'golfer': golfer, 'blocks': blocks, 'plannable': [list(b) for b in can],
@@ -1221,7 +1222,8 @@ def view(season, cursor):
             'staff_policy': dict({'seek_coach': 'no', 'seek_caddie': 'no', 'coach_approaches': 'ask',
                                   'caddie_approaches': 'ask'}, **getattr(c, 'staff_policy', {})),
             'money': _money(season, g, y),
-            'week_compare': _compare(season, c, g, cursor),
+            'week_compare': compare,
+            'advice': _advice(season, c, g, cursor, compare),
             'seasons_summary': _seasons(season, c),
             'timeline': _story(season, c, cursor, 'timeline'),
             'year_end': year_end_view(season, cursor)}
@@ -1231,6 +1233,12 @@ def _compare(season, c, g, cursor):
     """Play / train / rest evidence for each open week of the current period (golfsim.decision_support)."""
     from . import decision_support
     return decision_support.block_compare(season, c, g, cursor) if c.status == 'active' else {}
+
+
+def _advice(season, c, g, cursor, compare):
+    """The coach's advice for the period's open weeks (golfsim.career_advice): evidence and fixed rules, read only."""
+    from . import career_advice
+    return career_advice.advise(season, c, g, cursor, compare) if c.status == 'active' and compare else None
 
 
 def _money(season, g, y):
