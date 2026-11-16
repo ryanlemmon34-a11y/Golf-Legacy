@@ -115,3 +115,9 @@ Commands: `{schema: 1, type: 'set_goal', goal: {kind: 'win'|'play_in', series_id
 'amateur_rank', top, by_year}, version}` -> `{ok, goal: 'G<n>'}`; `{schema: 1, type: 'drop_goal', goal_id}`.
 View: `[{id, kind, series_id?, label?, top?, by_year, status: 'active'|'achieved'|'missed'|'dropped', achieved:
 [year, week]|null, progress: {position}|null, set: [year, week], golfer_id}]`, newest first. No rule reads goals.
+
+## Course fit and familiarity in event choice (2026-11-15, owner-authorized addition)
+
+Calendar v3 only. A bounded term in every golfer's event appeal (−3..+5 points), with the same number shown to the
+player as `week_compare[week].play[i].course_fit`. The v3 golden was re-baselined as an intended change; the v2
+goldens are unchanged. See COURSE_FIT.md.

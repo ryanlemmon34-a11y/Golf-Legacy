@@ -70,6 +70,8 @@ class Spec:
     college_champion_usa_open: bool = False
     # v3: distinctive fictional names for the ordinary numbered events (golfsim/event_names.py; new worlds only)
     fictional_names: bool = False
+    # v3: course fit and recorded familiarity as a small part of an event's appeal (golfsim/course_fit.py)
+    course_fit: bool = False
 
     @property
     def major_weeks(self):
@@ -206,7 +208,7 @@ V2 = Spec(
 V3 = replace(
     V2, version='v3', label='Reference calendar with US college qualifiers (majors weeks 15, 20, 25, 30)',
     anchors={k: v for k, v in V2.anchors.items() if k != 'COLLEGE_REGIONAL'},
-    college_champion_usa_open=True, fictional_names=True,
+    college_champion_usa_open=True, fictional_names=True, course_fit=True,
     college_qualifiers=(('COLLEGE_QUALIFIER_1', 10, 'qualifier 1, week 10'),
                         ('COLLEGE_QUALIFIER_2', 11, 'qualifier 2, week 11'),
                         ('COLLEGE_QUALIFIER_3', 12, 'qualifier 3, week 12'),

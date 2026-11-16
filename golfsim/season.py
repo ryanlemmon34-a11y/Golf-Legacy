@@ -43,6 +43,7 @@ from . import prestige as PR
 from . import qualification as Q
 from . import residence as RES
 from . import familiarity as FAM
+from . import course_fit as CF
 from . import home_clubs as HC
 from .calendar import LOCAL_CIRCUITS, TOUR_BY_KEY, _in_window
 from . import schedule as SCH
@@ -1077,6 +1078,8 @@ class Season:
         if cost is None:
             cost = self.trip_cost(g, s, self.venues(ed.year)[ed.event_id][0].city)
         v -= (cost - self.expected_prize(g, s) * gw['kept']) / gw['unit']
+        if self.cal.spec.course_fit:                         # v3: how the course suits them, how well they know it
+            v += CF.points(self, g, ed, gw)
         return v + rng.gauss(0, 3)
 
     # ---- the week ------------------------------------------------------------------------------

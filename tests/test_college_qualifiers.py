@@ -124,7 +124,9 @@ class Rules(unittest.TestCase):
         self.assertFalse(Q._eligible(ctx, 5, r, 2028))
         self.assertEqual(r.select(ctx, 2027), [])                       # no championship played: nobody invited
 
-V3_2028_W26 = '34e21453635b803a896d5e221fd3298a4b35470707289504a2b07b5c45565e5c'   # v3 golden (all AI), after the USA Open
+# v3 golden (all AI), after the USA Open. Re-baselined 2026-11-15 for course fit (docs/career/COURSE_FIT.md): an
+# intended change in which events AI golfers choose; before it, 34e21453635b803a896d5e221fd3298a4b35470707289504a2b07b5c45565e5c.
+V3_2028_W26 = '1599ebb91ea3ce426b01c3e90fbd79d2b7d8662a1c19e682b8e83ed162d3a234'
 
 
 class Season2028(unittest.TestCase):

@@ -25,7 +25,8 @@ def week_compare(season, c, g, year, week, opp=None):
         play.append({'event_id': row['event_id'], 'name': row.get('name'), 'eligible': row.get('eligible'),
                      'why': row.get('why'), 'cost': row.get('cost'), 'tour': row.get('tour'),
                      'opportunities': by_event.get(row['event_id'], []),
-                     'last_edition': O.field_history(season, row['event_id'].split(':', 1)[1], year)})
+                     'last_edition': O.field_history(season, row['event_id'].split(':', 1)[1], year),
+                     'course_fit': _course_fit(season, g, row['event_id'])})
     for row in opts['selected']:
         play.append({'event_id': row['event_id'], 'name': row.get('name'), 'eligible': None,
                      'why': row.get('rule'), 'cost': None, 'tour': row.get('tour'), 'selected_field': True,
@@ -51,6 +52,14 @@ def week_compare(season, c, g, year, week, opp=None):
                      'train_fatigue_after': ready['train_after'], 'rest_fatigue_after': ready['rest_after'],
                      'played_last_4': last(4), 'played_last_8': last(8), 'injured_until': ready['injured_until'],
                      'recorded_weeks': len(recent)}}
+
+
+def _course_fit(season, g, event_id):
+    """course_fit.evidence for one edition id ('<year>:<series id>'; None where the world does not weigh course fit)."""
+    from . import course_fit as CF
+    year = int(event_id.split(':', 1)[0])
+    ed = next((e for e in season.cal.editions(year) if e.event_id == event_id), None)
+    return None if ed is None else CF.evidence(season, g, ed)
 
 
 def block_compare(season, c, g, cursor):
