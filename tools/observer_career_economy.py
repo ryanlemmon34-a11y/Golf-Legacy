@@ -1,5 +1,6 @@
 """Read-only presentation of the committed career financial and weekly evidence."""
 from html import escape as esc
+from observer_course_context import panel as course_panel
 
 def dollars(x):
     return 'Not recorded' if x is None else f'${x:,.0f}'
@@ -46,6 +47,7 @@ def comparison(v,week):
     for e in r['play']:
         state='Selection required' if e.get('selected_field') else ('Eligible to attempt entry' if e['eligible'] else 'Not eligible')
         out+='<p><strong>'+esc(e['name'])+'</strong>: '+state+'; cost '+dollars(e.get('cost'))+'. '+esc(e.get('why') or '')+'</p>'
+        out+=course_panel(e.get('course_fit'))
         history=e.get('last_edition')
         if history:
             out+='<p class="muted"><strong>Previous edition ('+str(history['year'])+')</strong>: '+str(history['asked'])+' applications; '+str(history['admitted'])+' admitted from '+str(history['capacity'])+' places. '+('Field filled.' if history['full'] else 'Field did not fill.')+' Late fills: '+str(history['late_fills'])+'.</p>'
