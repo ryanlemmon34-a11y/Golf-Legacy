@@ -12,12 +12,14 @@ The advice uses only what the planner already shows (`week_compare`) and the sco
 
 | Factor | Source | Rule |
 |---|---|---|
-| Entry outlook | `entry_outlook` | open / ahead +2, near capacity +1, at cut-off or unknown +0.5, quota-limited 0, behind −3 |
+| Entry outlook | `entry_outlook` | open / ahead +2, near capacity +1, at cut-off or unknown +0.5, quota-limited 0, behind −3 (a long shot: suggested only when everything else outweighs it, and then said first, code `long_shot`) |
 | Stakes | `opportunities` rows still needing a result | +2: "a result here can earn a place in …" |
 | Pathway | the event's tour is the golfer's own tour | +1.5 |
 | Course fit and familiarity | `course_fit.points` | +0.5 × points |
 | Cost | cost compared with the money available for golf | −1 if it is more than half; never suggested if it can't be paid |
-| Load | tournaments recorded or suggested in the 4 weeks before | at most 2 in any 4-week stretch |
+| Load | tournaments recorded or suggested in the 4 weeks before, plus held places and qualifying the suggested policy enters | at most 2 in any 4-week stretch |
+| Held places / qualifying | rule-selected rows: `entry_outlook.status == 'holds_place'`; qualifying by the engine's own test (`career.entrant_decides`), entered (`qualifying: 'enter'`) only when a result there can still earn a place | that week's competition comes first and counts in the load (code `committed`); the plan entry is training, or rest |
+| Possible selections | other rule-selected rows | said (code `possible_selection`), not counted: selection isn't known in advance, so the real load can be higher |
 | Fatigue | `career.readiness` and the engine's rest and training formulas | rest when fatigue is above the 20 % threshold |
 | Injury | recorded injury window | rest |
 | Training area | the visible weakness order (observed levels), perceived growth room (scouting: an opinion with uncertainty) and the coach's public speciality | weakness (number of categories − rank), plus room (little 0, some 1, considerable 2, unknown 0.5), plus speciality +1 |
@@ -40,7 +42,8 @@ How each week is decided:
      basis: [codes], note}
 
 Reason codes:
-* Event weeks: `stakes`, `pathway`, `entry_outlook`, `course_fit`, `cost`, `not_guaranteed`, `load`.
+* Event weeks: `long_shot`, `stakes`, `pathway`, `entry_outlook`, `course_fit`, `cost`, `not_guaranteed`, `load`.
+* Any week: `committed` (a held place or qualifying first), `possible_selection`.
 * Training weeks: `visible_weakness`, `growth_room`, `growth_room_unknown`, `coach_speciality`, `no_strong_event`.
 * Rest weeks: `fatigue`, `injured`, `no_training`.
 * Alternatives' trade-offs: `no_results`, `fatigue_train`, `fatigue_rest`, `no_development`.
@@ -54,9 +57,12 @@ Reason codes:
 
 ## Tests
 
-`tests/test_career_advice.py` (3 tests):
+`tests/test_career_advice.py` (5 tests; the last two from HAL's review of 6d0d31e):
 * Read only and deterministic: the world digest is unchanged, and the suggested plan is accepted by the engine's own
   validation.
 * The rules: stakes and own tour preferred; the load cap; nothing suggested behind the cut-off or when unaffordable;
   rest when tired or injured; recorded play counts toward the load.
 * The training pick uses weakness, growth room and coach speciality.
+* A long shot (behind the cut-off) is suggested only when everything else outweighs it, with `long_shot` first.
+* A held place takes a load slot. Qualifying is recognised by the engine's test, so rule text saying "qualifying"
+  doesn't make an event qualifying. Possible selections are stated but not counted.

@@ -240,5 +240,42 @@ class ScoutingCadence(unittest.TestCase):
             self.assertEqual(scouting.view(se, c, other.id), scouting.view(se, c2, other.id))
 
 
+class AssessmentParity(unittest.TestCase):
+    """The same observed inputs give the same assessment whoever controls the golfer: each golfer is read once while
+    controlled (their own career) and once as an AI golfer (on a career controlling someone else), at the same dates
+    and with the same judge (no coach, then a coach) -- every grade, growth room, confidence and evidence identical."""
+
+    def test_controlled_and_ai_read_alike_self_and_coach(self):
+        from test_careertest2_fixes import free_coach
+        with Copy() as s:
+            g = started(s)
+            se = s.season
+            other = next(x for x in se.active_golfers() if x.id != g.id and x.lifestyle != 'retired'
+                         and se.staff.coach(x.id) is None)
+            mine = CA.Career(other.id, 2028, 1, {'rule': 'test'})          # other, controlled
+            theirs = CA.Career(g.id, 2028, 1, {'rule': 'test'})            # other, an AI golfer here
+            dates = [(2028, 1), (2028, 5), (2028, 33)]
+            for car in (mine, theirs):
+                for y, w in dates:
+                    scouting.observe(se, car, other.id, y, w, 'period')
+            self.assertEqual(mine.observations[other.id], theirs.observations[other.id])
+            self.assertEqual(scouting.view(se, mine, other.id), scouting.view(se, theirs, other.id))
+            self.assertEqual(scouting.view(se, mine, other.id)['source'], 'self')
+            coach = free_coach(se.staff)
+            se.staff.assign_coach(se, other, coach, 'fee', (2028, 34), 'golfer', 'test set-up')
+            for car in (mine, theirs):
+                scouting.observe(se, car, other.id, 2028, 35, 'coach_change')
+            a, b = scouting.view(se, mine, other.id), scouting.view(se, theirs, other.id)
+            self.assertEqual(a, b)
+            self.assertEqual((a['source'], a['judge']), ('coach', coach.name))
+            # and the career's own golfer, read on another golfer's career at the same dates
+            c = se.career
+            third = CA.Career(other.id, 2028, 1, {'rule': 'test'})
+            for (y, w) in [(r['year'], r['week']) for r in c.observations[g.id]]:
+                scouting.observe(se, third, g.id, y, w, 'period')
+            strip = lambda rows: [{k: v for k, v in r.items() if k != 'reason'} for r in rows]
+            self.assertEqual(strip(third.observations[g.id]), strip(c.observations[g.id]))
+
+
 if __name__ == '__main__':
     unittest.main()

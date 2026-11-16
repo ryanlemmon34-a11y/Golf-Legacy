@@ -29,8 +29,9 @@ def at_first_period(s):
     return g
 
 
-def event_row(eid, tour, status='open_last_time', cost=100.0, stakes=0, fit=None):
-    return {'event_id': eid, 'name': eid, 'eligible': True, 'why': '', 'cost': cost, 'tour': tour,
+def event_row(eid, tour, status='open_last_time', cost=100.0, stakes=0, fit=None, selected=False, why=''):
+    return {'event_id': eid, 'name': eid, 'eligible': True, 'why': why, 'cost': None if selected else cost, 'tour': tour,
+            **({'selected_field': True} if selected else {}),
             'opportunities': [{'status': 'needs_result', 'target': {'label': 'Test Major', 'year': 2028}}] * stakes,
             'course_fit': fit, 'entry_outlook': {'status': status, 'label': status, 'reason': 'test'}}
 
@@ -137,6 +138,71 @@ class Advice(unittest.TestCase):
             cat, reasons, _ = AD.train_pick(first, sc, Coach())
             self.assertEqual(cat, second)
             self.assertEqual({r['code'] for r in reasons}, {'visible_weakness', 'growth_room', 'coach_speciality'})
+
+
+class ReviewFixes(unittest.TestCase):
+    """HAL's review of 80fc9ff/6d0d31e: a long shot is described as one; held places and qualifying the policy enters
+    count in the load; qualifying is recognised by the engine's own test, never by text."""
+
+    synthetic = Advice.synthetic
+
+    def test_long_shot_only_with_enough_else_and_said_so(self):
+        with Copy() as s:
+            g = at_first_period(s)
+            from golfsim.calendar import TOUR_BY_KEY
+            own = TOUR_BY_KEY[g.tour].name
+            weak = {w: [event_row(f'2028:C{w}', own, status='behind_last_cutoff', stakes=1)] for w in range(1, 5)}
+            a, _, _ = self.synthetic(s, weak)                                  # -3 + 2 + 1.5 = 0.5: not suggested
+            self.assertTrue(all(x['recommended']['kind'] != 'event' for x in a['weeks'].values()))
+            strong = {w: [event_row(f'2028:C{w}', own, status='behind_last_cutoff', stakes=1,
+                                    fit={'points': 5.0})] for w in range(1, 5)}
+            a, _, w0 = self.synthetic(s, strong)                               # + 2.5 course fit: 3.0
+            x = a['weeks'][str(w0)]
+            self.assertEqual(x['recommended']['kind'], 'event')
+            self.assertEqual(x['reasons'][0]['code'], 'long_shot')
+            self.assertIn('long shot', x['reasons'][0]['text'])
+
+    def special(self, s, qualifier):
+        from golfsim import career as CA
+        se = s.season
+        return next(ed for ed in se.cal.editions(2028) if se.is_special(ed.series)
+                    and CA.entrant_decides(ed.series) == qualifier)
+
+    def test_held_place_and_qualifying_count_in_the_load(self):
+        with Copy() as s:
+            g = at_first_period(s)
+            from golfsim.calendar import TOUR_BY_KEY
+            own = TOUR_BY_KEY[g.tour].name
+            q = self.special(s, True)
+            sel = self.special(s, False)
+            rows = {w: [event_row(f'2028:B{w}', own, stakes=1)] for w in range(1, 5)}
+            a0, _, w0 = self.synthetic(s, rows)
+            held = event_row(sel.event_id, '', status='holds_place', selected=True)
+            rows[w0] = rows[w0] + [held]
+            a, _, _ = self.synthetic(s, rows)
+            x = a['weeks'][str(w0)]
+            self.assertNotEqual(x['recommended']['kind'], 'event')
+            self.assertEqual(x['reasons'][0]['code'], 'committed')
+            n0 = sum(1 for y in a0['weeks'].values() if y['recommended']['kind'] == 'event')
+            n = sum(1 for y in a['weeks'].values() if y['recommended']['kind'] == 'event')
+            self.assertEqual(n, n0 - 1)                                        # the held place used a load slot
+            # qualifying recognised by the engine's test (needs a result there to be worth entering)
+            qrow = event_row(q.event_id, '', status='rule_selected', selected=True, stakes=1)
+            rows2 = {w: [event_row(f'2028:B{w}', own, stakes=1)] for w in range(1, 5)}
+            rows2[w0] = rows2[w0] + [qrow]
+            a, _, _ = self.synthetic(s, rows2)
+            self.assertEqual(a['policy'], {'selected': 'accept', 'qualifying': 'enter'})
+            self.assertEqual(a['weeks'][str(w0)]['reasons'][0]['code'], 'committed')
+            # an event the word 'qualifying' in its rule text does not make one
+            fake = event_row(sel.event_id, '', status='rule_selected', selected=True, stakes=1,
+                             why='qualifying: entrants decide (your period policy)')
+            rows3 = {w: [event_row(f'2028:B{w}', own, stakes=1)] for w in range(1, 5)}
+            rows3[w0] = rows3[w0] + [fake]
+            a, _, _ = self.synthetic(s, rows3)
+            self.assertEqual(a['policy']['qualifying'], 'skip')
+            x = a['weeks'][str(w0)]
+            self.assertIn('possible_selection', [r['code'] for r in x['reasons']])   # said, not counted
+            self.assertEqual(x['recommended']['kind'], 'event')
 
 
 if __name__ == '__main__':
