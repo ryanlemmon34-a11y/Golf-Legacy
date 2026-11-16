@@ -86,7 +86,63 @@ class Timeline(unittest.TestCase):
             self.assertIn(g.name, t[0]['text'])
             self.assertEqual(t, sorted(t, key=lambda x: (tuple(x['date']), x['kind'], x['text'])))
             for x in t:
-                self.assertIn(x['kind'], ('control', 'decision', 'trophy', 'result', 'staff'))
+                self.assertIn(x['kind'], ('control', 'decision', 'trophy', 'result', 'staff', 'tour', 'injury'))
+
+
+class LivingHistory(unittest.TestCase):
+    """Tour / status transitions logged once when first seen under control (the first sight is a baseline, never a
+    transition; nothing earlier inferred); injuries from the onset episodes the weekly recaps keep (once each)."""
+
+    def test_transitions_logged_once_when_seen(self):
+        with Copy() as s:
+            g = started(s)
+            se, c = s.season, s.season.career
+            s.advance_career('next', op_key='a')
+            for d in c.pending(CA.OFFER_KINDS):
+                act(s, {'type': 'decide', 'decision': d['id'], 'answer': 'decline'}, f'o{d["id"]}')
+            self.assertEqual(getattr(c, 'status_log', []), [])          # the baseline is not a transition
+            self.assertIn(g.id, c.status_seen)
+            before = dict(c.status_seen[g.id])
+            g.tour = 'MT_TEST_TOUR' if g.tour != 'MT_TEST_TOUR' else 'MT_OTHER'   # (test set-up: a move happens)
+            for _ in range(3):                                         # gate asked again and again: logged once
+                CA.gate(se, {'year': 2028, 'week': 2, 'phase': 'week'})
+            self.assertEqual(len(c.status_log), 1)
+            x = c.status_log[0]
+            self.assertEqual((x['date'], x['from'], x['to']['tour']), ([2028, 2], before, g.tour))
+            t = [e for e in CA.view(se, s.cursor)['timeline'] if e['kind'] == 'tour']
+            self.assertEqual(len(t), 1)
+            self.assertTrue(t[0]['text'].startswith('Moved from '))
+            self.assertEqual(CA.view(se, s.cursor)['timeline'], CA.view(se, s.cursor)['timeline'])
+            d = s.dir
+            s._commit()
+            s.close()
+            s2 = Session.open(d)
+            self.assertEqual(s2.season.career.status_log, c.status_log)    # kept across a reload
+            s2.close()
+            s.dir = d
+
+    def test_status_words(self):
+        from golfsim.career_story import status_text
+        a = {'status': 'amateur', 'tour': 'AM_X', 'lifestyle': 'part_time'}
+        self.assertTrue(status_text(a, dict(a, status='pro', tour='MT_X')).startswith('Turned professional'))
+        self.assertEqual(status_text(dict(a, status='pro'), dict(a, status='club_pro', tour='')),
+                         'Became a club professional.')
+        self.assertEqual(status_text(a, dict(a, lifestyle='full_time')), 'Now playing full time.')
+
+    def test_injuries_once_per_onset(self):
+        with Copy() as s:
+            g = started(s)
+            c = s.season.career
+            ep = {'week': 7, 'kind': 'back', 'announced': 3, 'out': 3, 'available': [2028, 11], 'event': 'Test Open',
+                  'lasting': {}}
+            c.weekly_recaps = {(2028, w): {'year': 2028, 'week': w, 'golfer_id': g.id, 'activity': a, 'events': [],
+                                           'injuries': [ep] if w == 7 else []}
+                               for w, a in ((6, 'play'), (7, 'play'), (8, 'injured'), (9, 'injured'), (10, 'injured'))}
+            from golfsim import career_story
+            t = [e for e in career_story.timeline(s.season, c) if e['kind'] == 'injury']   # (synthetic recaps)
+            self.assertEqual(len(t), 1)
+            self.assertEqual(t[0]['date'], [2028, 7])
+            self.assertEqual(t[0]['text'], 'Injured (back) at the Test Open: out 3 weeks.')
 
 
 if __name__ == '__main__':

@@ -384,6 +384,8 @@ def gate(season, cursor):
         if c.status == 'choosing':
             d = _newcomer_decision(season, c, y)
             return {'kind': 'decision', 'ids': [d['id']]} if d is not None else None
+        if c.status == 'active' and g is not None and g.lifestyle != 'retired':
+            record_status(season, c, g, [y, 1])
         d = market_question(season, c, y)              # the staff market's approaches to the player, one at a time
         if d is not None:
             return {'kind': 'decision', 'ids': [d['id']]}
@@ -391,12 +393,15 @@ def gate(season, cursor):
     if c.status != 'active':
         return None
     if ph == 'end':
+        if g is not None and g.lifestyle != 'retired':
+            record_status(season, c, g, [y, 53])
         return _year_end_gate(season, c, g, y)
     if g is None or g.lifestyle == 'retired':
         d = c.ensure('unsupported', ('unsupported', 'retired', y), y, w, None, {},
                      'The golfer is no longer playing. This build cannot continue a career past that point.',
                      ('return_to_ai',))
         return {'kind': 'decision', 'ids': [d['id']]}
+    record_status(season, c, g, [y, w])
     if ph == 'week':
         if w == block_start(w):
             secured_notices(season, c, g, y, w)        # (newly held places, noted once, before the period is planned)
@@ -422,6 +427,26 @@ def gate(season, cursor):
 
 
 # ---- the year end (docs/career/YEAR_END.md) ----------------------------------------------------------------------------
+
+def _status_of(g):
+    return {'status': g.status, 'tour': g.tour, 'lifestyle': g.lifestyle}
+
+
+def record_status(season, c, g, date):
+    """Living history (records only): the controlled golfer's status, tour and lifestyle as the career's gate sees them.
+    The first sight of a golfer is the baseline (not a transition); afterwards each change is logged once, dated when
+    it was first seen (week 53 = the winter). Nothing earlier is inferred from today's state."""
+    seen = c.__dict__.setdefault('status_seen', {})
+    now = _status_of(g)
+    before = seen.get(g.id)
+    if before == now:
+        return
+    seen[g.id] = now
+    if before is None:
+        return
+    c.__dict__.setdefault('status_log', []).append({'date': list(date), 'golfer_id': g.id, 'from': before, 'to': now})
+    c._bump()
+
 
 def _end_stint(c, year, week):
     if c.stints and c.stints[-1]['to'] is None:

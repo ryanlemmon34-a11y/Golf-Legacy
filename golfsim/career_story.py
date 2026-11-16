@@ -121,6 +121,27 @@ def goals_view(season, c, cursor):
     return out
 
 
+def _tour_name(key):
+    from .calendar import TOUR_BY_KEY
+    t = TOUR_BY_KEY.get(key)
+    return t.name if t else (key or 'no tour')
+
+
+def status_text(a, b):
+    """One logged change of status / tour / lifestyle, in words."""
+    if a['status'] == 'amateur' and b['status'] == 'pro':
+        return f'Turned professional ({_tour_name(b["tour"])}).'
+    if b['status'] == 'club_pro' and a['status'] != 'club_pro':
+        return 'Became a club professional.'
+    if b['status'] == 'amateur' and a['status'] != 'amateur':
+        return f'Regained amateur status ({_tour_name(b["tour"])}).'
+    if a['tour'] != b['tour']:
+        return f'Moved from {_tour_name(a["tour"])} to {_tour_name(b["tour"])}.'
+    if a['lifestyle'] != b['lifestyle']:
+        return f'Now playing {b["lifestyle"].replace("_", " ")}.'
+    return 'Status changed.'
+
+
 def timeline(season, c):
     """[{date: [year, week], kind, text, golfer_id}] oldest first, from records only."""
     from . import awards
@@ -151,6 +172,15 @@ def timeline(season, c):
             elif e.get('position') == 1 and not any(x['kind'] == 'trophy' and x['date'] == [y, w] for x in out):
                 out.append({'date': [y, w], 'kind': 'result', 'golfer_id': r.get('golfer_id', c.golfer_id),
                             'text': f'Won the {e["name"]}.'})
+    for x in getattr(c, 'status_log', []):
+        out.append({'date': list(x['date']), 'kind': 'tour', 'golfer_id': x['golfer_id'],
+                    'text': status_text(x['from'], x['to'])})
+    for (y, w), r in sorted(getattr(c, 'weekly_recaps', {}).items()):
+        for inj in r.get('injuries', []):            # onset episodes only: recorded in the onset week's recap
+            where = f' at the {inj["event"]}' if inj.get('event') else ''
+            out.append({'date': [y, w], 'kind': 'injury', 'golfer_id': r.get('golfer_id', c.golfer_id),
+                         'text': f'Injured ({str(inj.get("kind", "injury")).replace("_", " ")}){where}: out '
+                                 f'{inj.get("announced")} week{"s" if inj.get("announced") != 1 else ""}.'})
     st = season.staff
     ids = {s['golfer_id'] for s in getattr(c, 'stints', [])}
     for gid in sorted(ids):
