@@ -16,7 +16,7 @@ def growth(row):
     evidence=row.get('evidence') or {}
     if 'observations' in evidence:
         h+='<p>'+str(evidence['observations'])+' recorded observations across '+str(evidence.get('span_weeks',0))+' weeks.'
-        h+=(' A development trend is available.' if evidence.get('trend_available') else 'No dependable development trend is available.')+'</p>'
+        h+=(' A development trend is available.' if evidence.get('trend_available') else ' No dependable development trend is available.')+'</p>'
     basis=[BASIS.get(k,k.replace('_',' ')) for k in room.get('basis',[])]
     if basis:
         h+='<p class="muted">Based on: '+esc(', '.join(basis))+'.</p>'

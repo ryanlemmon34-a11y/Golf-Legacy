@@ -11,11 +11,15 @@ class Estimates(unittest.TestCase):
         for t in ['Some estimated room','Uncertainty: wide','2 recorded observations','No dependable development trend','Limited &lt; evidence','not a known limit']:
             self.assertIn(t,h)
         self.assertEqual(old,r);self.assertEqual(h,growth(r))
+    def test_sentence_spacing(self):
+        for trend in (False,True):
+            h=growth({'growth_room':{'label':'some'},'evidence':{'observations':2,'span_weeks':4,'trend_available':trend}})
+            self.assertIn('weeks. ',h);self.assertNotIn('weeks.No',h);self.assertNotIn('weeks.A',h)
     def test_old_data_unknown_not_inferred(self):
         self.assertIn('not assessed',growth({'grade':'A'}))
         self.assertIn('not assessed',growth({'growth_room':{'label':'unknown'}}))
     def test_all_entry_statuses_preserve_limits(self):
-        for status in ['injured','not_eligible','cannot_afford','holds_place','rule_selected','quota_limited','open_last_time','near_capacity_last_time','ahead_of_last_cutoff','at_last_cutoff','behind_last_cutoff','unknown']:
+        for status in ['injured','not_eligible','cannot_afford','holds_place','assured_by_rules','unless_qualified_earlier','rule_selected','quota_limited','open_last_time','near_capacity_last_time','ahead_of_last_cutoff','at_last_cutoff','behind_last_cutoff','unknown']:
             r={'status':status,'label':status.replace('_',' '),'your_class_label':'home amateur','reason':'Recorded comparison','uncertainty':'Other applicants are not known'}
             old=copy.deepcopy(r);h=entry(r)
             self.assertIn('No numerical admission probability',h);self.assertIn('Other applicants',h)
