@@ -1,3 +1,6 @@
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 import copy
 import unittest
 import observer_career_economy as E
@@ -20,3 +23,12 @@ class Evidence(unittest.TestCase):
     def test_partial_season_label(self):
         h=E.seasons({'seasons_summary':[{'year':2030,'name':'A','recorded_weeks':4,'events':1,'wins':0,'top10':0,'missed_cuts':0,'prize_money':0}]})
         self.assertIn('incomplete season',h);self.assertIn('4 recorded weeks',h)
+
+    def test_previous_field_is_history_not_probability(self):
+        row={'name':'Open','eligible':True,'cost':10,'last_edition':{'year':2029,'asked':200,'admitted':100,'capacity':100,'full':True,'late_fills':2,'closed_at':'home amateurs'}}
+        v={'week_compare':{'1':{'load':{'fatigue':0,'performance_threshold':.2,'train_fatigue_after':.02,'rest_fatigue_after':0,'played_last_4':0,'played_last_8':0},'play':[row]}}}
+        before=copy.deepcopy(v);h=E.comparison(v,1)
+        self.assertIn('Previous edition (2029)',h)
+        self.assertIn('200 applications',h)
+        self.assertIn('not a forecast or your chance',h)
+        self.assertEqual(v,before)
