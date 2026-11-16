@@ -46,6 +46,12 @@ def comparison(v,week):
     for e in r['play']:
         state='Selection required' if e.get('selected_field') else ('Eligible to attempt entry' if e['eligible'] else 'Not eligible')
         out+='<p><strong>'+esc(e['name'])+'</strong>: '+state+'; cost '+dollars(e.get('cost'))+'. '+esc(e.get('why') or '')+'</p>'
+        history=e.get('last_edition')
+        if history:
+            out+='<p class="muted"><strong>Previous edition ('+str(history['year'])+')</strong>: '+str(history['asked'])+' applications; '+str(history['admitted'])+' admitted from '+str(history['capacity'])+' places. '+('Field filled.' if history['full'] else 'Field did not fill.')+' Late fills: '+str(history['late_fills'])+'.</p>'
+            if history.get('closed_at'):
+                out+='<p class="muted">Last recorded entry class: '+esc(history['closed_at'])+'.</p>'
+            out+='<p class="muted">Historical context only, not a forecast or your chance of entry.</p>'
         for route in e.get('opportunities',[]):
             t=route['target']
             out+='<p>'+esc(route['condition']['text'])+' → '+esc(t['label'])+' · week '+str(t['week'])+' of '+str(t['year'])+'. '+esc(route['status'].replace('_',' '))+'.</p>'
