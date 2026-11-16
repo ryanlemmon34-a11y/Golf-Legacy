@@ -373,5 +373,43 @@ class PlayerAIParity(unittest.TestCase):
         self.assertNotEqual(self.world_digest(t), self.world_digest(self.ai))
 
 
+class SelectedRows(unittest.TestCase):
+    """Rule-selected rows of week_compare carry course_fit from the same helper as ordinary rows (single site: the
+    evaluation; several sites: null fit and familiarity, 0 points; v1/v2: None)."""
+
+    def rows(self, s, eds):
+        from unittest import mock
+        from golfsim import career as CA
+        se = s.season
+        g = next(x for x in se.active_golfers() if x.tour)
+        c = CA.Career(g.id, 2027, 1, {'rule': 'test'})
+        sel = [{'event_id': ed.event_id, 'name': ed.series.name, 'rule': 'test rule', 'tour': ed.series.tour}
+               for ed in eds]
+        with mock.patch.object(CA, 'week_options', return_value={'events': [], 'selected': sel}):
+            out = DS.week_compare(se, c, g, 2027, eds[0].week, opp=[])
+        return g, [r for r in out['play'] if r.get('selected_field')]
+
+    def test_v3_single_and_multi_site(self):
+        s = fresh()
+        se = s.season
+        vs = se.venues(2027)
+        single = single_site(se, 2027)[0]
+        multi = next(ed for ed in se.cal.editions(2027) if len(vs[ed.event_id]) > 1)
+        g, rows = self.rows(s, [single, multi])
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(rows[0]['course_fit'], CF.evidence(se, g, single))
+        self.assertEqual(rows[0]['course_fit']['points'], CF.points(se, g, single))
+        m = rows[1]['course_fit']
+        self.assertEqual((m['course'], m['fit'], m['familiarity'], m['points'], m['sites']),
+                         (None, None, None, 0.0, len(vs[multi.event_id])))
+        s.close()
+
+    def test_v2_none(self):
+        s = fresh(calendar='v2')
+        _, rows = self.rows(s, [single_site(s.season, 2027)[0]])
+        self.assertIsNone(rows[0]['course_fit'])
+        s.close()
+
+
 if __name__ == '__main__':
     unittest.main()

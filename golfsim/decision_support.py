@@ -30,7 +30,8 @@ def week_compare(season, c, g, year, week, opp=None):
     for row in opts['selected']:
         play.append({'event_id': row['event_id'], 'name': row.get('name'), 'eligible': None,
                      'why': row.get('rule'), 'cost': None, 'tour': row.get('tour'), 'selected_field': True,
-                     'opportunities': by_event.get(row['event_id'], [])})
+                     'opportunities': by_event.get(row['event_id'], []),
+                     'course_fit': _course_fit(season, g, row['event_id'])})
     sc = scouting.view(season, c, g.id)
     obs = getattr(c, 'observations', {}).get(g.id, [])
     levels = obs[-1]['levels'] if obs else {}
