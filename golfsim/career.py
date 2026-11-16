@@ -403,6 +403,10 @@ def gate(season, cursor):
         return {'kind': 'decision', 'ids': [d['id']]}
     record_status(season, c, g, [y, w])
     if ph == 'week':
+        from . import scouting
+        why = scouting.due(season, c, g.id, y, w)
+        if why is not None:
+            scouting.observe(season, c, g.id, y, w, why)   # (records only; its own seeded draws)
         if w == block_start(w):
             secured_notices(season, c, g, y, w)        # (newly held places, noted once, before the period is planned)
         if c.plan_for(y, w) is None:
@@ -565,7 +569,7 @@ def _year_end_gate(season, c, g, y):
     ids = []
     if stage == 'season_review':
         from . import scouting
-        scouting.observe(season, c, g.id, y, 52)        # the season's-end look (once; fallible potential grades)
+        scouting.observe(season, c, g.id, y, 52, 'season_end')   # the season's-end look (once; fallible potential grades)
         choices = [
             {'key': 'keep', 'label': f'Keep playing as {g.name}',
              'facts': {'detail': f'You make {g.name}\'s winter choices next (career path, staff, residence).'}},
@@ -762,7 +766,7 @@ def _answer_year_end(season, c, d, cursor, answer):
         c.golfer_id = pick
         c.status = 'active'
         from . import scouting
-        scouting.observe(season, c, pick, y, 1)          # the first look at the new golfer
+        scouting.observe(season, c, pick, y, 1, 'start')   # the first look at the new golfer
         c.stints.append({'golfer_id': pick, 'from': [y, 1], 'to': None,
                          'how': {'kind': 'junior', 'class': y, 'candidates': len(d['payload']['candidates']),
                                  'rule': 'chosen by the player from a seeded sample of the season\'s junior class'}})
@@ -831,7 +835,7 @@ def new_career(season, cursor, action):
     c = Career(pick, y, 1, entry)
     g = season.g[pick]
     from . import scouting
-    scouting.observe(season, c, pick, y, 1)              # the first look (fallible potential grades)
+    scouting.observe(season, c, pick, y, 1, 'start')     # the first look (fallible potential grades)
     c.note(y, 1, 'start', f'You now control {g.name}, one of the {len(cls)} juniors who entered the world for {y}.')
     season.career = c
     return {'ok': True, 'golfer': pick, 'name': g.name}

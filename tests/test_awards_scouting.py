@@ -142,5 +142,103 @@ class Scouting(unittest.TestCase):
             self.assertTrue(all(x['grade'] is None and x['explanation'] for x in v['categories']))
 
 
+class ScoutingCadence(unittest.TestCase):
+    """Looks at control start, each period start, the first week after a coach change and the season's end; written
+    by the career's gate only (never by a read); growth room as the judge's qualitative, uncertain opinion."""
+
+    def gate(self, se, w):
+        CA.gate(se, {'year': 2028, 'week': w, 'phase': 'week'})
+
+    def test_period_and_coach_change_looks_from_the_gate_only(self):
+        from test_careertest2_fixes import free_coach
+        with Copy() as s:
+            g = started(s)
+            se, c = s.season, s.season.career
+            rows = c.observations[g.id]
+            self.assertEqual([(r['week'], r['reason']) for r in rows], [(1, 'start')])
+            before = F.digest(s)
+            real = g.ceilings
+            g.ceilings = NoPeeking(real)
+            try:
+                for w in range(1, 10):
+                    self.gate(se, w)
+                    self.gate(se, w)                                   # asked twice: one look
+                    for _ in range(3):                                 # reads write nothing
+                        scouting.view(se, c, g.id)
+                        CA.view(se, s.cursor)
+            finally:
+                g.ceilings = real
+            self.assertEqual([(r['week'], r['reason']) for r in rows], [(1, 'start'), (5, 'period'), (9, 'period')])
+            self.assertEqual(F.digest(s), before)                     # no world state or random stream touched
+            st = se.staff
+            new = free_coach(st)
+            st.assign_coach(se, g, new, 'fee', (2028, 10), 'golfer', 'test set-up')
+            self.gate(se, 10)
+            self.gate(se, 11)
+            self.assertEqual([(r['week'], r['reason'], r['coach']) for r in rows][-1], (10, 'coach_change', new.id))
+            self.assertEqual(len(rows), 4)
+            v = scouting.view(se, c, g.id)
+            self.assertEqual(v['source'], 'coach')
+            self.assertEqual([h['reason'] for h in v['categories'][0]['history']],
+                             ['start', 'period', 'period', 'coach_change'])
+
+    def test_growth_room_basis_and_evidence(self):
+        with Copy() as s:
+            g = started(s)
+            se, c = s.season, s.season.career
+            v = scouting.view(se, c, g.id)
+            for x in v['categories']:                                  # one look: no trend, wider, said so
+                gr = x['growth_room']
+                self.assertIn(gr['label'], ('little', 'some', 'considerable'))
+                self.assertNotIn('observed_trend', gr['basis'])
+                self.assertIn('age_curve', gr['basis'])
+                self.assertIn(gr['uncertainty'], ('moderate', 'wide'))
+                self.assertIn('no observed trend yet', gr['explanation'])
+                self.assertEqual(x['evidence'], {'observations': 1, 'looks_in_read': 1, 'span_weeks': 0,
+                                                 'trend_available': False, 'trend_weeks': None})
+                for h in HIDDEN:
+                    self.assertNotIn(h, gr['explanation'].lower())
+            for w in (5, 9, 13, 17, 21, 25, 29, 33):                   # (test: looks over 32 weeks)
+                scouting.observe(se, c, g.id, 2028, w, 'period')
+            v = scouting.view(se, c, g.id)
+            o = c.observations[g.id][-1]
+            for x in v['categories']:
+                e = o['estimates'][x['category']]
+                self.assertTrue(x['evidence']['trend_available'])
+                self.assertEqual(x['evidence']['trend_weeks'], 32)
+                self.assertEqual(x['evidence']['looks_in_read'], 3)
+                self.assertIn('observed_trend', x['growth_room']['basis'])
+                self.assertEqual(x['growth_room']['label'],
+                                 next(n for n, bar in scouting.ROOM if e['gain'] <= bar))
+                self.assertEqual(x['confidence'], 'medium')
+
+    def test_growth_room_is_the_judges_projection_not_grade_minus_level(self):
+        """The room follows the judge's projected gain (age curve, observed trend, their persistent error); a read
+        recorded before this was kept says 'unknown' instead of guessing."""
+        with Copy() as s:
+            g = started(s)
+            se, c = s.season, s.season.career
+            e = c.observations[g.id][0]['estimates']
+            for cat, x in e.items():
+                gr = scouting.growth_room(x, 'self')
+                self.assertEqual(gr['label'], next(n for n, bar in scouting.ROOM if x['gain'] <= bar))
+            old = {k: {kk: vv for kk, vv in x.items() if kk not in ('gain', 'spread', 'looks', 'trend_weeks')}
+                   for k, x in e.items()}                              # a read recorded by an earlier build
+            self.assertEqual(scouting.growth_room(old['putting'], 'self')['label'], 'unknown')
+
+    def test_same_rules_whoever_controls(self):
+        """The read of a golfer depends on the looks and the judge, not on who controls them: the same looks of an AI
+        golfer, kept on another career record, give the same read."""
+        with Copy() as s:
+            g = started(s)
+            se, c = s.season, s.season.career
+            other = next(x for x in se.active_golfers() if x.id != g.id and x.lifestyle != 'retired')
+            c2 = CA.Career(other.id, 2028, 1, {'rule': 'test'})
+            for car in (c, c2):
+                for w in (1, 5, 33):
+                    scouting.observe(se, car, other.id, 2028, w, 'period')
+            self.assertEqual(scouting.view(se, c, other.id), scouting.view(se, c2, other.id))
+
+
 if __name__ == '__main__':
     unittest.main()
