@@ -19,6 +19,7 @@ a tournament is played. No random draw.
 """
 from __future__ import annotations
 
+import weakref
 from statistics import mean
 
 from . import familiarity as FAM
@@ -33,7 +34,7 @@ REF = {'yards': (6440.0, 470.0), 'fairway': (30.6, 4.0), 'rough': (0.41, 0.17), 
        'gsb': (0.56, 0.10), 'speed': (10.5, 1.05), 'slope': (0.54, 0.10), 'hazard': (0.19, 0.09),
        'wind': (5.2, 4.0)}
 
-_DEMAND = {}
+_DEMAND = {}              # id(course) -> (weak reference to that very Course, demand): identity, never the layout id
 
 
 def _z(key, x):
@@ -47,10 +48,10 @@ def _clip(x):
 
 def demand(course):
     """{category: -1..1} what this course asks for more (+) or less (-) than a typical course."""
-    key = course.layout_id
+    key = id(course)          # the same layout id can be a different course in another world (another seed)
     hit = _DEMAND.get(key)
-    if hit is not None:
-        return hit
+    if hit is not None and hit[0]() is course:
+        return dict(hit[1])
     H = course.holes
     length = _z('yards', sum(h.plays for h in H))
     narrow = -_z('fairway', mean(h.fairway_width for h in H))
@@ -67,7 +68,8 @@ def demand(course):
            'short_game': _clip(0.5 * small + 0.5 * bunkers),
            'putting': _clip(0.5 * speed + 0.5 * slope),
            'mental': _clip(0.5 * hazard + 0.5 * wind)}
-    _DEMAND[key] = out
+    _DEMAND[key] = (weakref.ref(course, lambda _r, k=key: _DEMAND.pop(k, None)
+                                if _DEMAND.get(k, (None,))[0] is _r else None), dict(out))
     return out
 
 

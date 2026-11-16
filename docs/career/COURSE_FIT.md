@@ -107,7 +107,7 @@ Existing saves (fingerprint) are affected as for any engine change: older saves 
 
 ## Tests
 
-`tests/test_course_fit.py` (10 tests):
+`tests/test_course_fit.py` (15 tests):
 
 * The term is v3-only.
 * Boundedness, including extreme golfers and unlimited familiarity.
@@ -122,6 +122,24 @@ Existing saves (fingerprint) are affected as for any engine change: older saves 
 * Deterministic replay, with the read model asked for every golfer and event each week changing nothing.
 * The term really changes choices.
 
-Human/AI parity: the player's options are valued in the same loop with the same function (`regular_entries` →
-`event_value`), and the term reads only the golfer, the course and the rule, never who controls the golfer. The
-existing paired human/AI tests run in v2 worlds, where the term is off. No separate v3 paired-career test was added.
+Human/AI parity, dedicated to v3 (`PlayerAIParity`):
+* The same v3 state (week 18 of 2027, prepared) is played once with a golfer left to the AI and once under a player's
+  control, planning the very event the AI chose. This is done for golfers from four different events.
+* Every golfer's option values are identical in both arms, course-fit term included. The term is non-zero there, and
+  the worlds come out identical.
+* A different player choice gives a different world, so the check can fail.
+
+The term reads only the golfer, the course and the rule, never who controls the golfer.
+
+Demand cache (`DemandCache`; the fix after 811c179):
+* The cache is keyed by the Course object itself (`id` plus a weak reference that checks identity). It is never
+  keyed by layout id.
+* HAL found on 811c179 that the same layout id (`jinlong-lakes-golf-club:Club`) is different ground in seed-11 and
+  seed-22 libraries. The old cache then returned the first world's demand for the second (mental +1.0 instead of
+  −0.80).
+* The test covers both orders for every shared layout id whose holes differ, no mutation of courses (pickle bytes and
+  `__dict__` unchanged, returned dicts are copies), and entries dying with their course.
+* It fails on 811c179 (3 of 3) and passes after the fix.
+
+Performance: 26 v3 weeks took 9.2–9.3 s with the term and 9.2–9.4 s without it (same machine, two runs each, with
+another test run in progress). No measurable cost.

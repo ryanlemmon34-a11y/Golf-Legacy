@@ -217,5 +217,161 @@ class World(unittest.TestCase):
         b.close()
 
 
+class DemandCache(unittest.TestCase):
+    """The demand cache is keyed by the Course object itself (a weak reference checks identity), never by layout id:
+    the same layout id names different ground in worlds with other seeds (found by HAL on 811c179:
+    jinlong-lakes-golf-club:Club, seed 11 vs 22)."""
+
+    @classmethod
+    def setUpClass(cls):
+        from golfsim.course_library import CourseLibrary
+        cls.a, cls.b = CourseLibrary(seed=11), CourseLibrary(seed=22)
+
+    def uncached(self, c):
+        CF._DEMAND.clear()
+        out = CF.demand(c)
+        CF._DEMAND.clear()
+        return out
+
+    def pairs(self):
+        lb = {(site_key, c.layout_id): c for site_key, c in ((k, c) for _, k, c in self.b.layouts())}
+        out = []
+        for _, k, c in self.a.layouts():
+            other = lb.get((k, c.layout_id))
+            if other is not None and other.holes != c.holes:
+                out.append((c, other))
+        return out
+
+    def test_same_layout_id_different_ground_either_order(self):
+        pairs = self.pairs()
+        self.assertTrue(pairs)                                              # the case exists
+        truth = {id(c): self.uncached(c) for pair in pairs for c in pair}
+        for order in (0, 1):
+            CF._DEMAND.clear()
+            for pair in pairs:
+                for c in (pair if order == 0 else pair[::-1]):
+                    self.assertEqual(CF.demand(c), truth[id(c)], c.layout_id)
+        x, y = self.a.course('jinlong-lakes-golf-club:Club'), self.b.course('jinlong-lakes-golf-club:Club')
+        self.assertNotEqual(self.uncached(x), self.uncached(y))
+        CF._DEMAND.clear()
+        self.assertEqual((CF.demand(x), CF.demand(y)), (self.uncached(x), self.uncached(y)))
+        CF._DEMAND.clear()
+        self.assertEqual((CF.demand(y), CF.demand(x)), (self.uncached(y), self.uncached(x)))
+
+    def test_no_mutation(self):
+        """Working out demand (cached or not) changes no course, and a returned dict cannot alter the cache."""
+        import pickle
+        cs = [c for _, _, c in self.a.layouts()][:40]
+        before = [(pickle.dumps(c), dict(c.__dict__)) for c in cs]
+        CF._DEMAND.clear()
+        for c in cs:
+            d = CF.demand(c)
+            d['mental'] = 99.0
+            self.assertNotEqual(CF.demand(c)['mental'], 99.0)
+        self.assertEqual([(pickle.dumps(c), dict(c.__dict__)) for c in cs], before)
+
+    def test_entries_die_with_their_course(self):
+        import gc
+        from dataclasses import replace as rep
+        c = rep(next(c for _, _, c in self.a.layouts()))
+        CF._DEMAND.clear()
+        CF.demand(c)
+        self.assertEqual(len(CF._DEMAND), 1)
+        del c
+        gc.collect()
+        self.assertEqual(len(CF._DEMAND), 0)
+
+
+class PlayerAIParity(unittest.TestCase):
+    """Paired v3 worlds, the same state (week 18 of 2027, the week prepared), played once with a golfer left to the AI
+    and once with the same golfer under a player's control whose plan enters the very event the AI chose. The
+    options are valued the same (course-fit term included: the same numbers in both arms) and the worlds come out
+    identical. A different player choice changes the world (the check can fail)."""
+
+    @classmethod
+    def setUpClass(cls):
+        import pickle
+        cls.s = fresh(17)
+        cls.Y, cls.W = cls.s.cursor['year'], cls.s.cursor['week']
+        cls.blob = pickle.dumps(cls.s.season, protocol=pickle.HIGHEST_PROTOCOL)
+        cls.ai, cls.ai_vals = cls.arm()
+        ent = {}
+        for eid, r in cls.ai.results.items():
+            if (r.year, r.week) == (cls.Y, cls.W):
+                for site in r.finish:
+                    for gid, _, _ in site:
+                        ent[gid] = eid
+        cls.entered = ent
+        # golfers with a real choice whose AI choice was their first want (taken at the first ask)
+        cands = [gid for gid, vals in sorted(cls.ai_vals.items()) if len({e for e, _ in vals}) >= 2 and gid in ent
+                 and max(vals, key=lambda x: x[1])[0] == ent[gid]]
+        by_event = {}
+        for gid in cands:
+            by_event.setdefault(ent[gid], gid)
+        cls.pairs = [(gid, eid) for eid, gid in sorted(by_event.items())][:4]   # one golfer from up to four events
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.s.close()
+
+    @classmethod
+    def arm(cls, player=None):
+        import pickle
+        from golfsim import career as CA
+        t = pickle.loads(cls.blob)
+        vals = {}
+        orig = Season.event_value
+
+        def value(self, g, ed, week, rng, vc, cost=None, gw=None, base=None):
+            v = orig(self, g, ed, week, rng, vc, cost, gw, base)
+            vals.setdefault(g.id, []).append((ed.event_id, v))
+            return v
+        Season.event_value = value
+        try:
+            t.year = cls.Y
+            t.prepare_week(cls.Y, cls.W)
+            if player is not None:
+                gid, eid = player
+                c = CA.Career(gid, cls.Y, cls.W, {'rule': 'test'})
+                c.plans[(cls.Y, CA.block_start(cls.W))] = {
+                    'weeks': {cls.W: {'kind': 'event', 'event_id': eid, 'fallback': {'kind': 'rest'}}},
+                    'policy': {'qualifying': 'enter', 'selected': 'accept'}, 'made': [cls.Y, cls.W]}
+                t.career = c
+            t.play_prepared_week(cls.Y, cls.W, [e for e in t.cal.editions(cls.Y) if e.week == cls.W])
+        finally:
+            Season.event_value = orig
+        return t, vals
+
+    @staticmethod
+    def world_digest(t):
+        import hashlib
+        h = hashlib.sha256()
+        for g in sorted(t.world.golfers, key=lambda g: g.id):
+            h.update(repr((g.id, g.status, g.tour, round(g.overall, 6), round(g.cash, 4), round(g.backing, 4),
+                           tuple(sorted(g.familiarity.items())))).encode())
+        for eid in sorted(t.results):
+            h.update(repr((eid, t.results[eid].finish)).encode())
+        return h.hexdigest()
+
+    def test_same_choice_same_world_and_same_values(self):
+        self.assertGreaterEqual(len(self.pairs), 2)
+        ai = self.world_digest(self.ai)
+        for gid, eid in self.pairs:
+            with self.subTest(golfer=gid, event=eid):
+                t, vals = self.arm((gid, eid))
+                self.assertEqual(t.career.golfer_id, gid)
+                self.assertEqual(vals[gid], self.ai_vals[gid])            # the same appeal, term included
+                self.assertEqual(vals, self.ai_vals)                      # and everyone else's
+                ed = next(e for e in t.cal.editions(self.Y) if e.event_id == eid)
+                self.assertNotEqual(CF.points(t, t.g[gid], ed), 0.0)     # the term is really there
+                self.assertEqual(self.world_digest(t), ai)
+
+    def test_a_different_choice_shows(self):
+        gid, eid = self.pairs[0]
+        other = next(e for e, _ in sorted(self.ai_vals[gid], key=lambda x: -x[1]) if e != eid)
+        t, _ = self.arm((gid, other))
+        self.assertNotEqual(self.world_digest(t), self.world_digest(self.ai))
+
+
 if __name__ == '__main__':
     unittest.main()
