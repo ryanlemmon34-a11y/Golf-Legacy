@@ -18,8 +18,9 @@ The advice uses only what the planner already shows (`week_compare`) and the sco
 | Course fit and familiarity | `course_fit.points` | +0.5 × points |
 | Cost | cost compared with the money available for golf | −1 if it is more than half; never suggested if it can't be paid |
 | Load | tournaments recorded or suggested, plus held places and qualifying the suggested policy enters | at most 2 in any 4 consecutive weeks: a week is suggested only if the three weeks before hold fewer than 2 |
-| Held places / qualifying | rule-selected rows: `entry_outlook.status == 'holds_place'`; qualifying by the engine's own test (`career.entrant_decides`), entered (`qualifying: 'enter'`) only when a result there can still earn a place | that week's competition comes first and counts in the load (code `committed`); the plan entry is training, or rest |
-| Possible selections | other rule-selected rows | said (code `possible_selection`), not counted: selection isn't known in advance, so the real load can be higher |
+| Held places / qualifying | rule-selected rows: `entry_outlook.status` `holds_place` or `assured_by_rules`, and `unless_qualified_earlier` (counted to be safe and said to be uncertain); qualifying by the engine's own test (`career.entrant_decides`), entered (`qualifying: 'enter'`) only when a result there can still earn a place | that week's competition comes first and counts in the load (code `committed`); the plan entry is training, or rest |
+| Possible selections | other rule-selected rows (not those ruled out) | said (code `possible_selection`), not counted: selection isn't known in advance, so the real load can be higher |
+| Load around committed weeks | weeks filled by held, rule-given or entered places | an ordinary event is suggested only if every 4-week window containing it stays within 2, counting recorded, suggested and committed weeks. The committed weeks alone can exceed 2 (three college qualifiers in a row), and the note says so. |
 | Fatigue | `career.readiness` and the engine's rest and training formulas | rest when fatigue is above the 20 % threshold |
 | Injury | recorded injury window | rest |
 | Training area | the visible weakness order (observed levels), perceived growth room (scouting: an opinion with uncertainty) and the coach's public speciality | weakness (number of categories − rank), plus room (little 0, some 1, considerable 2, unknown 0.5), plus speciality +1 |
@@ -57,7 +58,7 @@ Reason codes:
 
 ## Tests
 
-`tests/test_career_advice.py` (6 tests; two from HAL's review of 6d0d31e, one from the audit of b7fb0ee):
+`tests/test_career_advice.py` (6 tests; two from HAL's review of 6d0d31e, one from the audit of b7fb0ee) and `tests/test_college_qualifier_guidance.py` (the seed-23 college-qualifier reproduction):
 * Read only and deterministic: the world digest is unchanged, and the suggested plan is accepted by the engine's own
   validation.
 * The rules: stakes and own tour preferred; the load cap; a weak event behind the cut-off not suggested (score below the bar); nothing unaffordable suggested;

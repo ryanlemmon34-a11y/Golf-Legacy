@@ -135,14 +135,32 @@ def advise(season, c, g, cursor, compare):
     cat, cat_reasons, table = train_pick(compare[str(weeks[0])], sc, coach)
     train_choice = {'kind': 'train', 'category': cat} if training and cat else {'kind': 'rest'}
     out = {}
+
+    def committed_rows(wc):
+        sel = [r for r in wc['play'] if r.get('selected_field')]
+        st = lambda r: (r.get('entry_outlook') or {}).get('status')
+        held = [r for r in sel if st(r) in ('holds_place', 'assured_by_rules')]
+        unless = [r for r in sel if st(r) == 'unless_qualified_earlier']   # entered unless qualified before it
+        trying = [r for r in sel if r in quals] if policy['qualifying'] == 'enter' else []
+        return sel, st, held, unless, trying
+    # weeks the rules (or the suggested policy) already fill with a competition: counted in every load window
+    committed_weeks = [w for w in weeks if not compare[str(w)]['load'].get('injured_until')
+                       and any(committed_rows(compare[str(w)])[2:])]
+
+    def window_room(w):
+        """Whether one more tournament in week w keeps every four consecutive weeks around it within MAX_RECENT,
+        counting recorded, suggested and committed weeks."""
+        busy = set(recent) | set(planned_play) | set(committed_weeks)
+        return all(sum(1 for x in busy if start <= x < start + WINDOW and x != w) + 1 <= MAX_RECENT
+                   for start in range(w - WINDOW + 1, w + 1))
     for w in weeks:
         wc = compare[str(w)]
         inj = wc['load'].get('injured_until')
         plays_4 = sum(1 for x in recent + planned_play if w - (WINDOW - 1) <= x < w)   # the three weeks before
-        sel = [r for r in wc['play'] if r.get('selected_field')]
-        held = [r for r in sel if (r.get('entry_outlook') or {}).get('status') == 'holds_place']
-        trying = [r for r in sel if r in quals] if policy['qualifying'] == 'enter' else []
-        maybe = [r for r in sel if r not in held and r not in trying
+        near = sorted(x for x in committed_weeks if abs(x - w) < WINDOW and x != w)
+        sel, st, held, unless, trying = committed_rows(wc)
+        maybe = [r for r in sel if r not in held and r not in trying and r not in unless
+                 and st(r) not in ('not_eligible', 'injured')
                  and not (series(r) is not None and CA.entrant_decides(series(r)))]
         cands = []
         for row in wc['play']:
@@ -164,18 +182,25 @@ def advise(season, c, g, cursor, compare):
         if inj:
             rec = {'kind': 'rest'}
             reasons = [_r('injured', 'Injured: the golfer cannot enter events; rest through the recovery window.')]
-        elif held or trying:
+        elif held or trying or unless:
             rec = dict(train_choice)
-            names = ', '.join(r.get('name') or r['event_id'] for r in held + trying)
-            reasons = [_r('committed', f'{names}: ' + ('you hold a place and the suggested policy accepts it'
-                                                       if held else 'the suggested policy enters qualifying')
-                          + '; that competition comes first this week (counted in the load). The planned '
-                          + ('training' if rec['kind'] == 'train' else 'rest') + ' applies if it does not happen.')]
+            names = ', '.join(r.get('name') or r['event_id'] for r in held + trying + unless)
+            if held:
+                why = ('you hold a place' if st(held[0]) == 'holds_place' else 'the rules enter you') + \
+                      ' and the suggested policy accepts it'
+            elif trying:
+                why = 'the suggested policy enters qualifying'
+            else:
+                why = ('the rules enter you unless you qualify in an earlier qualifier first (not certain: counted '
+                       'in the load to be safe)')
+            reasons = [_r('committed', f'{names}: {why}; that competition comes first this week (counted in the '
+                          'load). The planned ' + ('training' if rec['kind'] == 'train' else 'rest')
+                          + ' applies if it does not happen.')]
         elif fatigue_known and fatigue > FATIGUE_LIMIT:
             rec = {'kind': 'rest'}
             reasons = [_r('fatigue', f'Fatigue {fatigue:.0%} is above the {FATIGUE_LIMIT:.0%} threshold where '
                                      f'performance suffers; rest brings it to about {rest_after:.0%}.')]
-        elif best and best[0] >= PLAY_BAR and plays_4 < MAX_RECENT:   # (a long shot only with enough else for it)
+        elif best and best[0] >= PLAY_BAR and window_room(w):   # (a long shot only with enough else for it)
             rec = {'kind': 'event', 'event_id': best[1], 'fallback': dict(train_choice)}
             reasons = best[3] + [_r('load', f'{plays_4} tournament(s) recorded or suggested in the three weeks before: '
                                             f'at most {MAX_RECENT} in any four consecutive weeks.')]
@@ -184,7 +209,11 @@ def advise(season, c, g, cursor, compare):
         elif training and cat:
             rec = dict(train_choice)
             reasons = list(cat_reasons)
-            if best and plays_4 >= MAX_RECENT:
+            if best and best[0] >= PLAY_BAR and near and plays_4 < MAX_RECENT:
+                reasons.append(_r('load', 'Competitions the rules already give you in week'
+                                  f'{"s" if len(near) > 1 else ""} {", ".join(map(str, near))} fill the load (at most '
+                                  f'{MAX_RECENT} in any four consecutive weeks): a development week instead.'))
+            elif best and plays_4 >= MAX_RECENT:
                 reasons.append(_r('load', f'{plays_4} tournaments in the three weeks before (at most {MAX_RECENT} in '
                                           f'any four consecutive weeks): a development week instead.'))
             elif not best or best[0] < PLAY_BAR:
@@ -214,7 +243,7 @@ def advise(season, c, g, cursor, compare):
                          'against': [_r('no_development', 'No training gains and no results.')]})
         out[str(w)] = {'recommended': rec, 'reasons': reasons, 'alternatives': alts,
                        'events_considered': [{'event_id': e, 'score': s} for s, e, *_ in cands]}
-        if (held or trying) and not inj:
+        if (held or trying or unless) and not inj:
             planned_play.append(w)                           # a held place or qualifying: a competition this week
             fatigue_known = False
         elif rec['kind'] == 'event':
@@ -231,7 +260,9 @@ def advise(season, c, g, cursor, compare):
             'basis': ['entry_outlook', 'opportunities', 'own_tour', 'course_fit', 'cost', 'recent_load',
                       'fatigue_formulas', 'visible_weakness', 'perceived_growth_room', 'coach_speciality'],
             'note': 'A starting suggestion from the evidence shown, by fixed rules: not a forecast, not a guaranteed '
-                    'best route. Held places and qualifying the policy enters are counted in the load; places an event '
-                    'may still offer you are not (selection is not known in advance), so the real load can be higher. '
+                    'best route. Held places, places the rules give you (counted even when they depend on not qualifying '
+                    'earlier) and qualifying the policy enters are counted in the load, and those alone can exceed it; '
+                    'places an event may still offer you are not (selection is not known in advance), so the real '
+                    'load can be higher. '
                     'Fatigue after a tournament is not forecast, so later weeks after a suggested event are judged '
                     'without it. Edit freely; saving validates the plan as always.'}

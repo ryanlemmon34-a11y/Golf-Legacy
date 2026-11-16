@@ -1,9 +1,12 @@
 # Career roadmap: implementation status, dependencies and engine contracts (updated 2026-11-16)
 
-Verified baseline `wip/consolidated-career-update` @ 8580171 (full per-module regression, docs below). Bounded
-completion on `feature/career-completion` (from 8580171): course fit on selected rows, living history, period
-scouting with growth room, entry outlook, coach's advice. **Not ready for Ryan's test until the combined regression
-and HAL's UI wiring are verified.** HAL owns UI; Claude owns engine, persisted decisions and evidence, and the read
+Verified baseline `wip/consolidated-career-update` @ 8580171. Bounded completion on `feature/career-completion`
+@ 6ad8d9d (course fit on selected rows, living history, period scouting with growth room, entry outlook, coach's
+advice), with HAL's UI wiring integrated (ab4120ff → b7fb0ee). Verified: the full per-module regression on 6137ec7
+(128 modules, 1444 passed, 0 failed, 4 skipped); the affected modules re-run on b7fb0ee and 6ad8d9d; HAL's
+independent run on 6ad8d9d (130 modules: 1458 passed, 4 skipped, 2 browser-launch failures, environment only). College
+qualifier planning guidance: correction branch `fix/college-qualifier-guidance` (under review). Not verified: a visual
+browser pass (browser start blocked in the test environments) and Windows / the owner's machine. HAL owns UI; Claude owns engine, persisted decisions and evidence, and the read
 models below.
 
 Status words: **done** (engine and tests on this branch), **partial**, **in progress** (this checkpoint),
@@ -15,15 +18,15 @@ Status words: **done** (engine and tests on this branch), **partial**, **in prog
 |---|---|---|
 | Truthful entry reasons, closeness only from decision-time data | **done** (355555d) | `career.week_entry`, `ENTRY_TEXT`; older weeks `recorded: false`. HAL renders (8d02cb7). |
 | Truthful entry *chances* before deciding (forward-entry expectations) | **done: history plus qualitative outlook (no chances)** (feature/career-completion) | `week_compare` play rows' `entry_outlook` (docs/career/ENTRY_OUTLOOK.md): the golfer's entry class now against how the field closed last edition; `unknown` with the reason when unsupported; measured calibration in the doc, never shown as numbers. |
-| Default "yes" acceptance (selected / qualifying) | **partial** | Engine takes whatever policy is posted; the default is the form's (HAL). Engine default when a policy is omitted: not added (would change the command contract) — can add on request. |
+| Default "yes" acceptance (selected / qualifying) | **done in the planner form; no engine default** | The planner form defaults to accept / enter (tools/observer_career.py); the coach's advice proposes its own policy. Engine default when a policy is omitted: not added (would change the command contract). |
 | Visible current qualifications and placement unlocks | **done (engine read model, first version)** | `golfsim/opportunities.py`: `career.view()['opportunities']` from the implemented routes (major exemptions with their stated finish, qualifying stages, qualifier targets); status already_qualified / needs_result / awaiting_selection / not_eligible. Tour cards and winner exemptions held: HAL's `career_context`. US college qualifiers plug in when built. |
 | Early invitation notices | **done (decided places only)** | At each period start a notice (`kind: 'secured'`) for each place now held on recorded facts and not noticed before (`opportunities.held_places`: major exemptions, earned qualifying places, a v3 college championship place), with its route; exactly once (`career.secured_seen`) across reloads and interruptions. Nothing is announced about places not yet decided. |
 | Usable coach / caddie offers | **done (reworked)** | Market offers answered at the same point of the 1 January market as an AI golfer's (probe on a copy; same draw); the earlier holds were withdrawn after the parity audit. Paired human/AI tests. |
 | Player choosing staff themselves (hire a coach/caddie) | **done (engine)** | `staff_policy` command: seek_coach / seek_caddie = 'no' (default, earlier behaviour) / 'yes' / 'ask'; coach_approaches / caddie_approaches = 'ask' (default) / 'decline' (every market approach answered no, as on the spot) (the 1 January market stops with a `market_choice` decision, yes/no). Looking runs the AI's own search: same ranking, same coaches' and caddies' answers. `career.view()['staff_policy']`. |
 | Thirteen fixed four-week periods; interruptions resume within the period, one recap | **done (verified)** | tests/test_period_cadence.py. |
-| Editable four-week plan accepting coach advice | **done (engine advice: feature/career-completion; UI wiring: HAL)** | `career.view()['advice']` (docs/career/COACH_ADVICE.md): play / train / rest per open week from stakes, pathway, entry outlook, course fit, cost, load, fatigue formulas, visible weakness, perceived growth room and coach speciality, by fixed rules; read only; the suggestion is a valid plan. Replaces HAL's interim helper's rules once wired. |
+| Editable four-week plan accepting coach advice | **done (engine advice and HAL's UI: committed advice only, tools/observer_career_advice.committed_plan)** | `career.view()['advice']` (docs/career/COACH_ADVICE.md): play / train / rest per open week from stakes, pathway, entry outlook, course fit, cost, load, fatigue formulas, visible weakness, perceived growth room and coach speciality, by fixed rules; read only; the suggestion is a valid plan. The pages show only this committed advice. |
 | Season results / season review | **done** | `year_end.review` (YEAR_END.md), weekly recaps with entry evidence. |
-| Factual inbox / calendar / recaps | **partial** | Engine: notices, log, decisions, recaps, planner, `week_entry`. Inbox/calendar presentation: HAL. |
+| Factual inbox / calendar / recaps | **done** | Engine: notices, log, decisions, recaps, planner, `week_entry`. HAL's career page: inbox (decisions and notices) and the upcoming-opportunities calendar. |
 | Trophies (majors, college, amateur championships) with engraving and multi-win history | **done (engine read model)** | From recorded winners only (`ctx.results` keeps every winner for good). Contract below. |
 | Per-category fallible potential letter grades | **done (engine read model; period cadence and growth room: feature/career-completion)** | `golfsim/scouting.py`: looks at control start, each period start, the first week after a coach change and the season's end (the career's gate only); level read over 12 weeks of looks, trend over at least 26 weeks; the judge's seeded persistent error; never ceilings or potential. Grades A/B/C/D/F only; `growth_room` qualitative with uncertainty and basis; `unknown` without evidence. |
 | Optional goals | **done (engine)** | `set_goal` / `drop_goal` commands (versioned, exactly-once), at most 5 active; kinds win / play_in / world_rank / amateur_rank; status derived from records; read by no rule (tested: world unchanged). `career.view()['goals']`. |
@@ -37,7 +40,7 @@ Status words: **done** (engine and tests on this branch), **partial**, **in prog
 | Annual tracking | **done (engine read model)** | `career.view()['seasons_summary']`: one row per controlled season (events, wins, top 10s, prize money, ranks), from the recorded weeks. |
 | Old-save continuation (Patrick / CareerTest saves) | **not a release requirement (Ryan, 2026-11-15); not enabled** | Source engine 57c4719 is `rules_changed` (fatigue fix); migration proposal only (ENGINE_MIGRATION.md). Not enabled. |
 | Encyclopedia entry | **deferred** | After career testing (BACKLOG item 6). |
-| Performance target (120 s) | **no regression measured; target not re-measured** | Same container, same seed (11), full scale, 1 worker, regression run paused, all-AI season 1 (52 weeks + winter + save, generation/creation excluded): 5582e27 v2 238.6 / 233.8 s; 9aa0273 v2 236.1 / 233.6 s (identical digest 63c8b06b…); 9aa0273 v3 241.4 / 235.2 s. The 120 s target is defined on the owner's 16-worker machine (BACKLOG: season 1 measured there at 47.9 s); not comparable to this container. |
+| Performance target (120 s) | **no regression measured up to 9aa0273; not re-measured since (course fit measured at no cost); not certified** | Same container, same seed (11), full scale, 1 worker, regression run paused, all-AI season 1 (52 weeks + winter + save, generation/creation excluded): 5582e27 v2 238.6 / 233.8 s; 9aa0273 v2 236.1 / 233.6 s (identical digest 63c8b06b…); 9aa0273 v3 241.4 / 235.2 s. The 120 s target is defined on the owner's 16-worker machine (BACKLOG: season 1 measured there at 47.9 s); not comparable to this container. |
 | Commercial: Steam, Birth (origin) mode, mods | **deferred (long term)** | Not part of this update. |
 | Automatic world prologue | **not approved** | Not built. |
 
@@ -47,8 +50,9 @@ All seven original steps are built: consolidation; trophies; potential estimates
 notices; timeline and goals; the college qualifier overhaul (v3, U2C on); staff hiring, finance trace, sponsor
 explanations, annual tracking and fictional names. The bounded completion (feature/career-completion) was built in
 this order: course fit on selected rows (needs course fit); living history (needs the timeline); period scouting and
-growth room (needs scouting); entry outlook (needs field history); coach's advice (needs all of these). Open: HAL's UI
-wiring of the new keys; the combined regression; the encyclopedia (deferred); commercial items (deferred).
+growth room (needs scouting); entry outlook (needs field history); coach's advice (needs all of these). HAL's UI wiring
+and the combined regression are done (above). Open: review of the college-qualifier guidance correction; a visual
+browser pass and the owner's Windows machine (not verified); the encyclopedia (deferred); commercial items (deferred).
 
 ## Engine contracts (agreed shapes, engine side)
 

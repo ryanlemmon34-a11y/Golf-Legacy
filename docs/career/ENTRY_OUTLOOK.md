@@ -26,6 +26,9 @@ probability.
 * Rule-selected events report `rule_selected`. Being eligible is not being selected.
 * `holds_place` appears only where the rules record a place (`opportunities.held_places`). Even then, the period
   policy must accept it.
+* `assured_by_rules` and `unless_qualified_earlier` apply to v3 college qualifiers only, and come from the field rule
+  and the qualifiers already played. A golfer already qualified, no longer an active US college golfer, or injured
+  that week gets `not_eligible` or `injured`. v1/v2 worlds have no such qualifiers, so nothing changes there.
 * Admission is reported only after the field is decided (`career.week_entry`).
 
 ## Contract
@@ -40,6 +43,8 @@ probability.
 | `cannot_afford` | Eligible, but the trip isn't affordable now. |
 | `holds_place` | A rule-selected event in which the golfer holds a recorded place. |
 | `rule_selected` | The event picks its own field. |
+| `assured_by_rules` | v3 college qualifier: every active US college golfer not yet qualified is entered (`Season.college_postseason`), every earlier qualifier has been played, and the golfer isn't among the qualified. Still needs the period policy to accept rule-selected places and no other place on the same days taken first. |
+| `unless_qualified_earlier` | v3 college qualifier with an earlier qualifier still to play: entered unless the golfer qualifies there first. This is a future assumption, never a promise. |
 | `quota_limited` | The golfer is an amateur in a professional event, or a Premier member in a Challenger event. These get a limited number of places, and the record doesn't show how they were shared, so no judgement is given. |
 | `open_last_time` | The field didn't fill last edition, and requests were below 80 % of the places. |
 | `near_capacity_last_time` | The field didn't fill, but requests were at or above 80 % of the places. |
@@ -78,7 +83,9 @@ How to read this:
 
 ## Tests
 
-`tests/test_entry_outlook.py` (6 tests) covers:
+`tests/test_entry_outlook.py` (6 tests) and `tests/test_college_qualifier_guidance.py` (8 tests: the seed-23 period
+9–12 reproduction, before and after qualifier 1, not US college / retired / left college, injured, the acceptance
+policy in the engine, read only with no draws, the same for any golfer, v2 unchanged) cover:
 * each status from the engine's rule facts and a recorded edition;
 * `unknown` without history;
 * quota cases give no judgement;

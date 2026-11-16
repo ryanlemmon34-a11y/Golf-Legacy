@@ -15,7 +15,8 @@ rules give (opportunities.held_places); admission is only ever reported after th
 """
 from __future__ import annotations
 
-STATUSES = ('injured', 'not_eligible', 'cannot_afford', 'holds_place', 'rule_selected', 'quota_limited',
+STATUSES = ('injured', 'not_eligible', 'cannot_afford', 'holds_place', 'assured_by_rules', 'unless_qualified_earlier',
+            'rule_selected', 'quota_limited',
             'open_last_time', 'near_capacity_last_time', 'ahead_of_last_cutoff', 'at_last_cutoff',
             'behind_last_cutoff', 'unknown')
 NEAR = 0.8                 # requests at or above this share of the places: 'near capacity' though the field did not fill
@@ -25,6 +26,8 @@ LABELS = {
     'not_eligible': 'Not eligible to request entry',
     'cannot_afford': 'Eligible, but the trip is not affordable now',
     'holds_place': 'You hold a place under the event\'s rules',
+    'assured_by_rules': 'The rules enter you',
+    'unless_qualified_earlier': 'Entered unless you qualify earlier',
     'rule_selected': 'The event selects its own field',
     'quota_limited': 'Limited places for golfers like you',
     'open_last_time': 'Places were left last edition',
@@ -53,6 +56,9 @@ def outlook(season, g, year, week, row, held=None, injured=None):
     if injured:
         return _out('injured', 'An injury keeps the golfer out of entries this week.', uncertainty=None)
     if 'rule' in row:                                   # a rule-selected field (or qualifying the entrant decides)
+        cq = college_qualifier(season, g, sid, year, week)
+        if cq is not None:
+            return cq
         held = O.held_places(season, g.id, year, week) if held is None else held
         mine = held.get((sid, year))
         if mine:
@@ -98,3 +104,46 @@ def outlook(season, g, year, week, row, held=None, injured=None):
         st, why = 'behind_last_cutoff', 'Your entry class comes after the class the field closed at last time.'
     return _out(st, f'{why} Last time: {last["admitted"]} taken of {last["capacity"]} places from {last["asked"]} '
                 f'requests, closing at {last["closed_at"] or "an unrecorded class"}.', cls, cls_label, last)
+
+
+def college_qualifier(season, g, sid, year, week):
+    """v3 college qualifiers (Season.college_postseason): every active US college golfer not yet qualified by the
+    qualifiers already played is entered -- nobody is left out of the heats. So, from the rules and records alone:
+
+    * `assured_by_rules` when every earlier qualifier has been played and the golfer is not among the qualified;
+    * `unless_qualified_earlier` while an earlier qualifier is still to be played: a place then, unless they qualify
+      there first (a future assumption, never a promise);
+    * `not_eligible` (not a US college golfer now, retired, or already qualified) / `injured` (out that week).
+
+    Either place still needs the period policy to accept rule-selected places, and is taken only if no other place the
+    same days comes first (rule-selected events are set before ordinary entries). None when this is not a college
+    qualifier of a world with them (v1/v2: no change)."""
+    sp = getattr(getattr(season, 'cal', None), 'spec', None)
+    if sp is None or not sp.college_qualifiers or not sid.startswith('COLLEGE_QUALIFIER_'):
+        return None
+    ids = [x for x, _, _ in sp.college_qualifiers]
+    if sid not in ids:
+        return None
+    k = ids.index(sid) + 1
+    caveat = ('Needs your period policy to accept rule-selected places, and no other place on the same days taken '
+              'first; injury or leaving US college golf before then ends it.')
+    if g.lifestyle == 'retired' or g.tour not in season.US_COLLEGE:
+        return _out('not_eligible', 'Only active US college golfers are entered in the college qualifiers.',
+                    uncertainty=None)
+    done = season.college_qualified(year, k - 1)
+    if g.id in done:
+        q = done[g.id]
+        return _out('not_eligible', f'Already qualified for the college championship (qualifier {q[0]}, heat {q[1]}, '
+                    f'{q[2]}): not entered again.', uncertainty=None)
+    from .career import injured_until
+    if injured_until(season, g.id, year, week) is not None:
+        return _out('injured', 'Injured that week on the recorded injury: not available for this qualifier.',
+                    uncertainty=None)
+    pending = [j for j, x in enumerate(ids[:k - 1], 1) if f'{year}:{x}' not in season.results]
+    if pending:
+        return _out('unless_qualified_earlier', f'Every US college golfer not yet qualified is entered. Qualifier'
+                    f'{"s" if len(pending) > 1 else ""} {", ".join(map(str, pending))} come'
+                    f'{"" if len(pending) > 1 else "s"} first: qualify there and you are not entered in this one.',
+                    uncertainty=caveat)
+    return _out('assured_by_rules', 'Every US college golfer not yet qualified is entered, and you have not qualified '
+                'in the qualifiers played so far.', uncertainty=caveat)
