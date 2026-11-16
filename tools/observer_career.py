@@ -6,6 +6,7 @@ was drawn at and the career's version, so a repeated or stale submission changes
 shown.
 """
 from __future__ import annotations
+from observer_course_context import panel as course_panel
 from observer_career_economy import comparison
 
 import uuid
@@ -453,10 +454,10 @@ def training_categories_help():
 
 
 def event_choice(o, cur, evidence=None):
-    from observer_course_context import cue, panel
+    """A bounded event selector; all details remain readable without JavaScript."""
+    from observer_course_context import cue
     course_by_id = {e["event_id"]: e.get("course_fit") for e in (evidence or {}).get("play", [])}
     from observer_career_context import target_note
-    """A bounded event selector; all details remain readable without JavaScript."""
     n = o['week']
     events = [e for e in o['events'] if e['eligible'] and e.get('affordable')]
     available = bool(events) and not o['injured_until']
@@ -474,7 +475,7 @@ def event_choice(o, cur, evidence=None):
                   'Eligible to request entry' if e['eligible'] and e.get('affordable') else e['why'])
         cost_label = f'Estimated cost {money(e["cost"])}' if e.get('cost') is not None else 'Cost not quoted'
         details.append(f'<li><a href="/event/{quote(e["event_id"])}">{esc(e["name"])}</a><br>'
-                       f'{esc(e["city"])}, {esc(e["country"])} · {esc(e["tour"])} · {cost_label}<br>{esc(reason)}<br><small>Entry likelihood: not yet estimated.</small>{target_note(e)}{panel(course_by_id.get(e["event_id"]))}</li>')
+                       f'{esc(e["city"])}, {esc(e["country"])} · {esc(e["tour"])} · {cost_label}<br>{esc(reason)}<br><small>Entry likelihood: not yet estimated.</small>{target_note(e)}{course_panel(course_by_id.get(e["event_id"]))}</li>')
     return (f'<div class="plan-option"><label><input type="radio" name="w{n}" value="event"{selected}{disabled} required> '
             f'Enter a tournament</label><select name="e{n}" aria-label="Tournament for week {n}"{disabled}>' + ''.join(options) +
             '</select><small>Choose this activity and a tournament. Request an entry. Your fallback applies if it is not accepted.</small></div>'
@@ -504,6 +505,7 @@ def plan_page(w, q):
     rows = []
     for o in p['weeks']:
         n = o['week']
+        course_by_id = {e['event_id']: e.get('course_fit') for e in v.get('week_compare', {}).get(str(n), {}).get('play', [])}
         cur = o['current'] or {}
         opts = [event_choice(o, cur, v.get("week_compare", {}).get(str(n)))]
         train_disabled = ' disabled' if o['injured_until'] else ''
@@ -525,7 +527,7 @@ def plan_page(w, q):
         fallback = (f'<select name="f{n}" aria-label="If the entry is not accepted in week {n}">'
                     + ''.join(f'<option value="train:{k}"{fsel("train:" + k)}>train {esc(label.lower())}</option>' for k, label in CATS)
                     + f'<option value="rest"{fsel("rest")}>rest</option></select>')
-        sel_ev = ('<ul>' + ''.join(f'<li>{esc(e["name"])} ({esc(e["rule"])}){target_note(e)}{panel(course_by_id.get(e["event_id"]))}</li>' for e in o['selected']) + '</ul>'
+        sel_ev = ('<ul>' + ''.join(f'<li>{esc(e["name"])} ({esc(e["rule"])}){target_note(e)}{course_panel(course_by_id.get(e["event_id"]))}</li>' for e in o['selected']) + '</ul>'
                   if o['selected'] else '<span class="muted">none</span>')
         inj = f'<p class="banner warn">Injured this week: only rest is possible.</p>' if o['injured_until'] else ''
         rows.append(f'<fieldset class="planner-week"><legend>Week {n}</legend>' + inj + comparison(v,n) + ''.join(opts)
