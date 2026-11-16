@@ -251,19 +251,65 @@ class Policy(unittest.TestCase):
 
 
 class Legacy(unittest.TestCase):
-    def test_v2_unchanged(self):
-        s = base('v2')
+    def test_v1_and_v2_unchanged(self):
+        for cal in ('v1', 'v2'):
+            with self.subTest(calendar=cal):
+                s = base(cal)
+                try:
+                    se = s.season
+                    se.year = 2028
+                    self.assertEqual(se.cal.spec.version, cal)
+                    self.assertFalse(se.cal.spec.college_qualifiers)
+                    self.assertFalse(any(e.series.series_id.startswith('COLLEGE_QUALIFIER_')
+                                         for e in se.cal.editions(2028)))
+                    g = next(x for x in se.active_golfers() if x.tour == 'CO_US_D1')
+                    ed = next(e for e in se.cal.editions(2028) if e.series.category == 'college_postseason')
+                    sid = ed.series.series_id
+                    self.assertIsNone(EO.college_qualifier(se, g, sid, 2028, ed.week))
+                    self.assertIsNone(EO.college_qualifier(se, g, 'COLLEGE_QUALIFIER_1', 2028, ed.week))
+                    r = EO.outlook(se, g, 2028, ed.week, {'event_id': ed.event_id, 'rule': 'x'}, held={})
+                    self.assertEqual(r['status'], 'rule_selected')
+                finally:
+                    s.close()
+
+
+class MixedWeek(unittest.TestCase):
+    """A week with places of different kinds keeps each kind's own explanation (HAL's review of ff52d60): a held
+    special beside a contingent qualifier keeps the qualifier's 'unless ... not certain'; a rules-given qualifier
+    beside entered qualifying keeps both."""
+
+    def test_each_kind_explained(self):
+        import copy
+        s = base()
         try:
-            se = s.season
-            se.year = 2028
-            self.assertFalse(se.cal.spec.college_qualifiers)
-            g = next(x for x in se.active_golfers() if x.tour == 'CO_US_D1')
-            ed = next(e for e in se.cal.editions(2028) if e.series.category == 'college_postseason')
-            sid = ed.series.series_id
-            self.assertIsNone(EO.college_qualifier(se, g, sid, 2028, ed.week))
-            self.assertIsNone(EO.college_qualifier(se, g, 'COLLEGE_QUALIFIER_1', 2028, ed.week))
-            r = EO.outlook(se, g, 2028, ed.week, {'event_id': ed.event_id, 'rule': 'x'}, held={})
-            self.assertEqual(r['status'], 'rule_selected')
+            v = to_period_9(s)
+            se, c = s.season, s.season.career
+            g = se.g[c.golfer_id]
+            comp = copy.deepcopy(v['week_compare'])
+            held = {'event_id': '2028:TEST_HELD', 'name': 'Test Invitational', 'selected_field': True, 'cost': None,
+                    'eligible': True, 'why': 'x', 'tour': '', 'opportunities': [],
+                    'entry_outlook': {'status': 'holds_place', 'label': 'held', 'reason': 'Recorded: test.'}}
+            comp['11']['play'].append(held)
+            a = AD.advise(se, c, g, s.cursor, comp)
+            text = a['weeks']['11']['reasons'][0]['text']
+            self.assertEqual(a['weeks']['11']['reasons'][0]['code'], 'committed')
+            self.assertIn('Test Invitational: you hold a place and the suggested policy accepts it', text)
+            self.assertIn('unless you qualify in an earlier qualifier first (not certain', text)
+            q2 = next(r['name'] for r in comp['11']['play'] if r['event_id'] == q(2))
+            self.assertIn(f'{q2}: the rules enter you unless', text)
+            self.assertNotIn(f'{q2}: you hold', text)
+            # the plan and load are the same as without the extra row (mechanics unchanged)
+            base_a = AD.advise(se, c, g, s.cursor, v['week_compare'])
+            self.assertEqual({w: x['recommended'] for w, x in a['weeks'].items()},
+                             {w: x['recommended'] for w, x in base_a['weeks'].items()})
+            # rules-given qualifier beside held special: both explanations
+            comp2 = copy.deepcopy(v['week_compare'])
+            comp2['10']['play'].append(dict(held))
+            t2 = AD.advise(se, c, g, s.cursor, comp2)['weeks']['10']['reasons'][0]['text']
+            q1 = next(r['name'] for r in comp2['10']['play'] if r['event_id'] == q(1))
+            self.assertIn('Test Invitational: you hold a place', t2)
+            self.assertIn(f'{q1}: the rules enter you and the suggested policy accepts it', t2)
+            self.assertNotIn('not certain', t2)
         finally:
             s.close()
 

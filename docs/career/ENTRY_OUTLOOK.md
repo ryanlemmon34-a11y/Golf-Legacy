@@ -83,9 +83,10 @@ How to read this:
 
 ## Tests
 
-`tests/test_entry_outlook.py` (6 tests) and `tests/test_college_qualifier_guidance.py` (8 tests: the seed-23 period
+`tests/test_entry_outlook.py` (6 tests) and `tests/test_college_qualifier_guidance.py` (9 tests: the seed-23 period
 9–12 reproduction, before and after qualifier 1, not US college / retired / left college, injured, the acceptance
-policy in the engine, read only with no draws, the same for any golfer, v2 unchanged) cover:
+policy in the engine, read only with no draws, the same for any golfer, v1 and v2 unchanged, a mixed week keeping each
+place's own explanation) cover:
 * each status from the engine's rule facts and a recorded edition;
 * `unknown` without history;
 * quota cases give no judgement;

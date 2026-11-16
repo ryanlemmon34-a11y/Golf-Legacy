@@ -184,16 +184,20 @@ def advise(season, c, g, cursor, compare):
             reasons = [_r('injured', 'Injured: the golfer cannot enter events; rest through the recovery window.')]
         elif held or trying or unless:
             rec = dict(train_choice)
-            names = ', '.join(r.get('name') or r['event_id'] for r in held + trying + unless)
-            if held:
-                why = ('you hold a place' if st(held[0]) == 'holds_place' else 'the rules enter you') + \
-                      ' and the suggested policy accepts it'
-            elif trying:
-                why = 'the suggested policy enters qualifying'
-            else:
-                why = ('the rules enter you unless you qualify in an earlier qualifier first (not certain: counted '
-                       'in the load to be safe)')
-            reasons = [_r('committed', f'{names}: {why}; that competition comes first this week (counted in the '
+            name = lambda rows: ', '.join(r.get('name') or r['event_id'] for r in rows)
+            parts = []                                        # one explanation per kind of place, never merged
+            mine = [r for r in held if st(r) == 'holds_place']
+            given = [r for r in held if st(r) == 'assured_by_rules']
+            if mine:
+                parts.append(f'{name(mine)}: you hold a place and the suggested policy accepts it')
+            if given:
+                parts.append(f'{name(given)}: the rules enter you and the suggested policy accepts it')
+            if trying:
+                parts.append(f'{name(trying)}: the suggested policy enters qualifying')
+            if unless:
+                parts.append(f'{name(unless)}: the rules enter you unless you qualify in an earlier qualifier first '
+                             '(not certain: counted in the load to be safe)')
+            reasons = [_r('committed', '; '.join(parts) + '. That competition comes first this week (counted in the '
                           'load). The planned ' + ('training' if rec['kind'] == 'train' else 'rest')
                           + ' applies if it does not happen.')]
         elif fatigue_known and fatigue > FATIGUE_LIMIT:
